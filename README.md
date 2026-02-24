@@ -79,12 +79,25 @@ OpenWire is a peer-to-peer local network messenger built in Rust. It enables sec
 openwire/
 ├── Cargo.toml              # Project dependencies and metadata
 ├── README.md               # This file
-├── entitlements.plist       # macOS network entitlements
+├── CONTRIBUTING.md         # Contribution guidelines
+├── CHANGELOG.md            # Version history
+├── CODE_OF_CONDUCT.md      # Community standards
+├── SECURITY.md             # Security policy
+├── LICENSE                 # MIT License
+├── Makefile                # Common development commands
+├── .editorconfig           # Editor configuration
+├── entitlements.plist      # macOS network entitlements
 ├── Formula/
 │   └── openwire.rb         # Homebrew Formula
 ├── .github/
-│   └── workflows/
-│       └── release.yml     # Cross-platform release pipeline
+│   ├── workflows/
+│   │   ├── ci.yml          # CI pipeline (test, lint, fmt)
+│   │   └── release.yml     # Cross-platform release pipeline
+│   ├── ISSUE_TEMPLATE/     # Issue templates
+│   ├── PULL_REQUEST_TEMPLATE.md
+│   ├── dependabot.yml      # Dependency updates
+│   ├── FUNDING.yml         # Sponsorship options
+│   └── codecov.yml         # Coverage configuration
 └── src/
     ├── main.rs             # Application entry point, CLI parsing
     ├── crypto.rs           # Key generation, identity, signing
@@ -292,6 +305,23 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
+## Documentation
+
+- [Contributing Guide](CONTRIBUTING.md) - How to contribute to OpenWire
+- [Code of Conduct](CODE_OF_CONDUCT.md) - Community standards
+- [Security Policy](SECURITY.md) - Reporting security vulnerabilities
+- [Changelog](CHANGELOG.md) - Version history and changes
+
+---
+
+## Support
+
+- 🐛 [Report a Bug](https://github.com/shwetanshu21/openwire/issues/new?template=bug_report.md)
+- 💡 [Request a Feature](https://github.com/shwetanshu21/openwire/issues/new?template=feature_request.md)
+- 💬 [Discussions](https://github.com/shwetanshu21/openwire/discussions)
+
+---
+
 ## Acknowledgments
 
 - [libp2p](https://libp2p.io/) - Modular peer-to-peer networking stack
@@ -300,4 +330,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-**Built with ❤️ in Rust**
+**Built with Rust**
