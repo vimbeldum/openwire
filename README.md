@@ -73,16 +73,22 @@ OpenWire is a peer-to-peer local network messenger built in Rust. It enables sec
 openwire/
 ├── Cargo.toml              # Project dependencies and metadata
 ├── README.md               # This file
-├── .gitignore              # Git ignore rules
+├── entitlements.plist       # macOS network entitlements
+├── Formula/
+│   └── openwire.rb         # Homebrew Formula
+├── .github/
+│   └── workflows/
+│       └── release.yml     # Cross-platform release pipeline
 └── src/
     ├── main.rs             # Application entry point, CLI parsing
-    ├── crypto.rs           # Key generation, identity management
+    ├── crypto.rs           # Key generation, identity, signing
+    ├── encryption.rs       # E2E encryption (X25519 + ChaCha20)
     ├── network/
-    │   └── mod.rs          # libp2p swarm, behaviors, peer management
+    │   └── mod.rs          # libp2p swarm, peer mgmt, file transfer
     ├── ui/
-    │   └── mod.rs          # Terminal UI (ratatui) rendering
+    │   └── mod.rs          # Terminal UI (ratatui) 3-pane layout
     └── web/
-        └── mod.rs          # Axum web server and HTML templates
+        └── mod.rs          # Axum web server and REST API
 ```
 
 ---
@@ -131,16 +137,39 @@ openwire/
 
 ### Installation
 
+#### Homebrew (macOS — recommended)
+
+Builds from source on your machine, bypassing Gatekeeper entirely:
+
 ```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/openwire.git
+brew tap shwetanshu21/openwire https://github.com/shwetanshu21/openwire
+brew install openwire
+```
+
+#### Prebuilt Binaries
+
+Download from [GitHub Releases](https://github.com/shwetanshu21/openwire/releases):
+
+| Platform | File |
+|----------|------|
+| macOS Apple Silicon | `openwire-macos-arm.tar.gz` |
+| macOS Intel | `openwire-macos-intel.tar.gz` |
+| Linux x86_64 | `openwire-linux-x86_64.tar.gz` |
+| Windows x86_64 | `openwire-windows-x86_64.zip` |
+
+```bash
+# macOS / Linux
+tar xzf openwire-macos-arm.tar.gz
+./openwire -n "YourName"
+```
+
+#### Build from Source
+
+```bash
+git clone https://github.com/shwetanshu21/openwire.git
 cd openwire
-
-# Build the project
 cargo build --release
-
-# Run
-cargo run --release
+./target/release/openwire -n "YourName"
 ```
 
 ### Usage
@@ -187,10 +216,32 @@ OpenWire is designed to be zero-configuration. However, some options can be cust
 - Mesh-based routing for scalability
 - Message deduplication and validation
 
-### Encryption (Noise)
-- XX handshake pattern for mutual authentication
-- Forward secrecy for all communications
-- Each session uses unique ephemeral keys
+### Encryption
+- **Key Exchange**: X25519 Diffie-Hellman with ephemeral keys for forward secrecy
+- **AEAD**: ChaCha20-Poly1305 for authenticated encryption
+- **Signing**: Ed25519 for message authentication
+- **KDF**: HKDF-SHA256 with random salt per message
+- **Transport**: Noise protocol (XX handshake)
+
+---
+
+## macOS Notes
+
+**Firewall prompt**: On first run, macOS will ask *"Do you want the application 'openwire' to accept incoming network connections?"* — click **Allow**.
+
+If you installed via `brew install`, the binary is built locally and won't trigger Gatekeeper warnings.
+
+If you downloaded a prebuilt binary and macOS blocks it:
+
+```bash
+# Remove the quarantine flag
+xattr -d com.apple.quarantine ./openwire
+```
+
+If peers can't find you, check the firewall:
+
+1. **System Settings** → **Network** → **Firewall**
+2. Click **Options** and ensure `openwire` is set to **Allow**
 
 ---
 
