@@ -1,6 +1,6 @@
 [package]
 name = "openwire"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 description = "Decentralized P2P local network messenger - encrypted, anonymous, zero-config"
 license = "MIT"
@@ -77,6 +77,9 @@ chrono = { version = "0.4", features = ["serde"] }
 # Async utilities
 futures = "0.3"
 dirs-next = "2"
+
+# HTTP client for GIF API
+reqwest = { version = "0.12", features = ["json"] }
 
 [profile.release]
 lto = true
