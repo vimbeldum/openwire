@@ -63,6 +63,11 @@ Use the [Feature Request Template](.github/ISSUE_TEMPLATE/feature_request.md).
 
 - **Git**: For version control
 
+- **pre-commit** (recommended): Catches issues before committing
+  ```bash
+  pip install pre-commit
+  ```
+
 ### Clone and Build
 
 ```bash
@@ -72,6 +77,9 @@ cd openwire
 
 # Add upstream remote
 git remote add upstream https://github.com/shwetanshu21/openwire.git
+
+# Install pre-commit hooks (recommended)
+pre-commit install
 
 # Build the project
 cargo build
