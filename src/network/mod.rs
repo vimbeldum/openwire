@@ -7,6 +7,8 @@
 //! - End-to-end encryption for all messages
 //! - Signed key exchange for authenticated peer discovery
 
+#![allow(dead_code)] // Some fields are for future use or testing
+
 use anyhow::Result;
 use futures::StreamExt;
 use libp2p::{
@@ -142,11 +144,7 @@ impl KeyExchangeMessage {
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs();
 
-        let diff = if now > self.timestamp {
-            now - self.timestamp
-        } else {
-            self.timestamp - now
-        };
+        let diff = now.abs_diff(self.timestamp);
 
         if diff > MAX_TIMESTAMP_SKEW {
             return Err(anyhow::anyhow!(
