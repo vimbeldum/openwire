@@ -1,6 +1,6 @@
 [package]
 name = "openwire"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 description = "Decentralized P2P local network messenger - encrypted, anonymous, zero-config"
 license = "MIT"
