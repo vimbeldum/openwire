@@ -1,17 +1,31 @@
 //! Web Interface for OpenWire
 //!
-//! Provides an optional HTTP/WebSocket interface using Axum.
+//! Provides an optional HTTP interface using Axum.
+//! Serves status and peer info via REST API.
 
 use anyhow::Result;
-use axum::{routing::get, Router};
+use axum::{routing::get, Json, Router};
+use serde::Serialize;
 use std::net::SocketAddr;
 use tower_http::cors::{Any, CorsLayer};
+
+#[derive(Serialize)]
+struct HealthResponse {
+    status: String,
+    version: String,
+}
+
+#[derive(Serialize)]
+struct StatusResponse {
+    status: String,
+    version: String,
+    description: String,
+}
 
 /// Start the Axum web server
 ///
 /// Binds to 0.0.0.0 so the web interface is accessible from the LAN.
 pub async fn start_web_server(port: u16) -> Result<()> {
-    // CORS layer — permissive for development
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -19,11 +33,10 @@ pub async fn start_web_server(port: u16) -> Result<()> {
 
     let app = Router::new()
         .route("/", get(index_handler))
-        .route("/api/messages", get(get_messages))
         .route("/api/health", get(health_handler))
+        .route("/api/status", get(status_handler))
         .layer(cors);
 
-    // Bind to all interfaces for LAN accessibility
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     tracing::info!("Web server listening on http://{}", addr);
 
@@ -34,13 +47,20 @@ pub async fn start_web_server(port: u16) -> Result<()> {
 }
 
 async fn index_handler() -> &'static str {
-    "Welcome to OpenWire Web Interface"
+    "OpenWire P2P Encrypted Messenger — Web Interface"
 }
 
-async fn get_messages() -> &'static str {
-    "[]"
+async fn health_handler() -> Json<HealthResponse> {
+    Json(HealthResponse {
+        status: "ok".to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
+    })
 }
 
-async fn health_handler() -> &'static str {
-    r#"{"status":"ok"}"#
+async fn status_handler() -> Json<StatusResponse> {
+    Json(StatusResponse {
+        status: "running".to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        description: "OpenWire P2P Encrypted Messenger".to_string(),
+    })
 }
