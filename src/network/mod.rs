@@ -605,8 +605,12 @@ impl Network {
     fn unsubscribe_from_room(&mut self, room_id: &str) -> Result<()> {
         let topic_name = format!("openwire-room-{}", room_id);
         let topic = gossipsub::IdentTopic::new(&topic_name);
-        self.swarm.behaviour_mut().gossipsub.unsubscribe(&topic)?;
-        tracing::info!("Unsubscribed from room: {}", room_id);
+        let was_subscribed = self.swarm.behaviour_mut().gossipsub.unsubscribe(&topic);
+        if was_subscribed {
+            tracing::info!("Unsubscribed from room: {}", room_id);
+        } else {
+            tracing::warn!("Was not subscribed to room: {}", room_id);
+        }
         Ok(())
     }
 

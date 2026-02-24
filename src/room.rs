@@ -13,7 +13,7 @@ use chacha20poly1305::{
     aead::{Aead, KeyInit},
     ChaCha20Poly1305, Nonce,
 };
-use rand::{rngs::OsRng, RngCore};
+use rand::TryRng;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -42,7 +42,8 @@ fn invite_key_encrypt(plaintext: &[u8], their_public: &[u8; 32]) -> Result<Vec<u
     let their_public = PublicKey::from(*their_public);
 
     // Generate ephemeral key for forward secrecy
-    let ephemeral = EphemeralSecret::random_from_rng(OsRng);
+    let mut rng = rand::rng();
+    let ephemeral = EphemeralSecret::random_from_rng(&mut rng);
     let ephemeral_public = PublicKey::from(&ephemeral);
 
     // Perform DH
@@ -50,7 +51,8 @@ fn invite_key_encrypt(plaintext: &[u8], their_public: &[u8; 32]) -> Result<Vec<u
 
     // Derive key with HKDF
     let mut salt = [0u8; 32];
-    OsRng.fill_bytes(&mut salt);
+    rng.try_fill_bytes(&mut salt)
+        .expect("Failed to generate salt");
     let hkdf = Hkdf::<Sha256>::new(Some(&salt), &shared);
     let mut key = [0u8; 32];
     hkdf.expand(b"openwire-room-invite", &mut key)
@@ -58,7 +60,8 @@ fn invite_key_encrypt(plaintext: &[u8], their_public: &[u8; 32]) -> Result<Vec<u
 
     // Encrypt
     let mut nonce = [0u8; 12];
-    OsRng.fill_bytes(&mut nonce);
+    rng.try_fill_bytes(&mut nonce)
+        .expect("Failed to generate nonce");
 
     let cipher = ChaCha20Poly1305::new_from_slice(&key)
         .map_err(|e| anyhow::anyhow!("Cipher creation failed: {}", e))?;
@@ -136,7 +139,9 @@ impl GroupKey {
     /// Generate a new random group key
     pub fn generate() -> Self {
         let mut key = [0u8; GROUP_KEY_SIZE];
-        OsRng.fill_bytes(&mut key);
+        rand::rng()
+            .try_fill_bytes(&mut key)
+            .expect("Failed to generate key");
         Self(key)
     }
 
@@ -153,7 +158,9 @@ impl GroupKey {
     /// Encrypt a message for the room
     pub fn encrypt(&self, plaintext: &[u8]) -> Result<EncryptedRoomMessage> {
         let mut nonce_bytes = [0u8; NONCE_SIZE];
-        OsRng.fill_bytes(&mut nonce_bytes);
+        rand::rng()
+            .try_fill_bytes(&mut nonce_bytes)
+            .expect("Failed to generate nonce");
 
         let cipher = ChaCha20Poly1305::new_from_slice(&self.0)
             .map_err(|e| anyhow::anyhow!("Failed to create cipher: {}", e))?;
@@ -475,7 +482,9 @@ impl Room {
     /// Generate a unique room ID
     fn generate_room_id() -> String {
         let mut bytes = [0u8; 8];
-        OsRng.fill_bytes(&mut bytes);
+        rand::rng()
+            .try_fill_bytes(&mut bytes)
+            .expect("Failed to generate room ID bytes");
         format!("room-{}", hex::encode(bytes))
     }
 
@@ -659,7 +668,7 @@ mod tests {
         let inviter = Identity::generate().unwrap();
 
         // Generate a proper X25519 keypair for the invitee
-        let invitee_secret = StaticSecret::random_from_rng(OsRng);
+        let invitee_secret = StaticSecret::random_from_rng(&mut rand::rng());
         let invitee_public = PublicKey::from(&invitee_secret);
         let invitee_public_bytes = *invitee_public.as_bytes();
         let invitee_private_bytes = *invitee_secret.as_bytes();

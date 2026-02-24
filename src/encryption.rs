@@ -15,7 +15,7 @@ use chacha20poly1305::{
     ChaCha20Poly1305, Nonce,
 };
 use hkdf::Hkdf;
-use rand::{rngs::OsRng, RngCore};
+use rand::TryRng;
 use sha2::Sha256;
 use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
 use zeroize::Zeroize;
@@ -37,7 +37,9 @@ impl EncryptionNonce {
     /// Generate a random nonce
     pub fn random() -> Self {
         let mut nonce = [0u8; NONCE_SIZE];
-        OsRng.fill_bytes(&mut nonce);
+        rand::rng()
+            .try_fill_bytes(&mut nonce)
+            .expect("Failed to generate random nonce");
         Self(nonce)
     }
 
@@ -96,7 +98,7 @@ impl Drop for EncryptionKeyPair {
 impl EncryptionKeyPair {
     /// Generate a new random keypair
     pub fn generate() -> Result<Self> {
-        let secret = StaticSecret::random_from_rng(OsRng);
+        let secret = StaticSecret::random_from_rng(&mut rand::rng());
         let public = PublicKey::from(&secret);
         Ok(Self { secret, public })
     }
@@ -174,7 +176,8 @@ impl SessionManager {
         let their_public = EncryptionKeyPair::public_key_from_bytes(peer_public_key);
 
         // Generate ephemeral key for forward secrecy
-        let ephemeral = EphemeralSecret::random_from_rng(OsRng);
+        let mut rng = rand::rng();
+        let ephemeral = EphemeralSecret::random_from_rng(&mut rng);
         let ephemeral_public = PublicKey::from(&ephemeral);
 
         // Perform DH with both static and ephemeral keys
@@ -186,7 +189,8 @@ impl SessionManager {
 
         // Generate random salt for HKDF
         let mut salt = [0u8; SALT_SIZE];
-        OsRng.fill_bytes(&mut salt);
+        rng.try_fill_bytes(&mut salt)
+            .map_err(|e| anyhow::anyhow!("Failed to generate salt: {}", e))?;
 
         // Derive encryption key with proper salt and domain-separated info
         // Note: we use a static info string because the DH shared secret already
