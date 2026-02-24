@@ -70,8 +70,23 @@ async fn main() -> Result<()> {
     // Start network discovery
     network.start_discovery()?;
 
-    // TODO: Start terminal UI
-    // TODO: Optionally start web interface if --web flag is set
+    // Start web interface if --web flag is set
+    if args.web {
+        let web_port = args.web_port;
+        tokio::spawn(async move {
+            if let Err(e) = web::start_web_server(web_port).await {
+                tracing::error!("Web server error: {}", e);
+            }
+        });
+    }
+
+    // Start terminal UI
+    let mut ui = ui::UiApp::new()?;
+    tokio::spawn(async move {
+        if let Err(e) = ui.run().await {
+            tracing::error!("UI error: {}", e);
+        }
+    });
 
     tracing::info!("OpenWire is running. Press Ctrl+C to exit.");
 
