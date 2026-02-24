@@ -230,9 +230,14 @@ impl Network {
     /// for sending commands and receiving events.
     pub async fn new(crypto: CryptoManager, port: u16) -> Result<(Self, NetworkHandle)> {
         // Bridge our ed25519 identity to libp2p's keypair format
-        let signing_key_bytes = crypto.signing_key_bytes();
+        // libp2p expects 64 bytes: [32-byte secret seed || 32-byte public key]
+        let seed = crypto.signing_key_bytes();
+        let pubkey = crypto.signing_public_key();
+        let mut keypair_bytes = [0u8; 64];
+        keypair_bytes[..32].copy_from_slice(&seed);
+        keypair_bytes[32..].copy_from_slice(&pubkey);
         let libp2p_ed25519_keypair =
-            libp2p::identity::ed25519::Keypair::try_from_bytes(&mut signing_key_bytes.clone())
+            libp2p::identity::ed25519::Keypair::try_from_bytes(&mut keypair_bytes)
                 .map_err(|e| anyhow::anyhow!("Failed to convert ed25519 key to libp2p format: {}", e))?;
         let local_key = libp2p::identity::Keypair::from(libp2p_ed25519_keypair);
         let local_peer_id = PeerId::from(local_key.public());
