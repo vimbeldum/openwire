@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  # Step 1: Create the GitHub Release (empty, builds upload to it)
+  # Stage 1: Create a draft GitHub Release
   create-release:
     runs-on: ubuntu-latest
     steps:
@@ -24,7 +24,7 @@ jobs:
             --generate-notes \
             --draft
 
-  # Step 2: Build for each platform, sign macOS, upload to Release
+  # Stage 2: Build, sign, and upload for each platform
   build:
     needs: create-release
     strategy:
@@ -64,13 +64,20 @@ jobs:
       - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }}
 
-      # Ad-hoc code signing for macOS binaries
-      - name: Ad-hoc codesign (macOS)
+      # Ad-hoc codesign with Hardened Runtime + network entitlements (macOS)
+      - name: Ad-hoc sign with network entitlements (macOS)
         if: runner.os == 'macOS'
         run: |
-          codesign --force --sign - --timestamp target/${{ matrix.target }}/release/openwire
+          codesign --force --deep --options runtime \
+            --entitlements entitlements.plist \
+            --sign - \
+            target/${{ matrix.target }}/release/openwire
+
+      - name: Verify signed entitlements (macOS)
+        if: runner.os == 'macOS'
+        run: |
           codesign --verify --verbose target/${{ matrix.target }}/release/openwire
-          echo "✅ Ad-hoc signed: $(file target/${{ matrix.target }}/release/openwire)"
+          codesign -d --entitlements :- target/${{ matrix.target }}/release/openwire
 
       - name: Package binary (Unix)
         if: runner.os != 'Windows'
@@ -90,7 +97,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload ${{ github.ref_name }} ${{ matrix.name }}.${{ matrix.ext }} --clobber
 
-  # Step 3: Publish the release (un-draft it)
+  # Stage 3: Publish the release (un-draft)
   publish:
     needs: build
     runs-on: ubuntu-latest
