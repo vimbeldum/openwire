@@ -3,8 +3,8 @@
 [![CI](https://github.com/shwetanshu21/openwire/actions/workflows/ci.yml/badge.svg)](https://github.com/shwetanshu21/openwire/actions/workflows/ci.yml)
 [![Release](https://github.com/shwetanshu21/openwire/actions/workflows/release.yml/badge.svg)](https://github.com/shwetanshu21/openwire/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![GitHub release](https://img.shields.io/github/v/release/shwetanshu21/openwire?include_prereleases)](https://github.com/shwetanshu21/openwire/releases)
+[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
+[![GitHub release](https://img.shields.io/github/v/release/shwetanshu21/openwire)](https://github.com/shwetanshu21/openwire/releases)
 
 **Decentralized P2P Local Network Messenger** - Encrypted, Anonymous, Zero-Config
 
