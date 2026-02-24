@@ -6,8 +6,9 @@
 //! - Secure connections via Noise protocol
 
 use anyhow::Result;
+use futures::StreamExt;
 use libp2p::{
-    gossipsub, mdns, noise, swarm::NetworkBehaviour, swarm::Swarm, tcp, yamux, Multiaddr,
+    gossipsub, mdns, noise, swarm::NetworkBehaviour, tcp, yamux, Multiaddr,
     PeerId, SwarmBuilder,
 };
 use std::time::Duration;
@@ -55,7 +56,6 @@ pub enum NetworkCommand {
 /// - mDNS for peer discovery
 /// - Ping for keepalive
 #[derive(NetworkBehaviour)]
-#[behaviour(out_event = "NetworkBehaviourEvent")]
 pub struct OpenWireBehaviour {
     /// Gossipsub protocol for broadcasting messages
     pub gossipsub: gossipsub::Behaviour,
@@ -75,7 +75,7 @@ pub struct OpenWireBehaviour {
 /// - Connection lifecycle
 pub struct Network {
     /// The libp2p swarm
-    swarm: Swarm<OpenWireBehaviour>,
+    swarm: libp2p::Swarm<OpenWireBehaviour>,
     /// Sender for network events
     event_sender: mpsc::Sender<NetworkEvent>,
     /// Receiver for network commands
@@ -98,14 +98,17 @@ impl Network {
         let local_key = libp2p::identity::Keypair::generate_ed25519();
         let local_peer_id = PeerId::from(local_key.public());
 
-        // Set up gossipsub
+        // Set up gossipsub with proper message authenticity
         let gossipsub_config = gossipsub::ConfigBuilder::default()
             .heartbeat_interval(Duration::from_secs(10))
             .validation_mode(gossipsub::ValidationMode::Strict)
             .build()?;
 
+        // Use signed message authenticity (author is verified)
+        let message_authenticity = gossipsub::MessageAuthenticity::Signed(local_key.clone());
+
         let gossipsub = gossipsub::Behaviour::new(
-            gossipsub::MessageId::default,
+            message_authenticity,
             gossipsub_config,
         ).map_err(|e| anyhow::anyhow!("Failed to create gossipsub: {}", e))?;
 
@@ -132,21 +135,23 @@ impl Network {
         };
 
         // Build the swarm
-        let swarm = SwarmBuilder::with_existing_identity(local_key.clone())
+        let mut swarm = SwarmBuilder::with_existing_identity(local_key.clone())
             .with_tokio()
             .with_tcp(
-                tcp::Config::default().port_reuse(true),
+                tcp::Config::default(),
                 noise::Config::new,
                 yamux::Config::default,
             )?
             .with_behaviour(|_| behaviour)?
             .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(60)))
-            .listen_on(
-                Multiaddr::empty()
-                    .with(libp2p::multiaddr::Protocol::Ip4([127, 0, 0, 1].into()))
-                    .with(libp2p::multiaddr::Protocol::Tcp(port)),
-            )
-            .map_err(|e| anyhow::anyhow!("Failed to listen: {}", e))?;
+            .build();
+
+        // Listen on the specified port
+        let listen_addr = Multiaddr::empty()
+            .with(libp2p::multiaddr::Protocol::Ip4([127, 0, 0, 1].into()))
+            .with(libp2p::multiaddr::Protocol::Tcp(port));
+        
+        swarm.listen_on(listen_addr)?;
 
         // Create channels for events and commands
         let (event_sender, _) = mpsc::channel(100);
