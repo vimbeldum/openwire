@@ -1,72 +1,145 @@
 //! Klipy GIF API integration
 //!
 //! Provides GIF search and retrieval via the Klipy API.
+//! API Docs: https://docs.klipy.co/guide/gif/overview.html
 
 #![allow(dead_code)]
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-const KLIPY_API_BASE: &str = "https://api.klipy.com/v1";
+const KLIPY_API_BASE: &str = "https://api.klipy.com";
 
 /// Klipy API client
 pub struct KlipyClient {
-    api_key: String,
+    app_key: String,
     client: reqwest::Client,
 }
 
 impl KlipyClient {
     /// Create a new Klipy client
-    pub fn new(api_key: String) -> Self {
+    pub fn new(app_key: String) -> Self {
         Self {
-            api_key,
+            app_key,
             client: reqwest::Client::new(),
         }
     }
 
     /// Search for GIFs
     pub async fn search(&self, query: &str, limit: u32) -> Result<Vec<Gif>> {
-        let url = format!("{}/gifs/search", KLIPY_API_BASE);
+        // Klipy API: api/v1/{app_key}/gifs/search?q={query}&per_page={limit}
+        let url = format!("{}/api/v1/{}/gifs/search", KLIPY_API_BASE, self.app_key);
 
         let response = self
             .client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .query(&[("q", query), ("limit", &limit.to_string())])
+            .query(&[("q", query), ("per_page", &limit.to_string())])
             .send()
             .await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
+        let status = response.status();
+        let body = response.text().await?;
+
+        if !status.is_success() {
             return Err(anyhow::anyhow!("Klipy API error: {} - {}", status, body));
         }
 
-        let result: SearchResponse = response.json().await?;
-        Ok(result.data)
+        // Try to parse the response
+        let result: Result<KlipySearchResponse, _> = serde_json::from_str(&body);
+        match result {
+            Ok(parsed) => {
+                let gifs: Vec<Gif> = parsed
+                    .data
+                    .into_iter()
+                    .filter(|item| item.r#type == "gif")
+                    .map(|item| Gif {
+                        id: item.id,
+                        title: item.title,
+                        url: item.original_url,
+                        preview_url: item.preview_url,
+                        media_formats: None,
+                    })
+                    .collect();
+                Ok(gifs)
+            }
+            Err(e) => {
+                tracing::error!("Failed to parse Klipy response: {}. Body: {}", e, body);
+                Err(anyhow::anyhow!(
+                    "Failed to parse Klipy response. Error: {}",
+                    e
+                ))
+            }
+        }
     }
 
     /// Get trending GIFs
     pub async fn trending(&self, limit: u32) -> Result<Vec<Gif>> {
-        let url = format!("{}/gifs/trending", KLIPY_API_BASE);
+        let url = format!("{}/api/v1/{}/gifs/trending", KLIPY_API_BASE, self.app_key);
 
         let response = self
             .client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .query(&[("limit", &limit.to_string())])
+            .query(&[("per_page", &limit.to_string())])
             .send()
             .await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
+        let status = response.status();
+        let body = response.text().await?;
+
+        if !status.is_success() {
             return Err(anyhow::anyhow!("Klipy API error: {} - {}", status, body));
         }
 
-        let result: SearchResponse = response.json().await?;
-        Ok(result.data)
+        let result: Result<KlipySearchResponse, _> = serde_json::from_str(&body);
+        match result {
+            Ok(parsed) => {
+                let gifs: Vec<Gif> = parsed
+                    .data
+                    .into_iter()
+                    .filter(|item| item.r#type == "gif")
+                    .map(|item| Gif {
+                        id: item.id,
+                        title: item.title,
+                        url: item.original_url,
+                        preview_url: item.preview_url,
+                        media_formats: None,
+                    })
+                    .collect();
+                Ok(gifs)
+            }
+            Err(e) => {
+                tracing::error!("Failed to parse Klipy response: {}. Body: {}", e, body);
+                Err(anyhow::anyhow!(
+                    "Failed to parse Klipy response. Error: {}",
+                    e
+                ))
+            }
+        }
     }
+}
+
+/// Klipy API search response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct KlipySearchResponse {
+    /// List of items (GIFs, ads, etc.)
+    data: Vec<KlipyItem>,
+}
+
+/// An item from Klipy API response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct KlipyItem {
+    /// Type (gif, ad, etc.)
+    r#type: String,
+    /// Item ID
+    id: String,
+    /// Title
+    title: Option<String>,
+    /// Slug
+    slug: Option<String>,
+    /// Original URL
+    original_url: Option<String>,
+    /// Preview URL
+    preview_url: Option<String>,
 }
 
 /// A GIF from Klipy
@@ -80,27 +153,19 @@ pub struct Gif {
     pub url: Option<String>,
     /// Preview/small URL
     pub preview_url: Option<String>,
-    /// Media formats
+    /// Media formats (for future use)
     pub media_formats: Option<MediaFormats>,
 }
 
 impl Gif {
     /// Get the best URL for sharing
     pub fn share_url(&self) -> Option<&str> {
-        self.media_formats
-            .as_ref()
-            .and_then(|m| m.gif.as_ref())
-            .map(|g| g.url.as_str())
-            .or(self.url.as_deref())
+        self.url.as_deref()
     }
 
     /// Get the preview URL
     pub fn preview_url(&self) -> Option<&str> {
-        self.media_formats
-            .as_ref()
-            .and_then(|m| m.preview.as_ref())
-            .map(|g| g.url.as_str())
-            .or(self.preview_url.as_deref())
+        self.preview_url.as_deref()
     }
 }
 
@@ -124,13 +189,6 @@ pub struct MediaFormat {
     pub dims: Option<Vec<u32>>,
     /// File size in bytes
     pub size: Option<u64>,
-}
-
-/// Search API response
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct SearchResponse {
-    /// List of GIFs
-    data: Vec<Gif>,
 }
 
 #[cfg(test)]
