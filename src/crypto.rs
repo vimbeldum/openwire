@@ -7,7 +7,6 @@
 
 use anyhow::Result;
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
-use rand::rngs::OsRng;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -41,7 +40,8 @@ impl Identity {
     /// Uses the operating system's secure random number generator
     /// to create a new Ed25519 key pair.
     pub fn generate() -> Result<Self> {
-        let signing_key = SigningKey::generate(&mut OsRng);
+        let mut rng = rand::rng();
+        let signing_key = SigningKey::generate(&mut rng);
         let verifying_key = signing_key.verifying_key();
 
         Ok(Self {

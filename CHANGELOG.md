@@ -21,6 +21,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-02-25
+
+### Changed
+
+- **Major Dependency Updates**
+  - Updated to Rust edition 2024
+  - Updated to rand 0.10 with new `TryRng` API
+  - Updated to ed25519-dalek 3.0.0-pre.6 (pre-release)
+  - Updated to x25519-dalek 3.0.0-pre.6 (pre-release)
+  - Updated libp2p from 0.54 to 0.56
+  - Updated ratatui from 0.28 to 0.30
+  - Updated crossterm from 0.28 to 0.29
+  - Updated axum from 0.7 to 0.8
+  - Updated tower-http from 0.5 to 0.6
+  - Updated thiserror from 1 to 2
+
+### Fixed
+
+- Updated crypto code to use new rand 0.10 API (`rand::rng()`, `TryRng` trait)
+- Fixed Klipy API response parsing to handle both array and map formats
+- Updated gossipsub unsubscribe to handle bool return (libp2p 0.56 API change)
+- Updated CI workflows to use actions/checkout@v6
+
+---
+
 ## [0.2.3] - 2026-02-24
 
 ### Changed
@@ -128,7 +153,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.1.0] - 2024-01-15
+## [0.1.0] - 2026-01-15
 
 ### Added
 

@@ -1,7 +1,7 @@
 [package]
 name = "openwire"
-version = "0.2.4"
-edition = "2021"
+version = "0.3.0"
+edition = "2024"
 description = "Decentralized P2P local network messenger - encrypted, anonymous, zero-config"
 license = "MIT"
 authors = ["OpenWire Contributors"]
@@ -19,7 +19,7 @@ image-support = ["ratatui-image", "image"]
 tokio = { version = "1", features = ["full"] }
 
 # P2P networking
-libp2p = { version = "0.54", features = [
+libp2p = { version = "0.56", features = [
     "mdns",
     "gossipsub",
     "noise",
@@ -34,30 +34,30 @@ libp2p = { version = "0.54", features = [
 ] }
 
 # Terminal UI
-ratatui = "0.28"
-crossterm = "0.28"
+ratatui = "0.30"
+crossterm = "0.29"
 
 # Image support (optional)
 ratatui-image = { version = "1", optional = true }
 image = { version = "0.25", optional = true }
 
 # Web framework
-axum = "0.7"
+axum = "0.8"
 tower = "0.5"
-tower-http = { version = "0.5", features = ["fs", "cors"] }
+tower-http = { version = "0.6", features = ["fs", "cors"] }
 
 # Cryptography
-ed25519-dalek = { version = "2", features = ["rand_core", "zeroize"] }
-x25519-dalek = { version = "2", features = ["static_secrets", "zeroize"] }
+ed25519-dalek = { version = "3.0.0-pre.4", features = ["rand_core", "zeroize"] }
+x25519-dalek = { version = "3.0.0-pre.5", features = ["static_secrets", "zeroize"] }
 chacha20poly1305 = { version = "0.10", features = ["std"] }
-rand = "0.8"
+rand = "0.10"
 hkdf = "0.12"
 sha2 = "0.10"
 zeroize = { version = "1", features = ["derive"] }
 
 # Error handling
 anyhow = "1"
-thiserror = "1"
+thiserror = "2"
 
 # Logging and tracing
 tracing = "0.1"

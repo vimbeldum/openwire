@@ -1,12 +1,13 @@
 //! Klipy GIF API integration
 //!
 //! Provides GIF search and retrieval via the Klipy API.
-//! API Docs: https://docs.klipy.co/guide/gif/overview.html
+//! API Docs: https://docs.klipy.com/guide/gif/overview.html
 
 #![allow(dead_code)]
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 const KLIPY_API_BASE: &str = "https://api.klipy.com";
 
@@ -44,32 +45,7 @@ impl KlipyClient {
             return Err(anyhow::anyhow!("Klipy API error: {} - {}", status, body));
         }
 
-        // Try to parse the response
-        let result: Result<KlipySearchResponse, _> = serde_json::from_str(&body);
-        match result {
-            Ok(parsed) => {
-                let gifs: Vec<Gif> = parsed
-                    .data
-                    .into_iter()
-                    .filter(|item| item.r#type == "gif")
-                    .map(|item| Gif {
-                        id: item.id,
-                        title: item.title,
-                        url: item.original_url,
-                        preview_url: item.preview_url,
-                        media_formats: None,
-                    })
-                    .collect();
-                Ok(gifs)
-            }
-            Err(e) => {
-                tracing::error!("Failed to parse Klipy response: {}. Body: {}", e, body);
-                Err(anyhow::anyhow!(
-                    "Failed to parse Klipy response. Error: {}",
-                    e
-                ))
-            }
-        }
+        self.parse_response(&body)
     }
 
     /// Get trending GIFs
@@ -90,39 +66,50 @@ impl KlipyClient {
             return Err(anyhow::anyhow!("Klipy API error: {} - {}", status, body));
         }
 
-        let result: Result<KlipySearchResponse, _> = serde_json::from_str(&body);
-        match result {
-            Ok(parsed) => {
-                let gifs: Vec<Gif> = parsed
-                    .data
-                    .into_iter()
-                    .filter(|item| item.r#type == "gif")
-                    .map(|item| Gif {
-                        id: item.id,
-                        title: item.title,
-                        url: item.original_url,
-                        preview_url: item.preview_url,
-                        media_formats: None,
-                    })
-                    .collect();
-                Ok(gifs)
-            }
-            Err(e) => {
-                tracing::error!("Failed to parse Klipy response: {}. Body: {}", e, body);
-                Err(anyhow::anyhow!(
-                    "Failed to parse Klipy response. Error: {}",
-                    e
-                ))
-            }
-        }
+        self.parse_response(&body)
     }
-}
 
-/// Klipy API search response
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct KlipySearchResponse {
-    /// List of items (GIFs, ads, etc.)
-    data: Vec<KlipyItem>,
+    /// Parse Klipy API response - handles both array and map formats
+    fn parse_response(&self, body: &str) -> Result<Vec<Gif>> {
+        let json: Value = serde_json::from_str(body).map_err(|e| {
+            tracing::error!("Failed to parse Klipy JSON: {}. Body: {}", e, body);
+            anyhow::anyhow!("Failed to parse Klipy JSON: {}", e)
+        })?;
+
+        let data = json
+            .get("data")
+            .ok_or_else(|| anyhow::anyhow!("Klipy response missing 'data' field"))?;
+
+        let items: Vec<KlipyItem> = if data.is_array() {
+            // Handle array format: {"data": [...]}
+            serde_json::from_value(data.clone())?
+        } else if data.is_object() {
+            // Handle map format: {"data": {"id1": {...}, "id2": {...}}}
+            data.as_object()
+                .ok_or_else(|| anyhow::anyhow!("'data' is not an object"))?
+                .values()
+                .filter_map(|v| serde_json::from_value(v.clone()).ok())
+                .collect()
+        } else {
+            return Err(anyhow::anyhow!(
+                "Unexpected 'data' format: expected array or object"
+            ));
+        };
+
+        let gifs: Vec<Gif> = items
+            .into_iter()
+            .filter(|item| item.r#type == "gif")
+            .map(|item| Gif {
+                id: item.id,
+                title: item.title,
+                url: item.original_url,
+                preview_url: item.preview_url,
+                media_formats: None,
+            })
+            .collect();
+
+        Ok(gifs)
+    }
 }
 
 /// An item from Klipy API response
@@ -135,6 +122,7 @@ struct KlipyItem {
     /// Title
     title: Option<String>,
     /// Slug
+    #[allow(dead_code)]
     slug: Option<String>,
     /// Original URL
     original_url: Option<String>,
