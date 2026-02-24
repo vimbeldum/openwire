@@ -9,17 +9,34 @@ permissions:
   contents: write
 
 jobs:
+  # Step 1: Create the GitHub Release (empty, builds upload to it)
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "OpenWire ${{ github.ref_name }}" \
+            --generate-notes \
+            --draft
+
+  # Step 2: Build for each platform, sign macOS, upload to Release
   build:
+    needs: create-release
     strategy:
       matrix:
         include:
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            name: openwire-macos-intel
-            ext: tar.gz
           - target: aarch64-apple-darwin
             os: macos-latest
             name: openwire-macos-arm
+            ext: tar.gz
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            name: openwire-macos-intel
             ext: tar.gz
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
@@ -47,6 +64,14 @@ jobs:
       - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }}
 
+      # Ad-hoc code signing for macOS binaries
+      - name: Ad-hoc codesign (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          codesign --force --sign - --timestamp target/${{ matrix.target }}/release/openwire
+          codesign --verify --verbose target/${{ matrix.target }}/release/openwire
+          echo "✅ Ad-hoc signed: $(file target/${{ matrix.target }}/release/openwire)"
+
       - name: Package binary (Unix)
         if: runner.os != 'Windows'
         run: |
@@ -64,3 +89,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload ${{ github.ref_name }} ${{ matrix.name }}.${{ matrix.ext }} --clobber
+
+  # Step 3: Publish the release (un-draft it)
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit ${{ github.ref_name }} --draft=false
