@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,15 +16,19 @@ jobs:
           - target: x86_64-apple-darwin
             os: macos-latest
             name: openwire-macos-intel
+            ext: tar.gz
           - target: aarch64-apple-darwin
             os: macos-latest
             name: openwire-macos-arm
+            ext: tar.gz
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             name: openwire-linux-x86_64
+            ext: tar.gz
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             name: openwire-windows-x86_64
+            ext: zip
 
     runs-on: ${{ matrix.os }}
 
@@ -53,34 +56,11 @@ jobs:
 
       - name: Package binary (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          cd target/${{ matrix.target }}/release
-          Compress-Archive -Path openwire.exe -DestinationPath ../../../${{ matrix.name }}.zip
-          cd ../../..
+          Compress-Archive -Path "target/${{ matrix.target }}/release/openwire.exe" -DestinationPath "${{ matrix.name }}.zip"
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.name }}
-          path: |
-            ${{ matrix.name }}.tar.gz
-            ${{ matrix.name }}.zip
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          files: |
-            artifacts/**/*.tar.gz
-            artifacts/**/*.zip
+      - name: Upload to Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload ${{ github.ref_name }} ${{ matrix.name }}.${{ matrix.ext }} --clobber
