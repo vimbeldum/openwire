@@ -21,6 +21,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.1] - 2026-02-24
+
+### Added
+
+- **Room Access Control**
+  - Room invites now target a specific peer ID
+  - Only the intended recipient can accept invites
+  - Only room members can invite others to the room
+  - Private rooms are truly private - no unauthorized access
+
+### Changed
+
+- Improved UI layout with separate Rooms panel in sidebar
+- Peer invite now works with short peer IDs shown in UI
+- Message scrolling stops at first message (no more blank scrolling)
+
+### Fixed
+
+- Help display now shows all features with proper formatting
+- Clippy warnings in media module resolved
+
+---
+
 ## [0.2.0] - 2026-02-24
 
 ### Added

@@ -227,6 +227,8 @@ pub struct RoomInvite {
     pub room_id: RoomId,
     /// The room name (human readable)
     pub room_name: String,
+    /// The target peer ID (only this peer can accept the invite)
+    pub target_peer_id: String,
     /// The encrypted group key (encrypted for the invitee)
     pub encrypted_key: Vec<u8>,
     /// The inviter's public key
@@ -243,6 +245,7 @@ impl RoomInvite {
         identity: &Identity,
         room_id: RoomId,
         room_name: String,
+        target_peer_id: String,
         group_key: &GroupKey,
         invitee_encryption_key: &[u8; 32],
     ) -> Result<Self> {
@@ -253,10 +256,11 @@ impl RoomInvite {
         // Encrypt the group key for the invitee
         let encrypted_key = invite_key_encrypt(group_key.as_bytes(), invitee_encryption_key)?;
 
-        // Sign the invite data
+        // Sign the invite data (includes target_peer_id for access control)
         let mut sign_data = Vec::new();
         sign_data.extend_from_slice(room_id.as_bytes());
         sign_data.extend_from_slice(room_name.as_bytes());
+        sign_data.extend_from_slice(target_peer_id.as_bytes());
         sign_data.extend_from_slice(&encrypted_key);
         sign_data.extend_from_slice(&timestamp.to_le_bytes());
 
@@ -265,6 +269,7 @@ impl RoomInvite {
         Ok(Self {
             room_id,
             room_name,
+            target_peer_id,
             encrypted_key,
             inviter_public_key: identity.public_key().to_vec(),
             timestamp,
@@ -291,6 +296,7 @@ impl RoomInvite {
         let mut sign_data = Vec::new();
         sign_data.extend_from_slice(self.room_id.as_bytes());
         sign_data.extend_from_slice(self.room_name.as_bytes());
+        sign_data.extend_from_slice(self.target_peer_id.as_bytes());
         sign_data.extend_from_slice(&self.encrypted_key);
         sign_data.extend_from_slice(&self.timestamp.to_le_bytes());
 
@@ -299,6 +305,11 @@ impl RoomInvite {
             &ed25519_dalek::Signature::from_bytes(&sig_bytes),
             &pub_key_bytes,
         )
+    }
+
+    /// Check if this invite is for a specific peer
+    pub fn is_for_peer(&self, peer_id: &str) -> bool {
+        self.target_peer_id == peer_id
     }
 
     /// Decrypt and extract the group key
@@ -554,12 +565,12 @@ impl RoomManager {
         self.rooms.len()
     }
 
-    /// Create an invite for a peer
+    /// Create an invite for a peer (only room members can invite)
     pub fn create_invite(
         &self,
         room_id: &str,
         identity: &Identity,
-        _invitee_peer_id: &str,
+        invitee_peer_id: &str,
         invitee_encryption_key: &[u8; 32],
     ) -> Result<RoomInvite> {
         let room = self
@@ -567,13 +578,22 @@ impl RoomManager {
             .get(room_id)
             .ok_or_else(|| anyhow::anyhow!("Room not found: {}", room_id))?;
 
+        // Note: We implicitly allow invite creation since we're in the room
+        // (if we weren't, we wouldn't have the room in our rooms map)
+
         RoomInvite::new(
             identity,
             room.id.clone(),
             room.name.clone(),
+            invitee_peer_id.to_string(),
             &room.group_key,
             invitee_encryption_key,
         )
+    }
+
+    /// Check if we can invite to a room (must be a member)
+    pub fn can_invite_to_room(&self, room_id: &str) -> bool {
+        self.rooms.contains_key(room_id)
     }
 
     /// Encrypt a message for a room
@@ -645,16 +665,20 @@ mod tests {
         let invitee_private_bytes = *invitee_secret.as_bytes();
 
         let room = Room::new("Secret Room".to_string()).unwrap();
+        let target_peer_id = "12D3KooWTestPeerId".to_string();
         let invite = RoomInvite::new(
             &inviter,
             room.id.clone(),
             room.name.clone(),
+            target_peer_id.clone(),
             &room.group_key,
             &invitee_public_bytes,
         )
         .unwrap();
 
         assert!(invite.verify().is_ok());
+        assert!(invite.is_for_peer(&target_peer_id));
+        assert!(!invite.is_for_peer("other-peer-id"));
 
         let decrypted_key = invite.decrypt_key(&invitee_private_bytes).unwrap();
         assert_eq!(room.group_key.as_bytes(), decrypted_key.as_bytes());
