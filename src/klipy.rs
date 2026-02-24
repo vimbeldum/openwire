@@ -28,13 +28,19 @@ impl KlipyClient {
 
     /// Search for GIFs
     pub async fn search(&self, query: &str, limit: u32) -> Result<Vec<Gif>> {
-        // Klipy API: api/v1/{app_key}/gifs/search?q={query}&per_page={limit}
+        // Klipy API: api/v1/{app_key}/gifs/search?q={query}&per_page={limit}&customer_id=...
         let url = format!("{}/api/v1/{}/gifs/search", KLIPY_API_BASE, self.app_key);
+        let per_page = limit.max(8); // Klipy minimum is 8
 
         let response = self
             .client
             .get(&url)
-            .query(&[("q", query), ("per_page", &limit.to_string())])
+            .query(&[
+                ("q", query),
+                ("per_page", &per_page.to_string()),
+                ("customer_id", "openwire-default"),
+                ("format_filter", "gif"),
+            ])
             .send()
             .await?;
 
@@ -69,65 +75,98 @@ impl KlipyClient {
         self.parse_response(&body)
     }
 
-    /// Parse Klipy API response - handles both array and map formats
+    /// Parse Klipy API response - handles all known formats
     fn parse_response(&self, body: &str) -> Result<Vec<Gif>> {
+        tracing::debug!("Klipy raw response: {}", &body[..body.len().min(500)]);
+
         let json: Value = serde_json::from_str(body).map_err(|e| {
             tracing::error!("Failed to parse Klipy JSON: {}. Body: {}", e, body);
             anyhow::anyhow!("Failed to parse Klipy JSON: {}", e)
         })?;
 
-        let data = json
-            .get("data")
-            .ok_or_else(|| anyhow::anyhow!("Klipy response missing 'data' field"))?;
+        // Try to find the array of items — Klipy uses different response formats:
+        // 1. {"data": [...]}                          — array of items
+        // 2. {"data": {"items": [...]}}               — nested items array
+        // 3. {"data": {"results": [...]}}             — nested results array
+        // 4. {"results": [...]}                       — top-level results
+        // 5. Top-level array [...]                    — bare array
 
-        let items: Vec<KlipyItem> = if data.is_array() {
-            // Handle array format: {"data": [...]}
-            serde_json::from_value(data.clone())?
-        } else if data.is_object() {
+        let items_array = json.get("data")
+            .and_then(|d| {
+                if d.is_array() {
+                    Some(d)
+                } else if d.is_object() {
+                    // Try nested arrays: items, results, gifs
+                    d.get("items")
+                        .or_else(|| d.get("results"))
+                        .or_else(|| d.get("gifs"))
+                        .filter(|v| v.is_array())
+                }
+                else { None }
+            })
+            .or_else(|| json.get("results").filter(|v| v.is_array()))
+            .or_else(|| json.get("items").filter(|v| v.is_array()))
+            .or_else(|| if json.is_array() { Some(&json) } else { None });
+
+        let gifs: Vec<Gif> = if let Some(arr) = items_array {
+            // Parse from a JSON array
+            arr.as_array()
+                .unwrap_or(&vec![])
+                .iter()
+                .filter_map(|v| {
+                    // Skip ads
+                    if v.get("type").and_then(|t| t.as_str()) == Some("ad") {
+                        return None;
+                    }
+                    let id = v.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let title = v.get("title").and_then(|v| v.as_str()).map(|s| s.to_string());
+                    // Try multiple URL field names
+                    let url = v.get("original_url")
+                        .or_else(|| v.get("url"))
+                        .or_else(|| v.get("itemurl"))
+                        .or_else(|| v.get("content_url"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    let preview_url = v.get("preview_url")
+                        .or_else(|| v.get("preview"))
+                        .or_else(|| v.get("thumbnail"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    if id.is_empty() && url.is_none() {
+                        return None;
+                    }
+                    Some(Gif { id, title, url, preview_url, media_formats: None })
+                })
+                .collect()
+        } else if let Some(data) = json.get("data").filter(|d| d.is_object()) {
             // Handle map format: {"data": {"id1": {...}, "id2": {...}}}
             data.as_object()
-                .ok_or_else(|| anyhow::anyhow!("'data' is not an object"))?
+                .unwrap()
                 .values()
-                .filter_map(|v| serde_json::from_value(v.clone()).ok())
+                .filter_map(|v| {
+                    if !v.is_object() { return None; }
+                    let id = v.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let title = v.get("title").and_then(|v| v.as_str()).map(|s| s.to_string());
+                    let url = v.get("original_url")
+                        .or_else(|| v.get("url"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    let preview_url = v.get("preview_url")
+                        .or_else(|| v.get("preview"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    Some(Gif { id, title, url, preview_url, media_formats: None })
+                })
                 .collect()
         } else {
+            tracing::error!("Unrecognized Klipy response format: {}", &body[..body.len().min(200)]);
             return Err(anyhow::anyhow!(
-                "Unexpected 'data' format: expected array or object"
+                "Failed to parse Klipy response. Unrecognized format."
             ));
         };
 
-        let gifs: Vec<Gif> = items
-            .into_iter()
-            .filter(|item| item.r#type == "gif")
-            .map(|item| Gif {
-                id: item.id,
-                title: item.title,
-                url: item.original_url,
-                preview_url: item.preview_url,
-                media_formats: None,
-            })
-            .collect();
-
         Ok(gifs)
     }
-}
-
-/// An item from Klipy API response
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct KlipyItem {
-    /// Type (gif, ad, etc.)
-    r#type: String,
-    /// Item ID
-    id: String,
-    /// Title
-    title: Option<String>,
-    /// Slug
-    #[allow(dead_code)]
-    slug: Option<String>,
-    /// Original URL
-    original_url: Option<String>,
-    /// Preview URL
-    preview_url: Option<String>,
 }
 
 /// A GIF from Klipy
