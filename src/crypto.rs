@@ -25,7 +25,8 @@ use crate::encryption::SessionManager;
 #[derive(ZeroizeOnDrop)]
 pub struct Identity {
     /// The signing (private) key — zeroized on drop
-    #[zeroize(skip)] // SigningKey handles its own zeroization via ed25519-dalek's zeroize feature
+    #[zeroize(skip)]
+    // SigningKey handles its own zeroization via ed25519-dalek's zeroize feature
     signing_key: SigningKey,
     /// The verifying (public) key
     #[zeroize(skip)]
@@ -134,7 +135,10 @@ impl SignedMessage {
     /// Reconstructs the sender's public key and verifies the Ed25519 signature.
     pub fn verify(&self) -> Result<()> {
         if self.sender_public_key.len() != 32 {
-            return Err(anyhow::anyhow!("Invalid public key length: expected 32, got {}", self.sender_public_key.len()));
+            return Err(anyhow::anyhow!(
+                "Invalid public key length: expected 32, got {}",
+                self.sender_public_key.len()
+            ));
         }
         let mut public_key_bytes = [0u8; 32];
         public_key_bytes.copy_from_slice(&self.sender_public_key);
@@ -143,7 +147,10 @@ impl SignedMessage {
             .map_err(|e| anyhow::anyhow!("Invalid public key: {}", e))?;
 
         if self.signature.len() != 64 {
-            return Err(anyhow::anyhow!("Invalid signature length: expected 64, got {}", self.signature.len()));
+            return Err(anyhow::anyhow!(
+                "Invalid signature length: expected 64, got {}",
+                self.signature.len()
+            ));
         }
         let mut signature_bytes = [0u8; 64];
         signature_bytes.copy_from_slice(&self.signature);
@@ -287,7 +294,12 @@ impl CryptoManager {
     }
 
     /// Verify a signature from a peer
-    pub fn verify(&self, message: &[u8], signature: &Signature, public_key: &[u8; 32]) -> Result<()> {
+    pub fn verify(
+        &self,
+        message: &[u8],
+        signature: &Signature,
+        public_key: &[u8; 32],
+    ) -> Result<()> {
         verify_with_key(message, signature, public_key)
     }
 

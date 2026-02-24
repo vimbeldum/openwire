@@ -53,6 +53,8 @@ pub enum NetworkEvent {
     PeerConnected(PeerId),
     /// Encryption keys exchanged with peer
     KeysExchanged(PeerId),
+    /// A new listen address was assigned
+    ListenAddress(String),
     /// Error occurred
     Error(String),
 }
@@ -236,9 +238,10 @@ impl Network {
         let mut keypair_bytes = [0u8; 64];
         keypair_bytes[..32].copy_from_slice(&seed);
         keypair_bytes[32..].copy_from_slice(&pubkey);
-        let libp2p_ed25519_keypair =
-            libp2p::identity::ed25519::Keypair::try_from_bytes(&mut keypair_bytes)
-                .map_err(|e| anyhow::anyhow!("Failed to convert ed25519 key to libp2p format: {}", e))?;
+        let libp2p_ed25519_keypair = libp2p::identity::ed25519::Keypair::try_from_bytes(
+            &mut keypair_bytes,
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to convert ed25519 key to libp2p format: {}", e))?;
         let local_key = libp2p::identity::Keypair::from(libp2p_ed25519_keypair);
         let local_peer_id = PeerId::from(local_key.public());
 
@@ -262,9 +265,10 @@ impl Network {
         let ping = libp2p::ping::Behaviour::new(libp2p::ping::Config::new());
 
         // Set up identify
-        let identify = libp2p::identify::Behaviour::new(
-            libp2p::identify::Config::new("/openwire/0.1.0".to_string(), local_key.public()),
-        );
+        let identify = libp2p::identify::Behaviour::new(libp2p::identify::Config::new(
+            "/openwire/0.1.0".to_string(),
+            local_key.public(),
+        ));
 
         let behaviour = OpenWireBehaviour {
             gossipsub,
@@ -373,7 +377,10 @@ impl Network {
             exchanged.push(peer_id);
         }
 
-        tracing::info!("Verified and registered encryption keys for peer: {}", peer_id);
+        tracing::info!(
+            "Verified and registered encryption keys for peer: {}",
+            peer_id
+        );
 
         let _ = self
             .event_sender
@@ -506,7 +513,10 @@ impl Network {
 pub async fn run_network(mut network: Network) -> Result<()> {
     // Send key exchange on startup
     if let Err(e) = network.send_key_exchange().await {
-        tracing::warn!("Initial key exchange broadcast failed (no peers yet): {}", e);
+        tracing::warn!(
+            "Initial key exchange broadcast failed (no peers yet): {}",
+            e
+        );
     }
 
     loop {
@@ -534,7 +544,11 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                     }
 
                     libp2p::swarm::SwarmEvent::NewListenAddr { address, .. } => {
-                        tracing::info!("Listening on {}", address);
+                        let full_addr = format!("{}/p2p/{}", address, network.local_peer_id);
+                        tracing::info!("Listening on {}", full_addr);
+                        let _ = network.event_sender.send(
+                            NetworkEvent::ListenAddress(full_addr)
+                        ).await;
                     }
 
                     _ => {}
