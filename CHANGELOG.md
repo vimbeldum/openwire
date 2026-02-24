@@ -21,6 +21,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.3] - 2026-02-24
+
+### Changed
+
+- Improved room invite error message with helpful guidance
+- Added validation to check room membership before inviting
+
+### Fixed
+
+- Room invite now shows clearer error when keys not exchanged yet
+- Suggests waiting or sending a message to trigger key exchange
+
+---
+
 ## [0.2.2] - 2026-02-24
 
 ### Added
