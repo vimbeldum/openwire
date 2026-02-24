@@ -1,5 +1,11 @@
 # OpenWire
 
+[![CI](https://github.com/shwetanshu21/openwire/actions/workflows/ci.yml/badge.svg)](https://github.com/shwetanshu21/openwire/actions/workflows/ci.yml)
+[![Release](https://github.com/shwetanshu21/openwire/actions/workflows/release.yml/badge.svg)](https://github.com/shwetanshu21/openwire/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
+[![GitHub release](https://img.shields.io/github/v/release/shwetanshu21/openwire?include_prereleases)](https://github.com/shwetanshu21/openwire/releases)
+
 **Decentralized P2P Local Network Messenger** - Encrypted, Anonymous, Zero-Config
 
 ---
@@ -247,7 +253,7 @@ If peers can't find you, check the firewall:
 
 ## Development Status
 
-🚧 **Early Development** - This project is in active development.
+**Active Development** - This project is actively maintained.
 
 ### Roadmap
 
@@ -256,20 +262,27 @@ If peers can't find you, check the firewall:
 - [x] Encryption implementation
 - [x] Terminal UI
 - [x] Web interface
-- [ ] File transfer support
-- [ ] Cross-platform builds
+- [x] File transfer support
+- [x] Cross-platform builds
+- [ ] Message persistence
+- [ ] Direct encrypted messaging
+- [ ] Mobile companion app
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
+Quick start:
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+3. Make your changes and run `make check` to verify
+4. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+5. Push to the branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
+
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
 
 ---
 
