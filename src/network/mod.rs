@@ -881,9 +881,17 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                             let room_manager = network.room_manager.read().await;
                             let crypto = network.crypto.read().await;
 
+                            // Check if we're in the room
+                            if !room_manager.can_invite_to_room(&room_id) {
+                                return Err(anyhow::anyhow!("You are not a member of this room"));
+                            }
+
                             // Get peer's encryption key
                             let peer_info = crypto.get_peer(&peer_id).await
-                                .ok_or_else(|| anyhow::anyhow!("Peer not found or keys not exchanged"))?;
+                                .ok_or_else(|| anyhow::anyhow!(
+                                    "Keys not yet exchanged with peer. Wait a moment and try again, \
+                                     or send them a message first to trigger key exchange."
+                                ))?;
 
                             room_manager.create_invite(
                                 &room_id,
