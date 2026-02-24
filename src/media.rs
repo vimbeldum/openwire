@@ -5,6 +5,8 @@
 //! - ASCII art fallback for terminals without image support
 //! - Image metadata extraction
 
+#![allow(dead_code)]
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
@@ -221,12 +223,12 @@ pub fn generate_ascii_art(width: u32, height: u32, _data: &[u8]) -> String {
     let mut result = String::new();
 
     // Create a simple frame
-    let display_width = (width as usize / 8).min(40).max(10);
-    let display_height = (height as usize / 16).min(20).max(5);
+    let display_width = (width as usize / 8).clamp(10, 40);
+    let display_height = (height as usize / 16).clamp(5, 20);
 
-    result.push_str("┌");
+    result.push('┌');
     for _ in 0..display_width {
-        result.push_str("─");
+        result.push('─');
     }
     result.push_str("┐\n");
 
@@ -234,17 +236,17 @@ pub fn generate_ascii_art(width: u32, height: u32, _data: &[u8]) -> String {
         result.push('│');
         for x in 0..display_width {
             // Create a gradient pattern for visual effect
-            let idx = ((x + y) % chars.len());
+            let idx = (x + y) % chars.len();
             result.push(chars[idx]);
         }
         result.push_str("│\n");
     }
 
-    result.push_str("└");
+    result.push('└');
     for _ in 0..display_width {
-        result.push_str("─");
+        result.push('─');
     }
-    result.push_str("┘");
+    result.push('┘');
 
     result
 }
@@ -253,14 +255,12 @@ pub fn generate_ascii_art(width: u32, height: u32, _data: &[u8]) -> String {
 pub mod image_support {
     use super::*;
     use image::{DynamicImage, ImageReader};
-    use ratatui_image::picker::{Picker, ProtocolType};
+    use ratatui_image::picker::Picker;
     use std::io::Cursor;
 
     /// Load an image from bytes
     pub fn load_image(data: &[u8]) -> Result<DynamicImage> {
-        let reader = ImageReader::new(Cursor::new(data))
-            .with_guessed_format()?
-            .ok_or_else(|| anyhow::anyhow!("Could not guess image format"))?;
+        let reader = ImageReader::new(Cursor::new(data)).with_guessed_format()?;
         Ok(reader.decode()?)
     }
 
@@ -272,14 +272,14 @@ pub mod image_support {
 
     /// Create a picker for the terminal
     pub fn create_picker() -> Result<Picker> {
-        let mut picker = Picker::from_query_stdio()?;
+        let mut picker = Picker::from_termios().map_err(|e| anyhow::anyhow!("{e}"))?;
         picker.guess_protocol();
         Ok(picker)
     }
 
     /// Check if the terminal supports image display
     pub fn supports_images() -> bool {
-        Picker::from_query_stdio().is_ok()
+        Picker::from_termios().is_ok()
     }
 }
 
