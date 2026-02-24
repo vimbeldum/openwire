@@ -1,0 +1,68 @@
+[package]
+name = "openwire"
+version = "0.1.0"
+edition = "2021"
+description = "Decentralized P2P local network messenger - encrypted, anonymous, zero-config"
+license = "MIT"
+authors = ["OpenWire Contributors"]
+repository = "https://github.com/shwetanshu/openwire"
+keywords = ["p2p", "messenger", "networking", "encryption", "decentralized"]
+categories = ["network-programming", "cryptography"]
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# P2P networking
+libp2p = { version = "0.54", features = [
+    "mdns",
+    "gossipsub",
+    "noise",
+    "tcp",
+    "dns",
+    "tokio",
+    "macros",
+    "yamux",
+    "quic",
+    "identify",
+    "ping",
+] }
+
+# Terminal UI
+ratatui = "0.28"
+
+# Web framework
+axum = "0.7"
+tower = "0.5"
+tower-http = { version = "0.5", features = ["fs", "cors"] }
+
+# Cryptography
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+rand = "0.8"
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Async utilities
+futures = "0.3"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
