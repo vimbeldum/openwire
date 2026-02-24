@@ -7,13 +7,9 @@
 //! - Message signing with Ed25519
 //! - Peer discovery via mDNS
 //! - Secure transport via Noise protocol
-//!
-//! # Encryption
-//! All messages are encrypted end-to-end using:
-//! - X25519 for Diffie-Hellman key exchange
-//! - ChaCha20-Poly1305 for authenticated encryption (AEAD)
-//! - HKDF for key derivation
-//! - Ephemeral keys for forward secrecy
+//! - File transfer support
+//! - Terminal UI with 3-pane layout
+//! - Optional web interface
 
 mod crypto;
 mod encryption;
@@ -52,38 +48,40 @@ struct Args {
     nick: String,
 
     /// Log level (trace, debug, info, warn, error)
-    #[arg(short, long, default_value = "info")]
+    #[arg(short, long, default_value = "warn")]
     log_level: String,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Parse command line arguments
     let args = Args::parse();
 
-    // Initialize logging
+    // Initialize logging — write to file to avoid polluting the TUI
+    let log_dir = dirs_next::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".openwire");
+    std::fs::create_dir_all(&log_dir)?;
+    let log_file = std::fs::File::create(log_dir.join("openwire.log"))?;
+
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(&args.log_level))
-        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::fmt::layer().with_writer(std::sync::Mutex::new(log_file)))
         .init();
 
     tracing::info!("Starting OpenWire with End-to-End Encryption...");
 
     // Initialize cryptographic manager
     let crypto = CryptoManager::new()?;
-    tracing::info!("Peer ID: {}", crypto.peer_id());
-    tracing::info!(
-        "Encryption public key: {}",
-        hex::encode(crypto.encryption_public_key())
-    );
+    let peer_id_display = crypto.peer_id();
+    tracing::info!("Peer ID: {}", peer_id_display);
 
-    // Initialize network layer — returns the Network + a handle for communication
+    // Initialize network layer
     let (network, handle) = network::Network::new(crypto, args.port).await?;
-    let local_peer_id = *network.local_peer_id();
-    tracing::info!(
-        "Network initialized (libp2p peer: {}) with E2E encryption enabled",
-        local_peer_id
-    );
+    let local_peer_id = network.local_peer_id().to_string();
+    tracing::info!("Network initialized: {}", local_peer_id);
+
+    // Save command sender for shutdown
+    let shutdown_sender = handle.command_sender.clone();
 
     // If bootstrap peer provided, send a connect command
     if let Some(bootstrap_addr) = &args.bootstrap {
@@ -91,10 +89,9 @@ async fn main() -> Result<()> {
             .command_sender
             .send(network::NetworkCommand::Connect(bootstrap_addr.clone()))
             .await?;
-        tracing::info!("Queued connection to bootstrap peer: {}", bootstrap_addr);
     }
 
-    // Spawn the network event loop — this drives the swarm
+    // Spawn the network event loop
     let network_task = tokio::spawn(async move {
         if let Err(e) = network::run_network(network).await {
             tracing::error!("Network error: {}", e);
@@ -111,36 +108,27 @@ async fn main() -> Result<()> {
         });
     }
 
-    // Start terminal UI
-    let mut ui = ui::UiApp::new()?;
-    tokio::spawn(async move {
-        if let Err(e) = ui.run().await {
-            tracing::error!("UI error: {}", e);
-        }
-    });
+    // Run the TUI on the main thread (blocking — crossterm needs it)
+    let nick = args.nick.clone();
+    let mut ui = ui::UiApp::new(
+        nick,
+        local_peer_id,
+        handle.command_sender,
+        handle.event_receiver,
+    )?;
 
-    tracing::info!("OpenWire is running with E2E encryption.");
-    tracing::info!("All messages are encrypted using X25519 + ChaCha20-Poly1305");
-    tracing::info!("Press Ctrl+C to exit.");
+    // Run UI — blocks until user quits
+    if let Err(e) = ui.run().await {
+        tracing::error!("UI error: {}", e);
+    }
 
-    // Wait for shutdown signal
-    tokio::signal::ctrl_c().await?;
-    tracing::info!("Shutting down OpenWire...");
+    // UI exited — trigger graceful shutdown
+    let _ = shutdown_sender.send(network::NetworkCommand::Shutdown).await;
 
-    // Send graceful shutdown command to the network
-    let _ = handle
-        .command_sender
-        .send(network::NetworkCommand::Shutdown)
-        .await;
-
-    // Wait for the network task to finish (with a timeout)
+    // Wait for the network task to finish
     tokio::select! {
-        _ = network_task => {
-            tracing::info!("Network shut down cleanly.");
-        }
-        _ = tokio::time::sleep(std::time::Duration::from_secs(5)) => {
-            tracing::warn!("Network shutdown timed out, forcing exit.");
-        }
+        _ = network_task => {}
+        _ = tokio::time::sleep(std::time::Duration::from_secs(3)) => {}
     }
 
     Ok(())

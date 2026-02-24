@@ -22,9 +22,13 @@ use crate::crypto::CryptoManager;
 const KEY_EXCHANGE_TOPIC: &str = "openwire-key-exchange";
 /// Topic for general messages
 const GENERAL_TOPIC: &str = "openwire-general";
+/// Topic for file transfers
+const FILE_TRANSFER_TOPIC: &str = "openwire-file-transfer";
 
 /// Maximum allowed clock skew for key exchange timestamps (seconds)
 const MAX_TIMESTAMP_SKEW: u64 = 60;
+/// Maximum file size for transfer (1 MB — gossipsub limit)
+const MAX_FILE_SIZE: usize = 1_048_576;
 
 /// Events emitted by the network layer
 #[derive(Debug, Clone)]
@@ -37,6 +41,12 @@ pub enum NetworkEvent {
     MessageReceived {
         from: PeerId,
         topic: String,
+        data: Vec<u8>,
+    },
+    /// A file was received
+    FileReceived {
+        from: PeerId,
+        filename: String,
         data: Vec<u8>,
     },
     /// Successfully connected to a peer
@@ -54,10 +64,29 @@ pub enum NetworkCommand {
     Broadcast { data: Vec<u8> },
     /// Send an encrypted message to a specific peer
     SendToPeer { peer_id: String, data: Vec<u8> },
+    /// Send a file to all peers
+    SendFile { path: String },
     /// Connect to a specific peer
     Connect(String),
     /// Shutdown the network
     Shutdown,
+}
+
+/// A file transfer message
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FileTransferMessage {
+    /// Original filename
+    pub filename: String,
+    /// File size in bytes
+    pub size: usize,
+    /// File contents
+    pub data: Vec<u8>,
+    /// Sender's public key
+    pub sender_public_key: Vec<u8>,
+    /// Signature over [filename || data]
+    pub signature: Vec<u8>,
+    /// Timestamp
+    pub timestamp: u64,
 }
 
 /// Key exchange message for sharing encryption public keys.
@@ -261,8 +290,10 @@ impl Network {
         // Subscribe to topics
         let general_topic = gossipsub::IdentTopic::new(GENERAL_TOPIC);
         let key_topic = gossipsub::IdentTopic::new(KEY_EXCHANGE_TOPIC);
+        let file_topic = gossipsub::IdentTopic::new(FILE_TRANSFER_TOPIC);
         swarm.behaviour_mut().gossipsub.subscribe(&general_topic)?;
         swarm.behaviour_mut().gossipsub.subscribe(&key_topic)?;
+        swarm.behaviour_mut().gossipsub.subscribe(&file_topic)?;
 
         // Create channels — both halves are now properly used
         let (event_sender, event_receiver) = mpsc::channel(256);
@@ -404,6 +435,63 @@ impl Network {
         tracing::info!("Dialing peer at {}", addr_str);
         Ok(())
     }
+
+    /// Send a file to all peers on the file transfer topic
+    async fn send_file(&mut self, path: &str) -> Result<()> {
+        let file_path = std::path::Path::new(path);
+        if !file_path.exists() {
+            return Err(anyhow::anyhow!("File not found: {}", path));
+        }
+
+        let data = tokio::fs::read(file_path).await?;
+        if data.len() > MAX_FILE_SIZE {
+            return Err(anyhow::anyhow!(
+                "File too large ({} bytes, max {} bytes)",
+                data.len(),
+                MAX_FILE_SIZE
+            ));
+        }
+
+        let filename = file_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+
+        // Sign filename || data
+        let mut sign_data = Vec::new();
+        sign_data.extend_from_slice(filename.as_bytes());
+        sign_data.extend_from_slice(&data);
+
+        let (signature, sender_public_key);
+        {
+            let crypto = self.crypto.read().await;
+            let sig = crypto.sign(&sign_data)?;
+            signature = sig.to_bytes().to_vec();
+            sender_public_key = crypto.signing_public_key().to_vec();
+        }
+
+        let file_msg = FileTransferMessage {
+            filename: filename.clone(),
+            size: data.len(),
+            data,
+            sender_public_key,
+            signature,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)?
+                .as_secs(),
+        };
+
+        let msg_bytes = serde_json::to_vec(&file_msg)?;
+        let topic = gossipsub::IdentTopic::new(FILE_TRANSFER_TOPIC);
+        self.swarm
+            .behaviour_mut()
+            .gossipsub
+            .publish(topic, msg_bytes)?;
+
+        tracing::info!("Sent file '{}' ({} bytes)", filename, file_msg.size);
+        Ok(())
+    }
 }
 
 /// Run the network event loop.
@@ -464,6 +552,14 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                             tracing::error!("Failed to send to peer {}: {}", peer_id, e);
                             let _ = network.event_sender.send(
                                 NetworkEvent::Error(format!("Send to peer failed: {}", e))
+                            ).await;
+                        }
+                    }
+                    NetworkCommand::SendFile { path } => {
+                        if let Err(e) = network.send_file(&path).await {
+                            tracing::error!("Failed to send file: {}", e);
+                            let _ = network.event_sender.send(
+                                NetworkEvent::Error(format!("File send failed: {}", e))
                             ).await;
                         }
                     }
@@ -534,30 +630,40 @@ async fn handle_behaviour_event(network: &mut Network, event: OpenWireBehaviourE
                         tracing::debug!("Could not parse broadcast from {}: {}", peer_id, e);
                     }
                 }
-            } else if topic.starts_with("openwire-peer-") {
-                // Peer-specific encrypted message
-                let crypto = network.crypto.read().await;
-                let peer_id_str = peer_id.to_string();
-                match crypto
-                    .decrypt_and_verify_message(&message.data, &peer_id_str)
-                    .await
-                {
-                    Ok(decrypted) => {
-                        tracing::debug!(
-                            "Received and decrypted private message from {}",
+            } else if topic == FILE_TRANSFER_TOPIC {
+                // File transfer
+                match serde_json::from_slice::<FileTransferMessage>(&message.data) {
+                    Ok(file_msg) => {
+                        tracing::info!(
+                            "Received file '{}' ({} bytes) from {}",
+                            file_msg.filename,
+                            file_msg.size,
                             peer_id
                         );
+
+                        // Save file to ~/openwire-received/
+                        let save_dir = dirs_next::home_dir()
+                            .unwrap_or_else(|| std::path::PathBuf::from("."))
+                            .join("openwire-received");
+                        let _ = std::fs::create_dir_all(&save_dir);
+                        let save_path = save_dir.join(&file_msg.filename);
+                        if let Err(e) = std::fs::write(&save_path, &file_msg.data) {
+                            tracing::error!("Failed to save file: {}", e);
+                        } else {
+                            tracing::info!("Saved file to {:?}", save_path);
+                        }
+
                         let _ = network
                             .event_sender
-                            .send(NetworkEvent::MessageReceived {
+                            .send(NetworkEvent::FileReceived {
                                 from: peer_id,
-                                topic: topic.to_string(),
-                                data: decrypted,
+                                filename: file_msg.filename,
+                                data: file_msg.data,
                             })
                             .await;
                     }
                     Err(e) => {
-                        tracing::debug!("Could not decrypt message from {}: {}", peer_id, e);
+                        tracing::debug!("Could not parse file message from {}: {}", peer_id, e);
                     }
                 }
             }
