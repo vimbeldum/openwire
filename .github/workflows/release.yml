@@ -146,6 +146,19 @@ jobs:
           # Update Homebrew Formula URL
           sed -i "s|archive/refs/tags/v[0-9.]*\.tar\.gz|archive/refs/tags/${TAG}.tar.gz|" Formula/openwire.rb
 
+          # Calculate SHA256 of the tarball and update formula
+          TARBALL_URL="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${TAG}.tar.gz"
+          SHA256=$(curl -sL "$TARBALL_URL" | sha256sum | cut -d' ' -f1)
+
+          # Update or add sha256 line in formula
+          if grep -q "^  sha256 " Formula/openwire.rb; then
+            sed -i "s/^  sha256 \".*\"/  sha256 \"${SHA256}\"/" Formula/openwire.rb
+          else
+            sed -i "/^  url \".*\"/a\\  sha256 \"${SHA256}\"" Formula/openwire.rb
+          fi
+
+          echo "Updated formula with SHA256: ${SHA256}"
+
           # Commit and push if there are changes
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
