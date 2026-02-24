@@ -15,6 +15,7 @@
 
 mod crypto;
 mod encryption;
+mod game;
 mod klipy;
 mod media;
 mod network;

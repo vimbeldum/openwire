@@ -23,6 +23,7 @@ use ratatui::{
 use std::io;
 use tokio::sync::mpsc;
 
+use crate::game::{GameAction, TicTacToe};
 use crate::network::{NetworkCommand, NetworkEvent};
 
 /// A chat message for display
@@ -58,6 +59,8 @@ pub struct UiState {
     pub scroll_offset: usize,
     /// Auto-scroll to bottom when new messages arrive
     pub auto_scroll: bool,
+    /// Active tic-tac-toe game (room_id -> game)
+    pub active_game: Option<TicTacToe>,
 }
 
 impl UiState {
@@ -73,6 +76,7 @@ impl UiState {
             local_peer_id,
             scroll_offset: 0,
             auto_scroll: true,
+            active_game: None,
         };
         state.add_system_message("Welcome to OpenWire! End-to-end encrypted P2P messenger.");
         state.add_system_message("Peers on the same LAN are discovered automatically via mDNS.");
@@ -329,6 +333,14 @@ impl UiApp {
             self.state
                 .add_system_message("  /room leave <room>          - Leave room");
             self.state.add_system_message("");
+            self.state.add_system_message("GAMES:");
+            self.state
+                .add_system_message("  /game tictactoe <room_id>   - Start a game");
+            self.state
+                .add_system_message("  /game rematch               - Play again");
+            self.state
+                .add_system_message("  /move <1-9>                 - Make a move");
+            self.state.add_system_message("");
             self.state.add_system_message("MESSAGE SCROLLING:");
             self.state
                 .add_system_message("  Up / Down        - Scroll one line");
@@ -376,6 +388,12 @@ impl UiApp {
             false
         } else if let Some(room_cmd) = input.strip_prefix("/room ") {
             self.handle_room_command(room_cmd.trim()).await;
+            false
+        } else if let Some(game_cmd) = input.strip_prefix("/game ") {
+            self.handle_game_command(game_cmd.trim()).await;
+            false
+        } else if let Some(pos_str) = input.strip_prefix("/move ") {
+            self.handle_game_move(pos_str.trim()).await;
             false
         } else {
             // Regular chat message
@@ -475,6 +493,237 @@ impl UiApp {
         }
     }
 
+    /// Handle /game commands
+    async fn handle_game_command(&mut self, cmd: &str) {
+        if let Some(room_arg) = cmd.strip_prefix("tictactoe") {
+            let room_id = room_arg.trim();
+            if room_id.is_empty() {
+                // Try to use the first room if available
+                if self.state.rooms.is_empty() {
+                    self.state.add_system_message("Usage: /game tictactoe <room_id>");
+                    self.state.add_system_message("You must be in a room first. Use /room create <name>");
+                    return;
+                }
+                let room_id = self.state.rooms[0].0.clone();
+                self.start_game_challenge(&room_id).await;
+            } else {
+                self.start_game_challenge(room_id).await;
+            }
+        } else if cmd == "rematch" {
+            if let Some(ref mut game) = self.state.active_game {
+                let room_id = game.room_id.clone();
+                game.new_round();
+                // Show the new board
+                for line in game.render_status() {
+                    self.state.add_system_message(&line);
+                }
+                // Notify the room
+                let action = GameAction::Challenge {
+                    challenger: self.state.local_peer_id.clone(),
+                    challenger_nick: self.state.nick.clone(),
+                    room_id: room_id.clone(),
+                };
+                let _ = self.command_sender.send(NetworkCommand::SendRoomMessage {
+                    room_id,
+                    data: action.to_bytes(),
+                }).await;
+            } else {
+                self.state.add_system_message("No active game. Start one with /game tictactoe <room_id>");
+            }
+        } else {
+            self.state.add_system_message("Game commands:");
+            self.state.add_system_message("  /game tictactoe <room_id>  - Start a game");
+            self.state.add_system_message("  /game rematch              - Play again");
+            self.state.add_system_message("  /move <1-9>                - Make a move");
+        }
+    }
+
+    /// Start a tic-tac-toe challenge in a room
+    async fn start_game_challenge(&mut self, room_id: &str) {
+        // Verify we're in this room
+        if !self.state.rooms.iter().any(|(id, _)| id == room_id) {
+            self.state.add_system_message(&format!("You are not in room '{}'", room_id));
+            return;
+        }
+
+        self.state.add_system_message("🎮 Starting Tic-Tac-Toe! Waiting for opponent...");
+
+        // Send challenge to the room
+        let action = GameAction::Challenge {
+            challenger: self.state.local_peer_id.clone(),
+            challenger_nick: self.state.nick.clone(),
+            room_id: room_id.to_string(),
+        };
+        let _ = self.command_sender.send(NetworkCommand::SendRoomMessage {
+            room_id: room_id.to_string(),
+            data: action.to_bytes(),
+        }).await;
+    }
+
+    /// Handle /move command
+    async fn handle_game_move(&mut self, pos_str: &str) {
+        let position: u8 = match pos_str.parse() {
+            Ok(p) => p,
+            Err(_) => {
+                self.state.add_system_message("Usage: /move <1-9>");
+                return;
+            }
+        };
+
+        let (room_id, result_lines) = {
+            // First check if there's a game and if it's our turn
+            let turn_err = {
+                if let Some(ref game) = self.state.active_game {
+                    if !game.is_my_turn(&self.state.local_peer_id) {
+                        Some(format!(
+                            "Not your turn! Waiting for {}",
+                            game.nick_for(game.current_turn)
+                        ))
+                    } else {
+                        None
+                    }
+                } else {
+                    Some("No active game. Start one with /game tictactoe <room_id>".to_string())
+                }
+            };
+
+            if let Some(err) = turn_err {
+                self.state.add_system_message(&err);
+                return;
+            }
+
+            let game = self.state.active_game.as_mut().unwrap();
+            let peer_id = self.state.local_peer_id.clone();
+            match game.make_move(position, &peer_id) {
+                Ok(_result) => {
+                    let lines = game.render_status();
+                    (game.room_id.clone(), lines)
+                }
+                Err(e) => {
+                    self.state.add_system_message(&format!("⚠ {}", e));
+                    return;
+                }
+            }
+        };
+
+        // Show updated board
+        for line in &result_lines {
+            self.state.add_system_message(line);
+        }
+
+        // Send the move to the room
+        let action = GameAction::Move {
+            position,
+            room_id: room_id.clone(),
+            player: self.state.local_peer_id.clone(),
+        };
+        let _ = self.command_sender.send(NetworkCommand::SendRoomMessage {
+            room_id,
+            data: action.to_bytes(),
+        }).await;
+    }
+
+    /// Handle an incoming game action from another player
+    fn handle_incoming_game_action(&mut self, room_id: &str, sender_nick: &str, action: GameAction) {
+        match action {
+            GameAction::Challenge { challenger, challenger_nick, room_id: action_room } => {
+                // Check if we already have an active game in this room
+                if let Some(ref game) = self.state.active_game {
+                    if game.room_id == action_room {
+                        // This is a rematch notification — reset our board
+                        let mut new_game = game.clone();
+                        new_game.new_round();
+                        self.state.active_game = Some(new_game);
+                        for line in self.state.active_game.as_ref().unwrap().render_status() {
+                            self.state.add_system_message(&line);
+                        }
+                        return;
+                    }
+                }
+
+                // Auto-accept: create a new game (challenger is X, we are O)
+                let game = TicTacToe::new(
+                    (challenger.clone(), challenger_nick.clone()),
+                    (self.state.local_peer_id.clone(), self.state.nick.clone()),
+                    action_room.clone(),
+                );
+
+                self.state.add_system_message(&format!(
+                    "🎮 {} challenged you to Tic-Tac-Toe!",
+                    challenger_nick
+                ));
+                for line in game.render_status() {
+                    self.state.add_system_message(&line);
+                }
+
+                // If we're X (shouldn't happen since challenger is X), note it
+                self.state.add_system_message("You are O — use /move <1-9> when it's your turn");
+                self.state.active_game = Some(game);
+
+                // Send accept
+                let accept = GameAction::Accept {
+                    accepter: self.state.local_peer_id.clone(),
+                    accepter_nick: self.state.nick.clone(),
+                    room_id: action_room,
+                };
+                let nick = self.state.nick.clone();
+                // We can't await here (non-async fn), so use try_send
+                let _ = self.command_sender.try_send(NetworkCommand::SendRoomMessage {
+                    room_id: room_id.to_string(),
+                    data: accept.to_bytes(),
+                });
+                let _ = nick; // suppress warning
+            }
+            GameAction::Accept { accepter, accepter_nick, room_id: action_room } => {
+                // Someone accepted our challenge — create the game if we don't have one
+                if self.state.active_game.is_none() {
+                    let game = TicTacToe::new(
+                        (self.state.local_peer_id.clone(), self.state.nick.clone()),
+                        (accepter.clone(), accepter_nick.clone()),
+                        action_room,
+                    );
+                    self.state.active_game = Some(game);
+                }
+
+                self.state.add_system_message(&format!(
+                    "🎮 {} accepted! Game on!",
+                    accepter_nick
+                ));
+                self.state.add_system_message("You are X — you go first! Use /move <1-9>");
+                if let Some(ref game) = self.state.active_game {
+                    for line in game.render_status() {
+                        self.state.add_system_message(&line);
+                    }
+                }
+            }
+            GameAction::Move { position, room_id: _, player } => {
+                // Apply the opponent's move to our local game
+                if let Some(ref mut game) = self.state.active_game {
+                    match game.make_move(position, &player) {
+                        Ok(_) => {
+                            for line in game.render_status() {
+                                self.state.add_system_message(&line);
+                            }
+                        }
+                        Err(e) => {
+                            self.state.add_system_message(&format!(
+                                "⚠ Invalid move from {}: {}",
+                                sender_nick, e
+                            ));
+                        }
+                    }
+                }
+            }
+            GameAction::Resign { room_id: _, player: _ } => {
+                self.state.add_system_message(&format!("🏳️ {} resigned!", sender_nick));
+                self.state.active_game = None;
+            }
+            GameAction::Decline { .. } => {
+                self.state.add_system_message(&format!("{} declined the game.", sender_nick));
+            }
+        }
+    }
+
     /// Handle incoming network events
     fn handle_network_event(&mut self, event: NetworkEvent) {
         match event {
@@ -548,9 +797,16 @@ impl UiApp {
                 sender_nick,
                 content,
             } => {
-                let content_str = String::from_utf8_lossy(&content).to_string();
-                self.state
-                    .add_chat_message(&format!("[{}] {}", room_id, sender_nick), &content_str);
+                // Check if this is a game action
+                if GameAction::is_game_message(&content) {
+                    if let Some(action) = GameAction::from_bytes(&content) {
+                        self.handle_incoming_game_action(&room_id, &sender_nick, action);
+                    }
+                } else {
+                    let content_str = String::from_utf8_lossy(&content).to_string();
+                    self.state
+                        .add_chat_message(&format!("[{}] {}", room_id, sender_nick), &content_str);
+                }
             }
             NetworkEvent::RoomCreated { room_id, room_name } => {
                 // Add room to UI state
