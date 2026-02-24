@@ -7,6 +7,8 @@
 //!
 //! This ensures messages are encrypted end-to-end, not just at the transport layer.
 
+#![allow(dead_code)] // Some functions are for future use or testing
+
 use anyhow::Result;
 use chacha20poly1305::{
     aead::{Aead, KeyInit, Payload},

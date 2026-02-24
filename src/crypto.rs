@@ -3,6 +3,8 @@
 //! Handles key generation, identity management, message signing,
 //! and end-to-end encryption integration.
 
+#![allow(dead_code)] // Some functions are for future use or testing
+
 use anyhow::Result;
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use rand::rngs::OsRng;

@@ -214,9 +214,9 @@ impl UiApp {
         self.state.input.clear();
         self.state.cursor_pos = 0;
 
-        if input.starts_with("/send ") {
+        if let Some(path) = input.strip_prefix("/send ") {
             // File transfer command
-            let path = input[6..].trim();
+            let path = path.trim();
             if path.is_empty() {
                 self.state.add_system_message("Usage: /send <file_path>");
                 return;
@@ -231,8 +231,8 @@ impl UiApp {
                 .await;
         } else if input == "/quit" || input == "/q" {
             let _ = self.command_sender.send(NetworkCommand::Shutdown).await;
-        } else if input.starts_with("/connect ") {
-            let addr = input[9..].trim();
+        } else if let Some(addr) = input.strip_prefix("/connect ") {
+            let addr = addr.trim();
             if addr.is_empty() {
                 self.state
                     .add_system_message("Usage: /connect <multiaddress>");
@@ -250,8 +250,7 @@ impl UiApp {
                 .add_system_message("  /send <file>    - Send a file to peers");
             self.state
                 .add_system_message("  /connect <addr> - Connect to peer by multiaddress");
-            self.state
-                .add_system_message("  /quit           - Exit");
+            self.state.add_system_message("  /quit           - Exit");
             self.state.add_system_message("");
             self.state
                 .add_system_message("Group chat: Peers on the same LAN join automatically.");
