@@ -47,6 +47,9 @@ pub struct UiState {
     pub peers: Vec<String>,
     /// Joined rooms (room_id, room_name)
     pub rooms: Vec<(String, String)>,
+    /// Pending invites (room_id, room_name, inviter_short_id) - for future use
+    #[allow(dead_code)]
+    pub invited_rooms: Vec<(String, String, String)>,
     /// Local nickname
     pub nick: String,
     /// Local peer ID (short form)
@@ -65,6 +68,7 @@ impl UiState {
             messages: Vec::new(),
             peers: Vec::new(),
             rooms: Vec::new(),
+            invited_rooms: Vec::new(),
             nick,
             local_peer_id,
             scroll_offset: 0,
@@ -518,15 +522,25 @@ impl UiApp {
                 room_id,
                 room_name,
             } => {
+                let short = format!("{}…", &from.to_string()[..8.min(from.to_string().len())]);
+
                 // Add room to UI state when invited
                 if !self.state.rooms.iter().any(|(id, _)| id == &room_id) {
                     self.state.rooms.push((room_id.clone(), room_name.clone()));
                 }
-                let short = format!("{}…", &from.to_string()[..8.min(from.to_string().len())]);
-                self.state.add_system_message(&format!(
-                    "🏠 Joined room '{}' ({}) via invite from {}",
-                    room_name, room_id, short
-                ));
+
+                // Show clear invite message
+                self.state
+                    .add_system_message("╔══════════════════════════════════════════╗");
+                self.state
+                    .add_system_message(&format!("║ 🏠 ROOM INVITE from {}", short));
+                self.state
+                    .add_system_message(&format!("║ Room: {}", room_name));
+                self.state.add_system_message(&format!("║ ID: {}", room_id));
+                self.state
+                    .add_system_message("║ You have joined this room automatically!");
+                self.state
+                    .add_system_message("╚══════════════════════════════════════════╝");
             }
             NetworkEvent::RoomMessageReceived {
                 from: _,
