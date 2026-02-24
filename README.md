@@ -201,12 +201,11 @@ OpenWire is designed to be zero-configuration. However, some options can be cust
 ### Roadmap
 
 - [x] Project scaffolding
-- [ ] Core networking layer
-- [ ] Encryption implementation
-- [ ] Terminal UI
-- [ ] Web interface
+- [x] Core networking layer
+- [x] Encryption implementation
+- [x] Terminal UI
+- [x] Web interface
 - [ ] File transfer support
-- [ ] Message history persistence
 - [ ] Cross-platform builds
 
 ---
