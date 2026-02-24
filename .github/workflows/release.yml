@@ -61,6 +61,23 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
 
+      # Sync Cargo.toml version from git tag (strip leading 'v')
+      - name: Set version from tag (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i.bak "s/^version = \".*\"/version = \"${VERSION}\"/" Cargo.toml
+          rm -f Cargo.toml.bak
+          echo "Building version ${VERSION}"
+
+      - name: Set version from tag (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          (Get-Content Cargo.toml) -replace '^version = ".*"', "version = `"$version`"" | Set-Content Cargo.toml
+          Write-Host "Building version $version"
+
       - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }}
 
@@ -97,14 +114,40 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload ${{ github.ref_name }} ${{ matrix.name }}.${{ matrix.ext }} --clobber
 
-  # Stage 3: Publish the release (un-draft)
+  # Stage 3: Publish the release and sync versions back to master
   publish:
     needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: master
+          token: ${{ github.token }}
 
       - name: Publish Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release edit ${{ github.ref_name }} --draft=false
+
+      # Auto-bump Cargo.toml and Homebrew Formula on master
+      - name: Sync version to master
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          TAG="${GITHUB_REF_NAME}"
+
+          # Update Cargo.toml version
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" Cargo.toml
+
+          # Update Homebrew Formula URL
+          sed -i "s|archive/refs/tags/v[0-9.]*\.tar\.gz|archive/refs/tags/${TAG}.tar.gz|" Formula/openwire.rb
+
+          # Commit and push if there are changes
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml Formula/openwire.rb
+          if git diff --cached --quiet; then
+            echo "No version changes needed"
+          else
+            git commit -m "chore: bump version to ${VERSION} [skip ci]"
+            git push origin master
+          fi
