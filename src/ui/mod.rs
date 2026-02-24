@@ -62,7 +62,8 @@ impl UiState {
             scroll_offset: 0,
         };
         state.add_system_message("Welcome to OpenWire! End-to-end encrypted P2P messenger.");
-        state.add_system_message("Commands: /send <file> to transfer, /quit to exit");
+        state.add_system_message("Peers on the same LAN are discovered automatically via mDNS.");
+        state.add_system_message("Type a message and press Enter to chat. /help for commands.");
         state
     }
 
@@ -245,10 +246,17 @@ impl UiApp {
                 .await;
         } else if input == "/help" {
             self.state.add_system_message("Commands:");
-            self.state.add_system_message("  /send <file>   - Send a file to peers");
             self.state
-                .add_system_message("  /connect <addr> - Connect to peer");
-            self.state.add_system_message("  /quit          - Exit");
+                .add_system_message("  /send <file>    - Send a file to peers");
+            self.state
+                .add_system_message("  /connect <addr> - Connect to peer by multiaddress");
+            self.state
+                .add_system_message("  /quit           - Exit");
+            self.state.add_system_message("");
+            self.state
+                .add_system_message("Group chat: Peers on the same LAN join automatically.");
+            self.state
+                .add_system_message("Remote peers: Share your multiaddress shown at startup.");
         } else {
             // Regular chat message
             self.state
@@ -270,15 +278,11 @@ impl UiApp {
                 let short_id = format!("{}…", &from.to_string()[..8]);
                 self.state.add_chat_message(&short_id, &content);
             }
-            NetworkEvent::FileReceived {
-                from, filename, ..
-            } => {
+            NetworkEvent::FileReceived { from, filename, .. } => {
                 let short_id = format!("{}…", &from.to_string()[..8]);
                 self.state.add_file_message(&short_id, &filename);
-                self.state.add_system_message(&format!(
-                    "File saved to ~/openwire-received/{}",
-                    filename
-                ));
+                self.state
+                    .add_system_message(&format!("File saved to ~/openwire-received/{}", filename));
             }
             NetworkEvent::PeerDiscovered(peer_id) | NetworkEvent::PeerConnected(peer_id) => {
                 let id_str = peer_id.to_string();
@@ -301,9 +305,12 @@ impl UiApp {
                 self.state
                     .add_system_message(&format!("🔐 Keys exchanged with {}", short));
             }
-            NetworkEvent::Error(e) => {
+            NetworkEvent::ListenAddress(addr) => {
                 self.state
-                    .add_system_message(&format!("⚠ Error: {}", e));
+                    .add_system_message(&format!("📡 Listening on: {}", addr));
+            }
+            NetworkEvent::Error(e) => {
+                self.state.add_system_message(&format!("⚠ Error: {}", e));
             }
         }
     }
@@ -368,10 +375,7 @@ impl UiApp {
                 .collect();
 
             let messages_block = Block::default()
-                .title(format!(
-                    " OpenWire — {} ({}) ",
-                    nick, peer_id_short
-                ))
+                .title(format!(" OpenWire — {} ({}) ", nick, peer_id_short))
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Blue));
 

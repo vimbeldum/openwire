@@ -123,7 +123,9 @@ async fn main() -> Result<()> {
     }
 
     // UI exited — trigger graceful shutdown
-    let _ = shutdown_sender.send(network::NetworkCommand::Shutdown).await;
+    let _ = shutdown_sender
+        .send(network::NetworkCommand::Shutdown)
+        .await;
 
     // Wait for the network task to finish
     tokio::select! {
