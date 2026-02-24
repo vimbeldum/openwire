@@ -620,7 +620,17 @@ impl Network {
     async fn handle_room_invite(&mut self, peer_id: PeerId, data: &[u8]) -> Result<()> {
         let invite = crate::room::RoomInvite::from_bytes(data)?;
 
-        // Verify the invite
+        // Check if this invite is for us (access control)
+        if !invite.is_for_peer(&self.local_peer_id.to_string()) {
+            tracing::debug!(
+                "Ignoring room invite for {} (we are {})",
+                invite.target_peer_id,
+                self.local_peer_id
+            );
+            return Err(anyhow::anyhow!("Invite not for us"));
+        }
+
+        // Verify the invite signature
         invite.verify()?;
 
         // Join the room
