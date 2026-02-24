@@ -175,7 +175,9 @@ impl UiApp {
                             break;
                         }
                         (KeyCode::Enter, _) => {
-                            self.handle_submit().await;
+                            if self.handle_submit().await {
+                                break;
+                            }
                         }
                         (KeyCode::Char(c), _) => {
                             self.state.input.insert(self.state.cursor_pos, c);
@@ -248,11 +250,11 @@ impl UiApp {
         Ok(())
     }
 
-    /// Handle submit (Enter key)
-    async fn handle_submit(&mut self) {
+    /// Handle submit (Enter key). Returns true if should quit.
+    async fn handle_submit(&mut self) -> bool {
         let input = self.state.input.trim().to_string();
         if input.is_empty() {
-            return;
+            return false;
         }
 
         self.state.input.clear();
@@ -263,7 +265,7 @@ impl UiApp {
             let path = path.trim();
             if path.is_empty() {
                 self.state.add_system_message("Usage: /send <file_path>");
-                return;
+                return false;
             }
             self.state
                 .add_system_message(&format!("Sending file: {}", path));
@@ -273,14 +275,16 @@ impl UiApp {
                     path: path.to_string(),
                 })
                 .await;
+            false
         } else if input == "/quit" || input == "/q" {
             let _ = self.command_sender.send(NetworkCommand::Shutdown).await;
+            true
         } else if let Some(addr) = input.strip_prefix("/connect ") {
             let addr = addr.trim();
             if addr.is_empty() {
                 self.state
                     .add_system_message("Usage: /connect <multiaddress>");
-                return;
+                return false;
             }
             self.state
                 .add_system_message(&format!("Connecting to {}", addr));
@@ -288,6 +292,7 @@ impl UiApp {
                 .command_sender
                 .send(NetworkCommand::Connect(addr.to_string()))
                 .await;
+            false
         } else if input == "/help" {
             self.state
                 .add_system_message("═══════════════════════════════════════════");
@@ -302,6 +307,8 @@ impl UiApp {
             self.state
                 .add_system_message("  /image <file>    - Send an image to peers");
             self.state
+                .add_system_message("  /gif <search>    - Search and send GIF");
+            self.state
                 .add_system_message("  /connect <addr>  - Connect to peer by address");
             self.state
                 .add_system_message("  /quit or /q      - Exit the application");
@@ -311,6 +318,8 @@ impl UiApp {
                 .add_system_message("  /room create <name>         - Create room");
             self.state
                 .add_system_message("  /room invite <peer> <room>  - Invite peer");
+            self.state
+                .add_system_message("  /room join <room_id>        - Join room");
             self.state
                 .add_system_message("  /room list                  - List rooms");
             self.state
@@ -327,12 +336,13 @@ impl UiApp {
                 .add_system_message("  LAN peers discovered via mDNS automatically");
             self.state
                 .add_system_message("  Remote peers: share your multiaddress");
+            false
         } else if let Some(path) = input.strip_prefix("/image ") {
             // Image transfer command
             let path = path.trim();
             if path.is_empty() {
                 self.state.add_system_message("Usage: /image <file_path>");
-                return;
+                return false;
             }
             // Images are sent as files with a marker
             self.state
@@ -343,8 +353,26 @@ impl UiApp {
                     path: path.to_string(),
                 })
                 .await;
+            false
+        } else if let Some(query) = input.strip_prefix("/gif ") {
+            // GIF search command via Klipy
+            let query = query.trim();
+            if query.is_empty() {
+                self.state.add_system_message("Usage: /gif <search term>");
+                return false;
+            }
+            self.state
+                .add_system_message(&format!("🔍 Searching GIFs for: {}", query));
+            let _ = self
+                .command_sender
+                .send(NetworkCommand::SearchGif {
+                    query: query.to_string(),
+                })
+                .await;
+            false
         } else if let Some(room_cmd) = input.strip_prefix("/room ") {
             self.handle_room_command(room_cmd.trim()).await;
+            false
         } else {
             // Regular chat message
             self.state
@@ -355,6 +383,7 @@ impl UiApp {
                     data: input.into_bytes(),
                 })
                 .await;
+            false
         }
     }
 
@@ -409,6 +438,18 @@ impl UiApp {
             }
         } else if cmd == "list" {
             let _ = self.command_sender.send(NetworkCommand::ListRooms).await;
+        } else if let Some(room_id) = cmd.strip_prefix("join ") {
+            let room_id = room_id.trim();
+            if room_id.is_empty() {
+                self.state.add_system_message("Usage: /room join <room_id>");
+                return;
+            }
+            let _ = self
+                .command_sender
+                .send(NetworkCommand::JoinRoom {
+                    room_id: room_id.to_string(),
+                })
+                .await;
         } else if let Some(room_id) = cmd.strip_prefix("leave ") {
             let room_id = room_id.trim();
             if room_id.is_empty() {
@@ -426,7 +467,7 @@ impl UiApp {
                 .add_system_message(&format!("🏠 Left room: {}", room_id));
         } else {
             self.state
-                .add_system_message("Room commands: create, invite, list, leave");
+                .add_system_message("Room commands: create, invite, join, list, leave");
         }
     }
 
@@ -530,6 +571,42 @@ impl UiApp {
                 ));
                 self.state
                     .add_system_message("Saved to ~/openwire-received/");
+            }
+            NetworkEvent::GifSearchResult { query, gifs } => {
+                if gifs.is_empty() {
+                    self.state
+                        .add_system_message(&format!("No GIFs found for: {}", query));
+                } else {
+                    self.state.add_system_message(&format!(
+                        "🎬 Found {} GIFs for '{}':",
+                        gifs.len(),
+                        query
+                    ));
+                    for (i, gif) in gifs.iter().enumerate().take(3) {
+                        self.state.add_system_message(&format!(
+                            "  {}. {} - {}",
+                            i + 1,
+                            gif.title,
+                            gif.url
+                        ));
+                    }
+                    // Send the first GIF to peers (already done in network layer)
+                    if let Some(first) = gifs.first() {
+                        self.state.add_chat_message(
+                            &self.state.nick.clone(),
+                            &format!("[GIF] {} - {}", first.title, first.url),
+                        );
+                    }
+                }
+            }
+            NetworkEvent::GifReceived {
+                from,
+                url,
+                preview_url: _,
+            } => {
+                let short = format!("{}…", &from.to_string()[..8.min(from.to_string().len())]);
+                self.state
+                    .add_chat_message(&short, &format!("[GIF] {}", url));
             }
         }
     }

@@ -15,6 +15,7 @@
 
 mod crypto;
 mod encryption;
+mod klipy;
 mod media;
 mod network;
 mod room;

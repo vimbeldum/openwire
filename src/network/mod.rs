@@ -85,8 +85,25 @@ pub enum NetworkEvent {
         filename: String,
         data: Vec<u8>,
     },
+    /// GIF search results from Klipy
+    GifSearchResult { query: String, gifs: Vec<GifResult> },
+    /// GIF received from a peer
+    GifReceived {
+        from: PeerId,
+        url: String,
+        preview_url: String,
+    },
     /// Error occurred
     Error(String),
+}
+
+/// A GIF search result from Klipy
+#[derive(Debug, Clone)]
+pub struct GifResult {
+    pub id: String,
+    pub url: String,
+    pub preview_url: String,
+    pub title: String,
 }
 
 /// Commands to control the network layer
@@ -117,10 +134,14 @@ pub enum NetworkCommand {
     CreateRoom { name: String },
     /// Invite a peer to a room
     InviteToRoom { room_id: String, peer_id: String },
+    /// Join a room by ID (when you receive an invite out of band)
+    JoinRoom { room_id: String },
     /// Leave a room
     LeaveRoom { room_id: String },
     /// List all rooms
     ListRooms,
+    /// Search for a GIF via Klipy
+    SearchGif { query: String },
 }
 
 /// A file transfer message
@@ -271,6 +292,8 @@ pub struct Network {
     local_peer_id: PeerId,
     /// Track which peers have exchanged keys
     keys_exchanged: Arc<RwLock<Vec<PeerId>>>,
+    /// Klipy GIF API client (optional)
+    klipy_client: Option<crate::klipy::KlipyClient>,
 }
 
 impl Network {
@@ -373,6 +396,9 @@ impl Network {
             room_manager,
             local_peer_id,
             keys_exchanged: Arc::new(RwLock::new(Vec::new())),
+            klipy_client: std::env::var("KLIPY_KEY")
+                .ok()
+                .map(crate::klipy::KlipyClient::new),
         };
 
         let handle = NetworkHandle {
@@ -911,6 +937,65 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                         let _ = network.event_sender.send(
                             NetworkEvent::RoomList { rooms }
                         ).await;
+                    }
+                    NetworkCommand::JoinRoom { room_id: _ } => {
+                        // Note: You can only join a room if you receive a proper invite
+                        // This command is for future use when manual room joining is implemented
+                        let _ = network.event_sender.send(
+                            NetworkEvent::Error("Room joining requires an invite. Ask a room member to invite you.".to_string())
+                        ).await;
+                    }
+                    NetworkCommand::SearchGif { query } => {
+                        if let Some(ref client) = network.klipy_client {
+                            match client.search(&query, 5).await {
+                                Ok(gifs) => {
+                                    let results: Vec<GifResult> = gifs.into_iter()
+                                        .filter_map(|g| {
+                                            Some(GifResult {
+                                                id: g.id.clone(),
+                                                url: g.share_url()?.to_string(),
+                                                preview_url: g.preview_url()?.to_string(),
+                                                title: g.title.unwrap_or_default(),
+                                            })
+                                        })
+                                        .collect();
+
+                                    if results.is_empty() {
+                                        let _ = network.event_sender.send(
+                                            NetworkEvent::Error(format!("No GIFs found for: {}", query))
+                                        ).await;
+                                    } else {
+                                        // Send first GIF result to peers
+                                        if let Some(first_gif) = results.first() {
+                                            let _ = network.event_sender.send(
+                                                NetworkEvent::GifSearchResult {
+                                                    query: query.clone(),
+                                                    gifs: results.clone(),
+                                                }
+                                            ).await;
+
+                                            // Broadcast GIF URL to peers
+                                            let gif_message = format!("[GIF] {} - {}", first_gif.title, first_gif.url);
+                                            let signed = {
+                                                let crypto = network.crypto.read().await;
+                                                crate::crypto::SignedMessage::new(crypto.identity(), gif_message.as_bytes().to_vec())?
+                                            };
+                                            let topic = gossipsub::IdentTopic::new(GENERAL_TOPIC);
+                                            let _ = network.swarm.behaviour_mut().gossipsub.publish(topic, signed.to_bytes()?);
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    let _ = network.event_sender.send(
+                                        NetworkEvent::Error(format!("GIF search failed: {}", e))
+                                    ).await;
+                                }
+                            }
+                        } else {
+                            let _ = network.event_sender.send(
+                                NetworkEvent::Error("GIF search unavailable: KLIPY_KEY not configured".to_string())
+                            ).await;
+                        }
                     }
                 }
             }

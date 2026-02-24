@@ -21,6 +21,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.2] - 2026-02-24
+
+### Added
+
+- **GIF Support via Klipy**
+  - `/gif <search>` command to search and send GIFs
+  - Integrated with Klipy API (requires KLIPY_KEY env variable)
+  - GIFs are shared as URLs in chat
+
+- **Room Join Command**
+  - `/room join <room_id>` command added (placeholder for future use)
+  - Currently requires invite to join rooms
+
+### Changed
+
+- Improved help display with GIF command documentation
+
+### Fixed
+
+- **/quit command now works** - previously the command was processed but didn't exit the UI loop
+- Added `reqwest` dependency for HTTP requests to Klipy API
+
+---
+
 ## [0.2.1] - 2026-02-24
 
 ### Added
