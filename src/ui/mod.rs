@@ -252,10 +252,20 @@ impl UiApp {
                 .add_system_message("  /connect <addr> - Connect to peer by multiaddress");
             self.state.add_system_message("  /quit           - Exit");
             self.state.add_system_message("");
+            self.state.add_system_message("Room Commands:");
+            self.state
+                .add_system_message("  /room create <name>          - Create a private room");
+            self.state
+                .add_system_message("  /room invite <peer> <room>   - Invite peer to room");
+            self.state
+                .add_system_message("  /room list                   - List your rooms");
+            self.state.add_system_message("");
             self.state
                 .add_system_message("Group chat: Peers on the same LAN join automatically.");
             self.state
                 .add_system_message("Remote peers: Share your multiaddress shown at startup.");
+        } else if let Some(room_cmd) = input.strip_prefix("/room ") {
+            self.handle_room_command(room_cmd.trim()).await;
         } else {
             // Regular chat message
             self.state
@@ -266,6 +276,40 @@ impl UiApp {
                     data: input.into_bytes(),
                 })
                 .await;
+        }
+    }
+
+    /// Handle room commands
+    async fn handle_room_command(&mut self, cmd: &str) {
+        if let Some(name) = cmd.strip_prefix("create ") {
+            let name = name.trim();
+            if name.is_empty() {
+                self.state.add_system_message("Usage: /room create <name>");
+                return;
+            }
+            // Room creation is handled by the network layer
+            // For now, just show a message - the actual creation needs room manager access
+            self.state
+                .add_system_message(&format!("🏠 Room creation requested: '{}'", name));
+            self.state
+                .add_system_message("Note: Room commands require room manager integration");
+        } else if let Some(args) = cmd.strip_prefix("invite ") {
+            let parts: Vec<&str> = args.split_whitespace().collect();
+            if parts.len() < 2 {
+                self.state
+                    .add_system_message("Usage: /room invite <peer_id> <room_id>");
+                return;
+            }
+            let peer_id = parts[0];
+            let room_id = parts[1];
+            self.state
+                .add_system_message(&format!("🏠 Inviting {} to room {}", peer_id, room_id));
+        } else if cmd == "list" {
+            self.state
+                .add_system_message("🏠 Rooms: (feature in development)");
+        } else {
+            self.state
+                .add_system_message("Room commands: create, invite, list");
         }
     }
 
@@ -310,6 +354,27 @@ impl UiApp {
             }
             NetworkEvent::Error(e) => {
                 self.state.add_system_message(&format!("⚠ Error: {}", e));
+            }
+            NetworkEvent::RoomInviteReceived {
+                from,
+                room_id,
+                room_name,
+            } => {
+                let short = format!("{}…", &from.to_string()[..8.min(from.to_string().len())]);
+                self.state.add_system_message(&format!(
+                    "🏠 Invited to room '{}' ({}) by {}",
+                    room_name, room_id, short
+                ));
+            }
+            NetworkEvent::RoomMessageReceived {
+                from: _,
+                room_id,
+                sender_nick,
+                content,
+            } => {
+                let content_str = String::from_utf8_lossy(&content).to_string();
+                self.state
+                    .add_chat_message(&format!("[{}] {}", room_id, sender_nick), &content_str);
             }
         }
     }
