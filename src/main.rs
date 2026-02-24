@@ -8,12 +8,14 @@
 //! - Peer discovery via mDNS
 //! - Secure transport via Noise protocol
 //! - File transfer support
-//! - Terminal UI with 3-pane layout
+//! - Private group chat rooms
+//! - Terminal UI with multi-tab layout
 //! - Optional web interface
 
 mod crypto;
 mod encryption;
 mod network;
+mod room;
 mod ui;
 mod web;
 

@@ -19,6 +19,7 @@ use std::time::Duration;
 use tokio::sync::{mpsc, RwLock};
 
 use crate::crypto::CryptoManager;
+use crate::room::RoomManager;
 
 /// Topic for exchanging encryption keys
 const KEY_EXCHANGE_TOPIC: &str = "openwire-key-exchange";
@@ -26,6 +27,8 @@ const KEY_EXCHANGE_TOPIC: &str = "openwire-key-exchange";
 const GENERAL_TOPIC: &str = "openwire-general";
 /// Topic for file transfers
 const FILE_TRANSFER_TOPIC: &str = "openwire-file-transfer";
+/// Topic for room invites
+const ROOM_INVITE_TOPIC: &str = "openwire-room-invite";
 
 /// Maximum allowed clock skew for key exchange timestamps (seconds)
 const MAX_TIMESTAMP_SKEW: u64 = 60;
@@ -57,6 +60,19 @@ pub enum NetworkEvent {
     KeysExchanged(PeerId),
     /// A new listen address was assigned
     ListenAddress(String),
+    /// A room invite was received
+    RoomInviteReceived {
+        from: PeerId,
+        room_id: String,
+        room_name: String,
+    },
+    /// A room message was received (already decrypted)
+    RoomMessageReceived {
+        from: PeerId,
+        room_id: String,
+        sender_nick: String,
+        content: Vec<u8>,
+    },
     /// Error occurred
     Error(String),
 }
@@ -74,6 +90,17 @@ pub enum NetworkCommand {
     Connect(String),
     /// Shutdown the network
     Shutdown,
+    /// Create and subscribe to a room topic
+    SubscribeToRoom { room_id: String },
+    /// Unsubscribe from a room topic
+    UnsubscribeFromRoom { room_id: String },
+    /// Send a room message (encrypted)
+    SendRoomMessage { room_id: String, data: Vec<u8> },
+    /// Send a room invite to a peer
+    SendRoomInvite {
+        peer_id: String,
+        invite_data: Vec<u8>,
+    },
 }
 
 /// A file transfer message
@@ -208,6 +235,7 @@ pub struct NetworkHandle {
 /// - Peer discovery and management
 /// - Message routing with E2E encryption
 /// - Connection lifecycle
+/// - Room management
 pub struct Network {
     /// The libp2p swarm
     swarm: libp2p::Swarm<OpenWireBehaviour>,
@@ -217,6 +245,8 @@ pub struct Network {
     command_receiver: mpsc::Receiver<NetworkCommand>,
     /// Crypto manager for E2E encryption
     crypto: Arc<RwLock<CryptoManager>>,
+    /// Room manager for private group chats
+    room_manager: Arc<RwLock<RoomManager>>,
     /// Local peer ID
     local_peer_id: PeerId,
     /// Track which peers have exchanged keys
@@ -298,21 +328,29 @@ impl Network {
         let general_topic = gossipsub::IdentTopic::new(GENERAL_TOPIC);
         let key_topic = gossipsub::IdentTopic::new(KEY_EXCHANGE_TOPIC);
         let file_topic = gossipsub::IdentTopic::new(FILE_TRANSFER_TOPIC);
+        let room_invite_topic = gossipsub::IdentTopic::new(ROOM_INVITE_TOPIC);
         swarm.behaviour_mut().gossipsub.subscribe(&general_topic)?;
         swarm.behaviour_mut().gossipsub.subscribe(&key_topic)?;
         swarm.behaviour_mut().gossipsub.subscribe(&file_topic)?;
+        swarm
+            .behaviour_mut()
+            .gossipsub
+            .subscribe(&room_invite_topic)?;
 
         // Create channels — both halves are now properly used
         let (event_sender, event_receiver) = mpsc::channel(256);
         let (command_sender, command_receiver) = mpsc::channel(256);
 
         let crypto = Arc::new(RwLock::new(crypto));
+        let encryption_key = crypto.read().await.encryption_public_key();
+        let room_manager = Arc::new(RwLock::new(RoomManager::new(encryption_key)));
 
         let network = Self {
             swarm,
             event_sender,
             command_receiver,
             crypto,
+            room_manager,
             local_peer_id,
             keys_exchanged: Arc::new(RwLock::new(Vec::new())),
         };
@@ -502,6 +540,138 @@ impl Network {
         tracing::info!("Sent file '{}' ({} bytes)", filename, file_msg.size);
         Ok(())
     }
+
+    /// Get the room manager
+    pub fn room_manager(&self) -> Arc<RwLock<RoomManager>> {
+        self.room_manager.clone()
+    }
+
+    /// Subscribe to a room topic
+    fn subscribe_to_room(&mut self, room_id: &str) -> Result<()> {
+        let topic_name = format!("openwire-room-{}", room_id);
+        let topic = gossipsub::IdentTopic::new(&topic_name);
+        self.swarm.behaviour_mut().gossipsub.subscribe(&topic)?;
+        tracing::info!("Subscribed to room: {}", room_id);
+        Ok(())
+    }
+
+    /// Unsubscribe from a room topic
+    fn unsubscribe_from_room(&mut self, room_id: &str) -> Result<()> {
+        let topic_name = format!("openwire-room-{}", room_id);
+        let topic = gossipsub::IdentTopic::new(&topic_name);
+        self.swarm.behaviour_mut().gossipsub.unsubscribe(&topic)?;
+        tracing::info!("Unsubscribed from room: {}", room_id);
+        Ok(())
+    }
+
+    /// Send an encrypted room message
+    async fn send_room_message(&mut self, room_id: &str, data: Vec<u8>) -> Result<()> {
+        let encrypted_bytes;
+        {
+            let room_manager = self.room_manager.read().await;
+            let crypto = self.crypto.read().await;
+
+            // Create the room message
+            let room_msg = crate::room::RoomMessage::new(
+                crypto.identity(),
+                room_id.to_string(),
+                "User".to_string(), // TODO: pass nickname
+                data,
+            )?;
+
+            // Encrypt it with the room's group key
+            encrypted_bytes = room_manager
+                .encrypt_message(room_id, &room_msg)?
+                .to_bytes()?;
+        }
+
+        let topic_name = format!("openwire-room-{}", room_id);
+        let topic = gossipsub::IdentTopic::new(&topic_name);
+        self.swarm
+            .behaviour_mut()
+            .gossipsub
+            .publish(topic, encrypted_bytes)?;
+
+        tracing::debug!("Sent encrypted message to room: {}", room_id);
+        Ok(())
+    }
+
+    /// Handle incoming room invite
+    async fn handle_room_invite(&mut self, peer_id: PeerId, data: &[u8]) -> Result<()> {
+        let invite = crate::room::RoomInvite::from_bytes(data)?;
+
+        // Verify the invite
+        invite.verify()?;
+
+        // Join the room
+        {
+            let mut room_manager = self.room_manager.write().await;
+            room_manager.join_room(invite.clone())?;
+        }
+
+        // Subscribe to the room topic
+        self.subscribe_to_room(&invite.room_id)?;
+
+        tracing::info!(
+            "Joined room '{}' ({}) via invite from {}",
+            invite.room_name,
+            invite.room_id,
+            peer_id
+        );
+
+        let _ = self
+            .event_sender
+            .send(NetworkEvent::RoomInviteReceived {
+                from: peer_id,
+                room_id: invite.room_id,
+                room_name: invite.room_name,
+            })
+            .await;
+
+        Ok(())
+    }
+
+    /// Handle incoming encrypted room message
+    async fn handle_room_message(
+        &mut self,
+        peer_id: PeerId,
+        topic: &str,
+        data: &[u8],
+    ) -> Result<()> {
+        // Extract room ID from topic (format: openwire-room-<room_id>)
+        let room_id = topic
+            .strip_prefix("openwire-room-")
+            .ok_or_else(|| anyhow::anyhow!("Invalid room topic format"))?;
+
+        let encrypted = crate::room::EncryptedRoomMessage::from_bytes(data)?;
+
+        // Decrypt and verify
+        let room_msg;
+        {
+            let room_manager = self.room_manager.read().await;
+            room_msg = room_manager.decrypt_message(room_id, &encrypted)?;
+        }
+
+        room_msg.verify()?;
+
+        tracing::debug!(
+            "Received room message from {} in room {}",
+            room_msg.sender_nick,
+            room_id
+        );
+
+        let _ = self
+            .event_sender
+            .send(NetworkEvent::RoomMessageReceived {
+                from: peer_id,
+                room_id: room_id.to_string(),
+                sender_nick: room_msg.sender_nick,
+                content: room_msg.content,
+            })
+            .await;
+
+        Ok(())
+    }
 }
 
 /// Run the network event loop.
@@ -591,6 +761,40 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                     NetworkCommand::Shutdown => {
                         tracing::info!("Network shutting down gracefully");
                         break;
+                    }
+                    NetworkCommand::SubscribeToRoom { room_id } => {
+                        if let Err(e) = network.subscribe_to_room(&room_id) {
+                            tracing::error!("Failed to subscribe to room {}: {}", room_id, e);
+                            let _ = network.event_sender.send(
+                                NetworkEvent::Error(format!("Failed to join room: {}", e))
+                            ).await;
+                        }
+                    }
+                    NetworkCommand::UnsubscribeFromRoom { room_id } => {
+                        if let Err(e) = network.unsubscribe_from_room(&room_id) {
+                            tracing::error!("Failed to unsubscribe from room {}: {}", room_id, e);
+                            let _ = network.event_sender.send(
+                                NetworkEvent::Error(format!("Failed to leave room: {}", e))
+                            ).await;
+                        }
+                    }
+                    NetworkCommand::SendRoomMessage { room_id, data } => {
+                        if let Err(e) = network.send_room_message(&room_id, data).await {
+                            tracing::error!("Failed to send room message: {}", e);
+                            let _ = network.event_sender.send(
+                                NetworkEvent::Error(format!("Room message failed: {}", e))
+                            ).await;
+                        }
+                    }
+                    NetworkCommand::SendRoomInvite { peer_id: _, invite_data } => {
+                        // Send the invite on the room invite topic
+                        let topic = gossipsub::IdentTopic::new(ROOM_INVITE_TOPIC);
+                        if let Err(e) = network.swarm.behaviour_mut().gossipsub.publish(topic, invite_data) {
+                            tracing::error!("Failed to send room invite: {}", e);
+                            let _ = network.event_sender.send(
+                                NetworkEvent::Error(format!("Failed to send room invite: {}", e))
+                            ).await;
+                        }
                     }
                 }
             }
@@ -682,6 +886,19 @@ async fn handle_behaviour_event(network: &mut Network, event: OpenWireBehaviourE
                     Err(e) => {
                         tracing::debug!("Could not parse file message from {}: {}", peer_id, e);
                     }
+                }
+            } else if topic == ROOM_INVITE_TOPIC {
+                // Room invite
+                if let Err(e) = network.handle_room_invite(peer_id, &message.data).await {
+                    tracing::warn!("Rejected room invite from {}: {}", peer_id, e);
+                }
+            } else if topic.starts_with("openwire-room-") {
+                // Room message - decrypt and verify
+                if let Err(e) = network
+                    .handle_room_message(peer_id, topic, &message.data)
+                    .await
+                {
+                    tracing::debug!("Could not handle room message from {}: {}", peer_id, e);
                 }
             }
         }
