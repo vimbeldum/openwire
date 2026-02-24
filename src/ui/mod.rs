@@ -45,6 +45,8 @@ pub struct UiState {
     pub messages: Vec<ChatMessage>,
     /// Connected peer IDs
     pub peers: Vec<String>,
+    /// Joined rooms (room_id, room_name)
+    pub rooms: Vec<(String, String)>,
     /// Local nickname
     pub nick: String,
     /// Local peer ID (short form)
@@ -62,6 +64,7 @@ impl UiState {
             cursor_pos: 0,
             messages: Vec::new(),
             peers: Vec::new(),
+            rooms: Vec::new(),
             nick,
             local_peer_id,
             scroll_offset: 0,
@@ -208,7 +211,8 @@ impl UiApp {
                         (KeyCode::Up, _) => {
                             // Scroll up (towards older messages)
                             self.state.auto_scroll = false;
-                            if self.state.scroll_offset < self.state.messages.len() {
+                            let max_scroll = self.state.messages.len().saturating_sub(1);
+                            if self.state.scroll_offset < max_scroll {
                                 self.state.scroll_offset += 1;
                             }
                         }
@@ -224,8 +228,9 @@ impl UiApp {
                         (KeyCode::PageUp, _) => {
                             // Scroll up by 10 messages
                             self.state.auto_scroll = false;
+                            let max_scroll = self.state.messages.len().saturating_sub(1);
                             self.state.scroll_offset =
-                                (self.state.scroll_offset + 10).min(self.state.messages.len());
+                                (self.state.scroll_offset + 10).min(max_scroll);
                         }
                         (KeyCode::PageDown, _) => {
                             // Scroll down by 10 messages
@@ -372,14 +377,36 @@ impl UiApp {
             if parts.len() < 2 {
                 self.state
                     .add_system_message("Usage: /room invite <peer_id> <room_id>");
+                self.state
+                    .add_system_message("  Use the short peer ID shown in the Peers panel");
                 return;
             }
-            let peer_id = parts[0].to_string();
+            let short_peer_id = parts[0];
             let room_id = parts[1].to_string();
-            let _ = self
-                .command_sender
-                .send(NetworkCommand::InviteToRoom { room_id, peer_id })
-                .await;
+
+            // Find full peer ID by matching short ID prefix
+            let full_peer_id = self
+                .state
+                .peers
+                .iter()
+                .find(|p| p.starts_with(short_peer_id))
+                .cloned();
+
+            if let Some(peer_id) = full_peer_id {
+                self.state.add_system_message(&format!(
+                    "🏠 Inviting {} to room {}",
+                    short_peer_id, room_id
+                ));
+                let _ = self
+                    .command_sender
+                    .send(NetworkCommand::InviteToRoom { room_id, peer_id })
+                    .await;
+            } else {
+                self.state.add_system_message(&format!(
+                    "⚠ Peer '{}' not found. Check the Peers panel.",
+                    short_peer_id
+                ));
+            }
         } else if cmd == "list" {
             let _ = self.command_sender.send(NetworkCommand::ListRooms).await;
         } else if let Some(room_id) = cmd.strip_prefix("leave ") {
@@ -450,9 +477,13 @@ impl UiApp {
                 room_id,
                 room_name,
             } => {
+                // Add room to UI state when invited
+                if !self.state.rooms.iter().any(|(id, _)| id == &room_id) {
+                    self.state.rooms.push((room_id.clone(), room_name.clone()));
+                }
                 let short = format!("{}…", &from.to_string()[..8.min(from.to_string().len())]);
                 self.state.add_system_message(&format!(
-                    "🏠 Invited to room '{}' ({}) by {}",
+                    "🏠 Joined room '{}' ({}) via invite from {}",
                     room_name, room_id, short
                 ));
             }
@@ -467,12 +498,16 @@ impl UiApp {
                     .add_chat_message(&format!("[{}] {}", room_id, sender_nick), &content_str);
             }
             NetworkEvent::RoomCreated { room_id, room_name } => {
+                // Add room to UI state
+                self.state.rooms.push((room_id.clone(), room_name.clone()));
                 self.state.add_system_message(&format!(
                     "🏠 Room '{}' created! ID: {}",
                     room_name, room_id
                 ));
             }
             NetworkEvent::RoomList { rooms } => {
+                // Update UI state with rooms
+                self.state.rooms = rooms.clone();
                 if rooms.is_empty() {
                     self.state.add_system_message("🏠 No rooms joined");
                 } else {
@@ -630,6 +665,12 @@ impl UiApp {
                 ));
             }
 
+            // -- Right Panel: Peers + Rooms --
+            let right_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(5), Constraint::Length(8)])
+                .split(main_chunks[1]);
+
             // -- Peers Panel --
             let peer_items: Vec<ListItem> = self
                 .state
@@ -654,7 +695,37 @@ impl UiApp {
                 .border_style(Style::default().fg(Color::Magenta));
 
             let peers = List::new(peer_items).block(peers_block);
-            f.render_widget(peers, main_chunks[1]);
+            f.render_widget(peers, right_chunks[0]);
+
+            // -- Rooms Panel --
+            let room_items: Vec<ListItem> = self
+                .state
+                .rooms
+                .iter()
+                .map(|(id, name)| {
+                    let short_id = if id.len() > 8 {
+                        format!("{}…", &id[..8])
+                    } else {
+                        id.clone()
+                    };
+                    ListItem::new(Line::from(vec![
+                        Span::styled("🏠 ", Style::default().fg(Color::Yellow)),
+                        Span::styled(name, Style::default().fg(Color::White)),
+                        Span::styled(
+                            format!(" ({})", short_id),
+                            Style::default().fg(Color::DarkGray),
+                        ),
+                    ]))
+                })
+                .collect();
+
+            let rooms_block = Block::default()
+                .title(format!(" Rooms ({}) ", self.state.rooms.len()))
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow));
+
+            let rooms = List::new(room_items).block(rooms_block);
+            f.render_widget(rooms, right_chunks[1]);
         })?;
         Ok(())
     }
