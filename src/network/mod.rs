@@ -880,7 +880,7 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                         }
                     }
                     NetworkCommand::InviteToRoom { room_id, peer_id } => {
-                        // Create and send invite
+                        // Create and send invite — with key exchange retry
                         let invite_result = async {
                             let room_manager = network.room_manager.read().await;
                             let crypto = network.crypto.read().await;
@@ -890,12 +890,40 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                                 return Err(anyhow::anyhow!("You are not a member of this room"));
                             }
 
-                            // Get peer's encryption key
-                            let peer_info = crypto.get_peer(&peer_id).await
-                                .ok_or_else(|| anyhow::anyhow!(
-                                    "Keys not yet exchanged with peer. Wait a moment and try again, \
-                                     or send them a message first to trigger key exchange."
-                                ))?;
+                            // Get peer's encryption key — retry once after triggering key exchange
+                            let peer_info = match crypto.get_peer(&peer_id).await {
+                                Some(info) => info,
+                                None => {
+                                    tracing::info!("Keys not yet available for {}, triggering key exchange and retrying...", peer_id);
+                                    drop(crypto);
+                                    drop(room_manager);
+
+                                    if let Err(e) = network.send_key_exchange().await {
+                                        tracing::warn!("Key exchange broadcast failed: {}", e);
+                                    }
+
+                                    tokio::time::sleep(Duration::from_secs(2)).await;
+
+                                    let crypto = network.crypto.read().await;
+                                    let room_manager = network.room_manager.read().await;
+
+                                    let info = crypto.get_peer(&peer_id).await
+                                        .ok_or_else(|| anyhow::anyhow!(
+                                            "Keys still not exchanged after retry. Try again in a few seconds."
+                                        ))?;
+
+                                    if !room_manager.can_invite_to_room(&room_id) {
+                                        return Err(anyhow::anyhow!("You are not a member of this room"));
+                                    }
+
+                                    return room_manager.create_invite(
+                                        &room_id,
+                                        crypto.identity(),
+                                        &peer_id,
+                                        &info.encryption_public_key,
+                                    );
+                                }
+                            };
 
                             room_manager.create_invite(
                                 &room_id,
