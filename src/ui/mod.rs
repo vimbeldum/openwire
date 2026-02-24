@@ -288,6 +288,8 @@ impl UiApp {
             self.state
                 .add_system_message("  /send <file>    - Send a file to peers");
             self.state
+                .add_system_message("  /image <file>   - Send an image to peers");
+            self.state
                 .add_system_message("  /connect <addr> - Connect to peer by multiaddress");
             self.state.add_system_message("  /quit           - Exit");
             self.state.add_system_message("");
@@ -298,11 +300,35 @@ impl UiApp {
                 .add_system_message("  /room invite <peer> <room>   - Invite peer to room");
             self.state
                 .add_system_message("  /room list                   - List your rooms");
+            self.state
+                .add_system_message("  /room leave <room_id>        - Leave a room");
+            self.state.add_system_message("");
+            self.state.add_system_message("Navigation:");
+            self.state
+                .add_system_message("  Up/Down         - Scroll messages");
+            self.state
+                .add_system_message("  PageUp/PageDown - Fast scroll");
             self.state.add_system_message("");
             self.state
                 .add_system_message("Group chat: Peers on the same LAN join automatically.");
             self.state
                 .add_system_message("Remote peers: Share your multiaddress shown at startup.");
+        } else if let Some(path) = input.strip_prefix("/image ") {
+            // Image transfer command
+            let path = path.trim();
+            if path.is_empty() {
+                self.state.add_system_message("Usage: /image <file_path>");
+                return;
+            }
+            // Images are sent as files with a marker
+            self.state
+                .add_system_message(&format!("🖼️ Sending image: {}", path));
+            let _ = self
+                .command_sender
+                .send(NetworkCommand::SendFile {
+                    path: path.to_string(),
+                })
+                .await;
         } else if let Some(room_cmd) = input.strip_prefix("/room ") {
             self.handle_room_command(room_cmd.trim()).await;
         } else {
@@ -326,12 +352,12 @@ impl UiApp {
                 self.state.add_system_message("Usage: /room create <name>");
                 return;
             }
-            // Room creation is handled by the network layer
-            // For now, just show a message - the actual creation needs room manager access
-            self.state
-                .add_system_message(&format!("🏠 Room creation requested: '{}'", name));
-            self.state
-                .add_system_message("Note: Room commands require room manager integration");
+            let _ = self
+                .command_sender
+                .send(NetworkCommand::CreateRoom {
+                    name: name.to_string(),
+                })
+                .await;
         } else if let Some(args) = cmd.strip_prefix("invite ") {
             let parts: Vec<&str> = args.split_whitespace().collect();
             if parts.len() < 2 {
@@ -339,16 +365,32 @@ impl UiApp {
                     .add_system_message("Usage: /room invite <peer_id> <room_id>");
                 return;
             }
-            let peer_id = parts[0];
-            let room_id = parts[1];
-            self.state
-                .add_system_message(&format!("🏠 Inviting {} to room {}", peer_id, room_id));
+            let peer_id = parts[0].to_string();
+            let room_id = parts[1].to_string();
+            let _ = self
+                .command_sender
+                .send(NetworkCommand::InviteToRoom { room_id, peer_id })
+                .await;
         } else if cmd == "list" {
+            let _ = self.command_sender.send(NetworkCommand::ListRooms).await;
+        } else if let Some(room_id) = cmd.strip_prefix("leave ") {
+            let room_id = room_id.trim();
+            if room_id.is_empty() {
+                self.state
+                    .add_system_message("Usage: /room leave <room_id>");
+                return;
+            }
+            let _ = self
+                .command_sender
+                .send(NetworkCommand::LeaveRoom {
+                    room_id: room_id.to_string(),
+                })
+                .await;
             self.state
-                .add_system_message("🏠 Rooms: (feature in development)");
+                .add_system_message(&format!("🏠 Left room: {}", room_id));
         } else {
             self.state
-                .add_system_message("Room commands: create, invite, list");
+                .add_system_message("Room commands: create, invite, list, leave");
         }
     }
 
@@ -414,6 +456,36 @@ impl UiApp {
                 let content_str = String::from_utf8_lossy(&content).to_string();
                 self.state
                     .add_chat_message(&format!("[{}] {}", room_id, sender_nick), &content_str);
+            }
+            NetworkEvent::RoomCreated { room_id, room_name } => {
+                self.state.add_system_message(&format!(
+                    "🏠 Room '{}' created! ID: {}",
+                    room_name, room_id
+                ));
+            }
+            NetworkEvent::RoomList { rooms } => {
+                if rooms.is_empty() {
+                    self.state.add_system_message("🏠 No rooms joined");
+                } else {
+                    self.state.add_system_message("🏠 Your rooms:");
+                    for (id, name) in rooms {
+                        self.state
+                            .add_system_message(&format!("  • {} ({})", name, id));
+                    }
+                }
+            }
+            NetworkEvent::ImageReceived {
+                from,
+                filename,
+                data: _,
+            } => {
+                let short = format!("{}…", &from.to_string()[..8.min(from.to_string().len())]);
+                self.state.add_system_message(&format!(
+                    "🖼️ Image '{}' received from {}",
+                    filename, short
+                ));
+                self.state
+                    .add_system_message("Saved to ~/openwire-received/");
             }
         }
     }

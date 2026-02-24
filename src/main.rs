@@ -11,9 +11,11 @@
 //! - Private group chat rooms
 //! - Terminal UI with multi-tab layout
 //! - Optional web interface
+//! - Image sharing support
 
 mod crypto;
 mod encryption;
+mod media;
 mod network;
 mod room;
 mod ui;
