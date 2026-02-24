@@ -73,6 +73,18 @@ pub enum NetworkEvent {
         sender_nick: String,
         content: Vec<u8>,
     },
+    /// A room was created
+    RoomCreated { room_id: String, room_name: String },
+    /// List of rooms (response to ListRooms command)
+    RoomList {
+        rooms: Vec<(String, String)>, // (room_id, room_name)
+    },
+    /// Image received for display
+    ImageReceived {
+        from: PeerId,
+        filename: String,
+        data: Vec<u8>,
+    },
     /// Error occurred
     Error(String),
 }
@@ -101,6 +113,14 @@ pub enum NetworkCommand {
         peer_id: String,
         invite_data: Vec<u8>,
     },
+    /// Create a new room
+    CreateRoom { name: String },
+    /// Invite a peer to a room
+    InviteToRoom { room_id: String, peer_id: String },
+    /// Leave a room
+    LeaveRoom { room_id: String },
+    /// List all rooms
+    ListRooms,
 }
 
 /// A file transfer message
@@ -795,6 +815,92 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                                 NetworkEvent::Error(format!("Failed to send room invite: {}", e))
                             ).await;
                         }
+                    }
+                    NetworkCommand::CreateRoom { name } => {
+                        let result = {
+                            let mut room_manager = network.room_manager.write().await;
+                            room_manager.create_room(name.clone()).map(|r| (r.id.clone(), r.name.clone()))
+                        };
+                        match result {
+                            Ok((room_id, room_name)) => {
+                                // Subscribe to the room topic
+                                if let Err(e) = network.subscribe_to_room(&room_id) {
+                                    tracing::error!("Failed to subscribe to room {}: {}", room_id, e);
+                                }
+                                let _ = network.event_sender.send(
+                                    NetworkEvent::RoomCreated { room_id, room_name }
+                                ).await;
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to create room: {}", e);
+                                let _ = network.event_sender.send(
+                                    NetworkEvent::Error(format!("Failed to create room: {}", e))
+                                ).await;
+                            }
+                        }
+                    }
+                    NetworkCommand::InviteToRoom { room_id, peer_id } => {
+                        // Create and send invite
+                        let invite_result = async {
+                            let room_manager = network.room_manager.read().await;
+                            let crypto = network.crypto.read().await;
+
+                            // Get peer's encryption key
+                            let peer_info = crypto.get_peer(&peer_id).await
+                                .ok_or_else(|| anyhow::anyhow!("Peer not found or keys not exchanged"))?;
+
+                            room_manager.create_invite(
+                                &room_id,
+                                crypto.identity(),
+                                &peer_id,
+                                &peer_info.encryption_public_key,
+                            )
+                        }.await;
+
+                        match invite_result {
+                            Ok(invite) => {
+                                let invite_data = invite.to_bytes().unwrap_or_default();
+                                let topic = gossipsub::IdentTopic::new(ROOM_INVITE_TOPIC);
+                                if let Err(e) = network.swarm.behaviour_mut().gossipsub.publish(topic, invite_data) {
+                                    tracing::error!("Failed to send room invite: {}", e);
+                                    let _ = network.event_sender.send(
+                                        NetworkEvent::Error(format!("Failed to send room invite: {}", e))
+                                    ).await;
+                                } else {
+                                    let _ = network.event_sender.send(
+                                        NetworkEvent::RoomCreated { room_id, room_name: format!("Invited {} to room", peer_id) }
+                                    ).await;
+                                }
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to create room invite: {}", e);
+                                let _ = network.event_sender.send(
+                                    NetworkEvent::Error(format!("Failed to create invite: {}", e))
+                                ).await;
+                            }
+                        }
+                    }
+                    NetworkCommand::LeaveRoom { room_id } => {
+                        let room = {
+                            let mut room_manager = network.room_manager.write().await;
+                            room_manager.leave_room(&room_id)
+                        };
+                        if let Some(_room) = room {
+                            if let Err(e) = network.unsubscribe_from_room(&room_id) {
+                                tracing::error!("Failed to unsubscribe from room {}: {}", room_id, e);
+                            }
+                        }
+                    }
+                    NetworkCommand::ListRooms => {
+                        let rooms = {
+                            let room_manager = network.room_manager.read().await;
+                            room_manager.get_all_rooms().iter()
+                                .map(|r| (r.id.clone(), r.name.clone()))
+                                .collect()
+                        };
+                        let _ = network.event_sender.send(
+                            NetworkEvent::RoomList { rooms }
+                        ).await;
                     }
                 }
             }

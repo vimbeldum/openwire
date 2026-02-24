@@ -21,6 +21,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] - 2026-02-24
+
+### Added
+
+- **Private Group Chat Rooms**
+  - `/room create <name>` - Create encrypted private rooms
+  - `/room invite <peer> <room>` - Invite peers to rooms
+  - `/room list` - List joined rooms
+  - `/room leave <room>` - Leave a room
+  - Room-specific encryption with ChaCha20-Poly1305
+  - Signed room invites with X25519 key exchange
+
+- **Message Scrolling**
+  - Up/Down arrows to scroll message history
+  - PageUp/PageDown for fast scrolling
+  - Visual scrollbar indicator
+  - Auto-scroll to bottom on new messages
+
+- **Media Support**
+  - Optional image support with `--features image-support`
+  - `/image <file>` command to send images
+  - ASCII art fallback for terminals without image protocol support
+  - Supports PNG, JPEG, GIF, BMP, WebP formats
+
+- **Open Source Project Files**
+  - CONTRIBUTING.md with development guidelines
+  - CODE_OF_CONDUCT.md (Contributor Covenant)
+  - SECURITY.md with vulnerability reporting process
+  - Issue templates (bug report, feature request)
+  - Pull request template
+  - Dependabot configuration
+  - CI workflow with test, clippy, fmt checks
+  - Pre-commit hooks configuration
+
+### Changed
+
+- Updated README with badges and improved documentation
+- Improved error handling in room commands
+
+### Fixed
+
+- String slicing panics in UI code
+- Clippy warnings for manual string stripping
+
+---
+
 ## [0.1.0] - 2024-01-15
 
 ### Added
