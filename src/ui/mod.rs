@@ -14,7 +14,10 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
+    widgets::{
+        Block, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
+        Wrap,
+    },
     Terminal,
 };
 use std::io;
@@ -46,8 +49,10 @@ pub struct UiState {
     pub nick: String,
     /// Local peer ID (short form)
     pub local_peer_id: String,
-    /// Scroll offset for messages
-    pub scroll_offset: u16,
+    /// Scroll offset for messages (0 = show newest)
+    pub scroll_offset: usize,
+    /// Auto-scroll to bottom when new messages arrive
+    pub auto_scroll: bool,
 }
 
 impl UiState {
@@ -60,6 +65,7 @@ impl UiState {
             nick,
             local_peer_id,
             scroll_offset: 0,
+            auto_scroll: true,
         };
         state.add_system_message("Welcome to OpenWire! End-to-end encrypted P2P messenger.");
         state.add_system_message("Peers on the same LAN are discovered automatically via mDNS.");
@@ -75,6 +81,10 @@ impl UiState {
             is_system: true,
             is_file: false,
         });
+        // Reset scroll to bottom if auto-scroll is enabled
+        if self.auto_scroll {
+            self.scroll_offset = 0;
+        }
     }
 
     pub fn add_chat_message(&mut self, sender: &str, content: &str) {
@@ -85,6 +95,10 @@ impl UiState {
             is_system: false,
             is_file: false,
         });
+        // Reset scroll to bottom if auto-scroll is enabled
+        if self.auto_scroll {
+            self.scroll_offset = 0;
+        }
     }
 
     pub fn add_file_message(&mut self, sender: &str, filename: &str) {
@@ -95,6 +109,10 @@ impl UiState {
             is_system: false,
             is_file: true,
         });
+        // Reset scroll to bottom if auto-scroll is enabled
+        if self.auto_scroll {
+            self.scroll_offset = 0;
+        }
     }
 
     fn now() -> String {
@@ -188,12 +206,33 @@ impl UiApp {
                             self.state.cursor_pos = self.state.input.len();
                         }
                         (KeyCode::Up, _) => {
-                            if self.state.scroll_offset > 0 {
-                                self.state.scroll_offset -= 1;
+                            // Scroll up (towards older messages)
+                            self.state.auto_scroll = false;
+                            if self.state.scroll_offset < self.state.messages.len() {
+                                self.state.scroll_offset += 1;
                             }
                         }
                         (KeyCode::Down, _) => {
-                            self.state.scroll_offset += 1;
+                            // Scroll down (towards newer messages)
+                            if self.state.scroll_offset > 0 {
+                                self.state.scroll_offset -= 1;
+                            }
+                            if self.state.scroll_offset == 0 {
+                                self.state.auto_scroll = true;
+                            }
+                        }
+                        (KeyCode::PageUp, _) => {
+                            // Scroll up by 10 messages
+                            self.state.auto_scroll = false;
+                            self.state.scroll_offset =
+                                (self.state.scroll_offset + 10).min(self.state.messages.len());
+                        }
+                        (KeyCode::PageDown, _) => {
+                            // Scroll down by 10 messages
+                            self.state.scroll_offset = self.state.scroll_offset.saturating_sub(10);
+                            if self.state.scroll_offset == 0 {
+                                self.state.auto_scroll = true;
+                            }
                         }
                         _ => {}
                     }
@@ -404,9 +443,20 @@ impl UiApp {
                 .split(main_chunks[0]);
 
             // -- Messages Panel --
-            let msg_items: Vec<ListItem> = self
-                .state
-                .messages
+            let msg_area_height = left_chunks[0].height.saturating_sub(2) as usize; // Subtract borders
+
+            // Calculate which messages to show based on scroll offset
+            let total_messages = self.state.messages.len();
+            let start_idx = if total_messages > msg_area_height {
+                total_messages.saturating_sub(msg_area_height + self.state.scroll_offset)
+            } else {
+                0
+            };
+            let end_idx = total_messages
+                .saturating_sub(self.state.scroll_offset)
+                .min(total_messages);
+
+            let msg_items: Vec<ListItem> = self.state.messages[start_idx..end_idx]
                 .iter()
                 .map(|m| {
                     let style = if m.is_system {
@@ -445,6 +495,27 @@ impl UiApp {
 
             let messages = List::new(msg_items).block(messages_block);
             f.render_widget(messages, left_chunks[0]);
+
+            // Render scrollbar for messages
+            if total_messages > msg_area_height {
+                let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                    .begin_symbol(Some("▲"))
+                    .end_symbol(Some("▼"))
+                    .track_symbol(Some("│"))
+                    .thumb_symbol("█");
+
+                let mut scrollbar_state = ScrollbarState::new(total_messages)
+                    .position(total_messages.saturating_sub(end_idx));
+
+                f.render_stateful_widget(
+                    scrollbar,
+                    left_chunks[0].inner(ratatui::layout::Margin {
+                        vertical: 1,
+                        horizontal: 0,
+                    }),
+                    &mut scrollbar_state,
+                );
+            }
 
             // -- Input Panel --
             let input_text = if self.state.input.is_empty() {
