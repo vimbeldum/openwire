@@ -1,8 +1,8 @@
 class Openwire < Formula
   desc "P2P encrypted messenger for local networks with zero configuration"
   homepage "https://github.com/shwetanshu21/openwire"
-  url "https://github.com/shwetanshu21/openwire/archive/refs/tags/v0.2.4.tar.gz"
-  sha256 "f2a846f0eb3d82be91da9191a515005cbeb4b10b1dcb2a0ae81ab1bcffbc8bc3"
+  url "https://github.com/shwetanshu21/openwire/archive/refs/tags/v0.3.0.tar.gz"
+  sha256 "df8c284599ac536ff6847091c29188c00281527dab60c74a08a9d8b7f77f0d2f"
   license "MIT"
   head "https://github.com/shwetanshu21/openwire.git", branch: "master"
 
