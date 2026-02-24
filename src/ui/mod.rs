@@ -284,35 +284,44 @@ impl UiApp {
                 .send(NetworkCommand::Connect(addr.to_string()))
                 .await;
         } else if input == "/help" {
-            self.state.add_system_message("Commands:");
             self.state
-                .add_system_message("  /send <file>    - Send a file to peers");
+                .add_system_message("═══════════════════════════════════════════");
             self.state
-                .add_system_message("  /image <file>   - Send an image to peers");
+                .add_system_message("               OPENWIRE HELP               ");
             self.state
-                .add_system_message("  /connect <addr> - Connect to peer by multiaddress");
-            self.state.add_system_message("  /quit           - Exit");
+                .add_system_message("═══════════════════════════════════════════");
             self.state.add_system_message("");
-            self.state.add_system_message("Room Commands:");
+            self.state.add_system_message("MESSAGING COMMANDS:");
             self.state
-                .add_system_message("  /room create <name>          - Create a private room");
+                .add_system_message("  /send <file>     - Send a file to peers");
             self.state
-                .add_system_message("  /room invite <peer> <room>   - Invite peer to room");
+                .add_system_message("  /image <file>    - Send an image to peers");
             self.state
-                .add_system_message("  /room list                   - List your rooms");
+                .add_system_message("  /connect <addr>  - Connect to peer by address");
             self.state
-                .add_system_message("  /room leave <room_id>        - Leave a room");
+                .add_system_message("  /quit or /q      - Exit the application");
             self.state.add_system_message("");
-            self.state.add_system_message("Navigation:");
+            self.state.add_system_message("PRIVATE ROOMS:");
             self.state
-                .add_system_message("  Up/Down         - Scroll messages");
+                .add_system_message("  /room create <name>         - Create room");
             self.state
-                .add_system_message("  PageUp/PageDown - Fast scroll");
+                .add_system_message("  /room invite <peer> <room>  - Invite peer");
+            self.state
+                .add_system_message("  /room list                  - List rooms");
+            self.state
+                .add_system_message("  /room leave <room>          - Leave room");
             self.state.add_system_message("");
+            self.state.add_system_message("MESSAGE SCROLLING:");
             self.state
-                .add_system_message("Group chat: Peers on the same LAN join automatically.");
+                .add_system_message("  Up / Down        - Scroll one line");
             self.state
-                .add_system_message("Remote peers: Share your multiaddress shown at startup.");
+                .add_system_message("  PageUp/PageDown  - Scroll ten lines");
+            self.state.add_system_message("");
+            self.state.add_system_message("NETWORK INFO:");
+            self.state
+                .add_system_message("  LAN peers discovered via mDNS automatically");
+            self.state
+                .add_system_message("  Remote peers: share your multiaddress");
         } else if let Some(path) = input.strip_prefix("/image ") {
             // Image transfer command
             let path = path.trim();
@@ -591,7 +600,7 @@ impl UiApp {
 
             // -- Input Panel --
             let input_text = if self.state.input.is_empty() {
-                "Type a message... (/help for commands)".to_string()
+                "Type a message or /help for commands...".to_string()
             } else {
                 self.state.input.clone()
             };
