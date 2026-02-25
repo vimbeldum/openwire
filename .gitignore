@@ -30,3 +30,7 @@ logs/
 
 # Documentation
 /doc/
+
+# Node.js (web app)
+node_modules/
+dist/
