@@ -584,3 +584,269 @@ body {
     grid-column: 1;
   }
 }
+
+/* ── Invite Toasts ─────────────────────────────── */
+.invite-toasts {
+  position: fixed;
+  top: 60px;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 200;
+  max-width: 320px;
+}
+
+.invite-toast {
+  background: var(--bg-card);
+  border: 1px solid var(--border-active);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  box-shadow: var(--shadow), 0 0 20px rgba(96, 165, 250, 0.15);
+  backdrop-filter: blur(20px);
+  animation: slideIn 0.25s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.invite-toast-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.35rem;
+}
+
+.invite-toast-body {
+  font-size: 0.9rem;
+  color: var(--text);
+  margin-bottom: 0.75rem;
+}
+
+.invite-toast-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.invite-toast-actions button {
+  flex: 1;
+  padding: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-accept {
+  background: linear-gradient(135deg, var(--accent), #818cf8);
+  border-color: transparent !important;
+  color: white;
+}
+
+.btn-accept:hover {
+  box-shadow: 0 0 12px rgba(96, 165, 250, 0.4);
+}
+
+.btn-decline {
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.btn-decline:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* ── Game Challenge Popup ───────────────────────── */
+.game-challenge {
+  position: fixed;
+  bottom: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card);
+  border: 1px solid var(--border-active);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  box-shadow: var(--shadow), 0 0 30px rgba(96, 165, 250, 0.2);
+  backdrop-filter: blur(20px);
+  z-index: 200;
+  text-align: center;
+  min-width: 280px;
+  animation: slideIn 0.25s ease;
+}
+
+.game-challenge-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.game-challenge-sub {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-bottom: 1rem;
+}
+
+.game-challenge-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.game-challenge-actions button {
+  padding: 0.5rem 1.5rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid var(--border);
+}
+
+/* ── GIF Picker ─────────────────────────────────── */
+.gif-picker {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 360px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+  z-index: 300;
+  overflow: hidden;
+  animation: fadeIn 0.15s ease;
+}
+
+.gif-header {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.gif-search {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  padding: 0.4rem 0.75rem;
+  outline: none;
+}
+
+.gif-search:focus {
+  border-color: var(--accent);
+}
+
+.gif-search-btn,
+.gif-close {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  transition: background 0.15s;
+}
+
+.gif-search-btn:hover,
+.gif-close:hover {
+  background: var(--accent-glow);
+}
+
+.gif-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.gif-item {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.gif-item:hover {
+  opacity: 0.85;
+  transform: scale(1.03);
+}
+
+.gif-loading,
+.gif-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 2rem;
+}
+
+.gif-footer {
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  padding: 0.35rem;
+  border-top: 1px solid var(--border);
+}
+
+/* GIF in chat */
+.msg-gif {
+  max-width: 240px;
+  max-height: 180px;
+  border-radius: var(--radius-sm);
+  margin-top: 0.25rem;
+  display: block;
+}
+
+/* GIF button in input bar */
+.gif-btn {
+  padding: 0.65rem 0.75rem;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.gif-btn:hover {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.chat-input-wrapper {
+  position: relative;
+}

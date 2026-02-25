@@ -86,7 +86,7 @@ export class RelayRoom {
                         peer_id,
                         nick, // final (possibly suffixed) nick
                         peers: this.peerList(),
-                        rooms: this.roomList(),
+                        rooms: [], // new peer has no rooms yet
                     });
 
                     this.broadcast(
@@ -240,7 +240,8 @@ export class RelayRoom {
     }
 
     broadcastPeerUpdate() {
-        this.broadcast({ type: "peers", peers: this.peerList(), rooms: this.roomList() });
+        // Only broadcast peer list — rooms are private to members
+        this.broadcast({ type: "peers", peers: this.peerList() });
     }
 
     peerList() {

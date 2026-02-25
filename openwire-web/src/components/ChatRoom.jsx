@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import * as socket from '../lib/socket';
 import * as game from '../lib/game';
 import GameBoard from './GameBoard';
+import GifPicker from './GifPicker';
 
 function timeStr() {
     const d = new Date();
@@ -15,6 +16,9 @@ export default function ChatRoom({ nick: initialNick }) {
     const [rooms, setRooms] = useState([]);
     const [connected, setConnected] = useState(false);
     const [activeGame, setActiveGame] = useState(null);
+    const [pendingInvites, setPendingInvites] = useState([]); // { id, room_id, room_name, from, from_nick }
+    const [pendingChallenges, setPendingChallenges] = useState([]); // { id, challenger, challenger_nick, room_id }
+    const [showGifPicker, setShowGifPicker] = useState(false);
     const messagesEnd = useRef(null);
 
     // Use refs for values needed inside WS event callbacks to avoid stale closures
@@ -29,8 +33,8 @@ export default function ChatRoom({ nick: initialNick }) {
     useEffect(() => { roomsRef.current = rooms; }, [rooms]);
     useEffect(() => { peersRef.current = peers; }, [peers]);
 
-    const addMsg = useCallback((sender, content, type = 'chat') => {
-        setMessages(prev => [...prev, { time: timeStr(), sender, content, type, id: Date.now() + Math.random() }]);
+    const addMsg = useCallback((sender, content, type = 'chat', extra = {}) => {
+        setMessages(prev => [...prev, { time: timeStr(), sender, content, type, id: Date.now() + Math.random(), ...extra }]);
     }, []);
 
     // ── Game action handler (uses refs, no stale closure) ─────────────────────
@@ -42,19 +46,17 @@ export default function ChatRoom({ nick: initialNick }) {
             case 'Challenge': {
                 // Ignore our own challenges
                 if (action.challenger === myId) return;
-                addMsg('★', `🎮 ${msg.nick} challenges you to Tic-Tac-Toe! Auto-joining...`, 'system');
-                const g = game.createGame(
-                    { peer_id: action.challenger, nick: action.challenger_nick },
-                    { peer_id: myId, nick: myNick },
-                    msg.room_id
-                );
-                setActiveGame(g);
-                socket.sendRoomMessage(msg.room_id, game.serializeGameAction({
-                    type: 'Accept',
-                    accepter: myId,
-                    accepter_nick: myNick,
-                    room_id: msg.room_id,
-                }));
+                // Add to pending challenges instead of auto-accepting
+                setPendingChallenges(prev => {
+                    // Avoid duplicates
+                    if (prev.some(c => c.challenger === action.challenger && c.room_id === action.room_id)) return prev;
+                    return [...prev, {
+                        id: Date.now(),
+                        challenger: action.challenger,
+                        challenger_nick: action.challenger_nick,
+                        room_id: action.room_id,
+                    }];
+                });
                 break;
             }
             case 'Accept': {
@@ -70,6 +72,11 @@ export default function ChatRoom({ nick: initialNick }) {
                     );
                 });
                 addMsg('★', `🎮 ${action.accepter_nick} accepted! Game on!`, 'system');
+                break;
+            }
+            case 'Decline': {
+                if (action.decliner === myId) return;
+                addMsg('★', `🎮 ${action.decliner_nick} declined the challenge.`, 'system');
                 break;
             }
             case 'Move': {
@@ -90,12 +97,10 @@ export default function ChatRoom({ nick: initialNick }) {
 
     // ── WebSocket event handler ────────────────────────────────────────────────
     useEffect(() => {
-        // handleGameAction is stable (uses refs), so fine to capture here
         const onEvent = (msg) => {
             switch (msg.type) {
                 case 'welcome':
                     myIdRef.current = msg.peer_id;
-                    // Server may have suffixed nick if duplicate — sync it
                     if (msg.nick && msg.nick !== nickRef.current) {
                         nickRef.current = msg.nick;
                         addMsg('★', `Your nickname was taken — assigned "${msg.nick}"`, 'system');
@@ -138,15 +143,30 @@ export default function ChatRoom({ nick: initialNick }) {
                     addMsg('★', `🏠 Joined room "${msg.name}"`, 'system');
                     break;
                 case 'room_invite':
-                    addMsg('★', `🏠 ${msg.from_nick} invited you to "${msg.room_name}"! Joining...`, 'system');
-                    socket.joinRoom(msg.room_id);
+                    // Add to pending invites instead of auto-joining
+                    setPendingInvites(prev => {
+                        if (prev.some(i => i.room_id === msg.room_id)) return prev;
+                        return [...prev, {
+                            id: Date.now(),
+                            room_id: msg.room_id,
+                            room_name: msg.room_name,
+                            from: msg.from,
+                            from_nick: msg.from_nick,
+                        }];
+                    });
                     break;
                 case 'room_message': {
                     if (game.isGameMessage(msg.data)) {
                         const action = game.parseGameAction(msg.data);
                         if (action) handleGameAction(msg, action);
                     } else {
-                        addMsg(`[${msg.room_id?.slice(5, 17)}] ${msg.nick}`, msg.data, 'peer');
+                        // Check if it's a GIF message
+                        const gifMatch = msg.data.match(/^\[GIF\](.+)$/);
+                        if (gifMatch) {
+                            addMsg(`[${msg.room_id?.slice(5, 17)}] ${msg.nick}`, '', 'peer', { gif: gifMatch[1] });
+                        } else {
+                            addMsg(`[${msg.room_id?.slice(5, 17)}] ${msg.nick}`, msg.data, 'peer');
+                        }
                     }
                     break;
                 }
@@ -178,12 +198,69 @@ export default function ChatRoom({ nick: initialNick }) {
         messagesEnd.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
+    // ── Invite handlers ────────────────────────────────────────────────────────
+    const acceptInvite = (invite) => {
+        socket.joinRoom(invite.room_id);
+        setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
+    };
+
+    const declineInvite = (invite) => {
+        setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
+    };
+
+    // ── Challenge handlers ─────────────────────────────────────────────────────
+    const acceptChallenge = (challenge) => {
+        const myId = myIdRef.current;
+        const myNick = nickRef.current;
+        addMsg('★', `🎮 You accepted ${challenge.challenger_nick}'s challenge!`, 'system');
+        const g = game.createGame(
+            { peer_id: challenge.challenger, nick: challenge.challenger_nick },
+            { peer_id: myId, nick: myNick },
+            challenge.room_id
+        );
+        setActiveGame(g);
+        socket.sendRoomMessage(challenge.room_id, game.serializeGameAction({
+            type: 'Accept',
+            accepter: myId,
+            accepter_nick: myNick,
+            room_id: challenge.room_id,
+        }));
+        setPendingChallenges(prev => prev.filter(c => c.id !== challenge.id));
+    };
+
+    const declineChallenge = (challenge) => {
+        socket.sendRoomMessage(challenge.room_id, game.serializeGameAction({
+            type: 'Decline',
+            decliner: myIdRef.current,
+            decliner_nick: nickRef.current,
+            room_id: challenge.room_id,
+        }));
+        addMsg('★', `🎮 You declined ${challenge.challenger_nick}'s challenge.`, 'system');
+        setPendingChallenges(prev => prev.filter(c => c.id !== challenge.id));
+    };
+
+    // ── GIF handler ─────────────────────────────────────────────────────────────
+    const handleGifSelect = (gifUrl) => {
+        const myNick = nickRef.current;
+        const currentRooms = roomsRef.current;
+        if (currentRooms.length === 0) {
+            addMsg('★', '⚠ Create/join a room first to send GIFs', 'system');
+            return;
+        }
+        const roomId = currentRooms[0].room_id;
+        const gifMsg = `[GIF]${gifUrl}`;
+        addMsg(myNick, '', 'self', { gif: gifUrl });
+        socket.sendRoomMessage(roomId, gifMsg);
+        setShowGifPicker(false);
+    };
+
     // ── Command handler ────────────────────────────────────────────────────────
     const handleSend = (e) => {
         e.preventDefault();
         const text = input.trim();
         if (!text) return;
         setInput('');
+        setShowGifPicker(false);
 
         const myId = myIdRef.current;
         const myNick = nickRef.current;
@@ -312,25 +389,70 @@ export default function ChatRoom({ nick: initialNick }) {
                 </div>
             </header>
 
+            {/* Invite Toasts */}
+            <div className="invite-toasts">
+                {pendingInvites.map(invite => (
+                    <div key={invite.id} className="invite-toast">
+                        <div className="invite-toast-title">🏠 Room Invite</div>
+                        <div className="invite-toast-body">
+                            <strong>{invite.from_nick}</strong> invited you to <strong>{invite.room_name}</strong>
+                        </div>
+                        <div className="invite-toast-actions">
+                            <button className="btn-accept" onClick={() => acceptInvite(invite)}>Accept</button>
+                            <button className="btn-decline" onClick={() => declineInvite(invite)}>Decline</button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Game Challenge Popup */}
+            {pendingChallenges.length > 0 && (
+                <div className="game-challenge">
+                    <div className="game-challenge-title">🎮 Game Challenge!</div>
+                    <div className="game-challenge-sub">
+                        {pendingChallenges[0].challenger_nick} challenged you to Tic-Tac-Toe
+                    </div>
+                    <div className="game-challenge-actions">
+                        <button className="btn-accept" onClick={() => acceptChallenge(pendingChallenges[0])}>Accept</button>
+                        <button className="btn-decline" onClick={() => declineChallenge(pendingChallenges[0])}>Decline</button>
+                    </div>
+                </div>
+            )}
+
             <div className="messages-area">
                 {messages.map((m) => (
                     <div key={m.id} className={`msg ${m.type}`}>
                         <span className="msg-time">[{m.time}]</span>
-                        <span className={`msg-sender ${m.type}`}>{m.sender}:</span>
-                        <span className="msg-content"> {m.content}</span>
+                        {m.sender && <span className={`msg-sender ${m.type}`}>{m.sender}:</span>}
+                        {m.gif ? (
+                            <img src={m.gif} alt="GIF" className="msg-gif" />
+                        ) : (
+                            <span className="msg-content"> {m.content}</span>
+                        )}
                     </div>
                 ))}
                 <div ref={messagesEnd} />
             </div>
 
             <form className="chat-input" onSubmit={handleSend}>
-                <input
-                    type="text"
-                    placeholder="Type a message or /help..."
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    autoFocus
-                />
+                <div className="chat-input-wrapper" style={{ flex: 1, position: 'relative' }}>
+                    <input
+                        type="text"
+                        placeholder="Type a message or /help..."
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        autoFocus
+                    />
+                    {showGifPicker && (
+                        <GifPicker
+                            onSelect={handleGifSelect}
+                            onClose={() => setShowGifPicker(false)}
+                        />
+                    )}
+                </div>
+                <button type="button" className="gif-btn" onClick={() => setShowGifPicker(!showGifPicker)}>
+                    GIF
+                </button>
                 <button type="submit">Send</button>
             </form>
 
@@ -367,17 +489,32 @@ export default function ChatRoom({ nick: initialNick }) {
                     }}>+ Create Room</button>
 
                     {rooms.length > 0 && (
-                        <button className="sidebar-btn" onClick={() => {
-                            const r = roomsRef.current[0];
-                            if (!r) return;
-                            socket.sendRoomMessage(r.room_id, game.serializeGameAction({
-                                type: 'Challenge',
-                                challenger: myIdRef.current,
-                                challenger_nick: nickRef.current,
-                                room_id: r.room_id,
-                            }));
-                            addMsg('★', '🎮 Game challenge sent!', 'system');
-                        }}>🎮 Challenge to Game</button>
+                        <>
+                            <button className="sidebar-btn" onClick={() => {
+                                const r = roomsRef.current[0];
+                                if (!r) return;
+                                socket.sendRoomMessage(r.room_id, game.serializeGameAction({
+                                    type: 'Challenge',
+                                    challenger: myIdRef.current,
+                                    challenger_nick: nickRef.current,
+                                    room_id: r.room_id,
+                                }));
+                                addMsg('★', '🎮 Game challenge sent!', 'system');
+                            }}>🎮 Challenge to Game</button>
+
+                            <button className="sidebar-btn" onClick={() => {
+                                const nick = prompt('Invite nick:');
+                                if (nick && roomsRef.current[0]) {
+                                    const target = peersRef.current.find(p => p.nick === nick);
+                                    if (target) {
+                                        socket.inviteToRoom(roomsRef.current[0].room_id, target.peer_id);
+                                        addMsg('★', `🏠 Invited ${target.nick} to room.`, 'system');
+                                    } else {
+                                        addMsg('★', `⚠ Peer "${nick}" not found.`, 'system');
+                                    }
+                                }
+                            }}>✉ Invite to Room</button>
+                        </>
                     )}
                 </div>
             </div>
