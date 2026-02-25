@@ -72,13 +72,19 @@ export class RelayRoom {
             switch (msg.type) {
                 case "join": {
                     const peer_id = msg.peer_id || crypto.randomUUID().slice(0, 16);
-                    const nick = (msg.nick || "Anonymous").slice(0, 24);
+                    let nick = (msg.nick || "Anonymous").slice(0, 24);
+                    // Enforce unique nick
+                    const takenNicks = new Set([...this.peers.values()].map(p => p.nick));
+                    let base = nick, counter = 2;
+                    while (takenNicks.has(nick)) nick = `${base}${counter++}`;
+
                     peerInfo = { peer_id, nick, rooms: new Set() };
                     this.peers.set(ws, peerInfo);
 
                     this.send(ws, {
                         type: "welcome",
                         peer_id,
+                        nick, // final (possibly suffixed) nick
                         peers: this.peerList(),
                         rooms: this.roomList(),
                     });

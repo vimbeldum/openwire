@@ -8,32 +8,102 @@ function timeStr() {
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-export default function ChatRoom({ nick }) {
+export default function ChatRoom({ nick: initialNick }) {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [peers, setPeers] = useState([]);
     const [rooms, setRooms] = useState([]);
-    const [myId, setMyId] = useState(null);
     const [connected, setConnected] = useState(false);
     const [activeGame, setActiveGame] = useState(null);
-    const [pendingChallenge, setPendingChallenge] = useState(null);
     const messagesEnd = useRef(null);
+
+    // Use refs for values needed inside WS event callbacks to avoid stale closures
+    const myIdRef = useRef(null);
+    const nickRef = useRef(initialNick);
+    const activeGameRef = useRef(null);
+    const roomsRef = useRef([]);
+    const peersRef = useRef([]);
+
+    // Keep refs in sync
+    useEffect(() => { activeGameRef.current = activeGame; }, [activeGame]);
+    useEffect(() => { roomsRef.current = rooms; }, [rooms]);
+    useEffect(() => { peersRef.current = peers; }, [peers]);
 
     const addMsg = useCallback((sender, content, type = 'chat') => {
         setMessages(prev => [...prev, { time: timeStr(), sender, content, type, id: Date.now() + Math.random() }]);
     }, []);
 
-    // Connect to relay
+    // ── Game action handler (uses refs, no stale closure) ─────────────────────
+    const handleGameAction = useCallback((msg, action) => {
+        const myId = myIdRef.current;
+        const myNick = nickRef.current;
+
+        switch (action.type) {
+            case 'Challenge': {
+                // Ignore our own challenges
+                if (action.challenger === myId) return;
+                addMsg('★', `🎮 ${msg.nick} challenges you to Tic-Tac-Toe! Auto-joining...`, 'system');
+                const g = game.createGame(
+                    { peer_id: action.challenger, nick: action.challenger_nick },
+                    { peer_id: myId, nick: myNick },
+                    msg.room_id
+                );
+                setActiveGame(g);
+                socket.sendRoomMessage(msg.room_id, game.serializeGameAction({
+                    type: 'Accept',
+                    accepter: myId,
+                    accepter_nick: myNick,
+                    room_id: msg.room_id,
+                }));
+                break;
+            }
+            case 'Accept': {
+                // Challenger receives accept — set up game with challenger as X
+                if (action.accepter === myId) return; // ignore our own accept echo
+                setActiveGame(prev => {
+                    // Only set if we sent the challenge (we are X)
+                    if (prev && prev.playerX.peer_id === myId) return prev;
+                    return game.createGame(
+                        { peer_id: myId, nick: myNick },
+                        { peer_id: action.accepter, nick: action.accepter_nick },
+                        msg.room_id
+                    );
+                });
+                addMsg('★', `🎮 ${action.accepter_nick} accepted! Game on!`, 'system');
+                break;
+            }
+            case 'Move': {
+                setActiveGame(prev => {
+                    if (!prev) return null;
+                    const result = game.makeMove(prev, action.position, action.player);
+                    return result.game || prev;
+                });
+                break;
+            }
+            case 'Resign': {
+                addMsg('★', `🏳️ ${msg.nick} resigned.`, 'system');
+                setActiveGame(null);
+                break;
+            }
+        }
+    }, [addMsg]);
+
+    // ── WebSocket event handler ────────────────────────────────────────────────
     useEffect(() => {
-        socket.connect(nick, (msg) => {
+        // handleGameAction is stable (uses refs), so fine to capture here
+        const onEvent = (msg) => {
             switch (msg.type) {
                 case 'welcome':
-                    setMyId(msg.peer_id);
+                    myIdRef.current = msg.peer_id;
+                    // Server may have suffixed nick if duplicate — sync it
+                    if (msg.nick && msg.nick !== nickRef.current) {
+                        nickRef.current = msg.nick;
+                        addMsg('★', `Your nickname was taken — assigned "${msg.nick}"`, 'system');
+                    }
                     setConnected(true);
                     setPeers(msg.peers || []);
                     setRooms(msg.rooms || []);
-                    addMsg('★', 'Connected to OpenWire relay!', 'system');
-                    addMsg('★', `Your ID: ${msg.peer_id}`, 'system');
+                    addMsg('★', `Connected! Your ID: ${msg.peer_id}`, 'system');
                     addMsg('★', 'Type /help for commands.', 'system');
                     break;
                 case 'peers':
@@ -52,26 +122,39 @@ export default function ChatRoom({ nick }) {
                     addMsg(msg.nick, msg.data, 'peer');
                     break;
                 case 'room_created':
-                    setRooms(prev => [...prev, { room_id: msg.room_id, name: msg.name, members: 1 }]);
+                    setRooms(prev => {
+                        const updated = [...prev, { room_id: msg.room_id, name: msg.name, members: 1 }];
+                        roomsRef.current = updated;
+                        return updated;
+                    });
                     addMsg('★', `🏠 Room "${msg.name}" created! ID: ${msg.room_id}`, 'system');
                     break;
                 case 'room_joined':
-                    setRooms(prev => [...prev.filter(r => r.room_id !== msg.room_id), { room_id: msg.room_id, name: msg.name }]);
+                    setRooms(prev => {
+                        const updated = [...prev.filter(r => r.room_id !== msg.room_id), { room_id: msg.room_id, name: msg.name }];
+                        roomsRef.current = updated;
+                        return updated;
+                    });
                     addMsg('★', `🏠 Joined room "${msg.name}"`, 'system');
                     break;
                 case 'room_invite':
-                    addMsg('★', `🏠 ${msg.from_nick} invited you to "${msg.room_name}"!`, 'system');
-                    // Auto-join
+                    addMsg('★', `🏠 ${msg.from_nick} invited you to "${msg.room_name}"! Joining...`, 'system');
                     socket.joinRoom(msg.room_id);
                     break;
-                case 'room_message':
-                    handleRoomMessage(msg);
+                case 'room_message': {
+                    if (game.isGameMessage(msg.data)) {
+                        const action = game.parseGameAction(msg.data);
+                        if (action) handleGameAction(msg, action);
+                    } else {
+                        addMsg(`[${msg.room_id?.slice(5, 17)}] ${msg.nick}`, msg.data, 'peer');
+                    }
                     break;
+                }
                 case 'room_peer_joined':
-                    addMsg('★', `${msg.nick} joined room`, 'system');
+                    addMsg('★', `${msg.nick} joined the room`, 'system');
                     break;
                 case 'room_peer_left':
-                    addMsg('★', `${msg.nick} left room`, 'system');
+                    addMsg('★', `${msg.nick} left the room`, 'system');
                     break;
                 case 'room_list':
                     setRooms(msg.rooms || []);
@@ -84,85 +167,36 @@ export default function ChatRoom({ nick }) {
                     addMsg('★', `⚠ ${msg.message}`, 'system');
                     break;
             }
-        });
+        };
+
+        socket.connect(nickRef.current, onEvent);
         return () => socket.disconnect();
-    }, [nick, addMsg]);
-
-    // Handle room messages (check for game actions)
-    const handleRoomMessage = useCallback((msg) => {
-        if (game.isGameMessage(msg.data)) {
-            const action = game.parseGameAction(msg.data);
-            if (!action) return;
-            handleGameAction(msg, action);
-        } else {
-            addMsg(`[${msg.room_id?.slice(0, 12)}] ${msg.nick}`, msg.data, 'peer');
-        }
-    }, [addMsg]);
-
-    const handleGameAction = useCallback((msg, action) => {
-        switch (action.type) {
-            case 'Challenge':
-                setPendingChallenge({ ...action, room_id: msg.room_id, from_nick: msg.nick });
-                addMsg('★', `🎮 ${msg.nick} challenges you to Tic-Tac-Toe!`, 'system');
-                // Auto-accept
-                setActiveGame(prev => {
-                    const g = game.createGame(
-                        { peer_id: action.challenger, nick: action.challenger_nick },
-                        { peer_id: myId, nick },
-                        msg.room_id
-                    );
-                    return g;
-                });
-                socket.sendRoomMessage(msg.room_id, game.serializeGameAction({
-                    type: 'Accept',
-                    accepter: myId,
-                    accepter_nick: nick,
-                    room_id: msg.room_id,
-                }));
-                break;
-            case 'Accept':
-                if (!activeGame) {
-                    setActiveGame(game.createGame(
-                        { peer_id: myId, nick },
-                        { peer_id: action.accepter, nick: action.accepter_nick },
-                        msg.room_id
-                    ));
-                }
-                addMsg('★', `🎮 ${action.accepter_nick} accepted! Game on!`, 'system');
-                break;
-            case 'Move':
-                setActiveGame(prev => {
-                    if (!prev) return null;
-                    const result = game.makeMove(prev, action.position, action.player);
-                    return result.game || prev;
-                });
-                break;
-            case 'Resign':
-                addMsg('★', `🏳️ ${msg.nick} resigned!`, 'system');
-                setActiveGame(null);
-                break;
-        }
-    }, [myId, nick, activeGame, addMsg]);
+    }, [addMsg, handleGameAction]);
 
     // Auto-scroll
     useEffect(() => {
         messagesEnd.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    // Handle user input
+    // ── Command handler ────────────────────────────────────────────────────────
     const handleSend = (e) => {
         e.preventDefault();
         const text = input.trim();
         if (!text) return;
         setInput('');
 
+        const myId = myIdRef.current;
+        const myNick = nickRef.current;
+        const currentRooms = roomsRef.current;
+        const currentPeers = peersRef.current;
+
         if (text === '/help') {
-            addMsg('★', '── COMMANDS ──', 'system');
-            addMsg('★', '/room create <name>  — Create a room', 'system');
-            addMsg('★', '/room invite <peer> <room> — Invite peer', 'system');
-            addMsg('★', '/room list — List rooms', 'system');
-            addMsg('★', '/game tictactoe <room_id> — Start game', 'system');
-            addMsg('★', '/game rematch — Play again', 'system');
+            addMsg('★', '── COMMANDS ──────────────────────', 'system');
+            addMsg('★', '/room create <name>  — create a room', 'system');
+            addMsg('★', '/room invite <nick> <room_id>  — invite peer', 'system');
+            addMsg('★', '/room list  — list rooms', 'system');
+            addMsg('★', '/game tictactoe  — challenge room to game', 'system');
+            addMsg('★', '/game rematch  — play again', 'system');
             return;
         }
 
@@ -175,69 +209,73 @@ export default function ChatRoom({ nick }) {
         if (text.startsWith('/room invite ')) {
             const parts = text.slice(13).trim().split(/\s+/);
             if (parts.length >= 2) {
-                const peerId = peers.find(p => p.nick === parts[0] || p.peer_id.startsWith(parts[0]))?.peer_id;
-                if (peerId) {
-                    socket.inviteToRoom(parts[1], peerId);
-                    addMsg('★', `🏠 Inviting ${parts[0]} to ${parts[1]}`, 'system');
+                const target = currentPeers.find(p => p.nick === parts[0] || p.peer_id.startsWith(parts[0]));
+                if (target) {
+                    socket.inviteToRoom(parts[1], target.peer_id);
+                    addMsg('★', `🏠 Invited ${target.nick} to room.`, 'system');
                 } else {
-                    addMsg('★', `⚠ Peer "${parts[0]}" not found`, 'system');
+                    addMsg('★', `⚠ Peer "${parts[0]}" not found. Online: ${currentPeers.map(p => p.nick).join(', ')}`, 'system');
                 }
+            } else {
+                addMsg('★', 'Usage: /room invite <nick> <room_id>', 'system');
             }
             return;
         }
 
         if (text === '/room list') {
-            socket.send({ type: 'room_list' });
-            if (rooms.length === 0) {
-                addMsg('★', '🏠 No rooms', 'system');
+            if (currentRooms.length === 0) {
+                addMsg('★', '🏠 No rooms yet. Try /room create <name>', 'system');
             } else {
-                rooms.forEach(r => addMsg('★', `  🏠 ${r.name} (${r.room_id})`, 'system'));
+                currentRooms.forEach(r => addMsg('★', `  🏠 ${r.name}  |  ${r.room_id}`, 'system'));
             }
             return;
         }
 
-        if (text.startsWith('/game tictactoe')) {
-            let roomId = text.slice(16).trim();
-            if (!roomId && rooms.length > 0) roomId = rooms[0].room_id;
+        if (text.startsWith('/game tictactoe') || text === '/game') {
+            let roomId = text.slice(15).trim();
+            if (!roomId && currentRooms.length > 0) roomId = currentRooms[0].room_id;
             if (!roomId) {
                 addMsg('★', '⚠ Create a room first: /room create <name>', 'system');
                 return;
             }
-            addMsg('★', '🎮 Starting Tic-Tac-Toe! Waiting for opponent...', 'system');
+            addMsg('★', '🎮 Challenging room to Tic-Tac-Toe...', 'system');
             socket.sendRoomMessage(roomId, game.serializeGameAction({
                 type: 'Challenge',
                 challenger: myId,
-                challenger_nick: nick,
+                challenger_nick: myNick,
                 room_id: roomId,
             }));
             return;
         }
 
-        if (text === '/game rematch' && activeGame) {
-            const g = game.newRound(activeGame);
-            setActiveGame(g);
-            socket.sendRoomMessage(g.roomId, game.serializeGameAction({
-                type: 'Challenge',
-                challenger: myId,
-                challenger_nick: nick,
-                room_id: g.roomId,
-            }));
+        if (text === '/game rematch') {
+            const g = activeGameRef.current;
+            if (g) {
+                const ng = game.newRound(g);
+                setActiveGame(ng);
+                socket.sendRoomMessage(ng.roomId, game.serializeGameAction({
+                    type: 'Challenge',
+                    challenger: myId,
+                    challenger_nick: myNick,
+                    room_id: ng.roomId,
+                }));
+            } else {
+                addMsg('★', '⚠ No active game.', 'system');
+            }
             return;
         }
 
-        // Regular message
-        addMsg(nick, text, 'self');
+        // Regular message (broadcast)
+        addMsg(myNick, text, 'self');
         socket.sendChat(text);
     };
 
-    // Game move handler
+    // ── Game move ──────────────────────────────────────────────────────────────
     const handleGameMove = (position) => {
+        const myId = myIdRef.current;
         if (!activeGame || !game.isMyTurn(activeGame, myId)) return;
         const result = game.makeMove(activeGame, position, myId);
-        if (result.error) {
-            addMsg('★', `⚠ ${result.error}`, 'system');
-            return;
-        }
+        if (result.error) { addMsg('★', `⚠ ${result.error}`, 'system'); return; }
         setActiveGame(result.game);
         socket.sendRoomMessage(result.game.roomId, game.serializeGameAction({
             type: 'Move',
@@ -248,29 +286,32 @@ export default function ChatRoom({ nick }) {
     };
 
     const handleRematch = () => {
-        if (!activeGame) return;
-        const g = game.newRound(activeGame);
-        setActiveGame(g);
-        socket.sendRoomMessage(g.roomId, game.serializeGameAction({
+        const myId = myIdRef.current;
+        const myNick = nickRef.current;
+        const g = activeGameRef.current;
+        if (!g) return;
+        const ng = game.newRound(g);
+        setActiveGame(ng);
+        socket.sendRoomMessage(ng.roomId, game.serializeGameAction({
             type: 'Challenge',
             challenger: myId,
-            challenger_nick: nick,
-            room_id: g.roomId,
+            challenger_nick: myNick,
+            room_id: ng.roomId,
         }));
     };
 
+    const myNick = nickRef.current;
+
     return (
         <div className="chat-layout">
-            {/* Header */}
             <header className="chat-header">
                 <h1>⚡ OpenWire</h1>
                 <div className="header-status">
                     <span className={`status-dot ${connected ? '' : 'offline'}`} />
-                    <span>{connected ? `${nick} — ${peers.length} online` : 'Connecting...'}</span>
+                    <span>{connected ? `${myNick} — ${peers.length} online` : 'Connecting...'}</span>
                 </div>
             </header>
 
-            {/* Messages */}
             <div className="messages-area">
                 {messages.map((m) => (
                     <div key={m.id} className={`msg ${m.type}`}>
@@ -282,7 +323,6 @@ export default function ChatRoom({ nick }) {
                 <div ref={messagesEnd} />
             </div>
 
-            {/* Input */}
             <form className="chat-input" onSubmit={handleSend}>
                 <input
                     type="text"
@@ -294,18 +334,17 @@ export default function ChatRoom({ nick }) {
                 <button type="submit">Send</button>
             </form>
 
-            {/* Sidebar */}
             <div className="sidebar">
                 <div className="sidebar-section">
-                    <div className="sidebar-title">Peers ({peers.length})</div>
-                    {peers.filter(p => p.peer_id !== myId).map((p) => (
+                    <div className="sidebar-title">Online ({peers.length})</div>
+                    {peers.filter(p => p.peer_id !== myIdRef.current).map((p) => (
                         <div key={p.peer_id} className="peer-item">
                             <span className="peer-dot" />
                             <span className="peer-nick">{p.nick}</span>
                         </div>
                     ))}
-                    {peers.filter(p => p.peer_id !== myId).length === 0 && (
-                        <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '0.25rem' }}>
+                    {peers.filter(p => p.peer_id !== myIdRef.current).length === 0 && (
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                             No peers yet…
                         </div>
                     )}
@@ -326,24 +365,27 @@ export default function ChatRoom({ nick }) {
                         const name = prompt('Room name:');
                         if (name) socket.createRoom(name);
                     }}>+ Create Room</button>
+
                     {rooms.length > 0 && (
                         <button className="sidebar-btn" onClick={() => {
-                            if (rooms.length > 0) {
-                                socket.sendRoomMessage(rooms[0].room_id, game.serializeGameAction({
-                                    type: 'Challenge', challenger: myId, challenger_nick: nick, room_id: rooms[0].room_id,
-                                }));
-                                addMsg('★', '🎮 Challenge sent!', 'system');
-                            }
-                        }}>🎮 Tic-Tac-Toe</button>
+                            const r = roomsRef.current[0];
+                            if (!r) return;
+                            socket.sendRoomMessage(r.room_id, game.serializeGameAction({
+                                type: 'Challenge',
+                                challenger: myIdRef.current,
+                                challenger_nick: nickRef.current,
+                                room_id: r.room_id,
+                            }));
+                            addMsg('★', '🎮 Game challenge sent!', 'system');
+                        }}>🎮 Challenge to Game</button>
                     )}
                 </div>
             </div>
 
-            {/* Game Overlay */}
             {activeGame && (
                 <GameBoard
                     game={activeGame}
-                    myId={myId}
+                    myId={myIdRef.current}
                     onMove={handleGameMove}
                     onRematch={handleRematch}
                     onClose={() => setActiveGame(null)}
