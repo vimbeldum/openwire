@@ -5,7 +5,7 @@ edition = "2024"
 description = "Decentralized P2P local network messenger - encrypted, anonymous, zero-config"
 license = "MIT"
 authors = ["OpenWire Contributors"]
-repository = "https://github.com/shwetanshu21/openwire"
+repository = "https://github.com/vimbeldum/openwire"
 keywords = ["p2p", "messenger", "networking", "encryption", "decentralized"]
 categories = ["network-programming", "cryptography"]
 

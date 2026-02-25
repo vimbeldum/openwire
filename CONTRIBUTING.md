@@ -76,7 +76,7 @@ git clone https://github.com/YOUR_USERNAME/openwire.git
 cd openwire
 
 # Add upstream remote
-git remote add upstream https://github.com/shwetanshu21/openwire.git
+git remote add upstream https://github.com/vimbeldum/openwire.git
 
 # Install pre-commit hooks (recommended)
 pre-commit install

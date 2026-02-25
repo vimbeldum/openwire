@@ -18,7 +18,7 @@ We take the security of OpenWire seriously. If you believe you have found a secu
 
 Instead, please report them using GitHub's Security Advisory feature:
 
-1. Go to the [Security Advisories](https://github.com/shwetanshu21/openwire/security/advisories) page
+1. Go to the [Security Advisories](https://github.com/vimbeldum/openwire/security/advisories) page
 2. Click "Report a vulnerability"
 3. Fill in the details of the vulnerability
 
