@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as socket from '../lib/socket';
 import * as game from '../lib/game';
+import * as bj from '../lib/blackjack';
 import GameBoard from './GameBoard';
+import BlackjackBoard from './BlackjackBoard';
 import GifPicker from './GifPicker';
 
 function timeStr() {
@@ -15,21 +17,23 @@ export default function ChatRoom({ nick: initialNick }) {
     const [peers, setPeers] = useState([]);
     const [rooms, setRooms] = useState([]);
     const [connected, setConnected] = useState(false);
-    const [activeGame, setActiveGame] = useState(null);
-    const [pendingInvites, setPendingInvites] = useState([]); // { id, room_id, room_name, from, from_nick }
-    const [pendingChallenges, setPendingChallenges] = useState([]); // { id, challenger, challenger_nick, room_id }
+    const [activeGame, setActiveGame] = useState(null); // Tic-Tac-Toe
+    const [blackjackGame, setBlackjackGame] = useState(null);
+    const [pendingInvites, setPendingInvites] = useState([]);
+    const [pendingChallenges, setPendingChallenges] = useState([]);
+    const [pendingBjInvites, setPendingBjInvites] = useState([]);
     const [showGifPicker, setShowGifPicker] = useState(false);
     const messagesEnd = useRef(null);
 
-    // Use refs for values needed inside WS event callbacks to avoid stale closures
     const myIdRef = useRef(null);
     const nickRef = useRef(initialNick);
     const activeGameRef = useRef(null);
+    const blackjackRef = useRef(null);
     const roomsRef = useRef([]);
     const peersRef = useRef([]);
 
-    // Keep refs in sync
     useEffect(() => { activeGameRef.current = activeGame; }, [activeGame]);
+    useEffect(() => { blackjackRef.current = blackjackGame; }, [blackjackGame]);
     useEffect(() => { roomsRef.current = rooms; }, [rooms]);
     useEffect(() => { peersRef.current = peers; }, [peers]);
 
@@ -37,18 +41,15 @@ export default function ChatRoom({ nick: initialNick }) {
         setMessages(prev => [...prev, { time: timeStr(), sender, content, type, id: Date.now() + Math.random(), ...extra }]);
     }, []);
 
-    // ── Game action handler (uses refs, no stale closure) ─────────────────────
+    // ── Tic-Tac-Toe Game action handler ─────────────────────────────────────────
     const handleGameAction = useCallback((msg, action) => {
         const myId = myIdRef.current;
         const myNick = nickRef.current;
 
         switch (action.type) {
             case 'Challenge': {
-                // Ignore our own challenges
                 if (action.challenger === myId) return;
-                // Add to pending challenges instead of auto-accepting
                 setPendingChallenges(prev => {
-                    // Avoid duplicates
                     if (prev.some(c => c.challenger === action.challenger && c.room_id === action.room_id)) return prev;
                     return [...prev, {
                         id: Date.now(),
@@ -60,10 +61,8 @@ export default function ChatRoom({ nick: initialNick }) {
                 break;
             }
             case 'Accept': {
-                // Challenger receives accept — set up game with challenger as X
-                if (action.accepter === myId) return; // ignore our own accept echo
+                if (action.accepter === myId) return;
                 setActiveGame(prev => {
-                    // Only set if we sent the challenge (we are X)
                     if (prev && prev.playerX.peer_id === myId) return prev;
                     return game.createGame(
                         { peer_id: myId, nick: myNick },
@@ -90,6 +89,50 @@ export default function ChatRoom({ nick: initialNick }) {
             case 'Resign': {
                 addMsg('★', `🏳️ ${msg.nick} resigned.`, 'system');
                 setActiveGame(null);
+                break;
+            }
+        }
+    }, [addMsg]);
+
+    // ── Blackjack action handler ────────────────────────────────────────────────
+    const handleBlackjackAction = useCallback((msg, action) => {
+        const myId = myIdRef.current;
+        const myNick = nickRef.current;
+
+        switch (action.type) {
+            case 'bj_start': {
+                // Someone started a blackjack game
+                if (action.host === myId) return;
+                setPendingBjInvites(prev => {
+                    if (prev.some(i => i.room_id === action.room_id)) return prev;
+                    return [...prev, {
+                        id: Date.now(),
+                        room_id: action.room_id,
+                        host: action.host,
+                        host_nick: action.host_nick,
+                    }];
+                });
+                break;
+            }
+            case 'bj_state': {
+                // Receive full game state
+                const gameState = bj.deserializeGame(action.state);
+                if (gameState) {
+                    setBlackjackGame(gameState);
+                }
+                break;
+            }
+            case 'bj_join': {
+                addMsg('★', `🃏 ${action.nick} joined Blackjack!`, 'system');
+                break;
+            }
+            case 'bj_bet':
+            case 'bj_deal':
+            case 'bj_hit':
+            case 'bj_stand':
+            case 'bj_dealer':
+            case 'bj_newRound': {
+                // These are handled via bj_state broadcast
                 break;
             }
         }
@@ -143,7 +186,6 @@ export default function ChatRoom({ nick: initialNick }) {
                     addMsg('★', `🏠 Joined room "${msg.name}"`, 'system');
                     break;
                 case 'room_invite':
-                    // Add to pending invites instead of auto-joining
                     setPendingInvites(prev => {
                         if (prev.some(i => i.room_id === msg.room_id)) return prev;
                         return [...prev, {
@@ -159,8 +201,10 @@ export default function ChatRoom({ nick: initialNick }) {
                     if (game.isGameMessage(msg.data)) {
                         const action = game.parseGameAction(msg.data);
                         if (action) handleGameAction(msg, action);
+                    } else if (bj.isBlackjackMessage(msg.data)) {
+                        const action = bj.parseBlackjackAction(msg.data);
+                        if (action) handleBlackjackAction(msg, action);
                     } else {
-                        // Check if it's a GIF message
                         const gifMatch = msg.data.match(/^\[GIF\](.+)$/);
                         if (gifMatch) {
                             addMsg(`[${msg.room_id?.slice(5, 17)}] ${msg.nick}`, '', 'peer', { gif: gifMatch[1] });
@@ -191,9 +235,8 @@ export default function ChatRoom({ nick: initialNick }) {
 
         socket.connect(nickRef.current, onEvent);
         return () => socket.disconnect();
-    }, [addMsg, handleGameAction]);
+    }, [addMsg, handleGameAction, handleBlackjackAction]);
 
-    // Auto-scroll
     useEffect(() => {
         messagesEnd.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
@@ -239,6 +282,94 @@ export default function ChatRoom({ nick: initialNick }) {
         setPendingChallenges(prev => prev.filter(c => c.id !== challenge.id));
     };
 
+    // ── Blackjack handlers ─────────────────────────────────────────────────────
+    const startBlackjack = (roomId) => {
+        const myId = myIdRef.current;
+        const myNick = nickRef.current;
+        const newGame = bj.createGame(roomId, myId);
+        newGame.players = [{ peer_id: myId, nick: myNick, hand: [], status: 'waiting', bet: 0 }];
+        setBlackjackGame(newGame);
+        addMsg('★', `🃏 Blackjack started!`, 'system');
+        socket.sendRoomMessage(roomId, bj.serializeBlackjackAction({
+            type: 'bj_start',
+            room_id: roomId,
+            host: myId,
+            host_nick: myNick,
+        }));
+        socket.sendRoomMessage(roomId, bj.serializeBlackjackAction({
+            type: 'bj_state',
+            state: bj.serializeGame(newGame),
+        }));
+    };
+
+    const acceptBjInvite = (invite) => {
+        socket.sendRoomMessage(invite.room_id, bj.serializeBlackjackAction({
+            type: 'bj_join',
+            peer_id: myIdRef.current,
+            nick: nickRef.current,
+        }));
+        setPendingBjInvites(prev => prev.filter(i => i.id !== invite.id));
+    };
+
+    const declineBjInvite = (invite) => {
+        setPendingBjInvites(prev => prev.filter(i => i.id !== invite.id));
+    };
+
+    const handleBjAction = (action) => {
+        if (!blackjackGame) return;
+
+        const myId = myIdRef.current;
+        const myNick = nickRef.current;
+        let newGame = blackjackGame;
+
+        switch (action.type) {
+            case 'join':
+                newGame = bj.addPlayer(blackjackGame, myId, myNick);
+                socket.sendRoomMessage(blackjackGame.roomId, bj.serializeBlackjackAction({
+                    type: 'bj_join',
+                    peer_id: myId,
+                    nick: myNick,
+                }));
+                break;
+            case 'bet':
+                newGame = bj.placeBet(blackjackGame, action.peer_id, action.amount);
+                break;
+            case 'deal':
+                newGame = bj.dealInitialCards(blackjackGame);
+                break;
+            case 'hit':
+                newGame = bj.hit(blackjackGame, action.peer_id);
+                break;
+            case 'stand':
+                newGame = bj.stand(blackjackGame, action.peer_id);
+                break;
+            case 'dealerPlay':
+                newGame = bj.runDealerTurn(blackjackGame);
+                break;
+            case 'newRound':
+                newGame = bj.newRound(blackjackGame);
+                break;
+        }
+
+        setBlackjackGame(newGame);
+        socket.sendRoomMessage(newGame.roomId, bj.serializeBlackjackAction({
+            type: 'bj_state',
+            state: bj.serializeGame(newGame),
+        }));
+
+        // Auto-run dealer turn when phase changes to dealer
+        if (newGame.phase === 'dealer' && blackjackGame.phase !== 'dealer') {
+            setTimeout(() => {
+                const settled = bj.runDealerTurn(newGame);
+                setBlackjackGame(settled);
+                socket.sendRoomMessage(settled.roomId, bj.serializeBlackjackAction({
+                    type: 'bj_state',
+                    state: bj.serializeGame(settled),
+                }));
+            }, 1000);
+        }
+    };
+
     // ── GIF handler ─────────────────────────────────────────────────────────────
     const handleGifSelect = (gifUrl) => {
         const myNick = nickRef.current;
@@ -274,6 +405,7 @@ export default function ChatRoom({ nick: initialNick }) {
             addMsg('★', '/room list  — list rooms', 'system');
             addMsg('★', '/game tictactoe  — challenge room to game', 'system');
             addMsg('★', '/game rematch  — play again', 'system');
+            addMsg('★', '/blackjack  — start/join blackjack game', 'system');
             return;
         }
 
@@ -342,7 +474,21 @@ export default function ChatRoom({ nick: initialNick }) {
             return;
         }
 
-        // Regular message (broadcast)
+        if (text === '/blackjack' || text.startsWith('/blackjack ')) {
+            let roomId = text.slice(11).trim();
+            if (!roomId && currentRooms.length > 0) roomId = currentRooms[0].room_id;
+            if (!roomId) {
+                addMsg('★', '⚠ Create a room first: /room create <name>', 'system');
+                return;
+            }
+            if (blackjackRef.current) {
+                addMsg('★', '⚠ Blackjack game already in progress.', 'system');
+                return;
+            }
+            startBlackjack(roomId);
+            return;
+        }
+
         addMsg(myNick, text, 'self');
         socket.sendChat(text);
     };
@@ -403,9 +549,21 @@ export default function ChatRoom({ nick: initialNick }) {
                         </div>
                     </div>
                 ))}
+                {pendingBjInvites.map(invite => (
+                    <div key={invite.id} className="invite-toast">
+                        <div className="invite-toast-title">🃏 Blackjack</div>
+                        <div className="invite-toast-body">
+                            <strong>{invite.host_nick}</strong> started a Blackjack game!
+                        </div>
+                        <div className="invite-toast-actions">
+                            <button className="btn-accept" onClick={() => acceptBjInvite(invite)}>Join</button>
+                            <button className="btn-decline" onClick={() => declineBjInvite(invite)}>Ignore</button>
+                        </div>
+                    </div>
+                ))}
             </div>
 
-            {/* Game Challenge Popup */}
+            {/* Tic-Tac-Toe Challenge Popup */}
             {pendingChallenges.length > 0 && (
                 <div className="game-challenge">
                     <div className="game-challenge-title">🎮 Game Challenge!</div>
@@ -500,7 +658,17 @@ export default function ChatRoom({ nick: initialNick }) {
                                     room_id: r.room_id,
                                 }));
                                 addMsg('★', '🎮 Game challenge sent!', 'system');
-                            }}>🎮 Challenge to Game</button>
+                            }}>🎮 Tic-Tac-Toe</button>
+
+                            <button className="sidebar-btn" onClick={() => {
+                                const r = roomsRef.current[0];
+                                if (!r) return;
+                                if (blackjackRef.current) {
+                                    addMsg('★', '⚠ Blackjack already in progress', 'system');
+                                    return;
+                                }
+                                startBlackjack(r.room_id);
+                            }}>🃏 Blackjack</button>
 
                             <button className="sidebar-btn" onClick={() => {
                                 const nick = prompt('Invite nick:');
@@ -526,6 +694,15 @@ export default function ChatRoom({ nick: initialNick }) {
                     onMove={handleGameMove}
                     onRematch={handleRematch}
                     onClose={() => setActiveGame(null)}
+                />
+            )}
+
+            {blackjackGame && (
+                <BlackjackBoard
+                    game={blackjackGame}
+                    myId={myIdRef.current}
+                    onAction={handleBjAction}
+                    onClose={() => setBlackjackGame(null)}
                 />
             )}
         </div>

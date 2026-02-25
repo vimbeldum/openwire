@@ -23,7 +23,7 @@ use ratatui::{
 use std::io;
 use tokio::sync::mpsc;
 
-use crate::game::{GameAction, TicTacToe};
+use crate::game::{Blackjack, BlackjackAction, GameAction, TicTacToe};
 use crate::network::{NetworkCommand, NetworkEvent};
 
 /// A chat message for display
@@ -61,6 +61,8 @@ pub struct UiState {
     pub auto_scroll: bool,
     /// Active tic-tac-toe game (room_id -> game)
     pub active_game: Option<TicTacToe>,
+    /// Active blackjack game
+    pub blackjack_game: Option<Blackjack>,
 }
 
 impl UiState {
@@ -77,6 +79,7 @@ impl UiState {
             scroll_offset: 0,
             auto_scroll: true,
             active_game: None,
+            blackjack_game: None,
         };
         state.add_system_message("Welcome to OpenWire! End-to-end encrypted P2P messenger.");
         state.add_system_message("Peers on the same LAN are discovered automatically via mDNS.");
@@ -341,6 +344,20 @@ impl UiApp {
             self.state
                 .add_system_message("  /move <1-9>                 - Make a move");
             self.state.add_system_message("");
+            self.state.add_system_message("BLACKJACK:");
+            self.state
+                .add_system_message("  /blackjack                  - Start game in first room");
+            self.state
+                .add_system_message("  /bj bet <amount>            - Place your bet");
+            self.state
+                .add_system_message("  /bj deal                    - Deal cards (host only)");
+            self.state
+                .add_system_message("  /bj hit                     - Take a card");
+            self.state
+                .add_system_message("  /bj stand                   - End your turn");
+            self.state
+                .add_system_message("  /bj newround                - Start new round");
+            self.state.add_system_message("");
             self.state.add_system_message("MESSAGE SCROLLING:");
             self.state
                 .add_system_message("  Up / Down        - Scroll one line");
@@ -394,6 +411,9 @@ impl UiApp {
             false
         } else if let Some(pos_str) = input.strip_prefix("/move ") {
             self.handle_game_move(pos_str.trim()).await;
+            false
+        } else if input == "/blackjack" || input.starts_with("/bj ") {
+            self.handle_blackjack_command(input.trim()).await;
             false
         } else {
             // Regular chat message
@@ -621,6 +641,188 @@ impl UiApp {
             room_id,
             data: action.to_bytes(),
         }).await;
+    }
+
+    /// Handle blackjack commands
+    async fn handle_blackjack_command(&mut self, cmd: &str) {
+        let cmd = cmd.strip_prefix("/bj").unwrap_or(cmd.strip_prefix("/blackjack").unwrap_or(cmd));
+
+        // Start new game
+        if cmd.is_empty() || cmd.trim() == "" {
+            if self.state.blackjack_game.is_some() {
+                self.state.add_system_message("Blackjack game already in progress.");
+                return;
+            }
+            if self.state.rooms.is_empty() {
+                self.state.add_system_message("You need to be in a room first. /room create <name>");
+                return;
+            }
+            let room_id = self.state.rooms[0].0.clone();
+            let mut game = Blackjack::new(room_id.clone());
+            game.add_player(self.state.local_peer_id.clone(), self.state.nick.clone());
+
+            self.state.blackjack_game = Some(game);
+            self.state.add_system_message("🃏 Blackjack started! /bj bet <amount> to place your bet.");
+
+            // Broadcast start
+            let action = BlackjackAction::Start {
+                room_id,
+                host: self.state.local_peer_id.clone(),
+                host_nick: self.state.nick.clone(),
+            };
+            let _ = self.command_sender.send(NetworkCommand::SendRoomMessage {
+                room_id: self.state.rooms[0].0.clone(),
+                data: action.to_bytes(),
+            }).await;
+            return;
+        }
+
+        // Other commands need an active game
+        if self.state.blackjack_game.is_none() {
+            self.state.add_system_message("No blackjack game. Use /blackjack to start one.");
+            return;
+        }
+
+        let cmd = cmd.trim();
+
+        if let Some(amount_str) = cmd.strip_prefix("bet ") {
+            let amount: u32 = match amount_str.trim().parse() {
+                Ok(a) => a,
+                Err(_) => {
+                    self.state.add_system_message("Usage: /bj bet <amount>");
+                    return;
+                }
+            };
+            if let Some(ref mut game) = self.state.blackjack_game {
+                game.place_bet(&self.state.local_peer_id, amount);
+            }
+            self.state.add_system_message(&format!("Bet placed: ${}", amount));
+            self.broadcast_bj_state().await;
+
+        } else if cmd == "deal" {
+            let can_deal = {
+                if let Some(ref game) = self.state.blackjack_game {
+                    game.players.iter().any(|p| p.bet > 0)
+                } else {
+                    false
+                }
+            };
+            if !can_deal {
+                self.state.add_system_message("No one has placed a bet yet!");
+                return;
+            }
+            if let Some(ref mut game) = self.state.blackjack_game {
+                game.deal_initial_cards();
+            }
+            self.render_blackjack();
+            self.broadcast_bj_state().await;
+            self.maybe_run_dealer().await;
+
+        } else if cmd == "hit" {
+            let is_turn = {
+                if let Some(ref game) = self.state.blackjack_game {
+                    game.is_player_turn(&self.state.local_peer_id)
+                } else {
+                    false
+                }
+            };
+            if !is_turn {
+                self.state.add_system_message("It's not your turn!");
+                return;
+            }
+            if let Some(ref mut game) = self.state.blackjack_game {
+                game.hit(&self.state.local_peer_id);
+            }
+            self.render_blackjack();
+            self.broadcast_bj_state().await;
+            self.maybe_run_dealer().await;
+
+        } else if cmd == "stand" {
+            let is_turn = {
+                if let Some(ref game) = self.state.blackjack_game {
+                    game.is_player_turn(&self.state.local_peer_id)
+                } else {
+                    false
+                }
+            };
+            if !is_turn {
+                self.state.add_system_message("It's not your turn!");
+                return;
+            }
+            if let Some(ref mut game) = self.state.blackjack_game {
+                game.stand(&self.state.local_peer_id);
+            }
+            self.render_blackjack();
+            self.broadcast_bj_state().await;
+            self.maybe_run_dealer().await;
+
+        } else if cmd == "newround" || cmd == "new" {
+            if let Some(ref mut game) = self.state.blackjack_game {
+                game.new_round();
+            }
+            self.state.add_system_message("New round! /bj bet <amount> to place your bet.");
+            self.broadcast_bj_state().await;
+
+        } else {
+            self.state.add_system_message("Blackjack commands: bet <amount>, deal, hit, stand, newround");
+        }
+    }
+
+    async fn maybe_run_dealer(&mut self) {
+        let needs_dealer = {
+            if let Some(ref game) = self.state.blackjack_game {
+                game.phase == crate::game::BlackjackPhase::Dealer
+            } else {
+                false
+            }
+        };
+        if needs_dealer {
+            let room_id = {
+                if let Some(ref game) = self.state.blackjack_game {
+                    Some(game.room_id.clone())
+                } else {
+                    None
+                }
+            };
+            if let Some(ref mut game) = self.state.blackjack_game {
+                game.run_dealer_turn();
+            }
+            self.render_blackjack();
+            if let Some(rid) = room_id {
+                self.broadcast_bj_state_to_room(&rid).await;
+            }
+        }
+    }
+
+    fn render_blackjack(&mut self) {
+        if let Some(ref game) = self.state.blackjack_game {
+            for line in game.render_status(&self.state.local_peer_id) {
+                self.state.add_system_message(&line);
+            }
+        }
+    }
+
+    async fn broadcast_bj_state(&mut self) {
+        if let Some(ref game) = self.state.blackjack_game {
+            let room_id = game.room_id.clone();
+            let state_json = serde_json::to_string(game).unwrap_or_default();
+            let action = BlackjackAction::State { state_json };
+            let _ = self.command_sender.send(NetworkCommand::SendRoomMessage {
+                room_id,
+                data: action.to_bytes(),
+            }).await;
+        }
+    }
+
+    async fn broadcast_bj_state_to_room(&mut self, room_id: &str) {
+        if let Some(ref game) = self.state.blackjack_game {
+            let state_json = serde_json::to_string(game).unwrap_or_default();
+            let action = BlackjackAction::State { state_json };
+            let _ = self.command_sender.send(NetworkCommand::SendRoomMessage {
+                room_id: room_id.to_string(),
+                data: action.to_bytes(),
+            }).await;
+        }
     }
 
     /// Handle an incoming game action from another player

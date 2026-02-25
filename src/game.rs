@@ -1,6 +1,6 @@
 //! In-room mini-games for OpenWire
 //!
-//! Currently supports Tic-Tac-Toe played between two peers in a room.
+//! Currently supports Tic-Tac-Toe and Blackjack played between peers in a room.
 //! Game actions are sent as JSON-encoded room messages.
 
 #![allow(dead_code)]
@@ -471,5 +471,478 @@ mod tests {
         assert_eq!(lines.len(), 7);
         assert!(lines[0].contains("┌"));
         assert!(lines[6].contains("┘"));
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BLACKJACK
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const SUITS: &[&str] = &["♠", "♥", "♦", "♣"];
+const VALUES: &[&str] = &["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+
+/// A playing card
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Card {
+    pub suit: String,
+    pub value: String,
+    pub id: String,
+}
+
+impl Card {
+    pub fn new(suit: &str, value: &str) -> Self {
+        Self {
+            suit: suit.to_string(),
+            value: value.to_string(),
+            id: format!("{}{}", value, suit),
+        }
+    }
+
+    pub fn symbol(&self) -> String {
+        let is_red = self.suit == "♥" || self.suit == "♦";
+        if is_red { format!("{}{}", self.value, self.suit) }
+        else { format!("{}{}", self.value, self.suit) }
+    }
+
+    pub fn is_red(&self) -> bool {
+        self.suit == "♥" || self.suit == "♦"
+    }
+}
+
+/// Player status in Blackjack
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum PlayerStatus {
+    Waiting,
+    Ready,
+    Playing,
+    Stand,
+    Bust,
+    Blackjack,
+    Win,
+    Lose,
+    Push,
+    BlackjackWin,
+}
+
+impl PlayerStatus {
+    pub fn display(&self) -> &'static str {
+        match self {
+            PlayerStatus::Waiting => "waiting",
+            PlayerStatus::Ready => "ready",
+            PlayerStatus::Playing => "playing",
+            PlayerStatus::Stand => "STAND",
+            PlayerStatus::Bust => "BUST!",
+            PlayerStatus::Blackjack => "BLACKJACK!",
+            PlayerStatus::Win => "WIN!",
+            PlayerStatus::Lose => "LOSE",
+            PlayerStatus::Push => "PUSH",
+            PlayerStatus::BlackjackWin => "BLACKJACK WIN!",
+        }
+    }
+}
+
+/// A Blackjack player
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlackjackPlayer {
+    pub peer_id: String,
+    pub nick: String,
+    pub hand: Vec<Card>,
+    pub status: PlayerStatus,
+    pub bet: u32,
+}
+
+impl BlackjackPlayer {
+    pub fn new(peer_id: String, nick: String) -> Self {
+        Self {
+            peer_id,
+            nick,
+            hand: Vec::new(),
+            status: PlayerStatus::Waiting,
+            bet: 0,
+        }
+    }
+}
+
+/// Game phase
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum BlackjackPhase {
+    Betting,
+    Dealing,
+    Playing,
+    Dealer,
+    Settlement,
+    Ended,
+}
+
+/// Blackjack action for network transmission
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum BlackjackAction {
+    /// Start a new game
+    Start { room_id: String, host: String, host_nick: String },
+    /// Full game state sync
+    State { state_json: String },
+    /// Player joins
+    Join { peer_id: String, nick: String },
+    /// Player places bet
+    Bet { peer_id: String, amount: u32 },
+    /// Deal cards
+    Deal,
+    /// Player hits
+    Hit { peer_id: String },
+    /// Player stands
+    Stand { peer_id: String },
+    /// Dealer plays
+    DealerPlay,
+    /// New round
+    NewRound,
+}
+
+impl BlackjackAction {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut data = b"BJ:".to_vec();
+        data.extend_from_slice(&serde_json::to_vec(self).unwrap_or_default());
+        data
+    }
+
+    pub fn from_bytes(data: &[u8]) -> Option<Self> {
+        let data_str = std::str::from_utf8(data).ok()?;
+        let json_str = data_str.strip_prefix("BJ:")?;
+        serde_json::from_str(json_str).ok()
+    }
+
+    pub fn is_blackjack_message(data: &[u8]) -> bool {
+        data.starts_with(b"BJ:")
+    }
+}
+
+/// Blackjack game state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Blackjack {
+    pub room_id: String,
+    pub deck: Vec<Card>,
+    pub dealer_hand: Vec<Card>,
+    pub dealer_revealed: bool,
+    pub players: Vec<BlackjackPlayer>,
+    pub current_player_index: i32,
+    pub phase: BlackjackPhase,
+}
+
+impl Blackjack {
+    pub fn new(room_id: String) -> Self {
+        Self {
+            room_id,
+            deck: Self::create_deck(),
+            dealer_hand: Vec::new(),
+            dealer_revealed: false,
+            players: Vec::new(),
+            current_player_index: -1,
+            phase: BlackjackPhase::Betting,
+        }
+    }
+
+    fn create_deck() -> Vec<Card> {
+        let mut deck = Vec::new();
+        for &suit in SUITS {
+            for &value in VALUES {
+                deck.push(Card::new(suit, value));
+            }
+        }
+        Self::shuffle_deck(&mut deck);
+        deck
+    }
+
+    fn shuffle_deck(deck: &mut [Card]) {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let seed = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        // Simple Fisher-Yates with seed
+        let n = deck.len();
+        for i in (1..n).rev() {
+            let j = (seed.wrapping_mul(1103515245).wrapping_add(12345) % (i + 1) as u64) as usize;
+            deck.swap(i, j);
+        }
+    }
+
+    pub fn add_player(&mut self, peer_id: String, nick: String) {
+        if !self.players.iter().any(|p| p.peer_id == peer_id) {
+            self.players.push(BlackjackPlayer::new(peer_id, nick));
+        }
+    }
+
+    pub fn place_bet(&mut self, peer_id: &str, amount: u32) {
+        if let Some(player) = self.players.iter_mut().find(|p| p.peer_id == peer_id) {
+            player.bet = amount;
+            player.status = if amount > 0 { PlayerStatus::Ready } else { PlayerStatus::Waiting };
+        }
+    }
+
+    pub fn deal_initial_cards(&mut self) {
+        // Deal 2 cards to each player and dealer
+        for _ in 0..2 {
+            for player in &mut self.players {
+                if player.bet > 0 {
+                    if let Some(card) = self.deck.pop() {
+                        player.hand.push(card);
+                        player.status = PlayerStatus::Playing;
+                    }
+                }
+            }
+            if let Some(card) = self.deck.pop() {
+                self.dealer_hand.push(card);
+            }
+        }
+
+        // Check for blackjacks
+        for player in &mut self.players {
+            if Self::calculate_hand(&player.hand) == 21 {
+                player.status = PlayerStatus::Blackjack;
+            }
+        }
+
+        // Find first player
+        self.current_player_index = self.players.iter()
+            .position(|p| p.status == PlayerStatus::Playing)
+            .map(|i| i as i32)
+            .unwrap_or(-1);
+
+        if self.current_player_index == -1 {
+            self.phase = BlackjackPhase::Dealer;
+            self.dealer_revealed = true;
+        } else {
+            self.phase = BlackjackPhase::Playing;
+        }
+    }
+
+    pub fn calculate_hand(cards: &[Card]) -> u32 {
+        let mut total = 0u32;
+        let mut aces = 0u32;
+
+        for card in cards {
+            match card.value.as_str() {
+                "A" => { aces += 1; total += 11; }
+                "K" | "Q" | "J" => { total += 10; }
+                v => { total += v.parse::<u32>().unwrap_or(0); }
+            }
+        }
+
+        while total > 21 && aces > 0 {
+            total -= 10;
+            aces -= 1;
+        }
+
+        total
+    }
+
+    pub fn is_bust(cards: &[Card]) -> bool {
+        Self::calculate_hand(cards) > 21
+    }
+
+    pub fn is_blackjack(cards: &[Card]) -> bool {
+        cards.len() == 2 && Self::calculate_hand(cards) == 21
+    }
+
+    pub fn hit(&mut self, peer_id: &str) {
+        let idx = match self.players.iter().position(|p| p.peer_id == peer_id) {
+            Some(i) if i as i32 == self.current_player_index => i,
+            _ => return,
+        };
+
+        if let Some(card) = self.deck.pop() {
+            self.players[idx].hand.push(card);
+        }
+
+        if Self::is_bust(&self.players[idx].hand) {
+            self.players[idx].status = PlayerStatus::Bust;
+            self.advance_to_next_player();
+        } else if Self::calculate_hand(&self.players[idx].hand) == 21 {
+            self.players[idx].status = PlayerStatus::Stand;
+            self.advance_to_next_player();
+        }
+    }
+
+    pub fn stand(&mut self, peer_id: &str) {
+        let idx = match self.players.iter().position(|p| p.peer_id == peer_id) {
+            Some(i) if i as i32 == self.current_player_index => i,
+            _ => return,
+        };
+
+        self.players[idx].status = PlayerStatus::Stand;
+        self.advance_to_next_player();
+    }
+
+    pub fn new_round(&mut self) {
+        self.deck = Self::create_deck();
+        self.dealer_hand.clear();
+        self.dealer_revealed = false;
+        self.current_player_index = -1;
+        self.phase = BlackjackPhase::Betting;
+
+        for player in &mut self.players {
+            player.hand.clear();
+            player.status = PlayerStatus::Waiting;
+            player.bet = 0;
+        }
+    }
+
+    fn advance_to_next_player(&mut self) {
+        let next = self.players.iter()
+            .enumerate()
+            .skip((self.current_player_index + 1) as usize)
+            .find(|(_, p)| p.status == PlayerStatus::Playing)
+            .map(|(i, _)| i as i32);
+
+        self.current_player_index = next.unwrap_or(-1);
+
+        if self.current_player_index == -1 {
+            self.phase = BlackjackPhase::Dealer;
+            self.dealer_revealed = true;
+        }
+    }
+
+    pub fn dealer_play(&mut self) {
+        while Self::calculate_hand(&self.dealer_hand) < 17 {
+            if let Some(card) = self.deck.pop() {
+                self.dealer_hand.push(card);
+            } else {
+                break;
+            }
+        }
+        self.phase = BlackjackPhase::Settlement;
+    }
+
+    pub fn settle(&mut self) {
+        let dealer_total = Self::calculate_hand(&self.dealer_hand);
+        let dealer_bust = Self::is_bust(&self.dealer_hand);
+        let dealer_blackjack = Self::is_blackjack(&self.dealer_hand);
+
+        for player in &mut self.players {
+            if player.status == PlayerStatus::Bust {
+                player.status = PlayerStatus::Lose;
+                continue;
+            }
+
+            let player_total = Self::calculate_hand(&player.hand);
+            let player_blackjack = Self::is_blackjack(&player.hand);
+
+            if player_blackjack && !dealer_blackjack {
+                player.status = PlayerStatus::BlackjackWin;
+            } else if dealer_bust {
+                player.status = PlayerStatus::Win;
+            } else if player_total > dealer_total {
+                player.status = PlayerStatus::Win;
+            } else if player_total < dealer_total {
+                player.status = PlayerStatus::Lose;
+            } else {
+                player.status = PlayerStatus::Push;
+            }
+        }
+
+        self.phase = BlackjackPhase::Ended;
+    }
+
+    pub fn run_dealer_turn(&mut self) {
+        self.dealer_play();
+        self.settle();
+    }
+
+    pub fn is_player_turn(&self, peer_id: &str) -> bool {
+        if self.phase != BlackjackPhase::Playing { return false; }
+        self.players.iter()
+            .enumerate()
+            .find(|(_, p)| p.peer_id == peer_id)
+            .map(|(i, _)| i as i32 == self.current_player_index)
+            .unwrap_or(false)
+    }
+
+    /// Render ASCII card display
+    pub fn render_card(card: &Card, hidden: bool) -> String {
+        if hidden {
+            "┌──┐\n│??│\n└──┘".to_string()
+        } else {
+            let sym = card.symbol();
+            format!("┌──┐\n│{}│\n└──┘", if sym.len() > 2 { &sym[..2] } else { &sym })
+        }
+    }
+
+    /// Render game status for TUI
+    pub fn render_status(&self, my_id: &str) -> Vec<String> {
+        let mut lines = vec![
+            "════════════════ BLACKJACK ════════════════".to_string(),
+            String::new(),
+        ];
+
+        // Dealer hand
+        let dealer_value = if self.dealer_revealed {
+            format!("{}", Self::calculate_hand(&self.dealer_hand))
+        } else if !self.dealer_hand.is_empty() {
+            "?".to_string()
+        } else {
+            "-".to_string()
+        };
+
+        let dealer_cards: Vec<String> = self.dealer_hand.iter()
+            .enumerate()
+            .map(|(i, c)| if i == 1 && !self.dealer_revealed { "[??]".to_string() } else { c.symbol() })
+            .collect();
+
+        lines.push(format!("Dealer: {} | {}", dealer_cards.join(" "), dealer_value));
+        lines.push(String::new());
+        lines.push("──────────────────────────────────────────".to_string());
+        lines.push(String::new());
+
+        // Players
+        for player in &self.players {
+            let is_me = player.peer_id == my_id;
+            let prefix = if is_me { "► " } else { "  " };
+            let cards: Vec<String> = player.hand.iter().map(|c| c.symbol()).collect();
+            let value = Self::calculate_hand(&player.hand);
+            let me_marker = if is_me { " (You)" } else { "" };
+
+            lines.push(format!(
+                "{}{}{}: {} | ${} | {}{}",
+                prefix,
+                player.nick,
+                me_marker,
+                cards.join(" "),
+                player.bet,
+                value,
+                if player.status != PlayerStatus::Playing && player.status != PlayerStatus::Waiting && player.status != PlayerStatus::Ready {
+                    format!(" ({})", player.status.display())
+                } else {
+                    String::new()
+                }
+            ));
+        }
+
+        lines.push(String::new());
+
+        // Phase info
+        match &self.phase {
+            BlackjackPhase::Betting => {
+                lines.push("Phase: BETTING — /bj bet <amount> to place bet".to_string());
+                lines.push("         /bj deal to start (need at least 1 bet)".to_string());
+            }
+            BlackjackPhase::Playing => {
+                if let Some(current) = self.players.get(self.current_player_index as usize) {
+                    if current.peer_id == my_id {
+                        lines.push("Your turn! /bj hit or /bj stand".to_string());
+                    } else {
+                        lines.push(format!("Waiting for {}...", current.nick));
+                    }
+                }
+            }
+            BlackjackPhase::Dealer => {
+                lines.push("Dealer is playing...".to_string());
+            }
+            BlackjackPhase::Ended => {
+                lines.push("Round complete! /bj newround to play again".to_string());
+            }
+            _ => {}
+        }
+
+        lines.push("══════════════════════════════════════════".to_string());
+        lines
     }
 }

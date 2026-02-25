@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const GIPHY_KEY = import.meta.env.VITE_GIPHY_KEY || 'dc6zaTOxFJmzC';
 const API = `https://api.giphy.com/v1/gifs`;
@@ -10,7 +10,6 @@ export default function GifPicker({ onSelect, onClose }) {
     const inputRef = useRef();
 
     const search = async (q) => {
-        if (!q.trim()) return;
         setLoading(true);
         try {
             const url = q
@@ -26,7 +25,7 @@ export default function GifPicker({ onSelect, onClose }) {
     };
 
     // Load trending on first mount
-    useState(() => { search(''); }, []);
+    useEffect(() => { search(''); }, []);
 
     const handleKey = (e) => {
         if (e.key === 'Enter') search(query);
