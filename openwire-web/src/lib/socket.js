@@ -2,7 +2,7 @@
    OpenWire Web — WebSocket client for the relay server
    ═══════════════════════════════════════════════════════════ */
 
-const RELAY_URL = import.meta.env.VITE_RELAY_URL || 'ws://localhost:8080';
+const RELAY_URL = import.meta.env.VITE_RELAY_URL || 'ws://localhost:8787';
 
 let ws = null;
 let listeners = [];
