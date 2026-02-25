@@ -9,7 +9,7 @@ updates:
       time: "09:00"
     open-pull-requests-limit: 10
     reviewers:
-      - "shwetanshu21"
+      - "vimbeldum"
     labels:
       - "dependencies"
     commit-message:
@@ -33,7 +33,7 @@ updates:
       time: "09:00"
     open-pull-requests-limit: 5
     reviewers:
-      - "shwetanshu21"
+      - "vimbeldum"
     labels:
       - "dependencies"
       - "github-actions"
