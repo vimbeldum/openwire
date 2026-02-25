@@ -1,10 +1,10 @@
 # OpenWire
 
-[![CI](https://github.com/shwetanshu21/openwire/actions/workflows/ci.yml/badge.svg)](https://github.com/shwetanshu21/openwire/actions/workflows/ci.yml)
-[![Release](https://github.com/shwetanshu21/openwire/actions/workflows/release.yml/badge.svg)](https://github.com/shwetanshu21/openwire/actions/workflows/release.yml)
+[![CI](https://github.com/vimbeldum/openwire/actions/workflows/ci.yml/badge.svg)](https://github.com/vimbeldum/openwire/actions/workflows/ci.yml)
+[![Release](https://github.com/vimbeldum/openwire/actions/workflows/release.yml/badge.svg)](https://github.com/vimbeldum/openwire/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
-[![GitHub release](https://img.shields.io/github/v/release/shwetanshu21/openwire)](https://github.com/shwetanshu21/openwire/releases)
+[![GitHub release](https://img.shields.io/github/v/release/vimbeldum/openwire)](https://github.com/vimbeldum/openwire/releases)
 
 **Decentralized P2P Local Network Messenger** - Encrypted, Anonymous, Zero-Config
 
@@ -161,13 +161,13 @@ openwire/
 Builds from source on your machine, bypassing Gatekeeper entirely:
 
 ```bash
-brew tap shwetanshu21/openwire https://github.com/shwetanshu21/openwire
+brew tap vimbeldum/openwire https://github.com/vimbeldum/openwire
 brew install openwire
 ```
 
 #### Prebuilt Binaries
 
-Download from [GitHub Releases](https://github.com/shwetanshu21/openwire/releases):
+Download from [GitHub Releases](https://github.com/vimbeldum/openwire/releases):
 
 | Platform | File |
 |----------|------|
@@ -185,7 +185,7 @@ tar xzf openwire-macos-arm.tar.gz
 #### Build from Source
 
 ```bash
-git clone https://github.com/shwetanshu21/openwire.git
+git clone https://github.com/vimbeldum/openwire.git
 cd openwire
 cargo build --release
 ./target/release/openwire -n "YourName"
@@ -316,9 +316,9 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Support
 
-- 🐛 [Report a Bug](https://github.com/shwetanshu21/openwire/issues/new?template=bug_report.md)
-- 💡 [Request a Feature](https://github.com/shwetanshu21/openwire/issues/new?template=feature_request.md)
-- 💬 [Discussions](https://github.com/shwetanshu21/openwire/discussions)
+- 🐛 [Report a Bug](https://github.com/vimbeldum/openwire/issues/new?template=bug_report.md)
+- 💡 [Request a Feature](https://github.com/vimbeldum/openwire/issues/new?template=feature_request.md)
+- 💬 [Discussions](https://github.com/vimbeldum/openwire/discussions)
 
 ---
 
