@@ -11,11 +11,43 @@ function timeStr() {
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+// Message persistence helpers - uses sessionStorage so messages persist across refreshes
+// but are cleared when the tab/window is closed
+const STORAGE_KEY = 'openwire_messages';
+const MAX_STORED_MESSAGES = 500;
+
+function loadMessages() {
+    try {
+        const stored = sessionStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            return parsed.messages || [];
+        }
+    } catch (e) {
+        console.warn('Failed to load messages from sessionStorage:', e);
+    }
+    return [];
+}
+
+function saveMessages(messages) {
+    try {
+        const toStore = messages.slice(-MAX_STORED_MESSAGES);
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+            messages: toStore,
+            savedAt: Date.now()
+        }));
+    } catch (e) {
+        console.warn('Failed to save messages to sessionStorage:', e);
+    }
+}
+
 export default function ChatRoom({ nick: initialNick }) {
-    const [messages, setMessages] = useState([]);
+    // Load persisted messages on initial render
+    const [messages, setMessages] = useState(() => loadMessages());
     const [input, setInput] = useState('');
     const [peers, setPeers] = useState([]);
     const [rooms, setRooms] = useState([]);
+    const [currentRoom, setCurrentRoom] = useState(null); // null = general chat, room_id = in room
     const [connected, setConnected] = useState(false);
     const [activeGame, setActiveGame] = useState(null); // Tic-Tac-Toe
     const [blackjackGame, setBlackjackGame] = useState(null);
@@ -31,11 +63,18 @@ export default function ChatRoom({ nick: initialNick }) {
     const blackjackRef = useRef(null);
     const roomsRef = useRef([]);
     const peersRef = useRef([]);
+    const currentRoomRef = useRef(null);
 
     useEffect(() => { activeGameRef.current = activeGame; }, [activeGame]);
     useEffect(() => { blackjackRef.current = blackjackGame; }, [blackjackGame]);
     useEffect(() => { roomsRef.current = rooms; }, [rooms]);
     useEffect(() => { peersRef.current = peers; }, [peers]);
+    useEffect(() => { currentRoomRef.current = currentRoom; }, [currentRoom]);
+
+    // Persist messages when they change
+    useEffect(() => {
+        saveMessages(messages);
+    }, [messages]);
 
     const addMsg = useCallback((sender, content, type = 'chat', extra = {}) => {
         setMessages(prev => [...prev, { time: timeStr(), sender, content, type, id: Date.now() + Math.random(), ...extra }]);
@@ -175,6 +214,7 @@ export default function ChatRoom({ nick: initialNick }) {
                         roomsRef.current = updated;
                         return updated;
                     });
+                    setCurrentRoom(msg.room_id); // Switch to newly created room
                     addMsg('★', `🏠 Room "${msg.name}" created! ID: ${msg.room_id}`, 'system');
                     break;
                 case 'room_joined':
@@ -183,6 +223,7 @@ export default function ChatRoom({ nick: initialNick }) {
                         roomsRef.current = updated;
                         return updated;
                     });
+                    setCurrentRoom(msg.room_id);
                     addMsg('★', `🏠 Joined room "${msg.name}"`, 'system');
                     break;
                 case 'room_invite':
@@ -198,18 +239,26 @@ export default function ChatRoom({ nick: initialNick }) {
                     });
                     break;
                 case 'room_message': {
-                    if (game.isGameMessage(msg.data)) {
-                        const action = game.parseGameAction(msg.data);
-                        if (action) handleGameAction(msg, action);
-                    } else if (bj.isBlackjackMessage(msg.data)) {
-                        const action = bj.parseBlackjackAction(msg.data);
-                        if (action) handleBlackjackAction(msg, action);
-                    } else {
+                    // Only show room messages if we're viewing that room or if it's a game action
+                    const isCurrentRoom = currentRoomRef.current === msg.room_id;
+                    const isGameAction = game.isGameMessage(msg.data) || bj.isBlackjackMessage(msg.data);
+
+                    if (isGameAction) {
+                        // Game actions are always processed regardless of current room
+                        if (game.isGameMessage(msg.data)) {
+                            const action = game.parseGameAction(msg.data);
+                            if (action) handleGameAction(msg, action);
+                        } else if (bj.isBlackjackMessage(msg.data)) {
+                            const action = bj.parseBlackjackAction(msg.data);
+                            if (action) handleBlackjackAction(msg, action);
+                        }
+                    } else if (isCurrentRoom) {
+                        // Only show regular room messages if viewing that room
                         const gifMatch = msg.data.match(/^\[GIF\](.+)$/);
                         if (gifMatch) {
-                            addMsg(`[${msg.room_id?.slice(5, 17)}] ${msg.nick}`, '', 'peer', { gif: gifMatch[1] });
+                            addMsg(msg.nick, '', 'peer', { gif: gifMatch[1], roomId: msg.room_id });
                         } else {
-                            addMsg(`[${msg.room_id?.slice(5, 17)}] ${msg.nick}`, msg.data, 'peer');
+                            addMsg(msg.nick, msg.data, 'peer', { roomId: msg.room_id });
                         }
                     }
                     break;
@@ -373,15 +422,15 @@ export default function ChatRoom({ nick: initialNick }) {
     // ── GIF handler ─────────────────────────────────────────────────────────────
     const handleGifSelect = (gifUrl) => {
         const myNick = nickRef.current;
-        const currentRooms = roomsRef.current;
-        if (currentRooms.length === 0) {
-            addMsg('★', '⚠ Create/join a room first to send GIFs', 'system');
+        const activeRoom = currentRoomRef.current;
+
+        if (!activeRoom) {
+            addMsg('★', '⚠ Switch to a room to send GIFs (click a room in sidebar)', 'system');
             return;
         }
-        const roomId = currentRooms[0].room_id;
         const gifMsg = `[GIF]${gifUrl}`;
-        addMsg(myNick, '', 'self', { gif: gifUrl });
-        socket.sendRoomMessage(roomId, gifMsg);
+        addMsg(myNick, '', 'self', { gif: gifUrl, roomId: activeRoom });
+        socket.sendRoomMessage(activeRoom, gifMsg);
         setShowGifPicker(false);
     };
 
@@ -397,6 +446,7 @@ export default function ChatRoom({ nick: initialNick }) {
         const myNick = nickRef.current;
         const currentRooms = roomsRef.current;
         const currentPeers = peersRef.current;
+        const activeRoom = currentRoomRef.current;
 
         if (text === '/help') {
             addMsg('★', '── COMMANDS ──────────────────────', 'system');
@@ -406,6 +456,14 @@ export default function ChatRoom({ nick: initialNick }) {
             addMsg('★', '/game tictactoe  — challenge room to game', 'system');
             addMsg('★', '/game rematch  — play again', 'system');
             addMsg('★', '/blackjack  — start/join blackjack game', 'system');
+            addMsg('★', '/clear  — clear chat history', 'system');
+            return;
+        }
+
+        if (text === '/clear') {
+            setMessages([]);
+            sessionStorage.removeItem(STORAGE_KEY);
+            addMsg('★', 'Chat history cleared.', 'system');
             return;
         }
 
@@ -442,6 +500,7 @@ export default function ChatRoom({ nick: initialNick }) {
 
         if (text.startsWith('/game tictactoe') || text === '/game') {
             let roomId = text.slice(15).trim();
+            if (!roomId && activeRoom) roomId = activeRoom;
             if (!roomId && currentRooms.length > 0) roomId = currentRooms[0].room_id;
             if (!roomId) {
                 addMsg('★', '⚠ Create a room first: /room create <name>', 'system');
@@ -476,6 +535,7 @@ export default function ChatRoom({ nick: initialNick }) {
 
         if (text === '/blackjack' || text.startsWith('/blackjack ')) {
             let roomId = text.slice(11).trim();
+            if (!roomId && activeRoom) roomId = activeRoom;
             if (!roomId && currentRooms.length > 0) roomId = currentRooms[0].room_id;
             if (!roomId) {
                 addMsg('★', '⚠ Create a room first: /room create <name>', 'system');
@@ -489,8 +549,14 @@ export default function ChatRoom({ nick: initialNick }) {
             return;
         }
 
-        addMsg(myNick, text, 'self');
-        socket.sendChat(text);
+        // Send message to current room or general chat
+        if (activeRoom) {
+            addMsg(myNick, text, 'self', { roomId: activeRoom });
+            socket.sendRoomMessage(activeRoom, text);
+        } else {
+            addMsg(myNick, text, 'self');
+            socket.sendChat(text);
+        }
     };
 
     // ── Game move ──────────────────────────────────────────────────────────────
@@ -525,10 +591,38 @@ export default function ChatRoom({ nick: initialNick }) {
 
     const myNick = nickRef.current;
 
+    // Get current room name for display
+    const currentRoomName = currentRoom
+        ? rooms.find(r => r.room_id === currentRoom)?.name || 'Unknown Room'
+        : null;
+
+    // Function to switch to a room
+    const switchToRoom = (roomId) => {
+        setCurrentRoom(roomId);
+    };
+
+    // Function to switch to general chat
+    const switchToGeneral = () => {
+        setCurrentRoom(null);
+    };
+
     return (
         <div className="chat-layout">
             <header className="chat-header">
                 <h1>⚡ OpenWire</h1>
+                <div className="header-context">
+                    {currentRoomName ? (
+                        <span className="current-room-indicator">
+                            <span className="room-icon">🏠</span>
+                            <span className="room-name">{currentRoomName}</span>
+                            <button className="leave-room-btn" onClick={switchToGeneral} title="Back to General Chat">
+                                ✕
+                            </button>
+                        </span>
+                    ) : (
+                        <span className="general-chat-indicator">💬 General Chat</span>
+                    )}
+                </div>
                 <div className="header-status">
                     <span className={`status-dot ${connected ? '' : 'offline'}`} />
                     <span>{connected ? `${myNick} — ${peers.length} online` : 'Connecting...'}</span>
@@ -596,7 +690,11 @@ export default function ChatRoom({ nick: initialNick }) {
                 <div className="chat-input-wrapper" style={{ flex: 1, position: 'relative' }}>
                     <input
                         type="text"
-                        placeholder="Type a message or /help..."
+                        placeholder={
+                            currentRoom
+                                ? `Message #${rooms.find(r => r.room_id === currentRoom)?.name || 'room'}...`
+                                : 'Message General Chat... (or /help)'
+                        }
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         autoFocus
@@ -616,6 +714,18 @@ export default function ChatRoom({ nick: initialNick }) {
 
             <div className="sidebar">
                 <div className="sidebar-section">
+                    <div className="sidebar-title">Channels</div>
+                    <div
+                        className={`room-item ${!currentRoom ? 'active' : ''}`}
+                        onClick={switchToGeneral}
+                        style={{ cursor: 'pointer' }}
+                    >
+                        <span className="room-icon">💬</span>
+                        <span className="room-name">General Chat</span>
+                    </div>
+                </div>
+
+                <div className="sidebar-section">
                     <div className="sidebar-title">Online ({peers.length})</div>
                     {peers.filter(p => p.peer_id !== myIdRef.current).map((p) => (
                         <div key={p.peer_id} className="peer-item">
@@ -633,7 +743,12 @@ export default function ChatRoom({ nick: initialNick }) {
                 <div className="sidebar-section">
                     <div className="sidebar-title">Rooms ({rooms.length})</div>
                     {rooms.map((r) => (
-                        <div key={r.room_id} className="room-item">
+                        <div
+                            key={r.room_id}
+                            className={`room-item ${currentRoom === r.room_id ? 'active' : ''}`}
+                            onClick={() => switchToRoom(r.room_id)}
+                            style={{ cursor: 'pointer' }}
+                        >
                             <span className="room-icon">🏠</span>
                             <span className="room-name">{r.name}</span>
                         </div>
@@ -649,37 +764,46 @@ export default function ChatRoom({ nick: initialNick }) {
                     {rooms.length > 0 && (
                         <>
                             <button className="sidebar-btn" onClick={() => {
-                                const r = roomsRef.current[0];
-                                if (!r) return;
-                                socket.sendRoomMessage(r.room_id, game.serializeGameAction({
+                                const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
+                                if (!roomId) {
+                                    addMsg('★', '⚠ Select or create a room first', 'system');
+                                    return;
+                                }
+                                socket.sendRoomMessage(roomId, game.serializeGameAction({
                                     type: 'Challenge',
                                     challenger: myIdRef.current,
                                     challenger_nick: nickRef.current,
-                                    room_id: r.room_id,
+                                    room_id: roomId,
                                 }));
                                 addMsg('★', '🎮 Game challenge sent!', 'system');
                             }}>🎮 Tic-Tac-Toe</button>
 
                             <button className="sidebar-btn" onClick={() => {
-                                const r = roomsRef.current[0];
-                                if (!r) return;
+                                const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
+                                if (!roomId) {
+                                    addMsg('★', '⚠ Select or create a room first', 'system');
+                                    return;
+                                }
                                 if (blackjackRef.current) {
                                     addMsg('★', '⚠ Blackjack already in progress', 'system');
                                     return;
                                 }
-                                startBlackjack(r.room_id);
+                                startBlackjack(roomId);
                             }}>🃏 Blackjack</button>
 
                             <button className="sidebar-btn" onClick={() => {
                                 const nick = prompt('Invite nick:');
-                                if (nick && roomsRef.current[0]) {
+                                const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
+                                if (nick && roomId) {
                                     const target = peersRef.current.find(p => p.nick === nick);
                                     if (target) {
-                                        socket.inviteToRoom(roomsRef.current[0].room_id, target.peer_id);
+                                        socket.inviteToRoom(roomId, target.peer_id);
                                         addMsg('★', `🏠 Invited ${target.nick} to room.`, 'system');
                                     } else {
                                         addMsg('★', `⚠ Peer "${nick}" not found.`, 'system');
                                     }
+                                } else if (!roomId) {
+                                    addMsg('★', '⚠ Select or create a room first', 'system');
                                 }
                             }}>✉ Invite to Room</button>
                         </>

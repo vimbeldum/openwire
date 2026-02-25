@@ -265,6 +265,54 @@ body {
   letter-spacing: -0.02em;
 }
 
+.header-context {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  justify-content: center;
+}
+
+.current-room-indicator,
+.general-chat-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(102, 161, 238, 0.15);
+  border: 1px solid rgba(102, 161, 238, 0.3);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.general-chat-indicator {
+  background: rgba(168, 102, 238, 0.15);
+  border-color: rgba(168, 102, 238, 0.3);
+  color: var(--secondary);
+}
+
+.leave-room-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(232, 58, 48, 0.2);
+  border: 1px solid rgba(232, 58, 48, 0.3);
+  border-radius: 50%;
+  color: var(--red);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-left: 0.25rem;
+}
+
+.leave-room-btn:hover {
+  background: var(--red);
+  color: white;
+}
+
 .header-status {
   display: flex;
   align-items: center;
@@ -475,6 +523,16 @@ body {
 .peer-item:hover,
 .room-item:hover {
   background: rgba(255, 255, 255, 0.05);
+}
+
+.room-item.active {
+  background: var(--accent-glow);
+  border-left: 3px solid var(--accent);
+}
+
+.room-item.active .room-name {
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .peer-dot {
