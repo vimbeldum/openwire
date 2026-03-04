@@ -175,38 +175,69 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         return () => {
             if (rouletteTimerRef.current) clearInterval(rouletteTimerRef.current);
             if (abDealTimerRef.current) clearInterval(abDealTimerRef.current);
+            if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
         };
     }, []);
 
-    // ── Andar Bahar auto-deal ────────────────────────────────
-    const startAbDealTimer = useCallback((gameState) => {
+    // ── Andar Bahar auto-cycle (host-driven) ─────────────────
+    const abCycleTimerRef = useRef(null);
+
+    const startAbCycle = useCallback((initialGame) => {
+        // Clear any existing timers
         if (abDealTimerRef.current) clearInterval(abDealTimerRef.current);
-        if (!gameState || gameState.phase !== 'dealing') return;
+        if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
 
-        abDealTimerRef.current = setInterval(() => {
+        const roomId = initialGame.roomId;
+        const bettingMs = ab.BETTING_DURATION_MS;
+
+        // Phase 1: Betting window → after BETTING_DURATION_MS, deal trump
+        abCycleTimerRef.current = setTimeout(() => {
+            if (!amIHost(abHostRef.current)) return;
             const current = andarBaharRef.current;
-            const hostId = abHostRef.current;
-            if (!current || !amIHost(hostId)) { clearInterval(abDealTimerRef.current); return; }
-            if (current.phase !== 'dealing') { clearInterval(abDealTimerRef.current); return; }
+            if (!current || current.phase !== 'betting') return;
 
-            const next = ab.dealNext(current);
-            setAndarBaharGame(next);
-            const roomId = current.roomId;
-            socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(next) }));
+            const withTrump = ab.dealTrump(current);
+            setAndarBaharGame(withTrump);
+            socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(withTrump) }));
+            addActivityLog(`Andar Bahar: trump card ${withTrump.trumpCard?.value}${withTrump.trumpCard?.suit}`);
 
-            if (next.phase === 'ended') {
-                clearInterval(abDealTimerRef.current);
-                const myId = myIdRef.current;
-                const myNet = next.payouts?.[myId];
-                if (myNet !== undefined && walletRef.current) {
-                    let w = walletRef.current;
-                    if (myNet > 0) w = wallet.credit(w, myNet, 'Andar Bahar win');
-                    else if (myNet < 0) w = wallet.debit(w, -myNet, 'Andar Bahar bet');
-                    updateWallet(w);
+            // Phase 2: Deal cards 1-by-1
+            abDealTimerRef.current = setInterval(() => {
+                const cur = andarBaharRef.current;
+                if (!cur || !amIHost(abHostRef.current)) { clearInterval(abDealTimerRef.current); return; }
+                if (cur.phase !== 'dealing') { clearInterval(abDealTimerRef.current); return; }
+
+                const next = ab.dealNext(cur);
+                setAndarBaharGame(next);
+                socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(next) }));
+
+                if (next.phase === 'ended') {
+                    clearInterval(abDealTimerRef.current);
+
+                    // Apply wallet changes for host
+                    const myId = myIdRef.current;
+                    const myNet = next.payouts?.[myId];
+                    if (myNet !== undefined && walletRef.current) {
+                        let w = walletRef.current;
+                        if (myNet > 0) w = wallet.credit(w, myNet, 'Andar Bahar win');
+                        else if (myNet < 0) w = wallet.debit(w, -myNet, 'Andar Bahar bet');
+                        updateWallet(w);
+                    }
+                    addActivityLog(`Andar Bahar: ${next.result?.toUpperCase()} wins! Trump: ${next.trumpCard?.value}${next.trumpCard?.suit}`);
+
+                    // Phase 3: Show results for RESULTS_DISPLAY_MS, then new round
+                    abCycleTimerRef.current = setTimeout(() => {
+                        if (!amIHost(abHostRef.current)) return;
+                        const reset = ab.newRound(andarBaharRef.current || next);
+                        setAndarBaharGame(reset);
+                        socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(reset) }));
+                        // Restart cycle
+                        startAbCycle(reset);
+                    }, ab.RESULTS_DISPLAY_MS);
                 }
-                addActivityLog(`Andar Bahar: ${next.result?.toUpperCase()} wins! Trump: ${next.trumpCard?.value}${next.trumpCard?.suit}`);
-            }
-        }, ab.DEAL_INTERVAL_MS);
+            }, ab.DEAL_INTERVAL_MS);
+
+        }, bettingMs);
     }, [addActivityLog, amIHost, updateWallet]);
 
     // ── Tic-Tac-Toe handler ──────────────────────────────────
@@ -354,17 +385,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                                 setTimeout(() => updateWallet(w), 0);
                             }
                         }
-                        // If we received a dealing state and we are now the host, start deal timer
-                        if (gameState.phase === 'dealing' && amIHost(abHostRef.current)) {
-                            setTimeout(() => startAbDealTimer(gameState), 0);
-                        }
                         return gameState;
                     });
                 }
                 break;
             }
         }
-    }, [updateWallet, amIHost, startAbDealTimer]);
+    }, [updateWallet]);
 
     // ── WebSocket event handler ──────────────────────────────
     useEffect(() => {
@@ -482,9 +509,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     }
                     if (andarBaharRef.current?.roomId === msg.room_id) {
                         abHostRef.current = msg.new_host;
-                        if (msg.new_host === myId && andarBaharRef.current?.phase === 'dealing') {
+                        if (msg.new_host === myId) {
                             addMsg('★', '👑 You are now the Andar Bahar host', 'system');
-                            startAbDealTimer(andarBaharRef.current);
+                            // Restart the full AB cycle from current state
+                            const curAb = andarBaharRef.current;
+                            if (curAb) startAbCycle(curAb);
                         }
                     }
                     break;
@@ -524,7 +553,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
         socket.connect(nickRef.current, onEvent);
         return () => socket.disconnect();
-    }, [addMsg, handleGameAction, handleBlackjackAction, handleRouletteAction, handleAndarBaharAction, startRouletteTimer, startAbDealTimer]);
+    }, [addMsg, handleGameAction, handleBlackjackAction, handleRouletteAction, handleAndarBaharAction, startRouletteTimer, startAbCycle]);
 
     useEffect(() => {
         messagesEnd.current?.scrollIntoView({ behavior: 'smooth' });
@@ -649,55 +678,37 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         socket.sendRoomMessage(newGame.roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(newGame) }));
     };
 
-    // ── Andar Bahar handlers ─────────────────────────────────
+    // ── Andar Bahar handlers ───────────────────────────────────
     const startAndarBahar = (roomId) => {
         const myId = myIdRef.current;
         const myNick = nickRef.current;
         const newGame = ab.createGame(roomId);
         setAndarBaharGame(newGame);
         abHostRef.current = myId;
-        addMsg('★', `🃏 Andar Bahar started!`, 'system');
+        addMsg('★', `🃏 Andar Bahar started! Betting open for 30s.`, 'system');
         socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_start', room_id: roomId, host: myId, host_nick: myNick }));
         socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(newGame) }));
+        // Start the auto-cycle immediately
+        startAbCycle(newGame);
     };
 
     const acceptAbInvite = (invite) => {
         abHostRef.current = invite.host;
         setPendingAbInvites(prev => prev.filter(i => i.id !== invite.id));
-        addMsg('★', `🃏 Joined Andar Bahar!`, 'system');
+        addMsg('★', `🃏 Joined Andar Bahar table!`, 'system');
     };
 
     const handleAbAction = (action) => {
         if (!andarBaharGame) return;
         const myId = myIdRef.current;
         const myNick = nickRef.current;
-        let newGame = andarBaharGame;
+        if (action.type !== 'bet') return; // auto-cycle handles everything else
 
-        switch (action.type) {
-            case 'bet': {
-                const w = walletRef.current;
-                if (!w || !wallet.canAfford(w, action.amount)) { addMsg('★', `⚠ Insufficient chips.`, 'system'); return; }
-                newGame = ab.placeBet(andarBaharGame, myId, myNick, action.side, action.amount);
-                break;
-            }
-            case 'dealTrump': {
-                newGame = ab.dealTrump(andarBaharGame);
-                break;
-            }
-            case 'newRound': {
-                newGame = ab.newRound(andarBaharGame);
-                break;
-            }
-        }
-
+        const w = walletRef.current;
+        if (!w || !wallet.canAfford(w, action.amount)) { addMsg('★', `⚠ Insufficient chips.`, 'system'); return; }
+        const newGame = ab.placeBet(andarBaharGame, myId, myNick, action.side, action.amount);
         setAndarBaharGame(newGame);
-        const roomId = newGame.roomId;
-        socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(newGame) }));
-
-        // Start deal timer when phase becomes 'dealing'
-        if (newGame.phase === 'dealing' && andarBaharGame.phase !== 'dealing' && amIHost(abHostRef.current)) {
-            startAbDealTimer(newGame);
-        }
+        socket.sendRoomMessage(newGame.roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(newGame) }));
     };
 
     // ── GIF handler ──────────────────────────────────────────

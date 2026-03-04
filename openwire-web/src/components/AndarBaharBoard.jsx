@@ -1,48 +1,99 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as ab from '../lib/andarbahar';
 import * as bj from '../lib/blackjack';
 
-function Card({ card, index = 0 }) {
-    if (!card) return <div className="bj-card bj-card-back"><div className="bj-card-pattern">?</div></div>;
+/* ── Card Component ─────────────────────────────── */
+function Card({ card, index = 0, faceDown = false, small = false }) {
+    if (!card || faceDown) {
+        return (
+            <div className={`card card-back ${small ? 'card-sm' : ''}`}>
+                <div className="card-back-pattern" />
+            </div>
+        );
+    }
     const { display, isRed } = bj.cardSymbol(card);
+    const suitClass = isRed ? 'red' : 'black';
     return (
         <div
-            className={`bj-card ${isRed ? 'red' : 'black'} flipped`}
-            style={{ transform: `rotate(${(index % 3 - 1) * 4}deg) translateX(${index * -8}px)` }}
+            className={`card ${suitClass} ${small ? 'card-sm' : ''} card-flip`}
+            style={{ '--delay': `${Math.min(index, 8) * 0.05}s` }}
         >
-            <div className="bj-card-corner top">{display}</div>
-            <div className="bj-card-center">{card.suit}</div>
-            <div className="bj-card-corner bottom">{display}</div>
+            <div className="card-corner tl">
+                <div className="card-rank">{display}</div>
+                <div className="card-suit-sm">{card.suit}</div>
+            </div>
+            <div className="card-center-suit">{card.suit}</div>
+            <div className="card-corner br">
+                <div className="card-rank">{display}</div>
+                <div className="card-suit-sm">{card.suit}</div>
+            </div>
         </div>
     );
 }
 
 function TrumpCard({ card }) {
-    if (!card) return <div className="ab-trump-empty"><span>?</span></div>;
+    if (!card) {
+        return (
+            <div className="ab-trump-slot">
+                <div className="ab-trump-placeholder">?</div>
+            </div>
+        );
+    }
     const { display, isRed } = bj.cardSymbol(card);
     return (
-        <div className={`ab-trump-card bj-card ${isRed ? 'red' : 'black'} flipped`}>
-            <div className="bj-card-corner top">{display}</div>
-            <div className="bj-card-center" style={{ fontSize: '2rem' }}>{card.suit}</div>
-            <div className="bj-card-corner bottom">{display}</div>
+        <div className={`card ab-trump ${isRed ? 'red' : 'black'} card-flip`}>
+            <div className="card-corner tl">
+                <div className="card-rank">{display}</div>
+                <div className="card-suit-sm">{card.suit}</div>
+            </div>
+            <div className="card-center-suit" style={{ fontSize: '3rem' }}>{card.suit}</div>
+            <div className="card-corner br">
+                <div className="card-rank">{display}</div>
+                <div className="card-suit-sm">{card.suit}</div>
+            </div>
         </div>
     );
 }
 
+/* ── Countdown Timer ────────────────────────────── */
+function BettingCountdown({ bettingEndsAt }) {
+    const [timeLeft, setTimeLeft] = useState('');
+    useEffect(() => {
+        const update = () => {
+            const ms = Math.max(0, bettingEndsAt - Date.now());
+            const s = Math.ceil(ms / 1000);
+            setTimeLeft(s > 0 ? `${s}s` : '0s');
+        };
+        update();
+        const t = setInterval(update, 250);
+        return () => clearInterval(t);
+    }, [bettingEndsAt]);
+
+    const pct = Math.max(0, Math.min(100, ((bettingEndsAt - Date.now()) / ab.BETTING_DURATION_MS) * 100));
+    return (
+        <div className="ab-countdown">
+            <div className="ab-countdown-label">Betting closes in <strong>{timeLeft}</strong></div>
+            <div className="ab-countdown-bar">
+                <div className="ab-countdown-fill" style={{ width: `${pct}%` }} />
+            </div>
+        </div>
+    );
+}
+
+/* ── History Strip ──────────────────────────────── */
 function HistoryStrip({ history }) {
     const ref = useRef(null);
     useEffect(() => {
         if (ref.current) ref.current.scrollLeft = ref.current.scrollWidth;
-    }, [history]);
-
-    if (!history || history.length === 0) return null;
+    }, [history?.length]);
+    if (!history?.length) return null;
     return (
-        <div className="rl-history ab-history" ref={ref}>
+        <div className="game-history-strip" ref={ref}>
             {history.map((card, i) => {
                 const isRed = card.suit === '♥' || card.suit === '♦';
                 return (
-                    <span key={i} className={`rl-hist-chip rl-hist-${isRed ? 'red' : 'black'}`}>
-                        {card.value}
+                    <span key={i} className={`history-pip ${isRed ? 'red' : 'black'}`}>
+                        {card.value}{card.suit}
                     </span>
                 );
             })}
@@ -50,154 +101,205 @@ function HistoryStrip({ history }) {
     );
 }
 
+const BET_AMOUNTS = [10, 25, 50, 100, 250, 500];
+
+/* ── Main Board ─────────────────────────────────── */
 export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, onClose, isHost }) {
+    const [selectedAmount, setSelectedAmount] = useState(50);
+
     if (!game) return null;
 
-    const myBet = game.bets?.find(b => b.peer_id === myId);
     const balance = wallet ? (wallet.baseBalance + wallet.adminBonus) : 0;
+    const myBet = game.bets?.find(b => b.peer_id === myId);
     const canBet = game.phase === 'betting' && !myBet;
-    const BET_AMOUNTS = [10, 25, 50, 100, 250, 500];
+    const bettingOpen = game.phase === 'betting' && Date.now() < game.bettingEndsAt;
 
-    const handleBet = (side, amount) => {
-        if (!canBet || amount > balance) return;
-        onAction({ type: 'bet', side, amount });
+    const handleBet = (side) => {
+        if (!canBet || !bettingOpen || selectedAmount > balance) return;
+        onAction({ type: 'bet', side, amount: selectedAmount });
     };
 
-    const handleDealTrump = () => onAction({ type: 'dealTrump' });
-    const handleNewRound = () => onAction({ type: 'newRound' });
+    const myPayout = game.payouts?.[myId];
+    const resultColor = game.result === 'andar' ? 'blue' : 'orange';
+
+    // Pile card slice — show last 6 only to avoid overflow
+    const andarVisible = game.andar.slice(-8);
+    const baharVisible = game.bahar.slice(-8);
 
     return (
         <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
             <div className="ab-table">
-                <div className="rl-header">
-                    <div className="rl-header-left">
-                        <h2>🃏 Andar Bahar</h2>
-                        {isHost && <span className="rl-host-badge">Host</span>}
+                {/* Header */}
+                <div className="game-table-header">
+                    <div className="game-table-title">
+                        🃏 <span>Andar Bahar</span>
+                        {isHost && <span className="host-crown" title="You are the host">👑</span>}
                     </div>
-                    <div className="rl-header-center">
-                        {wallet && <span className="rl-balance">💰 {balance.toLocaleString()} chips</span>}
+                    <div className="game-table-meta">
+                        {wallet && <span className="chip-display">💰 {balance.toLocaleString()}</span>}
+                        {game.phase === 'betting' && <BettingCountdown bettingEndsAt={game.bettingEndsAt} />}
                     </div>
-                    <button className="bj-close" onClick={onClose}>✕</button>
+                    <button className="btn-icon-close" onClick={onClose}>✕</button>
                 </div>
 
-                {/* Trump card + status */}
-                <div className="ab-trump-section">
-                    <div className="ab-trump-label">Trump Card</div>
-                    <TrumpCard card={game.trumpCard} />
-                    <div className="ab-phase-label">
-                        {game.phase === 'betting' && !game.trumpCard && 'Place bets, then deal trump card'}
-                        {game.phase === 'betting' && game.trumpCard && 'Trump revealed — betting open'}
-                        {game.phase === 'dealing' && `Dealing… (${game.andar.length + game.bahar.length} cards dealt)`}
+                {/* Trump card area */}
+                <div className="ab-trump-area">
+                    <div className="ab-trump-col">
+                        <div className="ab-trump-label-text">TRUMP CARD</div>
+                        <TrumpCard card={game.trumpCard} />
+                        {game.trumpCard && (
+                            <div className="ab-trump-rank-label">
+                                Match: <strong>{game.trumpCard.value}</strong>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Phase badge */}
+                    <div className="ab-phase-badge-col">
+                        {game.phase === 'betting' && !game.trumpCard && (
+                            <div className="ab-phase-badge betting">PLACE BETS</div>
+                        )}
+                        {game.phase === 'betting' && game.trumpCard && (
+                            <div className="ab-phase-badge betting">BETTING OPEN</div>
+                        )}
+                        {game.phase === 'dealing' && (
+                            <div className="ab-phase-badge dealing">DEALING <span className="deal-dot" /></div>
+                        )}
                         {game.phase === 'ended' && (
-                            <span className="ab-result-label">
-                                🏆 {game.result?.toUpperCase()} wins!
-                                {game.payouts?.[myId] !== undefined && (
-                                    <span className={game.payouts[myId] >= 0 ? 'win' : 'lose'}>
-                                        &nbsp;{game.payouts[myId] >= 0 ? `+${game.payouts[myId]}` : game.payouts[myId]} chips
-                                    </span>
-                                )}
-                            </span>
+                            <div className={`ab-phase-badge result ${resultColor}`}>
+                                {game.result?.toUpperCase()} WINS!
+                            </div>
+                        )}
+                        {myPayout !== undefined && game.phase === 'ended' && (
+                            <div className={`ab-my-result ${myPayout >= 0 ? 'win' : 'lose'}`}>
+                                {myPayout >= 0 ? `+${myPayout}` : myPayout} chips
+                            </div>
                         )}
                     </div>
                 </div>
 
                 {/* Card piles */}
-                <div className="ab-piles">
-                    <div className={`ab-pile ${game.result === 'andar' ? 'winner' : ''}`}>
-                        <div className="ab-pile-label">
-                            अंदर (Andar)
-                            {myBet?.side === 'andar' && <span className="ab-my-bet-tag">Your bet: {myBet.amount}</span>}
+                <div className="ab-piles-row">
+                    {/* Andar (Inside) */}
+                    <div className={`ab-pile-zone andar ${game.result === 'andar' ? 'winner-glow' : ''}`}>
+                        <div className="ab-pile-header">
+                            <span className="ab-pile-name andar">ANDAR (Inside)</span>
+                            {myBet?.side === 'andar' && (
+                                <span className="ab-bet-indicator">{myBet.amount} chips</span>
+                            )}
+                            <span className="ab-pile-count">{game.andar.length} cards</span>
                         </div>
-                        <div className="ab-cards">
-                            {game.andar.length === 0 && <div className="ab-pile-empty">—</div>}
-                            {game.andar.map((card, i) => <Card key={card.id || i} card={card} index={i} />)}
+                        <div className="ab-cards-fan">
+                            {game.andar.length === 0
+                                ? <div className="ab-pile-empty-msg">—</div>
+                                : andarVisible.map((card, i) => (
+                                    <Card key={`a${i}`} card={card} index={i} small />
+                                ))
+                            }
                         </div>
-                        <div className="ab-pile-count">{game.andar.length} cards</div>
                     </div>
 
-                    <div className={`ab-pile ${game.result === 'bahar' ? 'winner' : ''}`}>
-                        <div className="ab-pile-label">
-                            बाहर (Bahar)
-                            {myBet?.side === 'bahar' && <span className="ab-my-bet-tag">Your bet: {myBet.amount}</span>}
+                    {/* Bahar (Outside) */}
+                    <div className={`ab-pile-zone bahar ${game.result === 'bahar' ? 'winner-glow' : ''}`}>
+                        <div className="ab-pile-header">
+                            <span className="ab-pile-name bahar">BAHAR (Outside)</span>
+                            {myBet?.side === 'bahar' && (
+                                <span className="ab-bet-indicator">{myBet.amount} chips</span>
+                            )}
+                            <span className="ab-pile-count">{game.bahar.length} cards</span>
                         </div>
-                        <div className="ab-cards">
-                            {game.bahar.length === 0 && <div className="ab-pile-empty">—</div>}
-                            {game.bahar.map((card, i) => <Card key={card.id || i} card={card} index={i} />)}
+                        <div className="ab-cards-fan">
+                            {game.bahar.length === 0
+                                ? <div className="ab-pile-empty-msg">—</div>
+                                : baharVisible.map((card, i) => (
+                                    <Card key={`b${i}`} card={card} index={i} small />
+                                ))
+                            }
                         </div>
-                        <div className="ab-pile-count">{game.bahar.length} cards</div>
                     </div>
                 </div>
 
-                {/* All players' bets */}
+                {/* All bets */}
                 {game.bets?.length > 0 && (
-                    <div className="rl-all-bets">
-                        <div className="rl-section-title">Bets</div>
-                        <div className="rl-bets-list">
-                            {game.bets.map((b, i) => (
-                                <span key={i} className={`rl-bet-tag ${b.side}`}>
-                                    {b.nick}: {b.side} — {b.amount}
-                                </span>
-                            ))}
-                        </div>
+                    <div className="ab-bets-bar">
+                        {game.bets.map((b, i) => (
+                            <span key={i} className={`ab-bet-pill ${b.side}`}>
+                                {b.nick}: {b.amount}
+                            </span>
+                        ))}
                     </div>
                 )}
 
-                {/* Action panel */}
-                <div className="ab-actions">
-                    {game.phase === 'betting' && canBet && (
-                        <div className="ab-bet-panel">
-                            <div className="ab-bet-row">
-                                {BET_AMOUNTS.map(a => (
-                                    <div key={a} className="ab-side-bets">
-                                        <button
-                                            className="ab-bet-btn andar"
-                                            onClick={() => handleBet('andar', a)}
-                                            disabled={a > balance}
-                                        >
-                                            अंदर {a}
-                                        </button>
-                                        <button
-                                            className="ab-bet-btn bahar"
-                                            onClick={() => handleBet('bahar', a)}
-                                            disabled={a > balance}
-                                        >
-                                            बाहर {a}
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
+                {/* Payouts */}
+                {game.phase === 'ended' && game.payouts && (
+                    <div className="ab-payouts-row">
+                        {Object.entries(game.payouts).map(([pid, net]) => {
+                            const bet = game.bets.find(b => b.peer_id === pid);
+                            return (
+                                <div key={pid} className={`ab-payout-chip ${net >= 0 ? 'win' : 'lose'}`}>
+                                    <span>{bet?.nick || pid.slice(0, 6)}</span>
+                                    <span>{net >= 0 ? `+${net}` : net}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* Betting controls */}
+                {canBet && bettingOpen && (
+                    <div className="ab-bet-controls">
+                        {/* Chip selector */}
+                        <div className="chip-selector">
+                            {BET_AMOUNTS.map(a => (
+                                <button
+                                    key={a}
+                                    className={`chip-btn ${selectedAmount === a ? 'active' : ''}`}
+                                    onClick={() => setSelectedAmount(a)}
+                                    disabled={a > balance}
+                                >
+                                    {a}
+                                </button>
+                            ))}
                         </div>
-                    )}
-
-                    {game.phase === 'betting' && myBet && (
-                        <div className="ab-bet-placed">
-                            ✅ Bet placed: {myBet.amount} chips on <strong>{myBet.side}</strong>
+                        {/* Side buttons */}
+                        <div className="ab-side-btns">
+                            <button
+                                className="ab-side-btn andar"
+                                onClick={() => handleBet('andar')}
+                                disabled={selectedAmount > balance}
+                            >
+                                <span className="ab-btn-top">ANDAR</span>
+                                <span className="ab-btn-sub">Inside · {selectedAmount} chips</span>
+                            </button>
+                            <button
+                                className="ab-side-btn bahar"
+                                onClick={() => handleBet('bahar')}
+                                disabled={selectedAmount > balance}
+                            >
+                                <span className="ab-btn-top">BAHAR</span>
+                                <span className="ab-btn-sub">Outside · {selectedAmount} chips</span>
+                            </button>
                         </div>
-                    )}
+                        <div className="ab-payout-note">Andar 0.9:1 · Bahar 1:1</div>
+                    </div>
+                )}
 
-                    {game.phase === 'betting' && isHost && (
-                        <button className="bj-btn-primary" onClick={handleDealTrump}>
-                            Deal Trump Card →
-                        </button>
-                    )}
+                {myBet && game.phase === 'betting' && (
+                    <div className="ab-bet-placed-msg">
+                        ✅ Bet placed: <strong>{myBet.amount} chips</strong> on <strong>{myBet.side.toUpperCase()}</strong>
+                    </div>
+                )}
 
-                    {game.phase === 'ended' && isHost && (
-                        <button className="bj-btn-primary" onClick={handleNewRound}>
-                            New Round
-                        </button>
-                    )}
-
-                    {game.phase === 'dealing' && (
-                        <div className="ab-dealing-indicator">
-                            <span className="ab-dealing-dot" />
-                            Auto-dealing…
-                        </div>
-                    )}
-                </div>
+                {game.phase === 'dealing' && (
+                    <div className="ab-dealing-msg">
+                        <span className="deal-dot" /><span className="deal-dot delay1" /><span className="deal-dot delay2" />
+                        Auto-dealing…
+                    </div>
+                )}
 
                 {/* History */}
                 <div className="ab-history-section">
-                    <div className="rl-section-title">Last 100 Trump Cards</div>
+                    <div className="section-mini-title">Last 100 Trump Cards</div>
                     <HistoryStrip history={game.trumpHistory} />
                 </div>
             </div>
