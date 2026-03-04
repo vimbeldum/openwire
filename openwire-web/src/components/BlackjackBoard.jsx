@@ -80,6 +80,28 @@ function Hand({ cards, label, value, hidden = false, status = '', isMyTurn = fal
 
 const BET_AMOUNTS = [10, 25, 50, 100, 250, 500];
 
+function Countdown({ game }) {
+    const [now, setNow] = useState(Date.now());
+
+    useEffect(() => {
+        if (game.phase !== 'betting') return;
+        const key = setInterval(() => setNow(Date.now()), 250);
+        return () => clearInterval(key);
+    }, [game.phase]);
+
+    if (game.phase !== 'betting') return null;
+
+    const ms = Math.max(0, game.nextDealAt - now);
+    const s = Math.floor(ms / 1000);
+    const text = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+    return (
+        <div className="game-timer pulse">
+            Dealing in {text}
+        </div>
+    );
+}
+
 /* ── Main Board ───────────────────────────────────── */
 export default function BlackjackBoard({ game, myId, myNick, wallet, onAction, onClose, isHost }) {
     const [selectedBet, setSelectedBet] = useState(50);
@@ -107,6 +129,7 @@ export default function BlackjackBoard({ game, myId, myNick, wallet, onAction, o
                     </div>
                     <div className="game-table-meta">
                         {wallet && <span className="chip-display">💰 {balance.toLocaleString()}</span>}
+                        <Countdown game={game} />
                     </div>
                     <button className="btn-icon-close" onClick={onClose}>✕</button>
                 </div>
@@ -177,11 +200,6 @@ export default function BlackjackBoard({ game, myId, myNick, wallet, onAction, o
                             ) : (
                                 <div className="bj-bet-row">
                                     <span className="bj-bet-locked">Bet placed: <strong>{myPlayer.bet}</strong> chips</span>
-                                    {isHost && game.players.some(p => p.bet > 0) && (
-                                        <button className="bj-btn-primary deal" onClick={() => onAction({ type: 'deal' })}>
-                                            Deal Cards
-                                        </button>
-                                    )}
                                 </div>
                             )}
                         </div>

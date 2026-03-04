@@ -61,7 +61,7 @@ function RouletteWheel({ spinning, result }) {
 
         // Label position (midpoint of arc)
         const midAngle = startAngle + angle / 2;
-        const lr = R * 0.72;
+        const lr = R * 0.76;
         const lx = cx + lr * Math.cos(toRad(midAngle));
         const ly = cy + lr * Math.sin(toRad(midAngle));
         const textRot = midAngle + 90;
@@ -80,8 +80,8 @@ function RouletteWheel({ spinning, result }) {
                     dominantBaseline="central"
                     transform={`rotate(${textRot},${lx},${ly})`}
                     fill="white"
-                    fontSize="3.2"
-                    fontWeight="700"
+                    fontSize="5.0"
+                    fontWeight="800"
                     fontFamily="Georgia, serif"
                 >
                     {num}
@@ -319,7 +319,7 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
                         </div>
                         {/* Column 2:1 bets */}
                         <div className="rl-col-bets">
-                            {[1, 2, 3].map(c => (
+                            {[3, 2, 1].map(c => (
                                 <OutsideBtn key={c} label={`2:1`} type="column" target={c} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
                             ))}
                         </div>

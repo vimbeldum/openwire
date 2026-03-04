@@ -1669,7 +1669,7 @@ body {
 
 .rl-grid-wrap {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 0.4rem;
 }
 
@@ -1704,17 +1704,17 @@ body {
 }
 
 .rl-cell {
-  padding: 0.4rem 0.1rem;
+  padding: 0.6rem 0.2rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
-  font-size: 0.72rem;
+  font-size: 1.2rem;
   font-weight: 700;
   font-family: var(--font-mono);
   cursor: pointer;
   transition: all 0.1s;
   text-align: center;
   color: white;
-  min-width: 28px;
+  min-width: 36px;
 }
 
 .rl-cell-red {
@@ -1744,7 +1744,7 @@ body {
 
 .rl-col-bets {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
   gap: 2px;
 }
 
@@ -3181,6 +3181,7 @@ body {
 
 .rl-grid-wrap {
   display: flex;
+  flex-direction: row;
   align-items: stretch;
   gap: 0.25rem;
   margin-bottom: 0.25rem;
@@ -3219,11 +3220,10 @@ body {
 }
 
 .rl-cell {
-  aspect-ratio: 1;
   border: 2px solid rgba(0, 0, 0, 0.3);
   border-radius: 4px;
-  font-weight: 700;
-  font-size: 0.95rem;
+  font-weight: 800;
+  font-size: 1.25rem;
   color: white;
   cursor: pointer;
   background: #111;
@@ -3231,6 +3231,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0.5rem 0.25rem;
 }
 
 .rl-cell-red {
@@ -3253,9 +3254,9 @@ body {
 }
 
 .rl-col-bets {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  display: grid;
+  grid-template-rows: repeat(3, 1fr);
+  gap: 2px;
 }
 
 .rl-outside-bets {

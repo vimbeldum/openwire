@@ -6,6 +6,9 @@
 const SUITS = ['♠', '♥', '♦', '♣'];
 const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
+export const BETTING_DURATION_MS = 20 * 1000;  // 20s betting window
+export const DEALER_PLAY_MS = 3 * 1000;        // 3s delay before round ends
+
 // Create a fresh deck
 export function createDeck() {
     const deck = [];
@@ -77,6 +80,7 @@ export function createGame(roomId, dealerId) {
         players: [], // { peer_id, nick, hand, status: 'waiting'|'playing'|'stand'|'bust'|'blackjack'|'win'|'lose'|'push', bet }
         currentPlayerIndex: -1, // -1 means betting phase
         phase: 'betting', // 'betting' | 'dealing' | 'playing' | 'dealer' | 'settlement' | 'ended'
+        nextDealAt: Date.now() + BETTING_DURATION_MS,
         createdAt: Date.now(),
     };
 }

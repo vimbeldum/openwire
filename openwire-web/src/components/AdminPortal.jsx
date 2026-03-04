@@ -1,13 +1,4 @@
-import { useState, useEffect } from 'react';
-
-// SHA-256 of "openwire-admin" — computed at build time as a static string
-// echo -n "openwire-admin" | sha256sum
-const ADMIN_HASH = 'a3b5e3a0e9c8f7b2d4e6a1b3c5d7e9f0a2b4c6d8e0f2a4b6c8d0e2f4a6b8c0d2';
-
-async function hashPassword(password) {
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
+import { useState } from 'react';
 
 const TABS = ['Players', 'Ban List', 'Activity Log', 'Stats'];
 
@@ -193,15 +184,16 @@ export function AdminPasswordGate({ onSuccess, onCancel }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        try {
-            const hash = await hashPassword(password);
-            if (hash === ADMIN_HASH) {
-                onSuccess();
-            } else {
-                setError('Incorrect password.');
-            }
-        } catch {
-            setError('Auth error.');
+        // Simulate slight delay for UX
+        await new Promise(r => setTimeout(r, 400));
+
+        // Use environment variable, fallback to openwire-admin for local dev if not set
+        const correctPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'openwire-admin';
+
+        if (password === correctPassword) {
+            onSuccess();
+        } else {
+            setError('Incorrect password.');
         }
         setLoading(false);
     };

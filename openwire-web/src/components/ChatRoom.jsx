@@ -188,11 +188,33 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         }, rl.SPIN_INTERVAL_MS);
     }, [addActivityLog, amIHost, updateWallet]);
 
+    // ── Blackjack Auto-deal timer ──────────────────────────
+    const bjDealerTimerRef = useRef(null);
+
+    const startBlackjackTimer = useCallback((gameVal) => {
+        if (!gameVal || gameVal.phase !== 'betting') return;
+        if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
+
+        const msLeft = Math.max(0, gameVal.nextDealAt - Date.now());
+
+        bjDealerTimerRef.current = setTimeout(() => {
+            const currentGame = blackjackRef.current;
+            const hostId = bjHostRef.current;
+            if (!currentGame || !amIHost(hostId) || currentGame.phase !== 'betting') return;
+
+            // Auto-deal
+            const dealtGame = bj.dealInitialCards(currentGame);
+            setBlackjackGame(dealtGame);
+            socket.sendRoomMessage(currentGame.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(dealtGame) }));
+        }, msLeft);
+    }, [amIHost]);
+
     useEffect(() => {
         return () => {
             if (rouletteTimerRef.current) clearInterval(rouletteTimerRef.current);
             if (abDealTimerRef.current) clearInterval(abDealTimerRef.current);
             if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
+            if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
         };
     }, []);
 
@@ -331,6 +353,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                                 addActivityLog(`Blackjack: ${myNick} ${resultText} chips`);
                             }
                         }
+
+                        // Restart timer loop on guest if new round
+                        if (gameState.phase === 'betting' && (!prev || prev.phase !== 'betting')) {
+                            // Only needed if you want UI to show a synced timer
+                        }
+
                         return gameState;
                     });
                 }
@@ -425,6 +453,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     setRooms(msg.rooms || []);
                     addMsg('★', `Connected! Your ID: ${msg.peer_id}`, 'system');
                     addMsg('★', 'Type /help for commands.', 'system');
+
+                    // Auto-join previously saved room if exists
+                    const savedRoom = localStorage.getItem('openwire_current_room');
+                    if (savedRoom) {
+                        socket.joinRoom(savedRoom);
+                        addMsg('★', `Auto-joined saved room.`, 'system');
+                    }
+
                     // Broadcast wallet balance
                     if (walletRef.current) {
                         setTimeout(() => socket.send({ type: 'balance_update', balance: wallet.getTotalBalance(walletRef.current) }), 500);
@@ -597,15 +633,19 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     };
 
     // ── Blackjack handlers ───────────────────────────────────
+    const bjHostRef = useRef(null);
+
     const startBlackjack = (roomId) => {
         const myId = myIdRef.current;
         const myNick = nickRef.current;
         const newGame = bj.createGame(roomId, myId);
         newGame.players = [{ peer_id: myId, nick: myNick, hand: [], status: 'waiting', bet: 0 }];
         setBlackjackGame(newGame);
-        addMsg('★', `🃏 Blackjack started!`, 'system');
+        bjHostRef.current = myId;
+        addMsg('★', `🃏 Blackjack started! Dealing in 20s.`, 'system');
         socket.sendRoomMessage(roomId, bj.serializeBlackjackAction({ type: 'bj_start', room_id: roomId, host: myId, host_nick: myNick }));
         socket.sendRoomMessage(roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(newGame) }));
+        startBlackjackTimer(newGame);
     };
 
     const acceptBjInvite = (invite) => {
@@ -638,7 +678,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             case 'hit': newGame = bj.hit(blackjackGame, action.peer_id); break;
             case 'stand': newGame = bj.stand(blackjackGame, action.peer_id); break;
             case 'dealerPlay': newGame = bj.runDealerTurn(blackjackGame); break;
-            case 'newRound': newGame = bj.newRound(blackjackGame); break;
+            case 'newRound':
+                newGame = bj.newRound(blackjackGame);
+                startBlackjackTimer(newGame);
+                break;
         }
 
         setBlackjackGame(newGame);
@@ -1008,7 +1051,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     <div className="sidebar-title">Channels</div>
                     <div className={`room-item ${!currentRoom ? 'active' : ''}`} onClick={() => setCurrentRoom(null)} style={{ cursor: 'pointer' }}>
                         <span className="room-icon">💬</span>
-                        <span className="room-name">General Chat</span>
+                        <span className="room-name">General Chat {!currentRoom && <span style={{ fontSize: '0.7em', color: 'var(--brand)', marginLeft: '4px' }}>(Joined)</span>}</span>
                     </div>
                 </div>
 
@@ -1045,7 +1088,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     {rooms.map((r) => (
                         <div key={r.room_id} className={`room-item ${currentRoom === r.room_id ? 'active' : ''}`} onClick={() => setCurrentRoom(r.room_id)} style={{ cursor: 'pointer' }}>
                             <span className="room-icon">🏠</span>
-                            <span className="room-name">{r.name}</span>
+                            <span className="room-name">{r.name} {currentRoom === r.room_id && <span style={{ fontSize: '0.7em', color: 'var(--brand)', marginLeft: '4px' }}>(Joined)</span>}</span>
                         </div>
                     ))}
                 </div>
