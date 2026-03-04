@@ -1,45 +1,146 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as rl from '../lib/roulette';
 
+/* ── Constants ──────────────────────────────────── */
 const RED_NUMBERS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
-const ALL_NUMBERS = Array.from({ length: 37 }, (_, i) => i);
 
-function NumberCell({ n, selected, onBet, disabled }) {
-    const color = n === 0 ? 'green' : RED_NUMBERS.has(n) ? 'red' : 'black';
-    return (
-        <button
-            className={`rl-cell rl-cell-${color} ${selected ? 'selected' : ''}`}
-            onClick={() => !disabled && onBet('single', n)}
-            disabled={disabled}
-            title={`Bet on ${n}`}
-        >
-            {n}
-        </button>
-    );
+// European roulette wheel order
+const WHEEL_ORDER = [
+    0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5,
+    24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26
+];
+
+function getColor(n) {
+    if (n === 0) return 'green';
+    return RED_NUMBERS.has(n) ? 'red' : 'black';
 }
 
-function HistoryStrip({ history }) {
-    const ref = useRef(null);
-    useEffect(() => {
-        if (ref.current) ref.current.scrollLeft = ref.current.scrollWidth;
-    }, [history]);
+const COLORS = { red: '#CC1111', black: '#111', green: '#1A6B3C' };
 
-    if (!history || history.length === 0) return null;
+/* ── Animated Roulette Wheel (CSS + SVG) ────────── */
+function RouletteWheel({ spinning, result }) {
+    const wheelRef = useRef(null);
+    const [rotation, setRotation] = useState(0);
+    const prevRotation = useRef(0);
+
+    useEffect(() => {
+        if (!spinning || result === null || result === undefined) return;
+
+        // Find target number's position on wheel
+        const idx = WHEEL_ORDER.indexOf(result);
+        const sectorAngle = 360 / 37;
+        const targetAngle = idx * sectorAngle;
+
+        // Spin 5–8 full rotations + land on target
+        const spins = 5 + Math.floor(Math.random() * 3);
+        const baseRot = prevRotation.current;
+        // We rotate clockwise; to land on idx, we want that sector at top (0°)
+        // Sector idx is at angle (idx * sectorAngle); to bring it to the top,
+        // we need the wheel rotated to -(idx * sectorAngle)
+        const targetRot = baseRot + spins * 360 + (360 - targetAngle);
+        prevRotation.current = targetRot % 360;
+        setRotation(targetRot);
+    }, [spinning, result]);
+
+    const n = 37;
+    const R = 48; // % of viewBox (radius)
+    const cx = 50, cy = 50;
+    const angle = 360 / n;
+
+    // Build SVG sectors
+    const sectors = WHEEL_ORDER.map((num, i) => {
+        const startAngle = i * angle - 90;
+        const endAngle = (i + 1) * angle - 90;
+        const toRad = (d) => (d * Math.PI) / 180;
+        const x1 = cx + R * Math.cos(toRad(startAngle));
+        const y1 = cy + R * Math.sin(toRad(startAngle));
+        const x2 = cx + R * Math.cos(toRad(endAngle));
+        const y2 = cy + R * Math.sin(toRad(endAngle));
+        const largeArc = angle > 180 ? 1 : 0;
+        const color = COLORS[getColor(num)];
+
+        // Label position (midpoint of arc)
+        const midAngle = startAngle + angle / 2;
+        const lr = R * 0.72;
+        const lx = cx + lr * Math.cos(toRad(midAngle));
+        const ly = cy + lr * Math.sin(toRad(midAngle));
+        const textRot = midAngle + 90;
+
+        return (
+            <g key={num}>
+                <path
+                    d={`M ${cx} ${cy} L ${x1} ${y1} A ${R} ${R} 0 ${largeArc} 1 ${x2} ${y2} Z`}
+                    fill={color}
+                    stroke="rgba(0,0,0,0.4)"
+                    strokeWidth="0.3"
+                />
+                <text
+                    x={lx} y={ly}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    transform={`rotate(${textRot},${lx},${ly})`}
+                    fill="white"
+                    fontSize="3.2"
+                    fontWeight="700"
+                    fontFamily="Georgia, serif"
+                >
+                    {num}
+                </text>
+            </g>
+        );
+    });
+
     return (
-        <div className="rl-history" ref={ref}>
-            {history.map((n, i) => {
-                const color = n === 0 ? 'green' : RED_NUMBERS.has(n) ? 'red' : 'black';
-                return (
-                    <span key={i} className={`rl-hist-chip rl-hist-${color}`}>{n}</span>
-                );
-            })}
+        <div className="rl-wheel-container">
+            {/* Pointer / ball stop marker */}
+            <div className="rl-pointer">▼</div>
+
+            {/* Outer ring */}
+            <div className="rl-outer-ring" />
+
+            {/* Spinning wheel SVG */}
+            <svg
+                ref={wheelRef}
+                viewBox="0 0 100 100"
+                className="rl-wheel-svg"
+                style={{
+                    transform: `rotate(${rotation}deg)`,
+                    transition: spinning
+                        ? 'transform 4.5s cubic-bezier(0.17, 0.67, 0.15, 1.0)'
+                        : 'none',
+                }}
+            >
+                {sectors}
+                {/* Center hub */}
+                <circle cx={cx} cy={cy} r="7" fill="#1A1A1A" stroke="#FFD700" strokeWidth="1.2" />
+                <circle cx={cx} cy={cy} r="3.5" fill="#FFD700" />
+            </svg>
+
+            {/* Ball (appears during spinning) */}
+            {spinning && <div className="rl-ball" />}
         </div>
     );
 }
 
+/* ── History Strip ──────────────────────────────── */
+function HistoryStrip({ history }) {
+    const ref = useRef(null);
+    useEffect(() => {
+        if (ref.current) ref.current.scrollLeft = ref.current.scrollWidth;
+    }, [history?.length]);
+    if (!history?.length) return null;
+    return (
+        <div className="rl-history" ref={ref}>
+            {history.map((n, i) => (
+                <span key={i} className={`rl-hist-chip rl-hist-${getColor(n)}`}>{n}</span>
+            ))}
+        </div>
+    );
+}
+
+/* ── Countdown ──────────────────────────────────── */
 function Countdown({ nextSpinAt, phase }) {
     const [timeLeft, setTimeLeft] = useState('');
-
     useEffect(() => {
         if (phase !== 'betting') { setTimeLeft(''); return; }
         const update = () => {
@@ -52,24 +153,67 @@ function Countdown({ nextSpinAt, phase }) {
         return () => clearInterval(t);
     }, [nextSpinAt, phase]);
 
+    const totalMs = rl.SPIN_INTERVAL_MS || 120000;
+    const msLeft = Math.max(0, nextSpinAt - Date.now());
+    const pct = Math.min(100, (msLeft / totalMs) * 100);
+
     if (!timeLeft) return null;
-    return <div className="rl-countdown">⏱ Next spin in <strong>{timeLeft}</strong></div>;
+    return (
+        <div className="rl-countdown-wrap">
+            <div className="rl-countdown-text">Next spin in <strong>{timeLeft}</strong></div>
+            <div className="rl-countdown-track">
+                <div className="rl-countdown-fill" style={{ width: `${pct}%` }} />
+            </div>
+        </div>
+    );
 }
 
+/* ── Number Grid Cell ───────────────────────────── */
+function NumberCell({ n, selected, onBet, disabled }) {
+    const color = getColor(n);
+    return (
+        <button
+            className={`rl-cell rl-cell-${color} ${selected ? 'selected' : ''}`}
+            onClick={() => !disabled && onBet('single', n)}
+            disabled={disabled}
+            title={`${n} chips on ${n}`}
+        >
+            {n}
+        </button>
+    );
+}
+
+/* ── Outside Bet Button ─────────────────────────── */
+function OutsideBtn({ label, type, target, myBets, onBet, disabled, className = '' }) {
+    const active = myBets.some(b => b.betType === type && b.betTarget === target);
+    return (
+        <button
+            className={`rl-outside-btn ${active ? 'selected' : ''} ${className}`}
+            onClick={() => onBet(type, target)}
+            disabled={disabled}
+        >
+            {label}
+        </button>
+    );
+}
+
+const BET_AMOUNTS = [5, 10, 25, 50, 100, 250];
+
+/* ── Main Board ─────────────────────────────────── */
 export default function RouletteBoard({ game, myId, myNick, wallet, onAction, onClose, isHost }) {
-    const [selectedBetType, setSelectedBetType] = useState('color');
-    const [selectedTarget, setSelectedTarget] = useState('red');
     const [betAmount, setBetAmount] = useState(25);
     const [spinning, setSpinning] = useState(false);
-    const [lastResult, setLastResult] = useState(null);
-    const wheelRef = useRef(null);
+    const [showResult, setShowResult] = useState(false);
 
     useEffect(() => {
-        if (game?.phase === 'spinning' || (game?.phase === 'results' && game.result !== null)) {
+        if (game?.phase === 'results' && game?.result !== null) {
             setSpinning(true);
-            setLastResult(game.result);
-            const t = setTimeout(() => setSpinning(false), 3000);
+            const t = setTimeout(() => setSpinning(false), 5000);
+            setShowResult(true);
             return () => clearTimeout(t);
+        }
+        if (game?.phase === 'betting') {
+            setShowResult(false);
         }
     }, [game?.phase, game?.result]);
 
@@ -79,6 +223,7 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
     const totalMyBet = myBets.reduce((s, b) => s + b.amount, 0);
     const canBet = game.phase === 'betting' && wallet;
     const balance = wallet ? (wallet.baseBalance + wallet.adminBonus) : 0;
+    const myPayout = game.payouts?.[myId];
 
     const handleBet = (type, target) => {
         if (!canBet) return;
@@ -86,12 +231,10 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
         onAction({ type: 'bet', betType: type, betTarget: target, amount: betAmount });
     };
 
-    const handleClearBets = () => onAction({ type: 'clearBets' });
+    const resultColor = game.result === null || game.result === undefined
+        ? '' : getColor(game.result);
 
-    const resultColor = lastResult === null ? '' : lastResult === 0 ? 'green' : RED_NUMBERS.has(lastResult) ? 'red' : 'black';
-    const myPayout = game.payouts?.[myId];
-
-    // Column layout for the 3-column betting grid
+    // 3-column layout: row3 top (3,6,9…36), row2, row1 bottom
     const col1 = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36];
     const col2 = [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35];
     const col3 = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34];
@@ -99,38 +242,42 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
     return (
         <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
             <div className="rl-table">
-                <div className="rl-header">
-                    <div className="rl-header-left">
-                        <h2>🎰 Roulette</h2>
-                        {isHost && <span className="rl-host-badge">Host</span>}
+
+                {/* ── Header ── */}
+                <div className="game-table-header">
+                    <div className="game-table-title">
+                        🎰 <span>Roulette</span>
+                        {isHost && <span className="host-crown" title="You are driving the wheel">👑</span>}
                     </div>
-                    <div className="rl-header-center">
-                        {wallet && (
-                            <span className="rl-balance">
-                                💰 {balance.toLocaleString()} chips
-                            </span>
-                        )}
+                    <div className="game-table-meta">
+                        {wallet && <span className="chip-display">💰 {balance.toLocaleString()}</span>}
+                        <Countdown nextSpinAt={game.nextSpinAt} phase={game.phase} />
                     </div>
-                    <button className="bj-close" onClick={onClose}>✕</button>
+                    <button className="btn-icon-close" onClick={onClose}>✕</button>
                 </div>
 
-                {/* Wheel + countdown */}
+                {/* ── Wheel + Result ── */}
                 <div className="rl-wheel-section">
-                    <div className={`rl-wheel ${spinning ? 'spinning' : ''}`} ref={wheelRef}>
-                        <div className="rl-wheel-inner">
-                            {game.phase === 'results' && lastResult !== null ? (
-                                <div className={`rl-result-number rl-result-${resultColor}`}>
-                                    {lastResult}
-                                </div>
-                            ) : (
-                                <div className="rl-wheel-idle">🎰</div>
-                            )}
-                        </div>
-                    </div>
+                    <RouletteWheel spinning={spinning} result={game.result} />
                     <div className="rl-wheel-info">
-                        <Countdown nextSpinAt={game.nextSpinAt} phase={game.phase} />
-                        {game.phase === 'spinning' && <div className="rl-spinning-text">Spinning…</div>}
-                        {game.phase === 'results' && myPayout !== undefined && (
+                        {game.phase === 'spinning' && (
+                            <div className="rl-spinning-text">
+                                <span className="deal-dot" />
+                                <span className="deal-dot delay1" />
+                                <span className="deal-dot delay2" />
+                                Spinning…
+                            </div>
+                        )}
+                        {showResult && game.result !== null && (
+                            <div className={`rl-result-badge rl-result-${resultColor}`}>
+                                <div className="rl-result-num">{game.result}</div>
+                                <div className="rl-result-label">
+                                    {resultColor === 'green' ? '🟢 Zero' : resultColor === 'red' ? '🔴 Red' : '⚫ Black'}
+                                    {game.result > 0 ? (game.result % 2 === 0 ? ' · Even' : ' · Odd') : ''}
+                                </div>
+                            </div>
+                        )}
+                        {myPayout !== undefined && showResult && (
                             <div className={`rl-payout-result ${myPayout >= 0 ? 'win' : 'lose'}`}>
                                 {myPayout >= 0 ? `+${myPayout}` : myPayout} chips
                             </div>
@@ -138,43 +285,40 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
                     </div>
                 </div>
 
-                {/* History strip */}
+                {/* ── History ── */}
                 <HistoryStrip history={game.spinHistory} />
 
-                {/* Betting area */}
+                {/* ── Betting Area ── */}
                 <div className="rl-betting-area">
+                    {/* Chip selector */}
+                    <div className="chip-selector" style={{ marginBottom: '0.75rem' }}>
+                        {BET_AMOUNTS.map(a => (
+                            <button
+                                key={a}
+                                className={`chip-btn ${betAmount === a ? 'active' : ''}`}
+                                onClick={() => setBetAmount(a)}
+                                disabled={a > balance}
+                            >
+                                {a}
+                            </button>
+                        ))}
+                    </div>
+
                     {/* Number grid */}
                     <div className="rl-grid-wrap">
                         <button
                             className={`rl-zero ${myBets.some(b => b.betType === 'single' && b.betTarget === 0) ? 'selected' : ''}`}
-                            onClick={() => handleBet('single', 0)}
-                            disabled={!canBet}
+                            onClick={() => handleBet('single', 0)} disabled={!canBet}
                         >0</button>
                         <div className="rl-grid">
-                            {col1.map(n => (
-                                <NumberCell key={n} n={n}
-                                    selected={myBets.some(b => b.betType === 'single' && b.betTarget === n)}
-                                    onBet={handleBet} disabled={!canBet} />
-                            ))}
-                            {col2.map(n => (
-                                <NumberCell key={n} n={n}
-                                    selected={myBets.some(b => b.betType === 'single' && b.betTarget === n)}
-                                    onBet={handleBet} disabled={!canBet} />
-                            ))}
-                            {col3.map(n => (
-                                <NumberCell key={n} n={n}
-                                    selected={myBets.some(b => b.betType === 'single' && b.betTarget === n)}
-                                    onBet={handleBet} disabled={!canBet} />
-                            ))}
+                            {col1.map(n => <NumberCell key={n} n={n} selected={myBets.some(b => b.betType === 'single' && b.betTarget === n)} onBet={handleBet} disabled={!canBet} />)}
+                            {col2.map(n => <NumberCell key={n} n={n} selected={myBets.some(b => b.betType === 'single' && b.betTarget === n)} onBet={handleBet} disabled={!canBet} />)}
+                            {col3.map(n => <NumberCell key={n} n={n} selected={myBets.some(b => b.betType === 'single' && b.betTarget === n)} onBet={handleBet} disabled={!canBet} />)}
                         </div>
-
-                        {/* Column bets */}
+                        {/* Column 2:1 bets */}
                         <div className="rl-col-bets">
                             {[1, 2, 3].map(c => (
-                                <button key={c} className={`rl-outside-btn sm ${myBets.some(b => b.betType === 'column' && b.betTarget === c) ? 'selected' : ''}`}
-                                    onClick={() => handleBet('column', c)} disabled={!canBet}>
-                                    Col {c} (2:1)
-                                </button>
+                                <OutsideBtn key={c} label={`2:1`} type="column" target={c} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
                             ))}
                         </div>
                     </div>
@@ -182,66 +326,33 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
                     {/* Outside bets */}
                     <div className="rl-outside-bets">
                         <div className="rl-outside-row">
-                            {['low', 'high'].map(h => (
-                                <button key={h} className={`rl-outside-btn ${myBets.some(b => b.betType === 'half' && b.betTarget === h) ? 'selected' : ''}`}
-                                    onClick={() => handleBet('half', h)} disabled={!canBet}>
-                                    {h === 'low' ? '1–18' : '19–36'}
-                                </button>
-                            ))}
+                            <OutsideBtn label="1–18" type="half" target="low" myBets={myBets} onBet={handleBet} disabled={!canBet} />
+                            <OutsideBtn label="EVEN" type="parity" target="even" myBets={myBets} onBet={handleBet} disabled={!canBet} />
+                            <OutsideBtn label="🔴 Red" type="color" target="red" myBets={myBets} onBet={handleBet} disabled={!canBet} className="red" />
+                            <OutsideBtn label="⚫ Black" type="color" target="black" myBets={myBets} onBet={handleBet} disabled={!canBet} className="black" />
+                            <OutsideBtn label="ODD" type="parity" target="odd" myBets={myBets} onBet={handleBet} disabled={!canBet} />
+                            <OutsideBtn label="19–36" type="half" target="high" myBets={myBets} onBet={handleBet} disabled={!canBet} />
                         </div>
                         <div className="rl-outside-row">
-                            {['even', 'odd'].map(p => (
-                                <button key={p} className={`rl-outside-btn ${myBets.some(b => b.betType === 'parity' && b.betTarget === p) ? 'selected' : ''}`}
-                                    onClick={() => handleBet('parity', p)} disabled={!canBet}>
-                                    {p.charAt(0).toUpperCase() + p.slice(1)}
-                                </button>
-                            ))}
+                            <OutsideBtn label="1st 12 (2:1)" type="dozen" target={1} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
+                            <OutsideBtn label="2nd 12 (2:1)" type="dozen" target={2} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
+                            <OutsideBtn label="3rd 12 (2:1)" type="dozen" target={3} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
                         </div>
-                        <div className="rl-outside-row">
-                            <button className={`rl-outside-btn red ${myBets.some(b => b.betType === 'color' && b.betTarget === 'red') ? 'selected' : ''}`}
-                                onClick={() => handleBet('color', 'red')} disabled={!canBet}>
-                                🔴 Red
-                            </button>
-                            <button className={`rl-outside-btn black ${myBets.some(b => b.betType === 'color' && b.betTarget === 'black') ? 'selected' : ''}`}
-                                onClick={() => handleBet('color', 'black')} disabled={!canBet}>
-                                ⚫ Black
-                            </button>
-                        </div>
-                        <div className="rl-outside-row">
-                            {[1, 2, 3].map(d => (
-                                <button key={d} className={`rl-outside-btn sm ${myBets.some(b => b.betType === 'dozen' && b.betTarget === d) ? 'selected' : ''}`}
-                                    onClick={() => handleBet('dozen', d)} disabled={!canBet}>
-                                    {d}st 12 (2:1)
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Bet amount selector */}
-                        <div className="rl-bet-amounts">
-                            {[5, 10, 25, 50, 100, 250].map(a => (
-                                <button key={a} className={`rl-chip-btn ${betAmount === a ? 'active' : ''}`}
-                                    onClick={() => setBetAmount(a)}>
-                                    {a}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Current bets summary */}
-                        {myBets.length > 0 && (
-                            <div className="rl-my-bets">
-                                <span>Your bets: {myBets.length} (total: {totalMyBet} chips)</span>
-                                {canBet && (
-                                    <button className="rl-clear-btn" onClick={handleClearBets}>Clear</button>
-                                )}
-                            </div>
-                        )}
                     </div>
+
+                    {/* My bets summary */}
+                    {myBets.length > 0 && (
+                        <div className="rl-my-bets">
+                            <span>{myBets.length} bet{myBets.length > 1 ? 's' : ''} · {totalMyBet} chips</span>
+                            {canBet && <button className="rl-clear-btn" onClick={() => onAction({ type: 'clearBets' })}>Clear</button>}
+                        </div>
+                    )}
                 </div>
 
-                {/* All players bets */}
-                {game.bets?.length > 0 && game.phase === 'betting' && (
+                {/* ── Live bets ticker ── */}
+                {game.bets?.length > 0 && (
                     <div className="rl-all-bets">
-                        <div className="rl-section-title">Live Bets</div>
+                        <div className="section-mini-title">Live bets</div>
                         <div className="rl-bets-list">
                             {game.bets.map((b, i) => (
                                 <span key={i} className="rl-bet-tag">
@@ -252,16 +363,9 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
                     </div>
                 )}
 
-                {/* Results breakdown */}
+                {/* ── Payout breakdown ── */}
                 {game.phase === 'results' && game.payouts && (
                     <div className="rl-results">
-                        <div className={`rl-result-display rl-result-${resultColor}`}>
-                            🎯 Result: <strong>{game.result}</strong>
-                            <span className="rl-result-label">
-                                {resultColor === 'green' ? '🟢 Zero' : resultColor === 'red' ? '🔴 Red' : '⚫ Black'}
-                                {game.result > 0 ? (game.result % 2 === 0 ? ' · Even' : ' · Odd') : ''}
-                            </span>
-                        </div>
                         <div className="rl-payouts-list">
                             {Object.entries(game.payouts).map(([pid, net]) => {
                                 const player = game.bets.find(b => b.peer_id === pid);

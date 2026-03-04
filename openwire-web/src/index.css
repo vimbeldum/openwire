@@ -3528,6 +3528,192 @@ body {
   color: white;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   BLACKJACK TABLE (redesigned)
+   ═══════════════════════════════════════════════════════════ */
+
+.bj-table {
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(30, 144, 255, 0.12) 0%, transparent 60%),
+    linear-gradient(180deg, #0a1120 0%, #0d1a33 100%);
+  border: 1px solid rgba(30, 144, 255, 0.25);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  width: min(95vw, 840px);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow:
+    var(--shadow-elevated),
+    0 0 60px rgba(30, 144, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.bj-dealer-area {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bj-status-bar {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.bj-phase-msg {
+  display: inline-block;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.5rem 1.5rem;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.bj-phase-msg.highlight {
+  background: rgba(232, 183, 48, 0.15);
+  border-color: rgba(232, 183, 48, 0.4);
+  color: #E8B730;
+}
+
+.bj-players-area {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.bj-hand-zone {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  transition: all 0.3s ease;
+  min-height: 120px;
+}
+
+.bj-hand-zone.active-turn {
+  border-color: rgba(232, 183, 48, 0.6);
+  background: rgba(232, 183, 48, 0.08);
+  box-shadow: 0 0 20px rgba(232, 183, 48, 0.2);
+  transform: translateY(-2px);
+}
+
+.bj-hand-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 0.5rem;
+}
+
+.bj-hand-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.bj-hand-val {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+}
+
+.bj-status-badge {
+  font-size: 0.6rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.bj-status-badge.bust {
+  background: rgba(255, 50, 50, 0.2);
+  color: #FF5555;
+  border: 1px solid rgba(255, 50, 50, 0.4);
+}
+
+.bj-cards-fan {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.bj-card-pos {
+  margin-right: -25px;
+  position: relative;
+}
+
+.bj-card-pos:last-child {
+  margin-right: 0;
+}
+
+.bj-card-pos:hover {
+  z-index: 10;
+  transform: translateY(-8px) scale(1.05) !important;
+}
+
+/* Actions */
+.bj-action-bar {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.bj-play-controls {
+  display: flex;
+  gap: 1rem;
+}
+
+.bj-bet-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.bj-btn-action {
+  padding: 0.75rem 2rem;
+  border-radius: 100px;
+  font-weight: 800;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.bj-btn-action.hit {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 4px 15px rgba(102, 161, 238, 0.4);
+}
+
+.bj-btn-action.hit:hover {
+  background: #5590D0;
+  transform: translateY(-2px);
+}
+
+.bj-btn-action.stand {
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+.bj-btn-action.stand:hover {
+  border-color: white;
+  background: rgba(255, 255, 255, 0.1);
+}
+
 /* ── Responsive ────────────────────────────────── */
 
 

@@ -1,227 +1,196 @@
 import { useEffect, useState } from 'react';
 import * as bj from '../lib/blackjack';
 
-function Card({ card, hidden = false, index = 0, animate = true }) {
+/* ── Reusable Premium Card ────────────────────────── */
+function Card({ card, hidden = false, index = 0 }) {
     const [flipped, setFlipped] = useState(false);
-    const { display, isRed } = bj.cardSymbol(card);
 
     useEffect(() => {
-        if (animate && !hidden) {
-            const timer = setTimeout(() => setFlipped(true), 100 + index * 150);
+        if (!hidden) {
+            const timer = setTimeout(() => setFlipped(true), 50 + index * 120);
             return () => clearTimeout(timer);
         }
-    }, [animate, hidden, index]);
+    }, [hidden, index]);
 
     if (hidden) {
         return (
-            <div className="bj-card bj-card-back">
-                <div className="bj-card-pattern">?</div>
+            <div className="card card-back bj-card-pos" style={{ '--delay': `${index * 0.1}s` }}>
+                <div className="card-back-pattern" />
             </div>
         );
     }
 
+    const { display, isRed } = bj.cardSymbol(card);
+    const suitClass = isRed ? 'red' : 'black';
+
     return (
         <div
-            className={`bj-card ${isRed ? 'red' : 'black'} ${flipped ? 'flipped' : ''}`}
+            className={`card ${suitClass} bj-card-pos ${flipped ? 'card-flip' : ''}`}
             style={{
-                animationDelay: `${index * 0.1}s`,
-                transform: `rotate(${(index - 1) * 3}deg)`,
+                '--delay': '0s',
+                transform: flipped ? `rotate(${(index - 1) * 4}deg)` : 'rotateY(90deg)',
+                opacity: flipped ? 1 : 0
             }}
         >
-            <div className="bj-card-corner top">{display}</div>
-            <div className="bj-card-center">{card.suit}</div>
-            <div className="bj-card-corner bottom">{display}</div>
+            <div className="card-corner tl">
+                <div className="card-rank">{display}</div>
+                <div className="card-suit-sm">{card.suit}</div>
+            </div>
+            <div className="card-center-suit">{card.suit}</div>
+            <div className="card-corner br">
+                <div className="card-rank">{display}</div>
+                <div className="card-suit-sm">{card.suit}</div>
+            </div>
         </div>
     );
 }
 
-function Hand({ cards, label, value, hidden = false, status = '' }) {
+/* ── Player / Dealer Hand ─────────────────────────── */
+function Hand({ cards, label, value, hidden = false, status = '', isMyTurn = false }) {
     return (
-        <div className={`bj-hand ${status}`}>
+        <div className={`bj-hand-zone ${isMyTurn ? 'active-turn' : ''} ${status === 'bust' ? 'bust' : ''}`}>
             <div className="bj-hand-header">
-                <span className="bj-hand-label">{label}</span>
-                <span className="bj-hand-value">
+                <span className="bj-hand-name">{label}</span>
+                <span className="bj-hand-val">
                     {hidden ? '?' : value}
-                    {status && <span className={`bj-status ${status}`}> — {status.toUpperCase()}</span>}
+                    {status && <span className={`bj-status-badge ${status}`}>{status.toUpperCase()}</span>}
                 </span>
             </div>
-            <div className="bj-cards">
+            <div className="bj-cards-fan">
                 {cards.map((card, i) => (
-                    <Card
-                        key={card.id || i}
-                        card={card}
-                        hidden={hidden && i === 1}
-                        index={i}
-                    />
+                    <Card key={card.id || i} card={card} hidden={hidden && i === 1} index={i} />
                 ))}
             </div>
         </div>
     );
 }
 
-export default function BlackjackBoard({ game, myId, wallet, onAction, onClose }) {
-    const [animating, setAnimating] = useState(false);
+const BET_AMOUNTS = [10, 25, 50, 100, 250, 500];
 
-    useEffect(() => {
-        setAnimating(true);
-        const timer = setTimeout(() => setAnimating(false), 500);
-        return () => clearTimeout(timer);
-    }, [game?.players?.length, game?.dealer?.hand?.length]);
+/* ── Main Board ───────────────────────────────────── */
+export default function BlackjackBoard({ game, myId, myNick, wallet, onAction, onClose, isHost }) {
+    const [selectedBet, setSelectedBet] = useState(50);
 
     if (!game) return null;
 
     const myPlayer = game.players.find(p => p.peer_id === myId);
-    const isMyTurn = bj.isPlayerTurn(game, myId);
-    const dealerValue = game.dealer.revealed ? bj.calculateHand(game.dealer.hand) : '?';
-    const balance = wallet ? (wallet.baseBalance + wallet.adminBonus) : Infinity;
+    const isMyTurn = game.phase === 'playing' && game.players[game.currentPlayerIndex]?.peer_id === myId;
+    const dealerValue = bj.calculateHand(game.dealer.hand);
+    const balance = wallet ? (wallet.baseBalance + wallet.adminBonus) : 0;
 
-    const handleHit = () => {
-        if (!isMyTurn || animating) return;
-        onAction({ type: 'hit', peer_id: myId });
-    };
-
-    const handleStand = () => {
-        if (!isMyTurn || animating) return;
-        onAction({ type: 'stand', peer_id: myId });
-    };
-
-    const handleBet = (amount) => {
-        if (game.phase !== 'betting' || animating) return;
-        if (myPlayer?.status !== 'waiting' && myPlayer?.status !== 'ready') return;
-        onAction({ type: 'bet', peer_id: myId, amount });
-    };
-
-    const handleDeal = () => {
-        if (game.phase !== 'betting' || animating) return;
-        const readyPlayers = game.players.filter(p => p.bet > 0);
-        if (readyPlayers.length === 0) return;
-        onAction({ type: 'deal' });
-    };
-
-    const handleNewRound = () => {
-        onAction({ type: 'newRound' });
+    const handleBet = () => {
+        if (selectedBet > balance) return;
+        onAction({ type: 'placeBet', amount: selectedBet });
     };
 
     return (
         <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
             <div className="bj-table">
-                <div className="bj-header">
-                    <h2>♠ Blackjack ♥</h2>
-                    {wallet && (
-                        <span className="rl-balance">💰 {balance.toLocaleString()} chips</span>
-                    )}
-                    <button className="bj-close" onClick={onClose}>✕</button>
+                {/* ── Header ── */}
+                <div className="game-table-header">
+                    <div className="game-table-title">
+                        ♠ <span>Blackjack</span> ♥
+                        {isHost && <span className="host-crown" title="You are the dealer">👑</span>}
+                    </div>
+                    <div className="game-table-meta">
+                        {wallet && <span className="chip-display">💰 {balance.toLocaleString()}</span>}
+                    </div>
+                    <button className="btn-icon-close" onClick={onClose}>✕</button>
                 </div>
 
-                {/* Dealer Section */}
+                {/* ── Dealer Area ── */}
                 <div className="bj-dealer-area">
                     <Hand
                         cards={game.dealer.hand}
                         label="Dealer"
                         value={dealerValue}
                         hidden={!game.dealer.revealed && game.dealer.hand.length > 0}
-                        status={game.phase === 'ended' ? (bj.isBust(game.dealer.hand) ? 'bust' : '') : ''}
+                        status={game.phase === 'ended' && bj.isBust(game.dealer.hand) ? 'bust' : ''}
                     />
                 </div>
 
-                {/* Game Status */}
+                {/* ── Status Bar ── */}
                 <div className="bj-status-bar">
-                    {game.phase === 'betting' && (
-                        <span className="bj-phase">Place your bets!</span>
-                    )}
+                    {game.phase === 'betting' && <div className="bj-phase-msg">Place your bets!</div>}
                     {game.phase === 'playing' && game.currentPlayerIndex >= 0 && (
-                        <span className="bj-phase">
+                        <div className="bj-phase-msg highlight">
                             {game.players[game.currentPlayerIndex]?.nick}'s turn
                             {isMyTurn && ' (You)'}
-                        </span>
+                        </div>
                     )}
-                    {game.phase === 'dealer' && (
-                        <span className="bj-phase">Dealer is playing...</span>
-                    )}
-                    {game.phase === 'ended' && (
-                        <span className="bj-phase">Round complete!</span>
-                    )}
+                    {game.phase === 'dealer' && <div className="bj-phase-msg">Dealer is playing...</div>}
+                    {game.phase === 'ended' && <div className="bj-phase-msg">Round complete!</div>}
                 </div>
 
-                {/* Players Section */}
+                {/* ── Players Area ── */}
                 <div className="bj-players-area">
                     {game.players.map((player, idx) => (
                         <Hand
                             key={player.peer_id}
                             cards={player.hand}
-                            label={player.nick + (player.peer_id === myId ? ' (You)' : '')}
+                            label={`${player.nick} ${player.peer_id === myId ? '(You)' : ''}`}
                             value={player.hand.length > 0 ? bj.calculateHand(player.hand) : '-'}
                             status={player.status}
+                            isMyTurn={game.phase === 'playing' && idx === game.currentPlayerIndex}
                         />
                     ))}
-                    {game.players.length === 0 && (
-                        <div className="bj-empty">No players yet</div>
-                    )}
+                    {game.players.length === 0 && <div className="bj-empty-msg">Waiting for players to join...</div>}
                 </div>
 
-                {/* Action Buttons */}
-                <div className="bj-actions">
+                {/* ── Action Bar ── */}
+                <div className="bj-action-bar">
                     {game.phase === 'betting' && (
-                        <>
-                            {(!myPlayer || myPlayer.status === 'waiting') && (
-                                <div className="bj-bet-buttons">
-                                    {[10, 25, 50, 100].map(amt => (
-                                        <button
-                                            key={amt}
-                                            onClick={() => handleBet(amt)}
-                                            disabled={amt > balance}
-                                            style={{ opacity: amt > balance ? 0.4 : 1 }}
-                                        >${amt}</button>
-                                    ))}
-                                </div>
-                            )}
-                            {myPlayer?.bet > 0 && (
-                                <div className="bj-bet-info">
-                                    Your bet: ${myPlayer.bet}
-                                    <button onClick={() => handleBet(0)}>Clear</button>
-                                </div>
-                            )}
-                            {game.players.some(p => p.bet > 0) && (
-                                <button className="bj-btn-primary" onClick={handleDeal}>
-                                    Deal Cards
+                        <div className="bj-bet-controls">
+                            {!myPlayer ? (
+                                <button className="bj-btn-primary" onClick={() => onAction({ type: 'join', peer_id: myId })}>
+                                    Join Table
                                 </button>
+                            ) : myPlayer.status === 'waiting' ? (
+                                <div className="bj-bet-row">
+                                    <div className="chip-selector">
+                                        {BET_AMOUNTS.map(a => (
+                                            <button
+                                                key={a}
+                                                className={`chip-btn ${selectedBet === a ? 'active' : ''}`}
+                                                onClick={() => setSelectedBet(a)}
+                                                disabled={a > balance}
+                                            >{a}</button>
+                                        ))}
+                                    </div>
+                                    <button className="bj-btn-primary play" onClick={handleBet} disabled={selectedBet > balance}>
+                                        Bet {selectedBet}
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="bj-bet-row">
+                                    <span className="bj-bet-locked">Bet placed: <strong>{myPlayer.bet}</strong> chips</span>
+                                    {isHost && game.players.some(p => p.bet > 0) && (
+                                        <button className="bj-btn-primary deal" onClick={() => onAction({ type: 'deal' })}>
+                                            Deal Cards
+                                        </button>
+                                    )}
+                                </div>
                             )}
-                        </>
+                        </div>
                     )}
 
                     {game.phase === 'playing' && isMyTurn && (
-                        <>
-                            <button className="bj-btn-hit" onClick={handleHit}>
-                                Hit
-                            </button>
-                            <button className="bj-btn-stand" onClick={handleStand}>
-                                Stand
-                            </button>
-                        </>
+                        <div className="bj-play-controls">
+                            <button className="bj-btn-action hit" onClick={() => onAction({ type: 'hit' })}>Hit (Draw)</button>
+                            <button className="bj-btn-action stand" onClick={() => onAction({ type: 'stand' })}>Stand</button>
+                        </div>
                     )}
 
-                    {game.phase === 'ended' && (
-                        <button className="bj-btn-primary" onClick={handleNewRound}>
-                            New Round
+                    {game.phase === 'ended' && isHost && (
+                        <button className="bj-btn-primary deal" onClick={() => onAction({ type: 'newRound' })}>
+                            Start Next Round
                         </button>
                     )}
 
-                    {!myPlayer && game.phase === 'betting' && (
-                        <button
-                            className="bj-btn-join"
-                            onClick={() => onAction({ type: 'join', peer_id: myId })}
-                        >
-                            Join Game
-                        </button>
+                    {!myPlayer && game.phase !== 'betting' && (
+                        <div className="bj-spectator-msg">Spectating... Wait for next round to join.</div>
                     )}
                 </div>
-
-                {/* Spectators can join during betting */}
-                {!myPlayer && game.phase !== 'betting' && (
-                    <div className="bj-spectator">
-                        You're spectating. Wait for next round to join.
-                    </div>
-                )}
             </div>
         </div>
     );

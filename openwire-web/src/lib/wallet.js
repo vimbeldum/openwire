@@ -1,9 +1,26 @@
 /* ═══════════════════════════════════════════════════════════
    OpenWire — Virtual Wallet
-   Daily base chips (IST midnight reset) + admin bonus chips
+   Keyed by device UUID (not nickname) so re-joining with a
+   different name doesn't reset the balance.
+   - baseBalance:  daily refresh at IST midnight (game winnings)
+   - adminBonus:   permanent, admin-granted only
    ═══════════════════════════════════════════════════════════ */
 
 export const DAILY_BASE = 1000;
+const DEVICE_KEY = 'openwire_device_id';
+const WALLET_PREFIX = 'openwire_wallet_dev_';
+
+/* ── Device fingerprint ───────────────────────────────────── */
+export function getDeviceId() {
+    let id = localStorage.getItem(DEVICE_KEY);
+    if (!id) {
+        // Generate a persistent UUID for this browser/device
+        id = crypto.randomUUID?.()
+            ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${performance.now().toString(36)}`;
+        localStorage.setItem(DEVICE_KEY, id);
+    }
+    return id;
+}
 
 // Get current date string in IST (UTC+5:30) as YYYY-MM-DD
 function getISTDateString() {
@@ -15,58 +32,65 @@ function getISTDateString() {
     }).format(new Date());
 }
 
-function storageKey(nick) {
-    return `openwire_wallet_${nick}`;
+function storageKey(deviceId) {
+    return `${WALLET_PREFIX}${deviceId}`;
 }
 
-// Load wallet from localStorage, resetting base if new IST day
+/* ── Load / create wallet ─────────────────────────────────── */
 export function loadWallet(nick) {
+    const deviceId = getDeviceId();
     const today = getISTDateString();
     let wallet;
 
     try {
-        const raw = localStorage.getItem(storageKey(nick));
+        const raw = localStorage.getItem(storageKey(deviceId));
         wallet = raw ? JSON.parse(raw) : null;
     } catch {
         wallet = null;
     }
 
     if (!wallet) {
-        // Brand new user
         wallet = {
+            deviceId,
             nick,
             baseBalance: DAILY_BASE,
             adminBonus: 0,
             lastRefreshDate: today,
             history: [{ time: Date.now(), reason: 'Daily refresh', amount: DAILY_BASE, balance: DAILY_BASE }],
         };
-    } else if (wallet.lastRefreshDate !== today) {
-        // New IST day — reset base only, preserve admin bonus
-        const prevBonus = wallet.adminBonus || 0;
-        wallet = {
-            ...wallet,
-            baseBalance: DAILY_BASE,
-            lastRefreshDate: today,
-            history: [
-                ...(wallet.history || []).slice(-99),
-                { time: Date.now(), reason: 'Daily refresh', amount: DAILY_BASE, balance: DAILY_BASE + prevBonus },
-            ],
-        };
+    } else {
+        // Update nick on login (display only — not used for keying)
+        wallet.nick = nick;
+        if (wallet.lastRefreshDate !== today) {
+            // New IST day — reset game winnings only, preserve admin bonus
+            const prevBonus = wallet.adminBonus || 0;
+            wallet = {
+                ...wallet,
+                nick,
+                baseBalance: DAILY_BASE,
+                lastRefreshDate: today,
+                history: [
+                    ...(wallet.history || []).slice(-99),
+                    { time: Date.now(), reason: 'Daily refresh', amount: DAILY_BASE, balance: DAILY_BASE + prevBonus },
+                ],
+            };
+        }
     }
 
-    saveWallet(nick, wallet);
+    saveWallet(wallet);
     return wallet;
 }
 
-export function saveWallet(nick, wallet) {
+export function saveWallet(wallet) {
+    const deviceId = wallet.deviceId || getDeviceId();
     try {
-        localStorage.setItem(storageKey(nick), JSON.stringify(wallet));
+        localStorage.setItem(storageKey(deviceId), JSON.stringify(wallet));
     } catch (e) {
         console.warn('Failed to save wallet', e);
     }
 }
 
-// Total spendable balance
+/* ── Balance helpers ──────────────────────────────────────── */
 export function getTotalBalance(wallet) {
     return (wallet.baseBalance || 0) + (wallet.adminBonus || 0);
 }
@@ -75,9 +99,9 @@ export function canAfford(wallet, amount) {
     return getTotalBalance(wallet) >= amount;
 }
 
-// Debit: takes from baseBalance first, then adminBonus
+/* ── Debit: baseBalance first, adminBonus next ────────────── */
 export function debit(wallet, amount, reason = 'Bet') {
-    if (!canAfford(wallet, amount)) return wallet; // safety guard
+    if (!canAfford(wallet, amount)) return wallet;
     let base = wallet.baseBalance;
     let bonus = wallet.adminBonus;
 
@@ -98,11 +122,13 @@ export function debit(wallet, amount, reason = 'Bet') {
             { time: Date.now(), reason, amount: -amount, balance: Math.max(0, base) + Math.max(0, bonus) },
         ],
     };
-    saveWallet(wallet.nick, updated);
+    saveWallet(updated);
     return updated;
 }
 
-// Credit game winnings → into baseBalance; admin grants → into adminBonus
+/* ── Credit ───────────────────────────────────────────────── */
+// Game winnings → baseBalance (expires daily)
+// Admin grants  → adminBonus (permanent)
 export function credit(wallet, amount, reason = 'Winnings', isAdminGrant = false) {
     const updated = {
         ...wallet,
@@ -118,11 +144,11 @@ export function credit(wallet, amount, reason = 'Winnings', isAdminGrant = false
             },
         ],
     };
-    saveWallet(wallet.nick, updated);
+    saveWallet(updated);
     return updated;
 }
 
-// Adjust by admin — can be positive or negative; goes into adminBonus
+/* ── Admin adjust ─────────────────────────────────────────── */
 export function adminAdjust(wallet, delta, reason = 'Admin adjustment') {
     const bonus = Math.max(0, (wallet.adminBonus || 0) + delta);
     const updated = {
@@ -133,6 +159,6 @@ export function adminAdjust(wallet, delta, reason = 'Admin adjustment') {
             { time: Date.now(), reason, amount: delta, balance: wallet.baseBalance + bonus },
         ],
     };
-    saveWallet(wallet.nick, updated);
+    saveWallet(updated);
     return updated;
 }
