@@ -363,3 +363,22 @@ export function deserializeGame(data) {
         return null;
     }
 }
+
+// Returns { peer_id → net chip change } for a settled game (phase === 'ended')
+// win: +bet, blackjack-win: +bet*1.5, push: 0, lose: -bet
+export function getPayouts(game) {
+    if (game.phase !== 'ended') return {};
+    const payouts = {};
+    for (const p of game.players) {
+        if (p.status === 'win') {
+            payouts[p.peer_id] = Math.floor(p.bet);
+        } else if (p.status === 'blackjack-win') {
+            payouts[p.peer_id] = Math.floor(p.bet * 1.5);
+        } else if (p.status === 'push') {
+            payouts[p.peer_id] = 0;
+        } else {
+            payouts[p.peer_id] = -p.bet;
+        }
+    }
+    return payouts;
+}

@@ -3,11 +3,11 @@ import Landing from './components/Landing';
 import ChatRoom from './components/ChatRoom';
 
 export default function App() {
-    const [nick, setNick] = useState(null);
+    const [session, setSession] = useState(null); // { nick, isAdmin }
 
-    if (!nick) {
-        return <Landing onJoin={setNick} />;
+    if (!session) {
+        return <Landing onJoin={(nick, isAdmin) => setSession({ nick, isAdmin })} />;
     }
 
-    return <ChatRoom nick={nick} />;
+    return <ChatRoom nick={session.nick} isAdmin={session.isAdmin} />;
 }

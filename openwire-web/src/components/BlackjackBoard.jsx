@@ -59,7 +59,7 @@ function Hand({ cards, label, value, hidden = false, status = '' }) {
     );
 }
 
-export default function BlackjackBoard({ game, myId, onAction, onClose }) {
+export default function BlackjackBoard({ game, myId, wallet, onAction, onClose }) {
     const [animating, setAnimating] = useState(false);
 
     useEffect(() => {
@@ -73,6 +73,7 @@ export default function BlackjackBoard({ game, myId, onAction, onClose }) {
     const myPlayer = game.players.find(p => p.peer_id === myId);
     const isMyTurn = bj.isPlayerTurn(game, myId);
     const dealerValue = game.dealer.revealed ? bj.calculateHand(game.dealer.hand) : '?';
+    const balance = wallet ? (wallet.baseBalance + wallet.adminBonus) : Infinity;
 
     const handleHit = () => {
         if (!isMyTurn || animating) return;
@@ -106,6 +107,9 @@ export default function BlackjackBoard({ game, myId, onAction, onClose }) {
             <div className="bj-table">
                 <div className="bj-header">
                     <h2>♠ Blackjack ♥</h2>
+                    {wallet && (
+                        <span className="rl-balance">💰 {balance.toLocaleString()} chips</span>
+                    )}
                     <button className="bj-close" onClick={onClose}>✕</button>
                 </div>
 
@@ -161,10 +165,14 @@ export default function BlackjackBoard({ game, myId, onAction, onClose }) {
                         <>
                             {(!myPlayer || myPlayer.status === 'waiting') && (
                                 <div className="bj-bet-buttons">
-                                    <button onClick={() => handleBet(10)}>$10</button>
-                                    <button onClick={() => handleBet(25)}>$25</button>
-                                    <button onClick={() => handleBet(50)}>$50</button>
-                                    <button onClick={() => handleBet(100)}>$100</button>
+                                    {[10, 25, 50, 100].map(amt => (
+                                        <button
+                                            key={amt}
+                                            onClick={() => handleBet(amt)}
+                                            disabled={amt > balance}
+                                            style={{ opacity: amt > balance ? 0.4 : 1 }}
+                                        >${amt}</button>
+                                    ))}
                                 </div>
                             )}
                             {myPlayer?.bet > 0 && (

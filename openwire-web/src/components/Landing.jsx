@@ -1,12 +1,20 @@
 import { useState } from 'react';
+import { AdminPasswordGate } from './AdminPortal';
 
 export default function Landing({ onJoin }) {
     const [name, setName] = useState('');
+    const [showAdminGate, setShowAdminGate] = useState(false);
 
     const handleSubmit = (e) => {
         e.preventDefault();
         const nick = name.trim() || 'Anonymous';
-        onJoin(nick);
+        onJoin(nick, false);
+    };
+
+    const handleAdminSuccess = () => {
+        setShowAdminGate(false);
+        const nick = name.trim() || 'Admin';
+        onJoin(nick, true);
     };
 
     return (
@@ -29,6 +37,18 @@ export default function Landing({ onJoin }) {
                 />
                 <button type="submit">Connect →</button>
             </form>
+            <button
+                className="admin-access-link"
+                onClick={() => setShowAdminGate(true)}
+            >
+                🔐 Admin Access
+            </button>
+            {showAdminGate && (
+                <AdminPasswordGate
+                    onSuccess={handleAdminSuccess}
+                    onCancel={() => setShowAdminGate(false)}
+                />
+            )}
         </div>
     );
 }

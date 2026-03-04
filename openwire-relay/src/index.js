@@ -1,11 +1,11 @@
 /* ═══════════════════════════════════════════════════════════
    OpenWire Relay — Cloudflare Worker + Durable Object
    WebSocket relay for auto peer discovery & message relay
+   + Admin: IP-level persistent banning, kick, host_left
    ═══════════════════════════════════════════════════════════ */
 
 export default {
     async fetch(request, env) {
-        // Route all WebSocket connections to a single Durable Object
         const id = env.RELAY.idFromName("global");
         const relay = env.RELAY.get(id);
         return relay.fetch(request);
@@ -15,16 +15,29 @@ export default {
 export class RelayRoom {
     constructor(state) {
         this.state = state;
-        // ws → { peer_id, nick, rooms: Set<string> }
+        // ws → { peer_id, nick, ip, rooms: Set<string>, balance: 0 }
         this.peers = new Map();
-        // room_id → { name, members: Set<string> }
+        // room_id → { name, members: Set<string>, hostPeerId: string }
         this.rooms = new Map();
+        this.bannedIps = null; // loaded lazily from KV
+    }
+
+    // Load banned IPs from persistent Durable Object storage
+    async loadBannedIps() {
+        if (this.bannedIps === null) {
+            const stored = await this.state.storage.get('banned_ips');
+            this.bannedIps = stored ? JSON.parse(stored) : [];
+        }
+        return this.bannedIps;
+    }
+
+    async saveBannedIps() {
+        await this.state.storage.put('banned_ips', JSON.stringify(this.bannedIps));
     }
 
     async fetch(request) {
         const url = new URL(request.url);
 
-        // Health check
         if (url.pathname === "/health") {
             return new Response(
                 JSON.stringify({ status: "ok", peers: this.peers.size }),
@@ -32,23 +45,30 @@ export class RelayRoom {
             );
         }
 
-        // CORS preflight
         if (request.method === "OPTIONS") {
-            return new Response(null, {
-                headers: corsHeaders(),
-            });
+            return new Response(null, { headers: corsHeaders() });
         }
 
-        // WebSocket upgrade
         const upgradeHeader = request.headers.get("Upgrade");
         if (!upgradeHeader || upgradeHeader !== "websocket") {
             return new Response("Expected WebSocket", { status: 426, headers: corsHeaders() });
         }
 
+        // Check IP ban BEFORE accepting connection
+        const clientIp = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+        const banned = await this.loadBannedIps();
+        if (banned.includes(clientIp)) {
+            const pair = new WebSocketPair();
+            const [client, server] = Object.values(pair);
+            server.accept();
+            server.send(JSON.stringify({ type: 'banned', message: 'You are banned from this server.' }));
+            server.close(1008, 'Banned');
+            return new Response(null, { status: 101, webSocket: client, headers: corsHeaders() });
+        }
+
         const pair = new WebSocketPair();
         const [client, server] = Object.values(pair);
-
-        this.handleSession(server);
+        this.handleSession(server, clientIp);
 
         return new Response(null, {
             status: 101,
@@ -57,56 +77,53 @@ export class RelayRoom {
         });
     }
 
-    handleSession(ws) {
+    handleSession(ws, clientIp) {
         ws.accept();
         let peerInfo = null;
 
-        ws.addEventListener("message", (event) => {
+        ws.addEventListener("message", async (event) => {
             let msg;
-            try {
-                msg = JSON.parse(event.data);
-            } catch {
-                return;
-            }
+            try { msg = JSON.parse(event.data); } catch { return; }
 
             switch (msg.type) {
                 case "join": {
                     const peer_id = msg.peer_id || crypto.randomUUID().slice(0, 16);
                     let nick = (msg.nick || "Anonymous").slice(0, 24);
-                    // Enforce unique nick
                     const takenNicks = new Set([...this.peers.values()].map(p => p.nick));
                     let base = nick, counter = 2;
                     while (takenNicks.has(nick)) nick = `${base}${counter++}`;
 
-                    peerInfo = { peer_id, nick, rooms: new Set() };
+                    peerInfo = { peer_id, nick, ip: clientIp, rooms: new Set(), balance: 0 };
                     this.peers.set(ws, peerInfo);
 
                     this.send(ws, {
                         type: "welcome",
                         peer_id,
-                        nick, // final (possibly suffixed) nick
+                        nick,
                         peers: this.peerList(),
-                        rooms: [], // new peer has no rooms yet
+                        rooms: [],
                     });
 
-                    this.broadcast(
-                        { type: "peer_joined", peer_id, nick },
-                        ws
-                    );
+                    this.broadcast({ type: "peer_joined", peer_id, nick }, ws);
                     break;
                 }
 
                 case "message": {
                     if (!peerInfo) return;
-                    this.broadcast(
-                        {
-                            type: "message",
-                            from: peerInfo.peer_id,
-                            nick: peerInfo.nick,
-                            data: msg.data,
-                        },
-                        ws
-                    );
+                    this.broadcast({
+                        type: "message",
+                        from: peerInfo.peer_id,
+                        nick: peerInfo.nick,
+                        data: msg.data,
+                    }, ws);
+                    break;
+                }
+
+                case "balance_update": {
+                    if (!peerInfo) return;
+                    peerInfo.balance = msg.balance || 0;
+                    // Broadcast updated peer list (with balances) to everyone
+                    this.broadcast({ type: "peers", peers: this.peerList() });
                     break;
                 }
 
@@ -117,6 +134,7 @@ export class RelayRoom {
                     this.rooms.set(room_id, {
                         name,
                         members: new Set([peerInfo.peer_id]),
+                        hostPeerId: peerInfo.peer_id,
                     });
                     peerInfo.rooms.add(room_id);
                     this.send(ws, { type: "room_created", room_id, name });
@@ -127,13 +145,9 @@ export class RelayRoom {
                 case "room_join": {
                     if (!peerInfo) return;
                     const room = this.rooms.get(msg.room_id);
-                    if (!room) {
-                        this.send(ws, { type: "error", message: "Room not found" });
-                        return;
-                    }
+                    if (!room) { this.send(ws, { type: "error", message: "Room not found" }); return; }
                     room.members.add(peerInfo.peer_id);
                     peerInfo.rooms.add(msg.room_id);
-
                     this.broadcastToRoom(msg.room_id, {
                         type: "room_peer_joined",
                         room_id: msg.room_id,
@@ -148,7 +162,6 @@ export class RelayRoom {
                     if (!peerInfo) return;
                     const invRoom = this.rooms.get(msg.room_id);
                     if (!invRoom) return;
-
                     for (const [clientWs, info] of this.peers) {
                         if (info.peer_id === msg.peer_id) {
                             this.send(clientWs, {
@@ -166,17 +179,13 @@ export class RelayRoom {
 
                 case "room_message": {
                     if (!peerInfo) return;
-                    this.broadcastToRoom(
-                        msg.room_id,
-                        {
-                            type: "room_message",
-                            room_id: msg.room_id,
-                            from: peerInfo.peer_id,
-                            nick: peerInfo.nick,
-                            data: msg.data,
-                        },
-                        ws
-                    );
+                    this.broadcastToRoom(msg.room_id, {
+                        type: "room_message",
+                        room_id: msg.room_id,
+                        from: peerInfo.peer_id,
+                        nick: peerInfo.nick,
+                        data: msg.data,
+                    }, ws);
                     break;
                 }
 
@@ -190,40 +199,124 @@ export class RelayRoom {
                     this.send(ws, { type: "room_list", rooms: this.roomList() });
                     break;
                 }
+
+                // ── ADMIN MESSAGES ─────────────────────────────────────
+
+                case "admin_kick": {
+                    if (!peerInfo) return;
+                    const targetId = msg.peer_id;
+                    for (const [clientWs, info] of this.peers) {
+                        if (info.peer_id === targetId) {
+                            this.send(clientWs, { type: 'kicked', message: 'You were kicked by an admin.' });
+                            try { clientWs.close(1008, 'Kicked'); } catch { }
+                            this.peers.delete(clientWs);
+                            break;
+                        }
+                    }
+                    this.broadcast({ type: 'peers', peers: this.peerList() });
+                    break;
+                }
+
+                case "admin_ban_ip": {
+                    if (!peerInfo) return;
+                    const targetId = msg.peer_id;
+                    let targetIp = null;
+
+                    for (const [clientWs, info] of this.peers) {
+                        if (info.peer_id === targetId) {
+                            targetIp = info.ip;
+                            this.send(clientWs, { type: 'banned', message: 'You have been banned.' });
+                            try { clientWs.close(1008, 'Banned'); } catch { }
+                            this.peers.delete(clientWs);
+                            break;
+                        }
+                    }
+
+                    if (targetIp && targetIp !== 'unknown' && !this.bannedIps.includes(targetIp)) {
+                        this.bannedIps.push(targetIp);
+                        await this.saveBannedIps();
+                    }
+
+                    // Send updated ban list back to the admin
+                    this.send(ws, { type: 'banned_ips', ips: this.bannedIps });
+                    this.broadcast({ type: 'peers', peers: this.peerList() });
+                    break;
+                }
+
+                case "admin_unban_ip": {
+                    if (!peerInfo) return;
+                    this.bannedIps = (this.bannedIps || []).filter(ip => ip !== msg.ip);
+                    await this.saveBannedIps();
+                    this.send(ws, { type: 'banned_ips', ips: this.bannedIps });
+                    break;
+                }
+
+                case "admin_adjust_balance": {
+                    if (!peerInfo) return;
+                    // Relay the adjustment to the target peer
+                    for (const [clientWs, info] of this.peers) {
+                        if (info.peer_id === msg.peer_id) {
+                            this.send(clientWs, {
+                                type: 'admin_adjust_balance',
+                                delta: msg.delta,
+                                reason: msg.reason || 'Admin adjustment',
+                                from_nick: peerInfo.nick,
+                            });
+                            break;
+                        }
+                    }
+                    break;
+                }
+
+                case "admin_get_bans": {
+                    if (!peerInfo) return;
+                    await this.loadBannedIps();
+                    this.send(ws, { type: 'banned_ips', ips: this.bannedIps });
+                    break;
+                }
             }
         });
 
         ws.addEventListener("close", () => {
             if (!peerInfo) return;
+            // Notify rooms about host leaving (for P2P host migration)
             for (const room_id of peerInfo.rooms) {
+                const room = this.rooms.get(room_id);
+                if (room && room.hostPeerId === peerInfo.peer_id) {
+                    // Find next member to become host (smallest peer_id alphabetically)
+                    const members = [...room.members].filter(id => id !== peerInfo.peer_id);
+                    if (members.length > 0) {
+                        members.sort();
+                        const newHostId = members[0];
+                        room.hostPeerId = newHostId;
+                        this.broadcastToRoom(room_id, {
+                            type: 'host_left',
+                            old_host: peerInfo.peer_id,
+                            new_host: newHostId,
+                            room_id,
+                        });
+                    }
+                }
                 this.leaveRoom(peerInfo, room_id, true);
             }
             this.peers.delete(ws);
-            this.broadcast({
-                type: "peer_left",
-                peer_id: peerInfo.peer_id,
-                nick: peerInfo.nick,
-            });
+            this.broadcast({ type: "peer_left", peer_id: peerInfo.peer_id, nick: peerInfo.nick });
         });
 
-        ws.addEventListener("error", () => {
-            this.peers.delete(ws);
-        });
+        ws.addEventListener("error", () => { this.peers.delete(ws); });
     }
 
     // ── Helpers ──────────────────────────────────────────────
 
     send(ws, obj) {
-        try {
-            ws.send(JSON.stringify(obj));
-        } catch { /* closed */ }
+        try { ws.send(JSON.stringify(obj)); } catch { }
     }
 
     broadcast(obj, exclude) {
         const data = JSON.stringify(obj);
         for (const [clientWs] of this.peers) {
             if (clientWs !== exclude) {
-                try { clientWs.send(data); } catch { /* closed */ }
+                try { clientWs.send(data); } catch { }
             }
         }
     }
@@ -234,20 +327,21 @@ export class RelayRoom {
         const data = JSON.stringify(obj);
         for (const [clientWs, info] of this.peers) {
             if (clientWs !== exclude && room.members.has(info.peer_id)) {
-                try { clientWs.send(data); } catch { /* closed */ }
+                try { clientWs.send(data); } catch { }
             }
         }
     }
 
     broadcastPeerUpdate() {
-        // Only broadcast peer list — rooms are private to members
         this.broadcast({ type: "peers", peers: this.peerList() });
     }
 
     peerList() {
-        return [...this.peers.values()].map((p) => ({
+        return [...this.peers.values()].map(p => ({
             peer_id: p.peer_id,
             nick: p.nick,
+            ip: p.ip,
+            balance: p.balance || 0,
         }));
     }
 
@@ -256,6 +350,7 @@ export class RelayRoom {
             room_id: id,
             name: r.name,
             members: r.members.size,
+            hostPeerId: r.hostPeerId,
         }));
     }
 
