@@ -10,21 +10,22 @@ let reconnectTimer = null;
 let pingTimer = null;
 
 export function connect(nick, onEvent) {
-    if (ws && ws.readyState === WebSocket.OPEN) return;
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
-    listeners.push(onEvent);
+    // Only keep the most recent listener to prevent duplicates on reconnect
+    listeners = [onEvent];
 
     ws = new WebSocket(RELAY_URL);
 
     ws.onopen = () => {
         ws.send(JSON.stringify({ type: 'join', nick, peer_id: generateId() }));
-        // Start keep-alive pings (every 25s to beat Cloudflare's idle timeout)
+        // Start keep-alive pings (every 15s to beat Cloudflare idle timeout)
         if (pingTimer) clearInterval(pingTimer);
         pingTimer = setInterval(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'ping' }));
             }
-        }, 25000);
+        }, 15000);
     };
 
     ws.onmessage = (e) => {
@@ -38,6 +39,7 @@ export function connect(nick, onEvent) {
     ws.onclose = () => {
         if (pingTimer) clearInterval(pingTimer);
         listeners.forEach((fn) => fn({ type: 'disconnected' }));
+        ws = null;
         reconnectTimer = setTimeout(() => connect(nick, onEvent), 3000);
     };
 
@@ -49,6 +51,7 @@ export function disconnect() {
     if (pingTimer) clearInterval(pingTimer);
     listeners = [];
     if (ws) {
+        ws.onclose = null; // Prevent the reconnect loop from firing
         ws.close();
         ws = null;
     }
