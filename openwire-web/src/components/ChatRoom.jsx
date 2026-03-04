@@ -40,7 +40,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const [input, setInput] = useState('');
     const [peers, setPeers] = useState([]);
     const [rooms, setRooms] = useState([]);
-    const [currentRoom, setCurrentRoom] = useState(null);
+    const [currentRoom, setCurrentRoom] = useState(() => localStorage.getItem('openwire_current_room') || null);
     const [connected, setConnected] = useState(false);
     const [myWallet, setMyWallet] = useState(null);
 
@@ -94,6 +94,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
     useEffect(() => { saveMessages(messages); }, [messages]);
 
+    useEffect(() => {
+        if (currentRoom) localStorage.setItem('openwire_current_room', currentRoom);
+        else localStorage.removeItem('openwire_current_room');
+    }, [currentRoom]);
+
     // ── Wallet init ──────────────────────────────────────────
     useEffect(() => {
         if (initialNick) {
@@ -141,32 +146,44 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             if (!currentGame || !amIHost(hostId)) return;
             if (currentGame.phase !== 'betting') return;
 
+            // Start 10s spinning phase
             const spun = rl.spin(currentGame);
             setRouletteGame(spun);
 
-            // Apply winnings to my wallet
-            const myId = myIdRef.current;
-            const myNet = spun.payouts?.[myId];
-            if (myNet !== undefined && walletRef.current) {
-                let w = walletRef.current;
-                if (myNet > 0) w = wallet.credit(w, myNet, 'Roulette win');
-                else if (myNet < 0) w = wallet.debit(w, -myNet, 'Roulette bet');
-                updateWallet(w);
-            }
-
-            // Broadcast state
             const roomId = currentGame.roomId;
             socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(spun) }));
-            addActivityLog(`Roulette spin: result ${spun.result} (${rl.getColor(spun.result)})`);
+            addActivityLog(`Roulette wheel spinning...`);
 
-            // Auto reset to betting after RESULTS_DISPLAY_MS
+            // After SPIN_PHASE_MS (10s), show results
             setTimeout(() => {
-                const reset = rl.newRound(spun);
-                setRouletteGame(reset);
-                if (amIHost(rouletteHostRef.current)) {
-                    socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(reset) }));
+                const resultsGame = rl.finishSpin(rouletteRef.current || spun);
+                setRouletteGame(resultsGame);
+
+                // Apply winnings to my wallet now that results are out
+                const myId = myIdRef.current;
+                const myNet = spun.payouts?.[myId];
+                if (myNet !== undefined && walletRef.current) {
+                    let w = walletRef.current;
+                    if (myNet > 0) w = wallet.credit(w, myNet, 'Roulette win');
+                    else if (myNet < 0) w = wallet.debit(w, -myNet, 'Roulette bet');
+                    updateWallet(w);
                 }
-            }, rl.RESULTS_DISPLAY_MS);
+
+                if (amIHost(rouletteHostRef.current)) {
+                    socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(resultsGame) }));
+                    addActivityLog(`Roulette spin: result ${spun.result} (${rl.getColor(spun.result)})`);
+                }
+
+                // After RESULTS_DISPLAY_MS (10s), start new betting round
+                setTimeout(() => {
+                    const reset = rl.newRound(rouletteRef.current || resultsGame);
+                    setRouletteGame(reset);
+                    if (amIHost(rouletteHostRef.current)) {
+                        socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(reset) }));
+                    }
+                }, rl.RESULTS_DISPLAY_MS);
+
+            }, rl.SPIN_PHASE_MS);
 
         }, rl.SPIN_INTERVAL_MS);
     }, [addActivityLog, amIHost, updateWallet]);

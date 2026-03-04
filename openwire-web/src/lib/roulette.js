@@ -5,6 +5,7 @@
    ═══════════════════════════════════════════════════════════ */
 
 export const SPIN_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+export const SPIN_PHASE_MS = 10 * 1000;        // 10s spinning animation
 export const RESULTS_DISPLAY_MS = 10 * 1000;   // 10s results before new round
 
 // Red numbers in European roulette
@@ -104,8 +105,6 @@ export function clearBets(game, peer_id) {
 // Spin the wheel — returns new game state with result + payouts
 export function spin(game) {
     const result = Math.floor(Math.random() * 37); // 0-36
-    const newHistory = [...(game.spinHistory || []), result].slice(-100);
-    saveHistory(game.roomId, newHistory);
 
     // Compute net change per player
     const payouts = {};
@@ -119,12 +118,21 @@ export function spin(game) {
 
     return {
         ...game,
-        phase: 'results',
+        phase: 'spinning',
         result,
-        spinHistory: newHistory,
         payouts,
         lastSpinAt: Date.now(),
-        nextSpinAt: Date.now() + SPIN_INTERVAL_MS,
+        nextSpinAt: Date.now() + SPIN_PHASE_MS + RESULTS_DISPLAY_MS + SPIN_INTERVAL_MS,
+    };
+}
+
+export function finishSpin(game) {
+    const newHistory = [...(game.spinHistory || []), game.result].slice(-100);
+    saveHistory(game.roomId, newHistory);
+    return {
+        ...game,
+        phase: 'results',
+        spinHistory: newHistory
     };
 }
 

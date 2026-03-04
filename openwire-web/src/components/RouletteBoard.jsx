@@ -91,7 +91,10 @@ function RouletteWheel({ spinning, result }) {
     });
 
     return (
-        <div className="rl-wheel-container">
+        <div className={`rl-wheel-container ${spinning ? 'is-spinning' : ''}`} style={{
+            transition: spinning ? 'transform 10s cubic-bezier(0.15, 0.85, 0.3, 1.0)' : 'transform 1s',
+            transform: spinning ? 'scale(1.15) translateY(5px)' : 'scale(1) translateY(0)'
+        }}>
             {/* Pointer / ball stop marker */}
             <div className="rl-pointer">▼</div>
 
@@ -106,7 +109,7 @@ function RouletteWheel({ spinning, result }) {
                 style={{
                     transform: `rotate(${rotation}deg)`,
                     transition: spinning
-                        ? 'transform 4.5s cubic-bezier(0.17, 0.67, 0.15, 1.0)'
+                        ? 'transform 10s cubic-bezier(0.15, 0.85, 0.3, 1.0)'
                         : 'none',
                 }}
             >
@@ -199,11 +202,14 @@ function OutsideBtn({ label, type, target, myBets, onBet, disabled, className = 
 
 const BET_AMOUNTS = [5, 10, 25, 50, 100, 250];
 
+const PREV_PHASE_KEY = 'rl_prev_phase';
+
 /* ── Main Board ─────────────────────────────────── */
 export default function RouletteBoard({ game, myId, myNick, wallet, onAction, onClose, isHost }) {
     const [betAmount, setBetAmount] = useState(25);
     const [spinning, setSpinning] = useState(false);
     const [showResult, setShowResult] = useState(false);
+    const prevPhaseRef = useRef('betting'); // To track phase changes
 
     useEffect(() => {
         if (game?.phase === 'results' && game?.result !== null) {
@@ -256,30 +262,26 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
                     <button className="btn-icon-close" onClick={onClose}>✕</button>
                 </div>
 
-                {/* ── Wheel + Result ── */}
+                {/* Status / Wheel Section */}
                 <div className="rl-wheel-section">
                     <RouletteWheel spinning={spinning} result={game.result} />
+
                     <div className="rl-wheel-info">
                         {game.phase === 'spinning' && (
-                            <div className="rl-spinning-text">
-                                <span className="deal-dot" />
-                                <span className="deal-dot delay1" />
-                                <span className="deal-dot delay2" />
-                                Spinning…
-                            </div>
+                            <div className="rl-spinning-text">Wheel is spinning...</div>
                         )}
-                        {showResult && game.result !== null && (
-                            <div className={`rl-result-badge rl-result-${resultColor}`}>
-                                <div className="rl-result-num">{game.result}</div>
-                                <div className="rl-result-label">
+                        {game.phase === 'results' && game.result !== null && (
+                            <div className={`rl-result-badge rl-result-${getColor(game.result)}`}>
+                                <span className="rl-result-num">{game.result}</span>
+                                <span className="rl-result-label">
                                     {resultColor === 'green' ? '🟢 Zero' : resultColor === 'red' ? '🔴 Red' : '⚫ Black'}
                                     {game.result > 0 ? (game.result % 2 === 0 ? ' · Even' : ' · Odd') : ''}
-                                </div>
+                                </span>
                             </div>
                         )}
-                        {myPayout !== undefined && showResult && (
+                        {game.phase === 'results' && myPayout !== undefined && (
                             <div className={`rl-payout-result ${myPayout >= 0 ? 'win' : 'lose'}`}>
-                                {myPayout >= 0 ? `+${myPayout}` : myPayout} chips
+                                {myPayout > 0 ? `+${myPayout}` : myPayout} chips
                             </div>
                         )}
                     </div>

@@ -11,6 +11,27 @@ export const BETTING_DURATION_MS = 30 * 1000;  // 30s betting window
 export const DEAL_INTERVAL_MS = 800;           // 0.8s between cards
 export const RESULTS_DISPLAY_MS = 8 * 1000;   // 8s results before new round
 
+export const SIDE_BETS = {
+    '1-5': 3.5,
+    '6-10': 4.5,
+    '11-15': 5.5,
+    '16-25': 4.5,
+    '26-35': 15.0,
+    '36-40': 50.0,
+    '41+': 120.0
+};
+
+export function isSideBetWin(side, total) {
+    if (side === '1-5') return total >= 1 && total <= 5;
+    if (side === '6-10') return total >= 6 && total <= 10;
+    if (side === '11-15') return total >= 11 && total <= 15;
+    if (side === '16-25') return total >= 16 && total <= 25;
+    if (side === '26-35') return total >= 26 && total <= 35;
+    if (side === '36-40') return total >= 36 && total <= 40;
+    if (side === '41+') return total >= 41;
+    return false;
+}
+
 function historyKey(roomId) { return `ab_history_${roomId}`; }
 
 export function loadHistory(roomId) {
@@ -87,10 +108,18 @@ export function dealNext(game) {
 
         // Payout: Andar pays 0.9:1 if trump was first seen on Bahar side (standard rule)
         const payouts = {};
+        const totalCards = andar.length + bahar.length;
+
         for (const bet of game.bets) {
             if (bet.side === result) {
                 const multiplier = (result === 'andar' && trumpFirst === 'bahar') ? 0.9 : 1.0;
                 payouts[bet.peer_id] = (payouts[bet.peer_id] || 0) + Math.floor(bet.amount * multiplier);
+            } else if (SIDE_BETS[bet.side]) {
+                if (isSideBetWin(bet.side, totalCards)) {
+                    payouts[bet.peer_id] = (payouts[bet.peer_id] || 0) + Math.floor(bet.amount * SIDE_BETS[bet.side]);
+                } else {
+                    payouts[bet.peer_id] = (payouts[bet.peer_id] || 0) - bet.amount;
+                }
             } else {
                 payouts[bet.peer_id] = (payouts[bet.peer_id] || 0) - bet.amount;
             }

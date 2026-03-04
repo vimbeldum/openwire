@@ -280,7 +280,22 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
                                 <span className="ab-btn-sub">Outside · {selectedAmount} chips</span>
                             </button>
                         </div>
-                        <div className="ab-payout-note">Andar 0.9:1 · Bahar 1:1</div>
+                        <div className="ab-payout-note" style={{ marginTop: '0.75rem' }}>Andar 0.9:1 · Bahar 1:1</div>
+
+                        <div className="ab-side-bets-header">Side Bets: Total Cards Dealt</div>
+                        <div className="ab-side-bets-grid">
+                            {Object.entries(ab.SIDE_BETS).map(([range, mult]) => (
+                                <button
+                                    key={range}
+                                    className="ab-side-btn-small"
+                                    onClick={() => handleBet(range)}
+                                    disabled={selectedAmount > balance}
+                                >
+                                    <div className="ab-btn-top">{range}</div>
+                                    <div className="ab-btn-sub">{mult}x</div>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )}
 

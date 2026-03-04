@@ -2,15 +2,21 @@ import { useEffect, useState } from 'react';
 import * as bj from '../lib/blackjack';
 
 /* ── Reusable Premium Card ────────────────────────── */
-function Card({ card, hidden = false, index = 0 }) {
+function Card({ card, hidden = false, index = 0, placeholder = false }) {
     const [flipped, setFlipped] = useState(false);
 
     useEffect(() => {
-        if (!hidden) {
+        if (!hidden && !placeholder) {
             const timer = setTimeout(() => setFlipped(true), 50 + index * 120);
             return () => clearTimeout(timer);
         }
-    }, [hidden, index]);
+    }, [hidden, index, placeholder]);
+
+    if (placeholder) {
+        return (
+            <div className="card card-placeholder bj-card-pos" />
+        );
+    }
 
     if (hidden) {
         return (
@@ -57,9 +63,16 @@ function Hand({ cards, label, value, hidden = false, status = '', isMyTurn = fal
                 </span>
             </div>
             <div className="bj-cards-fan">
-                {cards.map((card, i) => (
-                    <Card key={card.id || i} card={card} hidden={hidden && i === 1} index={i} />
-                ))}
+                {cards.length === 0 ? (
+                    <>
+                        <Card placeholder index={0} />
+                        <Card placeholder index={1} />
+                    </>
+                ) : (
+                    cards.map((card, i) => (
+                        <Card key={card.id || i} card={card} hidden={hidden && i === 1} index={i} />
+                    ))
+                )}
             </div>
         </div>
     );
@@ -80,7 +93,7 @@ export default function BlackjackBoard({ game, myId, myNick, wallet, onAction, o
 
     const handleBet = () => {
         if (selectedBet > balance) return;
-        onAction({ type: 'placeBet', amount: selectedBet });
+        onAction({ type: 'bet', amount: selectedBet });
     };
 
     return (
