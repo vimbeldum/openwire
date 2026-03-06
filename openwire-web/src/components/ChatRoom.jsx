@@ -58,6 +58,23 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     // Invites
     const [pendingInvites, setPendingInvites] = useState([]);
     const [pendingChallenges, setPendingChallenges] = useState([]);
+
+    // Bank Ledger (House P&L Tracker)
+    const [bankLedger, setBankLedger] = useState(() => {
+        try { return JSON.parse(sessionStorage.getItem('bank_ledger')) || { roulette: 0, blackjack: 0, andarbahar: 0 }; }
+        catch { return { roulette: 0, blackjack: 0, andarbahar: 0 }; }
+    });
+
+    const updateBankLedger = useCallback((gameName, payoutsMap) => {
+        if (!payoutsMap) return;
+        let houseNet = 0;
+        Object.values(payoutsMap).forEach(net => { houseNet -= net; }); // house profit = sum of player losses
+        setBankLedger(prev => {
+            const next = { ...prev, [gameName]: (prev[gameName] || 0) + houseNet };
+            sessionStorage.setItem('bank_ledger', JSON.stringify(next));
+            return next;
+        });
+    }, []);
     const [pendingBjInvites, setPendingBjInvites] = useState([]);
     const [pendingRlInvites, setPendingRlInvites] = useState([]);
     const [pendingAbInvites, setPendingAbInvites] = useState([]);
@@ -169,6 +186,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 // Apply winnings to my wallet now that results are out
                 const myId = myIdRef.current;
                 const myNet = spun.payouts?.[myId];
+
+                // Track house P&L
+                if (amIHost(rouletteHostRef.current) && resultsGame.payouts) {
+                    updateBankLedger('roulette', resultsGame.payouts);
+                }
+
                 if (myNet !== undefined && walletRef.current) {
                     let w = walletRef.current;
                     if (myNet > 0) w = wallet.credit(w, myNet, 'Roulette win');
@@ -259,6 +282,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
                 if (next.phase === 'ended') {
                     clearInterval(abDealTimerRef.current);
+
+                    if (amIHost(abHostRef.current) && next.payouts) {
+                        updateBankLedger('andarbahar', next.payouts);
+                    }
 
                     // Apply wallet changes for host
                     const myId = myIdRef.current;
@@ -728,6 +755,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             setTimeout(() => {
                 const settled = bj.runDealerTurn(newGame);
                 setBlackjackGame(settled);
+                if (amIHost(blackjackHostRef.current) && settled.payouts) {
+                    updateBankLedger('blackjack', settled.payouts);
+                }
                 socket.sendRoomMessage(settled.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(settled) }));
             }, 1000);
         }
@@ -848,6 +878,36 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         socket.send({ type: 'admin_adjust_balance', peer_id, delta, reason: `Admin grant from ${nickRef.current}` });
         addActivityLog(`Adjusted ${nick}'s balance by ${delta} chips`);
     };
+
+    // ── Paste handler for Images/GIFs ───────────────────────────────
+    const handlePaste = useCallback((e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (const item of items) {
+            if (item.type.indexOf('image/') !== -1) {
+                const file = item.getAsFile();
+                if (!file) continue;
+                if (file.size > 1024 * 1024) { // 1MB limit for P2P ease
+                    addMsg('★', '⚠ Image too large. Max 1MB.', 'system');
+                    continue;
+                }
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const dataUrl = ev.target.result;
+                    const activeRoom = currentRoomRef.current;
+                    if (activeRoom) {
+                        addMsg(nickRef.current, '', 'self', { roomId: activeRoom, gif: dataUrl });
+                        socket.sendRoomMessage(activeRoom, '', { gif: dataUrl });
+                    } else {
+                        addMsg('★', '⚠ Must be in a room to send images.', 'system');
+                    }
+                };
+                reader.readAsDataURL(file);
+                e.preventDefault();
+                break;
+            }
+        }
+    }, [addMsg]);
 
     // ── Command handler ──────────────────────────────────────
     const handleSend = (e) => {
@@ -1088,6 +1148,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         placeholder={currentRoom ? `Message #${rooms.find(r => r.room_id === currentRoom)?.name || 'room'}...` : 'Message General Chat... (or /help)'}
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
+                        onPaste={handlePaste}
                         autoFocus
                     />
                     {showGifPicker && <GifPicker onSelect={handleGifSelect} onClose={() => setShowGifPicker(false)} />}
@@ -1278,6 +1339,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                             placeholder="Message..."
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
+                            onPaste={handlePaste}
                         />
                         <button type="submit">Send</button>
                     </form>
@@ -1290,6 +1352,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     peers={peers}
                     activityLog={activityLog}
                     bannedIps={bannedIps}
+                    bankLedger={bankLedger}
                     onKick={handleAdminKick}
                     onBanIp={handleAdminBanIp}
                     onUnbanIp={handleAdminUnbanIp}

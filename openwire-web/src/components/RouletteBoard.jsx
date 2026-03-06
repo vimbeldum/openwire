@@ -342,17 +342,17 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
                     {/* Outside bets */}
                     <div className="rl-outside-bets">
                         <div className="rl-outside-row">
-                            <OutsideBtn label="1–18" type="half" target="low" myBets={myBets} onBet={handleBet} disabled={!canBet} />
-                            <OutsideBtn label="EVEN" type="parity" target="even" myBets={myBets} onBet={handleBet} disabled={!canBet} />
-                            <OutsideBtn label="🔴 Red" type="color" target="red" myBets={myBets} onBet={handleBet} disabled={!canBet} className="red" />
-                            <OutsideBtn label="⚫ Black" type="color" target="black" myBets={myBets} onBet={handleBet} disabled={!canBet} className="black" />
-                            <OutsideBtn label="ODD" type="parity" target="odd" myBets={myBets} onBet={handleBet} disabled={!canBet} />
-                            <OutsideBtn label="19–36" type="half" target="high" myBets={myBets} onBet={handleBet} disabled={!canBet} />
+                            <OutsideBtn label="1–18&#10;1:1" type="half" target="low" myBets={myBets} onBet={handleBet} disabled={!canBet} />
+                            <OutsideBtn label="EVEN&#10;1:1" type="parity" target="even" myBets={myBets} onBet={handleBet} disabled={!canBet} />
+                            <OutsideBtn label="🔴 Red&#10;1:1" type="color" target="red" myBets={myBets} onBet={handleBet} disabled={!canBet} className="red" />
+                            <OutsideBtn label="⚫ Black&#10;1:1" type="color" target="black" myBets={myBets} onBet={handleBet} disabled={!canBet} className="black" />
+                            <OutsideBtn label="ODD&#10;1:1" type="parity" target="odd" myBets={myBets} onBet={handleBet} disabled={!canBet} />
+                            <OutsideBtn label="19–36&#10;1:1" type="half" target="high" myBets={myBets} onBet={handleBet} disabled={!canBet} />
                         </div>
                         <div className="rl-outside-row">
-                            <OutsideBtn label="1st 12 (2:1)" type="dozen" target={1} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
-                            <OutsideBtn label="2nd 12 (2:1)" type="dozen" target={2} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
-                            <OutsideBtn label="3rd 12 (2:1)" type="dozen" target={3} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
+                            <OutsideBtn label="1st 12&#10;2:1" type="dozen" target={1} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
+                            <OutsideBtn label="2nd 12&#10;2:1" type="dozen" target={2} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
+                            <OutsideBtn label="3rd 12&#10;2:1" type="dozen" target={3} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
                         </div>
                     </div>
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 const TABS = ['Players', 'Ban List', 'Activity Log', 'Stats'];
 
-export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, activityLog, bannedIps, onClose }) {
+export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, activityLog, bannedIps, bankLedger, onClose }) {
     const [tab, setTab] = useState('Players');
     const [adjustTarget, setAdjustTarget] = useState(null);
     const [adjustAmount, setAdjustAmount] = useState(100);
@@ -168,10 +168,32 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                 <div className="admin-stat-value">{bannedIps?.length || 0}</div>
                             </div>
                         </div>
+
+                        <h3 style={{ marginTop: '2rem', marginBottom: '1rem', color: '#ffb300', fontSize: '1.2rem' }}>🏦 Bank P&L (House Profit)</h3>
+                        <div className="admin-stats-grid">
+                            <div className="admin-stat-card">
+                                <div className="admin-stat-label">Roulette Net</div>
+                                <div className="admin-stat-value" style={{ color: (bankLedger?.roulette || 0) >= 0 ? '#4caf50' : '#f44336' }}>
+                                    {(bankLedger?.roulette || 0) > 0 ? '+' : ''}{(bankLedger?.roulette || 0).toLocaleString()}
+                                </div>
+                            </div>
+                            <div className="admin-stat-card">
+                                <div className="admin-stat-label">Blackjack Net</div>
+                                <div className="admin-stat-value" style={{ color: (bankLedger?.blackjack || 0) >= 0 ? '#4caf50' : '#f44336' }}>
+                                    {(bankLedger?.blackjack || 0) > 0 ? '+' : ''}{(bankLedger?.blackjack || 0).toLocaleString()}
+                                </div>
+                            </div>
+                            <div className="admin-stat-card">
+                                <div className="admin-stat-label">Andar Bahar Net</div>
+                                <div className="admin-stat-value" style={{ color: (bankLedger?.andarbahar || 0) >= 0 ? '#4caf50' : '#f44336' }}>
+                                    {(bankLedger?.andarbahar || 0) > 0 ? '+' : ''}{(bankLedger?.andarbahar || 0).toLocaleString()}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }
 
