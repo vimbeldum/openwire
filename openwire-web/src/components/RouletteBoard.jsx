@@ -325,13 +325,20 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
                         ))}
                     </div>
 
-                    {/* Number grid — vertical layout: 12 rows × 3 cols */}
-                    <div className="rl-grid-wrap">
-                        <button
-                            className={`rl-zero ${myBets.some(b => b.betType === 'single' && b.betTarget === 0) ? 'selected' : ''}`}
-                            onClick={() => handleBet('single', 0)} disabled={!canBet}
-                        >0</button>
-                        <div className="rl-grid-vertical">
+                    {/* Number grid — vertical layout: 0 top, 12 rows × 3 cols middle, 2:1 bottom */}
+                    <div className="rl-grid-vertical">
+                        {/* Top: Zero spanning all 3 columns */}
+                        <div className="rl-zero-row">
+                            <button
+                                className={`rl-zero-vert ${myBets.some(b => b.betType === 'single' && b.betTarget === 0) ? 'selected' : ''}`}
+                                onClick={() => handleBet('single', 0)} disabled={!canBet}
+                            >
+                                0
+                            </button>
+                        </div>
+
+                        {/* Middle: 12 rows of 3 numbers */}
+                        <div className="rl-numbers-grid">
                             {rows.map((row, ri) => (
                                 <div key={ri} className="rl-grid-row">
                                     {row.map(n => (
@@ -345,28 +352,28 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
                                 </div>
                             ))}
                         </div>
-                        {/* Column 2:1 bets — one below each row group */}
-                        <div className="rl-col-bets-vertical">
+
+                        {/* Bottom: Column 2:1 bets (one for each column) */}
+                        <div className="rl-col-bets-row">
                             {[1, 2, 3].map(c => (
                                 <OutsideBtn key={c} label={`2:1`} type="column" target={c} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
                             ))}
                         </div>
-                    </div>
-
-                    {/* Outside bets */}
-                    <div className="rl-outside-bets">
-                        <div className="rl-outside-row">
-                            <OutsideBtn label="1–18&#10;1:1" type="half" target="low" myBets={myBets} onBet={handleBet} disabled={!canBet} />
-                            <OutsideBtn label="EVEN&#10;1:1" type="parity" target="even" myBets={myBets} onBet={handleBet} disabled={!canBet} />
-                            <OutsideBtn label="🔴 Red&#10;1:1" type="color" target="red" myBets={myBets} onBet={handleBet} disabled={!canBet} className="red" />
-                            <OutsideBtn label="⚫ Black&#10;1:1" type="color" target="black" myBets={myBets} onBet={handleBet} disabled={!canBet} className="black" />
-                            <OutsideBtn label="ODD&#10;1:1" type="parity" target="odd" myBets={myBets} onBet={handleBet} disabled={!canBet} />
-                            <OutsideBtn label="19–36&#10;1:1" type="half" target="high" myBets={myBets} onBet={handleBet} disabled={!canBet} />
-                        </div>
-                        <div className="rl-outside-row">
+                        {/* Outside bets — 3 rows of 3 to match vertical layout width */}
+                        <div className="rl-grid-row">
                             <OutsideBtn label="1st 12&#10;2:1" type="dozen" target={1} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
                             <OutsideBtn label="2nd 12&#10;2:1" type="dozen" target={2} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
                             <OutsideBtn label="3rd 12&#10;2:1" type="dozen" target={3} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
+                        </div>
+                        <div className="rl-grid-row">
+                            <OutsideBtn label="1–18&#10;1:1" type="half" target="low" myBets={myBets} onBet={handleBet} disabled={!canBet} />
+                            <OutsideBtn label="EVEN&#10;1:1" type="parity" target="even" myBets={myBets} onBet={handleBet} disabled={!canBet} />
+                            <OutsideBtn label="🔴 Red&#10;1:1" type="color" target="red" myBets={myBets} onBet={handleBet} disabled={!canBet} className="red" />
+                        </div>
+                        <div className="rl-grid-row">
+                            <OutsideBtn label="⚫ Black&#10;1:1" type="color" target="black" myBets={myBets} onBet={handleBet} disabled={!canBet} className="black" />
+                            <OutsideBtn label="ODD&#10;1:1" type="parity" target="odd" myBets={myBets} onBet={handleBet} disabled={!canBet} />
+                            <OutsideBtn label="19–36&#10;1:1" type="half" target="high" myBets={myBets} onBet={handleBet} disabled={!canBet} />
                         </div>
                     </div>
 
