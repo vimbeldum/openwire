@@ -31,13 +31,27 @@ function RouletteWheel({ spinning, result }) {
 
         const idx = WHEEL_ORDER.indexOf(result);
         const sectorAngle = 360 / 37;
-        // Land at CENTER of the sector, not the edge
-        const targetAngle = (idx + 0.5) * sectorAngle;
+
+        // The pointer is at Top (12 o'clock, which is -90deg or 270deg based on pure rotation)
+        // In the SVG below, sectors are drawn starting from -90. 
+        // Sector i starts at `i * angle - 90` and ends at `(i+1) * angle - 90`.
+        // The center of sector idx is: `(idx + 0.5) * sectorAngle - 90`
+        // To bring this center to the top (which is exactly where it was drawn at 0 rotation),
+        // we need to rotate backwards by the index-based angle.
+
+        const centerAngle = (idx + 0.5) * sectorAngle;
+        const targetAngle = 360 - centerAngle;
 
         const spins = 5 + Math.floor(Math.random() * 3);
         const baseRot = prevRotation.current;
-        const targetRot = baseRot + spins * 360 + (360 - targetAngle);
-        prevRotation.current = targetRot % 360;
+        // The rotation needed to hit the target modulo 360
+        const currentMod = baseRot % 360;
+        let delta = targetAngle - currentMod;
+        if (delta < 0) delta += 360;
+
+        const targetRot = baseRot + (spins * 360) + delta;
+
+        prevRotation.current = targetRot;
         setRotation(targetRot);
     }, [spinning, result]);
 
