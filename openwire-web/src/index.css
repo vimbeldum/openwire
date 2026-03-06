@@ -2917,8 +2917,8 @@ body {
 }
 
 .chip-btn {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   border: 3px solid rgba(255, 255, 255, 0.15);
   background: rgba(0, 0, 0, 0.4);
@@ -2994,10 +2994,11 @@ body {
     linear-gradient(180deg, #09130d 0%, #0c1a12 100%);
   border: 1px solid rgba(26, 107, 60, 0.4);
   border-radius: var(--radius-lg);
-  padding: 1.5rem;
+  padding: 1rem 1.5rem;
   width: min(95vw, 840px);
-  max-height: 90vh;
-  overflow-y: auto;
+  max-height: 95vh;
+  display: flex;
+  flex-direction: column;
   box-shadow:
     var(--shadow-elevated),
     0 0 60px rgba(26, 107, 60, 0.1),
@@ -3039,6 +3040,27 @@ body {
   display: flex;
   flex-direction: column;
   flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Custom scrollbar for right column */
+.rl-right-col::-webkit-scrollbar {
+  width: 6px;
+}
+
+.rl-right-col::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.rl-right-col::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.rl-right-col::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .rl-wheel-container {
@@ -3270,7 +3292,7 @@ body {
 
 .rl-zero-vert {
   width: 100%;
-  height: 48px;
+  height: 40px;
   background: #1A6B3C;
   border: 2px solid rgba(0, 0, 0, 0.3);
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
