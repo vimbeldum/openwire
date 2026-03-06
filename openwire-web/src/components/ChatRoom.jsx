@@ -63,7 +63,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const [pendingAbInvites, setPendingAbInvites] = useState([]);
 
     const [showGifPicker, setShowGifPicker] = useState(false);
+    const [showGameChat, setShowGameChat] = useState(false); // floating chat while game is open
     const messagesEnd = useRef(null);
+    const gameChatEnd = useRef(null);
 
     const myIdRef = useRef(null);
     const nickRef = useRef(initialNick);
@@ -82,6 +84,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const abHostRef = useRef(null);         // peer_id of andar bahar host
     const rouletteTimerRef = useRef(null);
     const abDealTimerRef = useRef(null);
+
+    // Consent flags: only open game board if user explicitly accepted
+    const hasJoinedBj = useRef(false);
+    const hasJoinedRl = useRef(false);
+    const hasJoinedAb = useRef(false);
 
     useEffect(() => { activeGameRef.current = activeGame; }, [activeGame]);
     useEffect(() => { blackjackRef.current = blackjackGame; }, [blackjackGame]);
@@ -338,6 +345,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             case 'bj_state': {
                 const gameState = bj.deserializeGame(action.state);
                 if (gameState) {
+                    // Only open/update game board if user has explicitly joined (or is host)
+                    if (!hasJoinedBj.current && bjHostRef.current !== myIdRef.current) break;
                     setBlackjackGame(prev => {
                         // Apply wallet changes when game ends
                         if (gameState.phase === 'ended' && prev?.phase !== 'ended') {
@@ -365,7 +374,22 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 break;
             }
             case 'bj_join': {
+                // A peer wants to join — host must add them to game and broadcast
                 addMsg('★', `🃏 ${action.nick} joined Blackjack!`, 'system');
+                // If I am the host, add the player and broadcast the new state
+                setBlackjackGame(prev => {
+                    if (!prev) return prev;
+                    // Check if already in game
+                    if (prev.players.some(p => p.peer_id === action.peer_id)) return prev;
+                    const updated = bj.addPlayer(prev, action.peer_id, action.nick);
+                    // Broadcast new state (async so we don't call socket inside setState directly)
+                    setTimeout(() => {
+                        if (bjHostRef.current === myIdRef.current) {
+                            socket.sendRoomMessage(updated.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(updated) }));
+                        }
+                    }, 0);
+                    return updated;
+                });
                 break;
             }
         }
@@ -386,6 +410,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             case 'rl_state': {
                 const gameState = rl.deserializeGame(action.state);
                 if (gameState) {
+                    // Only update route game if user has explicitly joined (or is host)
+                    if (!hasJoinedRl.current && rouletteHostRef.current !== myIdRef.current) break;
                     setRouletteGame(prev => {
                         // Apply wallet changes on results
                         if (gameState.phase === 'results' && prev?.phase !== 'results') {
@@ -420,6 +446,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             case 'ab_state': {
                 const gameState = ab.deserializeGame(action.state);
                 if (gameState) {
+                    // Only update if user has explicitly joined (or is host)
+                    if (!hasJoinedAb.current && abHostRef.current !== myIdRef.current) break;
                     setAndarBaharGame(prev => {
                         if (gameState.phase === 'ended' && prev?.phase !== 'ended') {
                             const myNet = gameState.payouts?.[myId];
@@ -609,6 +637,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     }, [addMsg, handleGameAction, handleBlackjackAction, handleRouletteAction, handleAndarBaharAction, startRouletteTimer, startAbCycle]);
 
     useEffect(() => {
+        if (gameChatEnd.current && showGameChat) {
+            gameChatEnd.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [messages, showGameChat]);
+
+    useEffect(() => {
         messagesEnd.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
@@ -642,6 +676,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         newGame.players = [{ peer_id: myId, nick: myNick, hand: [], status: 'waiting', bet: 0 }];
         setBlackjackGame(newGame);
         bjHostRef.current = myId;
+        hasJoinedBj.current = true; // host auto-joined
         addMsg('★', `🃏 Blackjack started! Dealing in 20s.`, 'system');
         socket.sendRoomMessage(roomId, bj.serializeBlackjackAction({ type: 'bj_start', room_id: roomId, host: myId, host_nick: myNick }));
         socket.sendRoomMessage(roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(newGame) }));
@@ -649,6 +684,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     };
 
     const acceptBjInvite = (invite) => {
+        hasJoinedBj.current = true; // user explicitly joined
+        bjHostRef.current = invite.host;
         socket.sendRoomMessage(invite.room_id, bj.serializeBlackjackAction({ type: 'bj_join', peer_id: myIdRef.current, nick: nickRef.current }));
         setPendingBjInvites(prev => prev.filter(i => i.id !== invite.id));
     };
@@ -671,7 +708,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     const updated = wallet.debit(w, action.amount, 'Blackjack bet');
                     updateWallet(updated);
                 }
-                newGame = bj.placeBet(blackjackGame, action.peer_id, action.amount);
+                newGame = bj.placeBet(blackjackGame, myId, action.amount);
                 break;
             }
             case 'deal': newGame = bj.dealInitialCards(blackjackGame); break;
@@ -703,6 +740,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         const newGame = rl.createRoulette(roomId);
         setRouletteGame(newGame);
         rouletteHostRef.current = myId;
+        hasJoinedRl.current = true; // host auto-joined
         addMsg('★', `🎰 Roulette started! Auto-spin every 2 minutes.`, 'system');
         socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_start', room_id: roomId, host: myId, host_nick: myNick }));
         socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(newGame) }));
@@ -710,6 +748,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     };
 
     const acceptRlInvite = (invite) => {
+        hasJoinedRl.current = true; // user explicitly joined
         rouletteHostRef.current = invite.host;
         setPendingRlInvites(prev => prev.filter(i => i.id !== invite.id));
         addMsg('★', `🎰 Joined Roulette room!`, 'system');
@@ -745,6 +784,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         const newGame = ab.createGame(roomId);
         setAndarBaharGame(newGame);
         abHostRef.current = myId;
+        hasJoinedAb.current = true; // host auto-joined
         addMsg('★', `🃏 Andar Bahar started! Betting open for 30s.`, 'system');
         socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_start', room_id: roomId, host: myId, host_nick: myNick }));
         socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(newGame) }));
@@ -753,6 +793,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     };
 
     const acceptAbInvite = (invite) => {
+        hasJoinedAb.current = true; // user explicitly joined
         abHostRef.current = invite.host;
         setPendingAbInvites(prev => prev.filter(i => i.id !== invite.id));
         addMsg('★', `🃏 Joined Andar Bahar table!`, 'system');
@@ -935,6 +976,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const myNick = nickRef.current;
     const currentRoomName = currentRoom ? rooms.find(r => r.room_id === currentRoom)?.name || 'Unknown Room' : null;
     const balance = myWallet ? wallet.getTotalBalance(myWallet) : 0;
+    const anyGameActive = !!(activeGame || blackjackGame || rouletteGame || andarBaharGame);
 
     return (
         <div className="chat-layout">
@@ -1151,7 +1193,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 <GameBoard game={activeGame} myId={myIdRef.current} onMove={handleGameMove} onRematch={handleRematch} onClose={() => setActiveGame(null)} />
             )}
             {blackjackGame && (
-                <BlackjackBoard game={blackjackGame} myId={myIdRef.current} wallet={myWallet} onAction={handleBjAction} onClose={() => setBlackjackGame(null)} />
+                <BlackjackBoard game={blackjackGame} myId={myIdRef.current} myNick={myNick} wallet={myWallet} onAction={handleBjAction} onClose={() => setBlackjackGame(null)} isHost={bjHostRef.current === myIdRef.current} />
             )}
             {rouletteGame && (
                 <RouletteBoard
@@ -1174,6 +1216,64 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     onClose={() => setAndarBaharGame(null)}
                     isHost={amIHost(abHostRef.current)}
                 />
+            )}
+
+            {/* Floating chat toggle — visible only when a game overlay is open */}
+            {anyGameActive && (
+                <button
+                    className={`floating-chat-btn ${showGameChat ? 'active' : ''}`}
+                    onClick={() => setShowGameChat(v => !v)}
+                    title="Toggle Chat"
+                >
+                    {showGameChat ? '✕' : '💬'}
+                    {!showGameChat && messages.length > 0 && <span className="floating-chat-badge" />}
+                </button>
+            )}
+
+            {/* Floating chat panel — shown on top of game overlays */}
+            {anyGameActive && showGameChat && (
+                <div className="floating-chat-panel">
+                    <div className="floating-chat-header">
+                        <span>💬 Chat {currentRoomName ? `· #${currentRoomName}` : ''}</span>
+                        <button onClick={() => setShowGameChat(false)}>✕</button>
+                    </div>
+                    <div className="floating-chat-messages">
+                        {messages.slice(-50).map((m) => (
+                            <div key={m.id} className={`msg ${m.type}`}>
+                                <span className="msg-time">[{m.time}]</span>
+                                {m.sender && <span className={`msg-sender ${m.type}`}>{m.sender}:</span>}
+                                {m.gif ? (
+                                    <img src={m.gif} alt="GIF" className="msg-gif" style={{ maxWidth: '140px' }} />
+                                ) : (
+                                    <span className="msg-content"> {m.content}</span>
+                                )}
+                            </div>
+                        ))}
+                        <div ref={gameChatEnd} />
+                    </div>
+                    <form className="floating-chat-input" onSubmit={(e) => {
+                        e.preventDefault();
+                        const text = input.trim();
+                        if (!text) return;
+                        setInput('');
+                        const activeRoom = currentRoomRef.current;
+                        if (activeRoom) {
+                            addMsg(nickRef.current, text, 'self', { roomId: activeRoom });
+                            socket.sendRoomMessage(activeRoom, text);
+                        } else {
+                            addMsg(nickRef.current, text, 'self');
+                            socket.sendChat(text);
+                        }
+                    }}>
+                        <input
+                            type="text"
+                            placeholder="Message..."
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                        />
+                        <button type="submit">Send</button>
+                    </form>
+                </div>
             )}
 
             {/* Admin Portal */}

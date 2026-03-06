@@ -22,9 +22,14 @@ function RouletteWheel({ spinning, result }) {
     const wheelRef = useRef(null);
     const [rotation, setRotation] = useState(0);
     const prevRotation = useRef(0);
+    const lastAnimatedResult = useRef(null);
 
     useEffect(() => {
+        // Only animate when spinning starts AND we have a target result
         if (!spinning || result === null || result === undefined) return;
+        // Don't re-animate for the same result (e.g. when phase changes from spinning → results)
+        if (lastAnimatedResult.current === result) return;
+        lastAnimatedResult.current = result;
 
         // Find target number's position on wheel
         const idx = WHEEL_ORDER.indexOf(result);
@@ -35,8 +40,6 @@ function RouletteWheel({ spinning, result }) {
         const spins = 5 + Math.floor(Math.random() * 3);
         const baseRot = prevRotation.current;
         // We rotate clockwise; to land on idx, we want that sector at top (0°)
-        // Sector idx is at angle (idx * sectorAngle); to bring it to the top,
-        // we need the wheel rotated to -(idx * sectorAngle)
         const targetRot = baseRot + spins * 360 + (360 - targetAngle);
         prevRotation.current = targetRot % 360;
         setRotation(targetRot);
@@ -92,8 +95,8 @@ function RouletteWheel({ spinning, result }) {
 
     return (
         <div className={`rl-wheel-container ${spinning ? 'is-spinning' : ''}`} style={{
-            transition: spinning ? 'transform 10s cubic-bezier(0.15, 0.85, 0.3, 1.0)' : 'transform 1s',
-            transform: spinning ? 'scale(1.15) translateY(5px)' : 'scale(1) translateY(0)'
+            transition: spinning ? 'transform 9s cubic-bezier(0.15, 0.85, 0.3, 1.0)' : 'transform 0.8s ease',
+            transform: spinning ? 'scale(1.1) translateY(4px)' : 'scale(1) translateY(0)'
         }}>
             {/* Pointer / ball stop marker */}
             <div className="rl-pointer">▼</div>
@@ -109,7 +112,7 @@ function RouletteWheel({ spinning, result }) {
                 style={{
                     transform: `rotate(${rotation}deg)`,
                     transition: spinning
-                        ? 'transform 10s cubic-bezier(0.15, 0.85, 0.3, 1.0)'
+                        ? 'transform 9s cubic-bezier(0.05, 0.9, 0.3, 1.0)'
                         : 'none',
                 }}
             >
@@ -212,13 +215,17 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
     const prevPhaseRef = useRef('betting'); // To track phase changes
 
     useEffect(() => {
-        if (game?.phase === 'results' && game?.result !== null) {
+        if (game?.phase === 'spinning' && game?.result !== null && game?.result !== undefined) {
+            // Wheel starts spinning immediately when host spins — animation plays for SPIN_PHASE_MS
             setSpinning(true);
-            const t = setTimeout(() => setSpinning(false), 5000);
+            setShowResult(false);
+        } else if (game?.phase === 'results') {
+            // Spin animation keeps going (wheel settles), show result overlay
+            // Don't reset spinning yet so wheel continues to decelerate visually
+            setSpinning(false);
             setShowResult(true);
-            return () => clearTimeout(t);
-        }
-        if (game?.phase === 'betting') {
+        } else if (game?.phase === 'betting') {
+            setSpinning(false);
             setShowResult(false);
         }
     }, [game?.phase, game?.result]);
