@@ -3227,6 +3227,29 @@ body {
   flex: 1;
 }
 
+/* Vertical layout (new default) */
+.rl-grid-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+}
+
+.rl-grid-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+}
+
+.rl-col-bets-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 40px;
+  flex-shrink: 0;
+  margin-left: 3px;
+}
+
 .rl-cell {
   border: 2px solid rgba(0, 0, 0, 0.3);
   border-radius: 4px;

@@ -712,8 +712,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 break;
             }
             case 'deal': newGame = bj.dealInitialCards(blackjackGame); break;
-            case 'hit': newGame = bj.hit(blackjackGame, action.peer_id); break;
-            case 'stand': newGame = bj.stand(blackjackGame, action.peer_id); break;
+            case 'hit': newGame = bj.hit(blackjackGame, myId); break;
+            case 'stand': newGame = bj.stand(blackjackGame, myId); break;
             case 'dealerPlay': newGame = bj.runDealerTurn(blackjackGame); break;
             case 'newRound':
                 newGame = bj.newRound(blackjackGame);
@@ -803,6 +803,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         if (!andarBaharGame) return;
         const myId = myIdRef.current;
         const myNick = nickRef.current;
+
+        if (action.type === 'clearBets') {
+            const newGame = ab.clearBets(andarBaharGame, myId);
+            setAndarBaharGame(newGame);
+            socket.sendRoomMessage(newGame.roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(newGame) }));
+            return;
+        }
+
         if (action.type !== 'bet') return; // auto-cycle handles everything else
 
         const w = walletRef.current;

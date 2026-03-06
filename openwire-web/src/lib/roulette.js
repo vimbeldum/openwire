@@ -4,7 +4,7 @@
    Auto-spin every 2 minutes. P2P host-resilient.
    ═══════════════════════════════════════════════════════════ */
 
-export const SPIN_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+export const SPIN_INTERVAL_MS = 1 * 60 * 1000; // 1 minute
 export const SPIN_PHASE_MS = 10 * 1000;        // 10s spinning animation
 export const RESULTS_DISPLAY_MS = 10 * 1000;   // 10s results before new round
 

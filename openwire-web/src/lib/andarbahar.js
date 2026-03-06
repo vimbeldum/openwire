@@ -73,9 +73,15 @@ export function createGame(roomId) {
 
 export function placeBet(game, peer_id, nick, side, amount) {
     if (game.phase !== 'betting') return game;
-    const bets = game.bets.filter(b => b.peer_id !== peer_id);
+    // Allow multiple bets per player on different sides (like roulette)
+    const bets = game.bets.filter(b => !(b.peer_id === peer_id && b.side === side));
     return { ...game, bets: [...bets, { peer_id, nick, side, amount }] };
 }
+
+export function clearBets(game, peer_id) {
+    return { ...game, bets: game.bets.filter(b => b.peer_id !== peer_id) };
+}
+
 
 // Host auto-deals trump at end of betting phase
 export function dealTrump(game) {
@@ -103,7 +109,7 @@ export function dealNext(game) {
     const isMatch = card.value === game.trumpCard.value;
     if (isMatch) {
         const result = side;
-        const newHistory = [...(game.trumpHistory || []), game.trumpCard].slice(-100);
+        const newHistory = [...(game.trumpHistory || []), result].slice(-100);
         saveHistory(game.roomId, newHistory);
 
         // Payout: Andar pays 0.9:1 if trump was first seen on Bahar side (standard rule)

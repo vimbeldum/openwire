@@ -25,21 +25,17 @@ function RouletteWheel({ spinning, result }) {
     const lastAnimatedResult = useRef(null);
 
     useEffect(() => {
-        // Only animate when spinning starts AND we have a target result
         if (!spinning || result === null || result === undefined) return;
-        // Don't re-animate for the same result (e.g. when phase changes from spinning → results)
         if (lastAnimatedResult.current === result) return;
         lastAnimatedResult.current = result;
 
-        // Find target number's position on wheel
         const idx = WHEEL_ORDER.indexOf(result);
         const sectorAngle = 360 / 37;
-        const targetAngle = idx * sectorAngle;
+        // Land at CENTER of the sector, not the edge
+        const targetAngle = (idx + 0.5) * sectorAngle;
 
-        // Spin 5–8 full rotations + land on target
         const spins = 5 + Math.floor(Math.random() * 3);
         const baseRot = prevRotation.current;
-        // We rotate clockwise; to land on idx, we want that sector at top (0°)
         const targetRot = baseRot + spins * 360 + (360 - targetAngle);
         prevRotation.current = targetRot % 360;
         setRotation(targetRot);
@@ -62,9 +58,9 @@ function RouletteWheel({ spinning, result }) {
         const largeArc = angle > 180 ? 1 : 0;
         const color = COLORS[getColor(num)];
 
-        // Label position (midpoint of arc)
+        // Label position — further out for larger text
         const midAngle = startAngle + angle / 2;
-        const lr = R * 0.76;
+        const lr = R * 0.82;
         const lx = cx + lr * Math.cos(toRad(midAngle));
         const ly = cy + lr * Math.sin(toRad(midAngle));
         const textRot = midAngle + 90;
@@ -83,9 +79,9 @@ function RouletteWheel({ spinning, result }) {
                     dominantBaseline="central"
                     transform={`rotate(${textRot},${lx},${ly})`}
                     fill="white"
-                    fontSize="5.0"
-                    fontWeight="800"
-                    fontFamily="Georgia, serif"
+                    fontSize="4.5"
+                    fontWeight="900"
+                    fontFamily="Arial, sans-serif"
                 >
                     {num}
                 </text>
@@ -216,14 +212,13 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
 
     useEffect(() => {
         if (game?.phase === 'spinning' && game?.result !== null && game?.result !== undefined) {
-            // Wheel starts spinning immediately when host spins — animation plays for SPIN_PHASE_MS
             setSpinning(true);
             setShowResult(false);
         } else if (game?.phase === 'results') {
-            // Spin animation keeps going (wheel settles), show result overlay
-            // Don't reset spinning yet so wheel continues to decelerate visually
+            // Let wheel decelerate for 2s before showing result overlay
             setSpinning(false);
-            setShowResult(true);
+            const t = setTimeout(() => setShowResult(true), 2000);
+            return () => clearTimeout(t);
         } else if (game?.phase === 'betting') {
             setSpinning(false);
             setShowResult(false);
@@ -247,10 +242,13 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
     const resultColor = game.result === null || game.result === undefined
         ? '' : getColor(game.result);
 
-    // 3-column layout: row3 top (3,6,9…36), row2, row1 bottom
-    const col1 = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36];
-    const col2 = [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35];
-    const col3 = [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34];
+    // Vertical layout: 12 rows of 3 numbers each (1-3, 4-6, ..., 34-36)
+    // Each row: [bottom, mid, top] as in classic roulette table layout
+    const rows = Array.from({ length: 12 }, (_, i) => [
+        i * 3 + 1,  // column 3 (bottom row)
+        i * 3 + 2,  // column 2 (mid row)
+        i * 3 + 3,  // column 1 (top row)
+    ]);
 
     return (
         <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
@@ -313,20 +311,29 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
                         ))}
                     </div>
 
-                    {/* Number grid */}
+                    {/* Number grid — vertical layout: 12 rows × 3 cols */}
                     <div className="rl-grid-wrap">
                         <button
                             className={`rl-zero ${myBets.some(b => b.betType === 'single' && b.betTarget === 0) ? 'selected' : ''}`}
                             onClick={() => handleBet('single', 0)} disabled={!canBet}
                         >0</button>
-                        <div className="rl-grid">
-                            {col1.map(n => <NumberCell key={n} n={n} selected={myBets.some(b => b.betType === 'single' && b.betTarget === n)} onBet={handleBet} disabled={!canBet} />)}
-                            {col2.map(n => <NumberCell key={n} n={n} selected={myBets.some(b => b.betType === 'single' && b.betTarget === n)} onBet={handleBet} disabled={!canBet} />)}
-                            {col3.map(n => <NumberCell key={n} n={n} selected={myBets.some(b => b.betType === 'single' && b.betTarget === n)} onBet={handleBet} disabled={!canBet} />)}
+                        <div className="rl-grid-vertical">
+                            {rows.map((row, ri) => (
+                                <div key={ri} className="rl-grid-row">
+                                    {row.map(n => (
+                                        <NumberCell
+                                            key={n} n={n}
+                                            selected={myBets.some(b => b.betType === 'single' && b.betTarget === n)}
+                                            onBet={handleBet}
+                                            disabled={!canBet}
+                                        />
+                                    ))}
+                                </div>
+                            ))}
                         </div>
-                        {/* Column 2:1 bets */}
-                        <div className="rl-col-bets">
-                            {[3, 2, 1].map(c => (
+                        {/* Column 2:1 bets — one below each row group */}
+                        <div className="rl-col-bets-vertical">
+                            {[1, 2, 3].map(c => (
                                 <OutsideBtn key={c} label={`2:1`} type="column" target={c} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
                             ))}
                         </div>

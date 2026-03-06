@@ -6,7 +6,7 @@
 const SUITS = ['♠', '♥', '♦', '♣'];
 const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
-export const BETTING_DURATION_MS = 20 * 1000;  // 20s betting window
+export const BETTING_DURATION_MS = 60 * 1000;  // 60s betting window
 export const DEALER_PLAY_MS = 3 * 1000;        // 3s delay before round ends
 
 // Create a fresh deck

@@ -110,13 +110,20 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
     if (!game) return null;
 
     const balance = wallet ? (wallet.baseBalance + wallet.adminBonus) : 0;
-    const myBet = game.bets?.find(b => b.peer_id === myId);
-    const canBet = game.phase === 'betting' && !myBet;
+    const myBets = game.bets?.filter(b => b.peer_id === myId) || [];
+    const myAndarBet = myBets.find(b => b.side === 'andar');
+    const myBaharBet = myBets.find(b => b.side === 'bahar');
+    const totalMyBet = myBets.reduce((s, b) => s + b.amount, 0);
+    const canBet = game.phase === 'betting'; // allow multiple bets
     const bettingOpen = game.phase === 'betting' && Date.now() < game.bettingEndsAt;
 
     const handleBet = (side) => {
-        if (!canBet || !bettingOpen || selectedAmount > balance) return;
+        if (!canBet || !bettingOpen || selectedAmount > balance - totalMyBet) return;
         onAction({ type: 'bet', side, amount: selectedAmount });
+    };
+
+    const handleClearBets = () => {
+        onAction({ type: 'clearBets' });
     };
 
     const myPayout = game.payouts?.[myId];
@@ -184,8 +191,8 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
                     <div className={`ab-pile-zone andar ${game.result === 'andar' ? 'winner-glow' : ''}`}>
                         <div className="ab-pile-header">
                             <span className="ab-pile-name andar">ANDAR (Inside)</span>
-                            {myBet?.side === 'andar' && (
-                                <span className="ab-bet-indicator">{myBet.amount} chips</span>
+                            {myAndarBet && (
+                                <span className="ab-bet-indicator">{myAndarBet.amount} chips</span>
                             )}
                             <span className="ab-pile-count">{game.andar.length} cards</span>
                         </div>
@@ -203,8 +210,8 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
                     <div className={`ab-pile-zone bahar ${game.result === 'bahar' ? 'winner-glow' : ''}`}>
                         <div className="ab-pile-header">
                             <span className="ab-pile-name bahar">BAHAR (Outside)</span>
-                            {myBet?.side === 'bahar' && (
-                                <span className="ab-bet-indicator">{myBet.amount} chips</span>
+                            {myBaharBet && (
+                                <span className="ab-bet-indicator">{myBaharBet.amount} chips</span>
                             )}
                             <span className="ab-pile-count">{game.bahar.length} cards</span>
                         </div>
@@ -299,9 +306,12 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
                     </div>
                 )}
 
-                {myBet && game.phase === 'betting' && (
+                {myBets.length > 0 && game.phase === 'betting' && (
                     <div className="ab-bet-placed-msg">
-                        ✅ Bet placed: <strong>{myBet.amount} chips</strong> on <strong>{myBet.side.toUpperCase()}</strong>
+                        {myBets.map((b, i) => (
+                            <span key={i}>✅ {b.amount} on <strong>{b.side.toUpperCase()}</strong>{i < myBets.length - 1 ? '  ·  ' : ''}</span>
+                        ))}
+                        {bettingOpen && <button className="rl-clear-btn" onClick={handleClearBets}>Clear</button>}
                     </div>
                 )}
 
@@ -314,7 +324,7 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
 
                 {/* History */}
                 <div className="ab-history-section">
-                    <div className="section-mini-title">Last 100 Trump Cards</div>
+                    <div className="section-mini-title">Last 100 Results (A = Andar, B = Bahar)</div>
                     <HistoryStrip history={game.trumpHistory} />
                 </div>
             </div>
