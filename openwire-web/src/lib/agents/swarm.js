@@ -23,6 +23,8 @@ const DEFAULT_MSG_PER_MIN = 8;
 const CROSSOVER_PROBABILITY = 0.7;
 const MAX_RETRIES = 3;
 const BASE_BACKOFF_MS = 2000;
+const PER_CHAR_COOLDOWN_MS = 10_000;  // 1 message per 10s per character
+const GLOBAL_COOLDOWN_MS = 5_000;     // 1 message per 5s across all AI
 
 export class AgentSwarm {
     constructor({ onMessage, onError, onModelLoad, onLog, onTyping }) {
@@ -60,6 +62,10 @@ export class AgentSwarm {
         // Rate-limit-aware message queue
         this._messageQueue = [];
         this._isProcessingQueue = false;
+
+        // Cooldown tracking for AI output rate limiting
+        this._lastMsgByChar = {};   // characterId → timestamp
+        this._lastMsgGlobal = 0;    // timestamp of last AI message
 
         // Dynamic config — loaded from agentStore
         this._characters = {};  // dict { id: charObj }
@@ -344,6 +350,15 @@ export class AgentSwarm {
         const c = this._characters[characterId];
         if (!c) return;
 
+        // Per-character cooldown: 1 msg per 10s per character
+        if (!force) {
+            const lastChar = this._lastMsgByChar[characterId] || 0;
+            if (Date.now() - lastChar < PER_CHAR_COOLDOWN_MS) {
+                this._log(`[Cooldown] ${c.name} blocked — per-character 10s cooldown`);
+                return;
+            }
+        }
+
         // Don't queue duplicate tasks for the same character
         if (this._messageQueue.some(t => t.characterId === characterId)) {
             this._log(`[Queue] ${c.name} already queued — skipping duplicate`);
@@ -368,6 +383,14 @@ export class AgentSwarm {
         if (!this._running) return;
 
         this._isProcessingQueue = true;
+
+        // Global cooldown: wait if last AI message was < 5s ago
+        const sinceLastGlobal = Date.now() - this._lastMsgGlobal;
+        if (sinceLastGlobal < GLOBAL_COOLDOWN_MS) {
+            const waitMs = GLOBAL_COOLDOWN_MS - sinceLastGlobal;
+            this._log(`[Cooldown] Global 5s cooldown — waiting ${(waitMs / 1000).toFixed(1)}s`);
+            await new Promise(r => setTimeout(r, waitMs));
+        }
 
         const task = this._messageQueue.shift();
         const { characterId, retries, force } = task;
@@ -434,6 +457,8 @@ export class AgentSwarm {
                 }
 
                 this._messagesThisMinute++;
+                this._lastMsgByChar[characterId] = Date.now();
+                this._lastMsgGlobal = Date.now();
                 this._onMessage(characterId, c.name, c.avatar, text);
                 this._log(`[Message] ${c.name}: "${text.slice(0, 50)}${text.length > 50 ? '...' : ''}"`);
 
