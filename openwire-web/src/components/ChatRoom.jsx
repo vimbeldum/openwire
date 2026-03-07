@@ -14,7 +14,10 @@ import GifPicker from './GifPicker';
 import HowToPlay from './HowToPlay';
 import PostSessionSummary from './PostSessionSummary';
 import AccountHistory from './AccountHistory';
+import LiveTicker from './chat/LiveTicker';
+import TypingBar from './chat/TypingBar';
 import * as ledger from '../lib/core/ledger.js';
+import { getRoomAlias } from '../lib/core/identity.js';
 import { RouletteEngine } from '../lib/roulette';
 import { BlackjackEngine } from '../lib/blackjack';
 import { AndarBaharEngine } from '../lib/andarbahar';
@@ -71,9 +74,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const [activityLog, setActivityLog] = useState([]);
     const [bannedIps, setBannedIps] = useState([]);
 
-    // Invites
+    // Invites (room-level only; game invites are now in-chat messages)
     const [pendingInvites, setPendingInvites] = useState([]);
-    const [pendingChallenges, setPendingChallenges] = useState([]);
 
     // Bank Ledger (House P&L Tracker)
     const [bankLedger, setBankLedger] = useState(() => {
@@ -91,9 +93,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             return next;
         });
     }, []);
-    const [pendingBjInvites, setPendingBjInvites] = useState([]);
-    const [pendingRlInvites, setPendingRlInvites] = useState([]);
-    const [pendingAbInvites, setPendingAbInvites] = useState([]);
+    // Casino ticker (separate from chat — game events only)
+    const [tickerItems, setTickerItems] = useState([]);
+    // Typing indicators
+    const [typingPeers, setTypingPeers] = useState({});
+    const lastTypingSentRef = useRef(0);
+    // Whisper mode
+    const [whisperTarget, setWhisperTarget] = useState(null);
 
     const [showGifPicker, setShowGifPicker] = useState(false);
     const [showGameChat, setShowGameChat] = useState(false); // floating chat while game is open
@@ -133,6 +139,40 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     useEffect(() => { walletRef.current = myWallet; }, [myWallet]);
 
     useEffect(() => { saveMessages(messages); }, [messages]);
+
+    // ── Typing peer cleanup (stale after 3s) ─────────────────
+    useEffect(() => {
+        const cleanup = setInterval(() => {
+            const cutoff = Date.now() - 3000;
+            setTypingPeers(prev => {
+                const next = Object.fromEntries(
+                    Object.entries(prev).filter(([, v]) => v.ts > cutoff)
+                );
+                return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+            });
+        }, 1000);
+        return () => clearInterval(cleanup);
+    }, []);
+
+    // ── Screenshot detection → room alert ────────────────────
+    useEffect(() => {
+        const detect = (e) => {
+            const isMac = /Mac|iPhone|iPad/.test(navigator.platform || '');
+            const isMacShot = isMac && e.metaKey && e.shiftKey && ['3', '4', '5', '6'].includes(e.key);
+            const isWinShot = !isMac && e.key === 'PrintScreen';
+            if (isMacShot || isWinShot) {
+                const activeRoom = currentRoomRef.current;
+                if (activeRoom) {
+                    socket.sendRoomMessage(activeRoom, JSON.stringify({
+                        type: 'screenshot_alert', nick: nickRef.current,
+                    }));
+                }
+                addMsg('📸', 'You took a screenshot — room has been notified.', 'system');
+            }
+        };
+        window.addEventListener('keydown', detect);
+        return () => window.removeEventListener('keydown', detect);
+    }, [addMsg]);
 
     // ── TTT game-over → NonFinancialEvent ledger record ──────
     useEffect(() => {
@@ -179,12 +219,148 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     }, []);
 
     const addMsg = useCallback((sender, content, type = 'chat', extra = {}) => {
-        setMessages(prev => [...prev, { time: timeStr(), sender, content, type, id: Date.now() + Math.random(), ...extra }]);
+        setMessages(prev => [...prev, {
+            time: timeStr(), sender, content, type,
+            id: Date.now() + Math.random(),
+            roomId: currentRoomRef.current || null,
+            reactions: {},
+            ...extra,
+        }]);
+    }, []);
+
+    const addTicker = useCallback((text, gameType = 'casino') => {
+        setTickerItems(prev => [...prev.slice(-29), { text, gameType, ts: Date.now() }]);
+    }, []);
+
+    const addReaction = useCallback((msgId, emoji, peerId) => {
+        setMessages(prev => prev.map(m => {
+            if (m.id !== msgId) return m;
+            const existing = m.reactions?.[emoji] || [];
+            if (existing.includes(peerId)) return m;
+            return { ...m, reactions: { ...m.reactions, [emoji]: [...existing, peerId] } };
+        }));
     }, []);
 
     const addActivityLog = useCallback((message) => {
         setActivityLog(prev => [...prev.slice(-99), { time: timeStr(), message }]);
     }, []);
+
+    // ── Emoji reaction handler ────────────────────────────────
+    const handleReact = useCallback((msgId, emoji) => {
+        const myId = myIdRef.current;
+        addReaction(msgId, emoji, myId);
+        const activeRoom = currentRoomRef.current;
+        if (activeRoom) {
+            socket.sendRoomMessage(activeRoom, JSON.stringify({
+                type: 'react', msgId, emoji, nick: nickRef.current,
+            }));
+        }
+    }, [addReaction]);
+
+    // ── Payout resolution (financial games) ─────────────────
+    const resolvePayoutEvent = useCallback((event, myId, walletObj) => {
+        const deviceId = wallet.getDeviceId();
+        const { updatedWallet } = ledger.processEvent(walletObj, event, myId, deviceId);
+        updateWallet(updatedWallet);
+        setLastPayoutEvent(event);
+        setShowPostSummary(true);
+        // Add to casino ticker (not chat)
+        const net = event.totals?.[myId];
+        if (net !== undefined && Math.abs(net) >= 50) {
+            const sign = net > 0 ? '+' : '';
+            addTicker(`${nickRef.current} ${sign}${net} — ${event.resultLabel}`, event.gameType);
+        }
+        // Broadcast big wins to room ticker
+        if (net >= 200 && currentRoomRef.current) {
+            socket.sendRoomMessage(currentRoomRef.current, JSON.stringify({
+                type: 'casino_ticker',
+                text: `${nickRef.current} won ${net} chips! (${event.resultLabel})`,
+                gameType: event.gameType,
+            }));
+        }
+        return updatedWallet;
+    }, [addTicker, updateWallet]);
+
+    // ── Game invite from chat message ────────────────────────
+    const joinGameFromInvite = useCallback((msg) => {
+        const { gameType, inviteData } = msg;
+        const myId = myIdRef.current;
+        const myNick = nickRef.current;
+        switch (gameType) {
+            case 'blackjack':
+                hasJoinedBj.current = true;
+                bjHostRef.current = inviteData.host;
+                socket.sendRoomMessage(inviteData.room_id, bj.serializeBlackjackAction({
+                    type: 'bj_join', peer_id: myId, nick: myNick,
+                }));
+                addMsg('★', '🃏 Joined Blackjack table!', 'system');
+                break;
+            case 'roulette':
+                hasJoinedRl.current = true;
+                rouletteHostRef.current = inviteData.host;
+                addMsg('★', '🎰 Joined Roulette room!', 'system');
+                break;
+            case 'andarbahar':
+                hasJoinedAb.current = true;
+                abHostRef.current = inviteData.host;
+                addMsg('★', '🃏 Joined Andar Bahar table!', 'system');
+                break;
+            case 'tictactoe': {
+                const newTTT = game.createGame(
+                    { peer_id: inviteData.challenger, nick: inviteData.challenger_nick },
+                    { peer_id: myId, nick: myNick },
+                    inviteData.room_id,
+                );
+                setActiveGame(newTTT);
+                socket.sendRoomMessage(inviteData.room_id, game.serializeGameAction({
+                    type: 'Accept', accepter: myId, accepter_nick: myNick, room_id: inviteData.room_id,
+                }));
+                addMsg('★', '🎮 Game accepted!', 'system');
+                break;
+            }
+        }
+        setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, inviteUsed: true } : m));
+    }, [addMsg]);
+
+    const dismissInvite = useCallback((msgId) => {
+        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, inviteUsed: true } : m));
+    }, []);
+
+    // ── Custom P2P action handler ─────────────────────────────
+    const handleCustomAction = useCallback((msg, action) => {
+        const myId = myIdRef.current;
+        switch (action.type) {
+            case 'typing':
+                setTypingPeers(prev => ({
+                    ...prev, [msg.peer_id]: { nick: action.nick, ts: Date.now() },
+                }));
+                break;
+            case 'react':
+                addReaction(action.msgId, action.emoji, msg.peer_id);
+                break;
+            case 'tip':
+                if (action.to === myId && walletRef.current) {
+                    const updated = wallet.credit(walletRef.current, action.amount, `Tip from ${action.from_nick}`);
+                    updateWallet(updated);
+                    addMsg('💸', `${action.from_nick} sent you ${action.amount} chips!`, 'system');
+                }
+                break;
+            case 'screenshot_alert':
+                addMsg('📸', `${action.nick} took a screenshot!`, 'system');
+                break;
+            case 'casino_ticker':
+                addTicker(action.text, action.gameType);
+                break;
+            case 'whisper':
+                if (action.to === myId || msg.peer_id === myId) {
+                    addMsg(`🤫 ${action.from_nick}`, action.content, 'whisper', {
+                        to: action.to, to_nick: action.to_nick, peer_id: msg.peer_id,
+                        roomId: msg.room_id,
+                    });
+                }
+                break;
+        }
+    }, [addMsg, addReaction, addTicker, updateWallet]);
 
     // ── P2P host election ────────────────────────────────────
     const amIHost = useCallback((hostPeerId) => {
@@ -231,11 +407,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
                 if (myNet !== undefined && walletRef.current) {
                     const event = new RouletteEngine(resultsGame).calculateResults(resultsGame);
-                    const deviceId = wallet.getDeviceId();
-                    const { updatedWallet } = ledger.processEvent(walletRef.current, event, myId, deviceId);
-                    updateWallet(updatedWallet);
-                    setLastPayoutEvent(event);
-                    setShowPostSummary(true);
+                    resolvePayoutEvent(event, myId, walletRef.current);
                 }
 
                 if (amIHost(rouletteHostRef.current)) {
@@ -331,11 +503,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     const myNet = next.payouts?.[myId];
                     if (myNet !== undefined && walletRef.current) {
                         const event = new AndarBaharEngine(next).calculateResults(next);
-                        const deviceId = wallet.getDeviceId();
-                        const { updatedWallet } = ledger.processEvent(walletRef.current, event, myId, deviceId);
-                        updateWallet(updatedWallet);
-                        setLastPayoutEvent(event);
-                        setShowPostSummary(true);
+                        resolvePayoutEvent(event, myId, walletRef.current);
                     }
                     addActivityLog(`Andar Bahar: ${next.result?.toUpperCase()} wins! Trump: ${next.trumpCard?.value}${next.trumpCard?.suit}`);
 
@@ -361,9 +529,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         switch (action.type) {
             case 'Challenge': {
                 if (action.challenger === myId) return;
-                setPendingChallenges(prev => {
-                    if (prev.some(c => c.challenger === action.challenger && c.room_id === action.room_id)) return prev;
-                    return [...prev, { id: Date.now(), challenger: action.challenger, challenger_nick: action.challenger_nick, room_id: action.room_id }];
+                addMsg('🎮', `${action.challenger_nick} challenged you to Tic-Tac-Toe!`, 'game_invite', {
+                    gameType: 'tictactoe',
+                    inviteData: {
+                        challenger: action.challenger,
+                        challenger_nick: action.challenger_nick,
+                        room_id: action.room_id,
+                    },
+                    roomId: action.room_id,
                 });
                 break;
             }
@@ -404,9 +577,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         switch (action.type) {
             case 'bj_start': {
                 if (action.host === myId) return;
-                setPendingBjInvites(prev => {
-                    if (prev.some(i => i.room_id === action.room_id)) return prev;
-                    return [...prev, { id: Date.now(), room_id: action.room_id, host: action.host, host_nick: action.host_nick }];
+                addMsg('🃏', `${action.host_nick} started a Blackjack game!`, 'game_invite', {
+                    gameType: 'blackjack',
+                    inviteData: { room_id: action.room_id, host: action.host, host_nick: action.host_nick },
+                    roomId: msg.room_id,
                 });
                 break;
             }
@@ -421,13 +595,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                             const event = new BlackjackEngine(gameState).calculateResults(gameState);
                             const myNet = event.totals?.[myId];
                             if (myNet !== undefined && walletRef.current) {
-                                const deviceId = wallet.getDeviceId();
-                                const { updatedWallet } = ledger.processEvent(walletRef.current, event, myId, deviceId);
-                                setTimeout(() => {
-                                    updateWallet(updatedWallet);
-                                    setLastPayoutEvent(event);
-                                    setShowPostSummary(true);
-                                }, 0);
+                                setTimeout(() => resolvePayoutEvent(event, myId, walletRef.current), 0);
                                 const resultText = myNet > 0 ? `won ${myNet}` : myNet < 0 ? `lost ${-myNet}` : 'pushed';
                                 addActivityLog(`Blackjack: ${myNick} ${resultText} chips`);
                             }
@@ -471,9 +639,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         switch (action.type) {
             case 'rl_start': {
                 if (action.host === myId) return;
-                setPendingRlInvites(prev => {
-                    if (prev.some(i => i.room_id === action.room_id)) return prev;
-                    return [...prev, { id: Date.now(), room_id: action.room_id, host: action.host, host_nick: action.host_nick }];
+                addMsg('🎰', `${action.host_nick} started Roulette!`, 'game_invite', {
+                    gameType: 'roulette',
+                    inviteData: { room_id: action.room_id, host: action.host, host_nick: action.host_nick },
+                    roomId: msg.room_id,
                 });
                 break;
             }
@@ -488,13 +657,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                             const myNet = gameState.payouts?.[myId];
                             if (myNet !== undefined && walletRef.current) {
                                 const event = new RouletteEngine(gameState).calculateResults(gameState);
-                                const deviceId = wallet.getDeviceId();
-                                const { updatedWallet } = ledger.processEvent(walletRef.current, event, myId, deviceId);
-                                setTimeout(() => {
-                                    updateWallet(updatedWallet);
-                                    setLastPayoutEvent(event);
-                                    setShowPostSummary(true);
-                                }, 0);
+                                setTimeout(() => resolvePayoutEvent(event, myId, walletRef.current), 0);
                             }
                         }
                         return gameState;
@@ -511,9 +674,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         switch (action.type) {
             case 'ab_start': {
                 if (action.host === myId) return;
-                setPendingAbInvites(prev => {
-                    if (prev.some(i => i.room_id === action.room_id)) return prev;
-                    return [...prev, { id: Date.now(), room_id: action.room_id, host: action.host, host_nick: action.host_nick }];
+                addMsg('🃏', `${action.host_nick} started Andar Bahar!`, 'game_invite', {
+                    gameType: 'andarbahar',
+                    inviteData: { room_id: action.room_id, host: action.host, host_nick: action.host_nick },
+                    roomId: msg.room_id,
                 });
                 break;
             }
@@ -527,13 +691,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                             const myNet = gameState.payouts?.[myId];
                             if (myNet !== undefined && walletRef.current) {
                                 const event = new AndarBaharEngine(gameState).calculateResults(gameState);
-                                const deviceId = wallet.getDeviceId();
-                                const { updatedWallet } = ledger.processEvent(walletRef.current, event, myId, deviceId);
-                                setTimeout(() => {
-                                    updateWallet(updatedWallet);
-                                    setLastPayoutEvent(event);
-                                    setShowPostSummary(true);
-                                }, 0);
+                                setTimeout(() => resolvePayoutEvent(event, myId, walletRef.current), 0);
                             }
                         }
                         return gameState;
@@ -622,7 +780,19 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     const isAbMsg = ab.isAndarBaharMessage(msg.data);
                     const isGameMsg = game.isGameMessage(msg.data);
 
-                    if (isGameMsg) {
+                    // Try custom JSON action first (typing, react, tip, whisper, ticker, screenshot)
+                    let customAction = null;
+                    if (!isBjMsg && !isRlMsg && !isAbMsg && !isGameMsg && msg.data?.startsWith('{')) {
+                        try {
+                            const parsed = JSON.parse(msg.data);
+                            const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper'];
+                            if (CUSTOM.includes(parsed.type)) customAction = parsed;
+                        } catch { /* not JSON */ }
+                    }
+
+                    if (customAction) {
+                        handleCustomAction(msg, customAction);
+                    } else if (isGameMsg) {
                         const action = game.parseGameAction(msg.data);
                         if (action) handleGameAction(msg, action);
                     } else if (isBjMsg) {
@@ -638,7 +808,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         const gifMatch = msg.data.match(/^\[GIF\](.+)$/);
                         if (gifMatch) {
                             addMsg(msg.nick, '', 'peer', { gif: gifMatch[1], roomId: msg.room_id });
-                        } else {
+                        } else if (msg.data) {
                             addMsg(msg.nick, msg.data, 'peer', { roomId: msg.room_id });
                         }
                     }
@@ -728,22 +898,6 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const acceptInvite = (invite) => { socket.joinRoom(invite.room_id); setPendingInvites(prev => prev.filter(i => i.id !== invite.id)); };
     const declineInvite = (invite) => setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
 
-    // ── Challenge handlers ───────────────────────────────────
-    const acceptChallenge = (challenge) => {
-        const myId = myIdRef.current;
-        const myNick = nickRef.current;
-        addMsg('★', `🎮 You accepted ${challenge.challenger_nick}'s challenge!`, 'system');
-        const g = game.createGame({ peer_id: challenge.challenger, nick: challenge.challenger_nick }, { peer_id: myId, nick: myNick }, challenge.room_id);
-        setActiveGame(g);
-        socket.sendRoomMessage(challenge.room_id, game.serializeGameAction({ type: 'Accept', accepter: myId, accepter_nick: myNick, room_id: challenge.room_id }));
-        setPendingChallenges(prev => prev.filter(c => c.id !== challenge.id));
-    };
-    const declineChallenge = (challenge) => {
-        socket.sendRoomMessage(challenge.room_id, game.serializeGameAction({ type: 'Decline', decliner: myIdRef.current, decliner_nick: nickRef.current, room_id: challenge.room_id }));
-        addMsg('★', `🎮 You declined ${challenge.challenger_nick}'s challenge.`, 'system');
-        setPendingChallenges(prev => prev.filter(c => c.id !== challenge.id));
-    };
-
     // ── Blackjack handlers ───────────────────────────────────
     const bjHostRef = useRef(null);
 
@@ -759,13 +913,6 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         socket.sendRoomMessage(roomId, bj.serializeBlackjackAction({ type: 'bj_start', room_id: roomId, host: myId, host_nick: myNick }));
         socket.sendRoomMessage(roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(newGame) }));
         startBlackjackTimer(newGame);
-    };
-
-    const acceptBjInvite = (invite) => {
-        hasJoinedBj.current = true; // user explicitly joined
-        bjHostRef.current = invite.host;
-        socket.sendRoomMessage(invite.room_id, bj.serializeBlackjackAction({ type: 'bj_join', peer_id: myIdRef.current, nick: nickRef.current }));
-        setPendingBjInvites(prev => prev.filter(i => i.id !== invite.id));
     };
 
     const handleBjAction = (action) => {
@@ -806,7 +953,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             setTimeout(() => {
                 const settled = bj.runDealerTurn(newGame);
                 setBlackjackGame(settled);
-                if (amIHost(blackjackHostRef.current) && settled.payouts) {
+                if (amIHost(bjHostRef.current) && settled.payouts) {
                     updateBankLedger('blackjack', settled.payouts);
                 }
                 socket.sendRoomMessage(settled.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(settled) }));
@@ -826,13 +973,6 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_start', room_id: roomId, host: myId, host_nick: myNick }));
         socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(newGame) }));
         startRouletteTimer();
-    };
-
-    const acceptRlInvite = (invite) => {
-        hasJoinedRl.current = true; // user explicitly joined
-        rouletteHostRef.current = invite.host;
-        setPendingRlInvites(prev => prev.filter(i => i.id !== invite.id));
-        addMsg('★', `🎰 Joined Roulette room!`, 'system');
     };
 
     const handleRlAction = (action) => {
@@ -871,13 +1011,6 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(newGame) }));
         // Start the auto-cycle immediately
         startAbCycle(newGame);
-    };
-
-    const acceptAbInvite = (invite) => {
-        hasJoinedAb.current = true; // user explicitly joined
-        abHostRef.current = invite.host;
-        setPendingAbInvites(prev => prev.filter(i => i.id !== invite.id));
-        addMsg('★', `🃏 Joined Andar Bahar table!`, 'system');
     };
 
     const handleAbAction = (action) => {
@@ -984,14 +1117,38 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             addMsg('★', '/roulette  — start roulette (auto-spin every 2 min)', 'system');
             addMsg('★', '/andarbahar  — start Andar Bahar', 'system');
             addMsg('★', '/balance  — show your chip balance', 'system');
-            addMsg('★', '/clear  — clear chat history', 'system');
+            addMsg('★', '/tip <nick> <amount>  — send chips to a peer', 'system');
+            addMsg('★', '/clear  — clear current chat history', 'system');
             return;
         }
 
         if (text === '/clear') {
-            setMessages([]);
-            sessionStorage.removeItem(STORAGE_KEY);
-            addMsg('★', 'Chat history cleared.', 'system');
+            const clearRoom = currentRoomRef.current || null;
+            setMessages(prev => prev.filter(m => m.roomId !== clearRoom));
+            addMsg('★', 'Chat history cleared.', 'system', { roomId: clearRoom });
+            return;
+        }
+
+        if (text.startsWith('/tip ')) {
+            const parts = text.slice(5).trim().split(/\s+/);
+            if (parts.length >= 2) {
+                const targetNick = parts[0];
+                const amount = parseInt(parts[1], 10);
+                const target = currentPeers.find(p => p.nick === targetNick);
+                if (!target) { addMsg('★', `⚠ Peer "${targetNick}" not found.`, 'system'); return; }
+                if (!amount || amount <= 0) { addMsg('★', '⚠ Invalid amount.', 'system'); return; }
+                const w = walletRef.current;
+                if (!w || !wallet.canAfford(w, amount)) { addMsg('★', '⚠ Insufficient chips.', 'system'); return; }
+                const updated = wallet.debit(w, amount, `Tip to ${targetNick}`);
+                updateWallet(updated);
+                const tipRoom = activeRoom || (currentRooms[0]?.room_id);
+                if (tipRoom) {
+                    socket.sendRoomMessage(tipRoom, JSON.stringify({
+                        type: 'tip', to: target.peer_id, from_nick: myNick, amount,
+                    }));
+                }
+                addMsg('💸', `Tipped ${amount} chips to ${targetNick}!`, 'system');
+            }
             return;
         }
 
@@ -1063,6 +1220,21 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             return;
         }
 
+        // Whisper mode — send ephemeral P2P message
+        if (whisperTarget && activeRoom) {
+            socket.sendRoomMessage(activeRoom, JSON.stringify({
+                type: 'whisper',
+                to: whisperTarget.peer_id,
+                to_nick: whisperTarget.nick,
+                from_nick: myNick,
+                content: text,
+            }));
+            addMsg(`🤫 ${myNick}`, text, 'whisper', {
+                to: whisperTarget.peer_id, to_nick: whisperTarget.nick, roomId: activeRoom,
+            });
+            return;
+        }
+
         if (activeRoom) {
             addMsg(myNick, text, 'self', { roomId: activeRoom });
             socket.sendRoomMessage(activeRoom, text);
@@ -1128,76 +1300,84 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 </div>
             </header>
 
-            {/* Invite Toasts */}
-            <div className="invite-toasts">
-                {pendingInvites.map(invite => (
-                    <div key={invite.id} className="invite-toast">
-                        <div className="invite-toast-title">🏠 Room Invite</div>
-                        <div className="invite-toast-body"><strong>{invite.from_nick}</strong> invited you to <strong>{invite.room_name}</strong></div>
-                        <div className="invite-toast-actions">
-                            <button className="btn-accept" onClick={() => acceptInvite(invite)}>Accept</button>
-                            <button className="btn-decline" onClick={() => declineInvite(invite)}>Decline</button>
+            {/* Room Invites — toast only for room invites (not game invites) */}
+            {pendingInvites.length > 0 && (
+                <div className="invite-toasts">
+                    {pendingInvites.map(invite => (
+                        <div key={invite.id} className="invite-toast">
+                            <div className="invite-toast-title">🏠 Room Invite</div>
+                            <div className="invite-toast-body"><strong>{invite.from_nick}</strong> invited you to <strong>{invite.room_name}</strong></div>
+                            <div className="invite-toast-actions">
+                                <button className="btn-accept" onClick={() => acceptInvite(invite)}>Accept</button>
+                                <button className="btn-decline" onClick={() => declineInvite(invite)}>Decline</button>
+                            </div>
                         </div>
-                    </div>
-                ))}
-                {pendingBjInvites.map(invite => (
-                    <div key={invite.id} className="invite-toast">
-                        <div className="invite-toast-title">🃏 Blackjack</div>
-                        <div className="invite-toast-body"><strong>{invite.host_nick}</strong> started a Blackjack game!</div>
-                        <div className="invite-toast-actions">
-                            <button className="btn-accept" onClick={() => acceptBjInvite(invite)}>Join</button>
-                            <button className="btn-decline" onClick={() => setPendingBjInvites(prev => prev.filter(i => i.id !== invite.id))}>Ignore</button>
-                        </div>
-                    </div>
-                ))}
-                {pendingRlInvites.map(invite => (
-                    <div key={invite.id} className="invite-toast">
-                        <div className="invite-toast-title">🎰 Roulette</div>
-                        <div className="invite-toast-body"><strong>{invite.host_nick}</strong> started Roulette!</div>
-                        <div className="invite-toast-actions">
-                            <button className="btn-accept" onClick={() => acceptRlInvite(invite)}>Join</button>
-                            <button className="btn-decline" onClick={() => setPendingRlInvites(prev => prev.filter(i => i.id !== invite.id))}>Ignore</button>
-                        </div>
-                    </div>
-                ))}
-                {pendingAbInvites.map(invite => (
-                    <div key={invite.id} className="invite-toast">
-                        <div className="invite-toast-title">🃏 Andar Bahar</div>
-                        <div className="invite-toast-body"><strong>{invite.host_nick}</strong> started Andar Bahar!</div>
-                        <div className="invite-toast-actions">
-                            <button className="btn-accept" onClick={() => acceptAbInvite(invite)}>Join</button>
-                            <button className="btn-decline" onClick={() => setPendingAbInvites(prev => prev.filter(i => i.id !== invite.id))}>Ignore</button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {/* Tic-Tac-Toe Challenge Popup */}
-            {pendingChallenges.length > 0 && (
-                <div className="game-challenge">
-                    <div className="game-challenge-title">🎮 Game Challenge!</div>
-                    <div className="game-challenge-sub">{pendingChallenges[0].challenger_nick} challenged you to Tic-Tac-Toe</div>
-                    <div className="game-challenge-actions">
-                        <button className="btn-accept" onClick={() => acceptChallenge(pendingChallenges[0])}>Accept</button>
-                        <button className="btn-decline" onClick={() => declineChallenge(pendingChallenges[0])}>Decline</button>
-                    </div>
+                    ))}
                 </div>
             )}
 
+            {/* Casino Live Ticker — game events only, separate from chat */}
+            <LiveTicker items={tickerItems} />
+
             <div className="messages-area">
-                {messages.map((m) => (
-                    <div key={m.id} className={`msg ${m.type}`}>
-                        <span className="msg-time">[{m.time}]</span>
-                        {m.sender && <span className={`msg-sender ${m.type}`}>{m.sender}:</span>}
-                        {m.gif ? (
-                            <img src={m.gif} alt="GIF" className="msg-gif" />
+                {messages
+                    .filter(m => m.roomId === (currentRoom || null))
+                    .map((m) => (
+                    <div key={m.id} className={`msg ${m.type}${m.type === 'whisper' ? ' whisper' : ''}`}>
+                        {m.type === 'game_invite' && !m.inviteUsed ? (
+                            <div className="game-invite-inline">
+                                <span className="game-invite-icon">{m.sender}</span>
+                                <span className="game-invite-text">{m.content}</span>
+                                <button className="game-invite-join" onClick={() => joinGameFromInvite(m)}>Join Table</button>
+                                <button className="game-invite-dismiss" onClick={() => dismissInvite(m.id)}>✕</button>
+                            </div>
+                        ) : m.type === 'game_invite' && m.inviteUsed ? (
+                            <div className="game-invite-inline used">
+                                <span className="game-invite-icon">{m.sender}</span>
+                                <span className="game-invite-text">{m.content} <em>(joined)</em></span>
+                            </div>
                         ) : (
-                            <span className="msg-content"> {m.content}</span>
+                            <>
+                                <span className="msg-time">[{m.time}]</span>
+                                {m.sender && <span className={`msg-sender ${m.type}`}>{m.sender}:</span>}
+                                {m.gif ? (
+                                    <img src={m.gif} alt="GIF" className="msg-gif" />
+                                ) : (
+                                    <span className="msg-content"> {m.content}</span>
+                                )}
+                                {/* Emoji reaction display */}
+                                {m.reactions && Object.keys(m.reactions).length > 0 && (
+                                    <span className="msg-reactions-display">
+                                        {Object.entries(m.reactions).map(([emoji, peers]) => (
+                                            <span key={emoji} className="reaction-badge" onClick={() => handleReact(m.id, emoji)}>
+                                                {emoji} {peers.length}
+                                            </span>
+                                        ))}
+                                    </span>
+                                )}
+                                {/* Quick reaction picker — show on hover via CSS */}
+                                {(m.type === 'peer' || m.type === 'self') && (
+                                    <span className="msg-reaction-bar">
+                                        {['🔥', '👏', '💰'].map(e => (
+                                            <button key={e} className="react-btn" onClick={() => handleReact(m.id, e)}>{e}</button>
+                                        ))}
+                                    </span>
+                                )}
+                            </>
                         )}
                     </div>
                 ))}
                 <div ref={messagesEnd} />
             </div>
+
+            <TypingBar typingPeers={typingPeers} myId={myIdRef.current} />
+
+            {whisperTarget && (
+                <div className="whisper-mode-bar">
+                    🤫 Whispering to <strong>{whisperTarget.nick}</strong>
+                    <button onClick={() => setWhisperTarget(null)}>✕ Exit</button>
+                </div>
+            )}
 
             <form className="chat-input" onSubmit={handleSend}>
                 <div className="chat-input-wrapper" style={{ flex: 1, position: 'relative' }}>
@@ -1205,7 +1385,16 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         type="text"
                         placeholder={currentRoom ? `Message #${rooms.find(r => r.room_id === currentRoom)?.name || 'room'}...` : 'Message General Chat... (or /help)'}
                         value={input}
-                        onChange={(e) => setInput(e.target.value)}
+                        onChange={(e) => {
+                            setInput(e.target.value);
+                            const now = Date.now();
+                            if (now - lastTypingSentRef.current > 1500 && currentRoomRef.current) {
+                                lastTypingSentRef.current = now;
+                                socket.sendRoomMessage(currentRoomRef.current, JSON.stringify({
+                                    type: 'typing', nick: nickRef.current,
+                                }));
+                            }
+                        }}
                         onPaste={handlePaste}
                         autoFocus
                     />
@@ -1245,6 +1434,30 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                             <span className="peer-dot" />
                             <span className="peer-nick">{p.nick}</span>
                             {p.balance > 0 && <span className="peer-chips">{p.balance.toLocaleString()}</span>}
+                            <button
+                                className="whisper-btn"
+                                title={`Whisper to ${p.nick}`}
+                                onClick={() => setWhisperTarget({ peer_id: p.peer_id, nick: p.nick })}
+                            >🤫</button>
+                            <button
+                                className="tip-btn"
+                                title={`Tip ${p.nick}`}
+                                onClick={() => {
+                                    const amount = parseInt(prompt(`Tip amount to ${p.nick}:`), 10);
+                                    if (!amount || amount <= 0) return;
+                                    const w = walletRef.current;
+                                    if (!w || !wallet.canAfford(w, amount)) { addMsg('★', '⚠ Insufficient chips.', 'system'); return; }
+                                    const updated = wallet.debit(w, amount, `Tip to ${p.nick}`);
+                                    updateWallet(updated);
+                                    const tipRoom = currentRoomRef.current || roomsRef.current[0]?.room_id;
+                                    if (tipRoom) {
+                                        socket.sendRoomMessage(tipRoom, JSON.stringify({
+                                            type: 'tip', to: p.peer_id, from_nick: nickRef.current, amount,
+                                        }));
+                                    }
+                                    addMsg('💸', `Tipped ${amount} chips to ${p.nick}!`, 'system');
+                                }}
+                            >💰</button>
                         </div>
                     ))}
                     {peers.filter(p => p.peer_id !== myIdRef.current).length === 0 && (
