@@ -178,7 +178,9 @@ export class AgentSwarm {
 
     addContext(nick, text) {
         if (!text || typeof text !== 'string') return;
-        this._context.push({ role: 'user', content: `${nick}: ${text}` });
+        const agentNames = new Set(Object.values(this._characters).map(c => c.name));
+        const isAgent = agentNames.has(nick);
+        this._context.push({ role: 'user', content: `${nick}: ${text}`, _isAgent: isAgent });
         if (this._context.length > CONTEXT_BUFFER_SIZE) this._context.shift();
 
         if (!this._running) return;
@@ -445,19 +447,19 @@ export class AgentSwarm {
         let trigger;
         if (recent.length) {
             const convo = recent.map(m => m.content).join('\n');
-            const lastMsg = recent[recent.length - 1]?.content || '';
-            // Check if the last message is from a human (not an AI agent)
-            const agentNames = new Set(Object.values(this._characters).map(ch => ch.name));
-            const lastSender = lastMsg.match(/^([^:]+):/)?.[1]?.trim();
-            const isHumanMsg = lastSender && !agentNames.has(lastSender);
 
-            if (isHumanMsg) {
-                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\nYou MUST directly respond to what "${lastSender}" just said. React to THEIR message — agree, disagree, joke about it, or roast them. Do NOT ignore them or change the topic. Keep it 1-2 short lines.` }];
+            // Find the most recent human message (not from an AI agent)
+            const lastHumanMsg = [...recent].reverse().find(m => !m._isAgent);
+            const lastHumanSender = lastHumanMsg?.content?.match(/^([^:]+):/)?.[1]?.trim();
+            const lastHumanText = lastHumanMsg?.content || '';
+
+            if (lastHumanSender) {
+                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\n>>> THE MOST IMPORTANT MESSAGE TO RESPOND TO:\n"${lastHumanText}"\n\nYou MUST respond to what "${lastHumanSender}" said above. React to THEIR words — agree, disagree, joke, answer their question, or roast them. Do NOT ignore the human user. Do NOT start your own random topic. Keep it 1-2 short lines in Hinglish.` }];
             } else {
-                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\nRespond naturally to the conversation above. You can react to what was said OR bring up something new in character. Keep it 1-2 short lines.` }];
+                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\nRespond naturally to the conversation above. You can react to what was said OR bring up something new in character. Keep it 1-2 short lines in Hinglish.` }];
             }
         } else {
-            trigger = [{ role: 'user', content: 'Say something fun and in-character for this chat room. Keep it 1-2 short lines.' }];
+            trigger = [{ role: 'user', content: 'Say something fun and in-character for this chat room. Keep it 1-2 short lines in Hinglish.' }];
         }
 
         // Smart mention: identify who we're responding to
