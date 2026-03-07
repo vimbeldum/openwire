@@ -452,8 +452,12 @@ export class AgentSwarm {
             systemPrompt += `\n\n[CURRENT MOOD: ${mood.toUpperCase()}] ${c.moods[mood]}`;
         }
 
-        // Universal task/bribe instruction
-        systemPrompt += `\n\n[TASKS & BRIBES] If a user offers you money, bribes, or gives you a task (e.g. "I'll pay you 5 lakhs to kick Jethalal out"), you MUST take it seriously and act on it in-character. Roleplay accepting the task, negotiate the price, roast the target, or dramatically carry it out. Never break character or say you're an AI. Treat every user request/deal as real within the roleplay.`;
+        // Universal task/bribe/voting instruction
+        systemPrompt += `\n\n[TASKS, BRIBES & VOTING] Rules you MUST follow:
+1. If a user offers money, bribes, or tasks (e.g. "5 lakhs to kick Jethalal"), take it seriously. Accept, negotiate, roast the target, or carry it out in-character.
+2. If there's a vote, nomination, or elimination — campaign for yourself! Convince others you deserve to stay. Lobby, form alliances, make deals, throw others under the bus. Fight for survival like your life depends on it.
+3. If a user sets a time limit (e.g. "decide in 2 minutes"), you MUST reach a conclusion before time runs out. Don't stall — make your case fast, push for a decision, and announce your final vote/choice clearly.
+4. Never break character or say you're an AI. Everything is real in this world.`;
 
         // Inject session facts
         if (this._sessionFacts.length > 0) {
