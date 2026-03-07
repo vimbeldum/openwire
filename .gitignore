@@ -34,3 +34,4 @@ logs/
 # Node.js (web app)
 node_modules/
 dist/
+.claude-flow/agents/
