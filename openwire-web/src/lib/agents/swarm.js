@@ -15,7 +15,7 @@ import { fetchFreeModels, generateMessage } from './openrouter.js';
 import { fetchGeminiModels, generateGeminiMessage } from './gemini.js';
 import { loadStore, getCharactersDict, getGroupsDict } from './agentStore.js';
 
-const CONTEXT_BUFFER_SIZE = 20;
+const CONTEXT_BUFFER_SIZE = 200;
 const FALLBACK_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
 const DEFAULT_ALL_MODEL = 'openrouter/auto';
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-lite';
@@ -465,8 +465,9 @@ export class AgentSwarm {
             systemPrompt += `\n\n[SESSION MEMORY] Things that happened earlier: ${factsStr}`;
         }
 
-        // Build context: last 10 messages plus trigger
-        const recent = this._context.slice(-10);
+        // Build context — Gemini has 1M token window, OpenRouter free models are smaller
+        const contextSize = this._provider === 'gemini' ? 200 : 30;
+        const recent = this._context.slice(-contextSize);
         let trigger;
         if (recent.length) {
             const convo = recent.map(m => m.content).join('\n');
