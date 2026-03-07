@@ -157,6 +157,21 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         return () => clearInterval(cleanup);
     }, []);
 
+    // ── addMsg — declared here so screenshot useEffect below can reference it
+    const addMsg = useCallback((sender, content, type = 'chat', extra = {}) => {
+        setMessages(prev => [...prev, {
+            time: timeStr(), sender, content, type,
+            id: Date.now() + Math.random(),
+            roomId: currentRoomRef.current || null,
+            reactions: {},
+            ...extra,
+        }]);
+        // Feed real chat messages into swarm context (not system/game messages)
+        if ((type === 'self' || type === 'peer') && content && !extra?.isAgent) {
+            swarmRef.current?.addContext(sender, content);
+        }
+    }, []);
+
     // ── Screenshot detection → room alert ────────────────────
     useEffect(() => {
         const detect = (e) => {
@@ -218,20 +233,6 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         // Broadcast balance to relay
         if (myIdRef.current) {
             socket.send({ type: 'balance_update', balance: wallet.getTotalBalance(updatedWallet) });
-        }
-    }, []);
-
-    const addMsg = useCallback((sender, content, type = 'chat', extra = {}) => {
-        setMessages(prev => [...prev, {
-            time: timeStr(), sender, content, type,
-            id: Date.now() + Math.random(),
-            roomId: currentRoomRef.current || null,
-            reactions: {},
-            ...extra,
-        }]);
-        // Feed real chat messages into swarm context (not system/game messages)
-        if ((type === 'self' || type === 'peer') && content && !extra?.isAgent) {
-            swarmRef.current?.addContext(sender, content);
         }
     }, []);
 
