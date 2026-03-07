@@ -438,7 +438,7 @@ RESPOND NATURALLY to the last message in the chat as Dr. Hathi.`,
         frequencyWeight: 4,
         minInterval: 10 * 60 * 1000,
         maxInterval: 22 * 60 * 1000,
-        reactive_tags: ['madhavi', 'bhide', 'wife', 'society', 'complaint', 'rules', 'neighbor'],
+        reactive_tags: ['madhavi', 'bhide', 'wife', 'society', 'complaint', 'gossip', 'neighbor'],
         agent_triggers: ['jethalal', 'daya'],
         moods: {
             normal: '',
