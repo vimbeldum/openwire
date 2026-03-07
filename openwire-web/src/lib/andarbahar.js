@@ -2,8 +2,11 @@
    OpenWire Web — Andar Bahar game engine
    Classic Indian card game: bet Inside (Andar) or Outside (Bahar)
    Full auto-cycle every 2 minutes, P2P host-driven
+   Bounded Context: Andar Bahar | Shared Core: GameEngine + payouts
    ═══════════════════════════════════════════════════════════ */
 
+import { GameEngine, registerGame } from './GameEngine.js';
+import { settleBets } from './core/payouts.js';
 import { createDeck } from './blackjack.js';
 
 export const GAME_INTERVAL_MS = 2 * 60 * 1000; // 2 min full cycle
@@ -153,6 +156,64 @@ export function newRound(game) {
         startedAt: now,
     };
 }
+
+/* ── Rules (used by HowToPlay) ────────────────────────────── */
+
+export const ANDARBAHAR_RULES = {
+    name: 'Andar Bahar',
+    description: 'A trump card is drawn; bet whether its matching rank appears first in Andar (Inside) or Bahar (Outside). Cards are dealt alternately, starting from Bahar.',
+    bets: [
+        { name: 'Andar (Inside)', odds: '0.9:1', description: 'The matching card lands on the Andar pile. Pays 0.9:1 when trump appeared first on Bahar.' },
+        { name: 'Bahar (Outside)', odds: '1:1', description: 'The matching card lands on the Bahar pile. Pays 1:1.' },
+        { name: 'Side Bet 1–5', odds: '3.5×', description: 'Match found within 1–5 total cards dealt.' },
+        { name: 'Side Bet 6–10', odds: '4.5×', description: 'Match found within 6–10 total cards dealt.' },
+        { name: 'Side Bet 11–15', odds: '5.5×', description: 'Match found within 11–15 total cards dealt.' },
+        { name: 'Side Bet 16–25', odds: '4.5×', description: 'Match found within 16–25 total cards dealt.' },
+        { name: 'Side Bet 26–35', odds: '15×', description: 'Match found within 26–35 total cards dealt.' },
+        { name: 'Side Bet 36–40', odds: '50×', description: 'Match found within 36–40 total cards dealt.' },
+        { name: 'Side Bet 41+', odds: '120×', description: 'Match found after 41 or more cards dealt.' },
+    ],
+};
+
+/* ── GameEngine implementation ────────────────────────────── */
+
+export class AndarBaharEngine extends GameEngine {
+    constructor(game) {
+        super();
+        this._game = game;
+    }
+
+    getGameState() {
+        return this._game;
+    }
+
+    /**
+     * @param {Array<{peer_id: string, side: string, amount: number}>} bets
+     * @param {{ winningSide: string, totalCards: number, trumpFirst: string }} result
+     * @returns {{ [peer_id: string]: number }}
+     */
+    calculatePayout(bets, result) {
+        const { winningSide, totalCards, trumpFirst } = result;
+        return settleBets(bets, (bet) => {
+            if (bet.side === winningSide) {
+                const multiplier = (winningSide === 'andar' && trumpFirst === 'bahar') ? 0.9 : 1.0;
+                return Math.floor(bet.amount * multiplier);
+            }
+            if (SIDE_BETS[bet.side]) {
+                return isSideBetWin(bet.side, totalCards)
+                    ? Math.floor(bet.amount * SIDE_BETS[bet.side])
+                    : -bet.amount;
+            }
+            return -bet.amount;
+        });
+    }
+
+    getRules() {
+        return ANDARBAHAR_RULES;
+    }
+}
+
+registerGame('andarbahar', AndarBaharEngine);
 
 // Message protocol
 export function isAndarBaharMessage(data) { return typeof data === 'string' && data.startsWith('AB:'); }

@@ -609,6 +609,7 @@ body {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   animation: overlayFade 0.2s ease;
+  overflow: hidden; /* Presentation domain: no element may breach 100vh/100vw */
 }
 
 @keyframes overlayFade {
@@ -626,7 +627,11 @@ body {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   padding: 2.5rem;
-  min-width: 380px;
+  min-width: 320px;
+  max-width: 95vw;
+  max-height: 95dvh;
+  display: flex;
+  flex-direction: column;
   backdrop-filter: blur(var(--blur));
   -webkit-backdrop-filter: blur(var(--blur));
   box-shadow: var(--shadow-elevated), var(--shadow-glow);
@@ -3721,10 +3726,13 @@ body {
     linear-gradient(180deg, #0d0a16 0%, #130d20 100%);
   border: 1px solid rgba(168, 102, 238, 0.25);
   border-radius: var(--radius-lg);
-  padding: 1.5rem;
-  width: min(95vw, 820px);
-  max-height: 90vh;
-  overflow-y: auto;
+  padding: 1rem;
+  width: min(98vw, 820px);
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   box-shadow:
     var(--shadow-elevated),
     0 0 60px rgba(168, 102, 238, 0.08),
@@ -3736,8 +3744,9 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  gap: 2rem;
-  margin-bottom: 1.25rem;
+  gap: 1.25rem;
+  margin-bottom: 0.5rem;
+  flex-shrink: 0;
 }
 
 .ab-trump-col {
@@ -3845,12 +3854,15 @@ body {
   color: #FF4444;
 }
 
-/* Card piles */
+/* Card piles — grow to fill remaining height */
 .ab-piles-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .ab-pile-zone {
@@ -3927,7 +3939,8 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  padding: 0.5rem 0;
+  padding: 0.25rem 0;
+  flex-shrink: 0;
 }
 
 .ab-bet-pill {
@@ -3980,13 +3993,15 @@ body {
   border: 1px solid rgba(255, 68, 68, 0.2);
 }
 
-/* Bet controls */
+/* Bet controls — shrink to fit, never overflow parent */
 .ab-bet-controls {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 0.75rem;
+  gap: 0.5rem;
+  padding: 0.5rem;
   background: rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--radius-sm);
 }
@@ -4159,9 +4174,11 @@ body {
 }
 
 .ab-history-section {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
   border-top: 1px solid rgba(168, 102, 238, 0.12);
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 /* Betting countdown bar */
@@ -4328,9 +4345,12 @@ body {
   border: 1px solid rgba(30, 144, 255, 0.25);
   border-radius: var(--radius-lg);
   padding: 1.5rem;
-  width: min(95vw, 840px);
-  max-height: 90vh;
-  overflow-y: auto;
+  width: min(98vw, 840px);
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   box-shadow:
     var(--shadow-elevated),
     0 0 60px rgba(30, 144, 255, 0.08),
@@ -4340,14 +4360,16 @@ body {
 .bj-dealer-area {
   display: flex;
   justify-content: center;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1.5rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
 }
 
 .bj-status-bar {
   text-align: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.5rem;
+  flex-shrink: 0;
 }
 
 .bj-phase-msg {
@@ -4370,18 +4392,23 @@ body {
 
 .bj-players-area {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1.25rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .bj-hand-zone {
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-sm);
-  padding: 1rem;
-  transition: all 0.3s ease;
-  min-height: 120px;
+  padding: 0.75rem;
+  transition: border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .bj-hand-zone.active-turn {

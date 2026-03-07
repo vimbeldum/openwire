@@ -1,7 +1,11 @@
 /* ═══════════════════════════════════════════════════════════
    OpenWire Web — Blackjack game engine
    Multiplayer blackjack with shared dealer
+   Bounded Context: Blackjack | Shared Core: GameEngine + payouts
    ═══════════════════════════════════════════════════════════ */
+
+import { GameEngine, registerGame } from './GameEngine.js';
+import { settleBets } from './core/payouts.js';
 
 const SUITS = ['♠', '♥', '♦', '♣'];
 const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -374,17 +378,56 @@ export function deserializeGame(data) {
 // win: +bet, blackjack-win: +bet*1.5, push: 0, lose: -bet
 export function getPayouts(game) {
     if (game.phase !== 'ended') return {};
-    const payouts = {};
-    for (const p of game.players) {
-        if (p.status === 'win') {
-            payouts[p.peer_id] = Math.floor(p.bet);
-        } else if (p.status === 'blackjack-win') {
-            payouts[p.peer_id] = Math.floor(p.bet * 1.5);
-        } else if (p.status === 'push') {
-            payouts[p.peer_id] = 0;
-        } else {
-            payouts[p.peer_id] = -p.bet;
-        }
-    }
-    return payouts;
+    return settleBets(game.players, (p) => {
+        if (p.status === 'win') return Math.floor(p.bet);
+        if (p.status === 'blackjack-win') return Math.floor(p.bet * 1.5);
+        if (p.status === 'push') return 0;
+        return -p.bet;
+    });
 }
+
+/* ── Rules (used by HowToPlay) ────────────────────────────── */
+
+export const BLACKJACK_RULES = {
+    name: 'Blackjack',
+    description: 'Beat the dealer by getting closer to 21 without going over. Dealer hits on 16 or less, stands on 17+.',
+    bets: [
+        { name: 'Win', odds: '1:1', description: 'Your hand beats the dealer — you win your bet.' },
+        { name: 'Blackjack', odds: '3:2', description: 'Natural 21 on first two cards beats any non-blackjack dealer hand.' },
+        { name: 'Push', odds: '0', description: 'Tie with dealer — your bet is returned.' },
+        { name: 'Bust / Loss', odds: '-1', description: 'Exceed 21 or dealer scores higher — you lose your bet.' },
+    ],
+};
+
+/* ── GameEngine implementation ────────────────────────────── */
+
+export class BlackjackEngine extends GameEngine {
+    constructor(game) {
+        super();
+        this._game = game;
+    }
+
+    getGameState() {
+        return this._game;
+    }
+
+    /**
+     * @param {Array<{peer_id: string, bet: number, status: string}>} players  game.players after settlement
+     * @param {*} _result  Not used — outcome is encoded in player statuses
+     * @returns {{ [peer_id: string]: number }}
+     */
+    calculatePayout(players, _result) {
+        return settleBets(players, (p) => {
+            if (p.status === 'win') return Math.floor(p.bet);
+            if (p.status === 'blackjack-win') return Math.floor(p.bet * 1.5);
+            if (p.status === 'push') return 0;
+            return -p.bet;
+        });
+    }
+
+    getRules() {
+        return BLACKJACK_RULES;
+    }
+}
+
+registerGame('blackjack', BlackjackEngine);
