@@ -7,6 +7,7 @@
 
 import { GameEngine, registerGame } from './GameEngine.js';
 import { settleBets } from './core/payouts.js';
+import { createPayoutEvent } from './core/PayoutEvent.js';
 import { createDeck } from './blackjack.js';
 
 export const GAME_INTERVAL_MS = 2 * 60 * 1000; // 2 min full cycle
@@ -210,6 +211,61 @@ export class AndarBaharEngine extends GameEngine {
 
     getRules() {
         return ANDARBAHAR_RULES;
+    }
+
+    /**
+     * Process a completed Andar Bahar round and return a financial PayoutEvent.
+     * Handles main bets (Andar 0.9:1 / Bahar 1:1) and all 7 side bet ranges.
+     *
+     * @param {object} gameState  Ended game state (phase === 'ended')
+     * @returns {object}          PayoutEvent
+     */
+    calculateResults(gameState) {
+        const { result, bets, andar, bahar, roomId, trumpFirst } = gameState;
+        const totalCards = (andar?.length || 0) + (bahar?.length || 0);
+        const resultLabel = result
+            ? `${result.toUpperCase()} wins — ${totalCards} cards dealt`
+            : 'Round ended';
+
+        const breakdown = (bets || []).map(bet => {
+            let net, outcome, betLabel;
+
+            if (bet.side === result) {
+                const multiplier = (result === 'andar' && trumpFirst === 'bahar') ? 0.9 : 1.0;
+                net = Math.floor(bet.amount * multiplier);
+                outcome = 'win';
+                betLabel = `${bet.side.charAt(0).toUpperCase() + bet.side.slice(1)} (${multiplier === 0.9 ? '0.9' : '1'}:1)`;
+            } else if (SIDE_BETS[bet.side]) {
+                if (isSideBetWin(bet.side, totalCards)) {
+                    net = Math.floor(bet.amount * SIDE_BETS[bet.side]);
+                    outcome = 'win';
+                    betLabel = `Side Bet ${bet.side} (${SIDE_BETS[bet.side]}×)`;
+                } else {
+                    net = -bet.amount;
+                    outcome = 'loss';
+                    betLabel = `Side Bet ${bet.side} (missed)`;
+                }
+            } else {
+                net = -bet.amount;
+                outcome = 'loss';
+                betLabel = `${bet.side.charAt(0).toUpperCase() + bet.side.slice(1)} (lost)`;
+            }
+
+            return { peer_id: bet.peer_id, nick: bet.nick, betLabel, wager: bet.amount, net, outcome };
+        });
+
+        const totals = {};
+        for (const b of breakdown) {
+            totals[b.peer_id] = (totals[b.peer_id] ?? 0) + b.net;
+        }
+
+        return createPayoutEvent({
+            gameType: 'andarbahar',
+            roundId: `${roomId}-${Date.now()}`,
+            resultLabel,
+            breakdown,
+            totals,
+        });
     }
 }
 

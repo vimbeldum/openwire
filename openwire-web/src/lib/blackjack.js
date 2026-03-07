@@ -6,6 +6,7 @@
 
 import { GameEngine, registerGame } from './GameEngine.js';
 import { settleBets } from './core/payouts.js';
+import { createPayoutEvent } from './core/PayoutEvent.js';
 
 const SUITS = ['♠', '♥', '♦', '♣'];
 const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -427,6 +428,50 @@ export class BlackjackEngine extends GameEngine {
 
     getRules() {
         return BLACKJACK_RULES;
+    }
+
+    /**
+     * Process a fully-settled Blackjack round and return a financial PayoutEvent.
+     * Handles win (1:1), blackjack (3:2), push, bust, and loss scenarios.
+     *
+     * @param {object} gameState  Settled game state (phase === 'ended')
+     * @returns {object}          PayoutEvent
+     */
+    calculateResults(gameState) {
+        const { dealer, players, roomId } = gameState;
+        const dealerTotal = calculateHand(dealer.hand);
+        const dealerBusted = isBust(dealer.hand);
+        const resultLabel = `Dealer ${dealerTotal}${dealerBusted ? ' (Bust)' : ''}`;
+
+        const breakdown = (players || [])
+            .filter(p => p.bet > 0)
+            .map(p => {
+                let net, outcome, betLabel;
+                if (p.status === 'win') {
+                    net = Math.floor(p.bet); outcome = 'win'; betLabel = 'Win (1:1)';
+                } else if (p.status === 'blackjack-win') {
+                    net = Math.floor(p.bet * 1.5); outcome = 'blackjack'; betLabel = 'Blackjack (3:2)';
+                } else if (p.status === 'push') {
+                    net = 0; outcome = 'push'; betLabel = 'Push';
+                } else {
+                    net = -p.bet; outcome = 'loss';
+                    betLabel = p.status === 'bust' ? 'Bust' : 'Loss';
+                }
+                return { peer_id: p.peer_id, nick: p.nick, betLabel, wager: p.bet, net, outcome };
+            });
+
+        const totals = {};
+        for (const b of breakdown) {
+            totals[b.peer_id] = (totals[b.peer_id] ?? 0) + b.net;
+        }
+
+        return createPayoutEvent({
+            gameType: 'blackjack',
+            roundId: `${roomId}-${Date.now()}`,
+            resultLabel,
+            breakdown,
+            totals,
+        });
     }
 }
 

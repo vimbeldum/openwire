@@ -1,0 +1,147 @@
+/* ═══════════════════════════════════════════════════════════
+   OpenWire — Shared Core: Global Ledger Service
+   Listens for PayoutEvents from game engines.
+   • Financial events  → update wallet + record to ledger
+   • Non-financial events → record stats only (no wallet change)
+   • All events stored in localStorage (max 500 per device)
+   ═══════════════════════════════════════════════════════════ */
+
+import * as walletLib from '../wallet.js';
+
+const LEDGER_PREFIX = 'openwire_ledger_';
+const MAX_EVENTS = 500;
+
+function ledgerKey(deviceId) {
+    return `${LEDGER_PREFIX}${deviceId}`;
+}
+
+/* ── Persistence ──────────────────────────────────────────── */
+
+/**
+ * Append a PayoutEvent to the ledger (localStorage).
+ * @param {string} deviceId
+ * @param {object} event
+ */
+export function record(deviceId, event) {
+    try {
+        const raw = localStorage.getItem(ledgerKey(deviceId));
+        const history = raw ? JSON.parse(raw) : [];
+        history.push(event);
+        if (history.length > MAX_EVENTS) history.splice(0, history.length - MAX_EVENTS);
+        localStorage.setItem(ledgerKey(deviceId), JSON.stringify(history));
+    } catch (e) {
+        console.warn('[Ledger] Failed to record event:', e);
+    }
+}
+
+/**
+ * Retrieve all stored events for a device, newest first.
+ * @param {string} deviceId
+ * @returns {object[]}
+ */
+export function getHistory(deviceId) {
+    try {
+        const raw = localStorage.getItem(ledgerKey(deviceId));
+        const events = raw ? JSON.parse(raw) : [];
+        return [...events].reverse();
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Clear all ledger history for a device.
+ * @param {string} deviceId
+ */
+export function clearHistory(deviceId) {
+    try {
+        localStorage.removeItem(ledgerKey(deviceId));
+    } catch { }
+}
+
+/* ── Wallet Application ───────────────────────────────────── */
+
+/**
+ * Apply net chip change from a financial PayoutEvent to a wallet.
+ * Only modifies wallet if the player participated (has a totals entry).
+ * @param {object} wallet   Current wallet object
+ * @param {object} event    Financial PayoutEvent
+ * @param {string} myId     Local player's peer_id
+ * @returns {object}        Updated (or unchanged) wallet
+ */
+function applyEventToWallet(wallet, event, myId) {
+    const net = event.totals?.[myId];
+    if (net === undefined || net === 0) return wallet;
+    if (net > 0) return walletLib.credit(wallet, net, `${event.gameType} win`);
+    return walletLib.debit(wallet, -net, `${event.gameType} loss`);
+}
+
+/* ── Core API ─────────────────────────────────────────────── */
+
+/**
+ * Process a PayoutEvent from a game engine.
+ *
+ * Financial events (Roulette, Blackjack, Andar Bahar):
+ *   → Updates the player's wallet based on event.totals[myId]
+ *   → Records the event to the persistent ledger
+ *
+ * Non-financial events (Tic-Tac-Toe):
+ *   → Records stats to the ledger
+ *   → Does NOT modify the wallet
+ *
+ * @param {object} currentWallet  The player's current wallet
+ * @param {object} event          PayoutEvent or NonFinancialEvent
+ * @param {string} myId           Local player's peer_id
+ * @param {string} deviceId       For ledger storage key
+ * @returns {{ updatedWallet: object, event: object }}
+ */
+export function processEvent(currentWallet, event, myId, deviceId) {
+    let updatedWallet = currentWallet;
+
+    if (event.financial) {
+        updatedWallet = applyEventToWallet(currentWallet, event, myId);
+        record(deviceId, event);
+    } else {
+        // Stats only — no wallet changes
+        record(deviceId, event);
+    }
+
+    return { updatedWallet, event };
+}
+
+/* ── Statistics ───────────────────────────────────────────── */
+
+/**
+ * Compute per-game statistics from the ledger for a player.
+ * Returns win / loss / push counts and total net chips.
+ *
+ * @param {string} deviceId
+ * @param {string} myId
+ * @returns {{ [gameType]: { wins, losses, pushes, totalNet } }}
+ */
+export function getStats(deviceId, myId) {
+    const history = getHistory(deviceId);
+    const stats = {};
+
+    for (const event of history) {
+        const type = event.gameType;
+        if (!stats[type]) stats[type] = { wins: 0, losses: 0, pushes: 0, totalNet: 0 };
+
+        if (event.financial) {
+            const net = event.totals?.[myId] ?? 0;
+            if (net > 0) stats[type].wins++;
+            else if (net < 0) stats[type].losses++;
+            else stats[type].pushes++;
+            stats[type].totalNet += net;
+        } else {
+            const stat = event.playerStats?.find(p => p.peer_id === myId);
+            if (stat) {
+                if (stat.outcome === 'win') stats[type].wins++;
+                else if (stat.outcome === 'loss') stats[type].losses++;
+                else stats[type].pushes++;
+            }
+        }
+    }
+
+    return stats;
+}

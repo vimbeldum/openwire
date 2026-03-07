@@ -42,6 +42,24 @@ export class GameEngine {
     getRules() {
         throw new Error(`${this.constructor.name} must implement getRules()`);
     }
+
+    /**
+     * Process a completed game round and return a standardised PayoutEvent
+     * (for financial games) or NonFinancialEvent (for non-wagering games).
+     *
+     * Financial games (Roulette, Blackjack, Andar Bahar):
+     *   Returns a PayoutEvent with { financial: true, breakdown, totals }.
+     *
+     * Non-financial games (Tic-Tac-Toe):
+     *   Returns a NonFinancialEvent with { financial: false, playerStats }.
+     *   The GlobalLedgerService will log stats but NOT touch wallets.
+     *
+     * @param {object} gameState  The fully-settled game state (phase === 'ended')
+     * @returns {object}          PayoutEvent | NonFinancialEvent
+     */
+    calculateResults(gameState) {
+        throw new Error(`${this.constructor.name} must implement calculateResults()`);
+    }
 }
 
 /* ── Global Game Registry ─────────────────────────────────── */

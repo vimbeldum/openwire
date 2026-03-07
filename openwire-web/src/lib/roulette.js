@@ -6,6 +6,7 @@
    ═══════════════════════════════════════════════════════════ */
 
 import { GameEngine, registerGame } from './GameEngine.js';
+import { createPayoutEvent } from './core/PayoutEvent.js';
 
 export const SPIN_INTERVAL_MS = 1 * 60 * 1000; // 1 minute
 export const SPIN_PHASE_MS = 10 * 1000;        // 10s spinning animation
@@ -218,6 +219,58 @@ export class RouletteEngine extends GameEngine {
 
     getRules() {
         return ROULETTE_RULES;
+    }
+
+    /**
+     * Process a completed spin and return a financial PayoutEvent.
+     * Supports all bet types: single, color, parity, half, dozen, column.
+     *
+     * @param {object} gameState  Settled roulette state (has result + bets)
+     * @returns {object}          PayoutEvent
+     */
+    calculateResults(gameState) {
+        const { result, bets, roomId } = gameState;
+        const color = getColor(result);
+        const colorLabel = color.charAt(0).toUpperCase() + color.slice(1);
+        const resultLabel = `${result} — ${colorLabel}`;
+
+        const breakdown = (bets || []).map(bet => {
+            const multiplier = getPayout(bet.betType, bet.betTarget, result);
+            const net = multiplier > 0 ? bet.amount * (multiplier - 1) : -bet.amount;
+            return {
+                peer_id: bet.peer_id,
+                nick: bet.nick,
+                betLabel: _formatBetLabel(bet.betType, bet.betTarget),
+                wager: bet.amount,
+                net,
+                outcome: net > 0 ? 'win' : net === 0 ? 'push' : 'loss',
+            };
+        });
+
+        const totals = {};
+        for (const b of breakdown) {
+            totals[b.peer_id] = (totals[b.peer_id] ?? 0) + b.net;
+        }
+
+        return createPayoutEvent({
+            gameType: 'roulette',
+            roundId: `${roomId}-${Date.now()}`,
+            resultLabel,
+            breakdown,
+            totals,
+        });
+    }
+}
+
+function _formatBetLabel(betType, betTarget) {
+    switch (betType) {
+        case 'single': return `Single ${betTarget}`;
+        case 'color': return betTarget === 'red' ? 'Red' : 'Black';
+        case 'parity': return betTarget === 'even' ? 'Even' : 'Odd';
+        case 'half': return betTarget === 'low' ? 'Low (1–18)' : 'High (19–36)';
+        case 'dozen': return `Dozen ${betTarget}`;
+        case 'column': return `Column ${betTarget}`;
+        default: return betType;
     }
 }
 

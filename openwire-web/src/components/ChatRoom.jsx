@@ -12,6 +12,12 @@ import AndarBaharBoard from './AndarBaharBoard';
 import AdminPortal from './AdminPortal';
 import GifPicker from './GifPicker';
 import HowToPlay from './HowToPlay';
+import PostSessionSummary from './PostSessionSummary';
+import AccountHistory from './AccountHistory';
+import * as ledger from '../lib/core/ledger.js';
+import { RouletteEngine } from '../lib/roulette';
+import { BlackjackEngine } from '../lib/blackjack';
+import { AndarBaharEngine } from '../lib/andarbahar';
 
 function timeStr() {
     const d = new Date();
@@ -53,6 +59,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
     // How to Play
     const [showHelp, setShowHelp] = useState(false);
+    const [showPostSummary, setShowPostSummary] = useState(false);
+    const [lastPayoutEvent, setLastPayoutEvent] = useState(null);
+    const [showAccountHistory, setShowAccountHistory] = useState(false);
+    const handledGameResultRef = useRef(null);
     const [helpGame, setHelpGame] = useState(null);
     const openHelp = (gameType) => { setHelpGame(gameType); setShowHelp(true); };
 
@@ -124,6 +134,27 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
     useEffect(() => { saveMessages(messages); }, [messages]);
 
+    // ── TTT game-over → NonFinancialEvent ledger record ──────
+    useEffect(() => {
+        if (!activeGame?.result) return;
+        if (activeGame.result === handledGameResultRef.current) return;
+        handledGameResultRef.current = activeGame.result;
+
+        const myId = myIdRef.current;
+        if (!myId) return;
+        const isParticipant =
+            activeGame.playerX?.peer_id === myId ||
+            activeGame.playerO?.peer_id === myId;
+        if (!isParticipant) return;
+
+        const event = game.calculateResults(activeGame);
+        const deviceId = wallet.getDeviceId();
+        ledger.processEvent(walletRef.current, event, myId, deviceId);
+
+        setLastPayoutEvent(event);
+        setShowPostSummary(true);
+    }, [activeGame]);
+
     useEffect(() => {
         if (currentRoom) localStorage.setItem('openwire_current_room', currentRoom);
         else localStorage.removeItem('openwire_current_room');
@@ -189,7 +220,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 const resultsGame = rl.finishSpin(rouletteRef.current || spun);
                 setRouletteGame(resultsGame);
 
-                // Apply winnings to my wallet now that results are out
+                // Apply winnings via Global Ledger Service
                 const myId = myIdRef.current;
                 const myNet = spun.payouts?.[myId];
 
@@ -199,10 +230,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 }
 
                 if (myNet !== undefined && walletRef.current) {
-                    let w = walletRef.current;
-                    if (myNet > 0) w = wallet.credit(w, myNet, 'Roulette win');
-                    else if (myNet < 0) w = wallet.debit(w, -myNet, 'Roulette bet');
-                    updateWallet(w);
+                    const event = new RouletteEngine(resultsGame).calculateResults(resultsGame);
+                    const deviceId = wallet.getDeviceId();
+                    const { updatedWallet } = ledger.processEvent(walletRef.current, event, myId, deviceId);
+                    updateWallet(updatedWallet);
+                    setLastPayoutEvent(event);
+                    setShowPostSummary(true);
                 }
 
                 if (amIHost(rouletteHostRef.current)) {
@@ -293,14 +326,16 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         updateBankLedger('andarbahar', next.payouts);
                     }
 
-                    // Apply wallet changes for host
+                    // Apply wallet changes for host via Global Ledger Service
                     const myId = myIdRef.current;
                     const myNet = next.payouts?.[myId];
                     if (myNet !== undefined && walletRef.current) {
-                        let w = walletRef.current;
-                        if (myNet > 0) w = wallet.credit(w, myNet, 'Andar Bahar win');
-                        else if (myNet < 0) w = wallet.debit(w, -myNet, 'Andar Bahar bet');
-                        updateWallet(w);
+                        const event = new AndarBaharEngine(next).calculateResults(next);
+                        const deviceId = wallet.getDeviceId();
+                        const { updatedWallet } = ledger.processEvent(walletRef.current, event, myId, deviceId);
+                        updateWallet(updatedWallet);
+                        setLastPayoutEvent(event);
+                        setShowPostSummary(true);
                     }
                     addActivityLog(`Andar Bahar: ${next.result?.toUpperCase()} wins! Trump: ${next.trumpCard?.value}${next.trumpCard?.suit}`);
 
@@ -383,14 +418,16 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     setBlackjackGame(prev => {
                         // Apply wallet changes when game ends
                         if (gameState.phase === 'ended' && prev?.phase !== 'ended') {
-                            const payouts = bj.getPayouts(gameState);
-                            const myNet = payouts[myId];
+                            const event = new BlackjackEngine(gameState).calculateResults(gameState);
+                            const myNet = event.totals?.[myId];
                             if (myNet !== undefined && walletRef.current) {
-                                let w = walletRef.current;
-                                if (myNet > 0) w = wallet.credit(w, myNet, 'Blackjack win');
-                                else if (myNet < 0) w = wallet.debit(w, -myNet, 'Blackjack loss');
-                                // Update wallet asynchronously
-                                setTimeout(() => updateWallet(w), 0);
+                                const deviceId = wallet.getDeviceId();
+                                const { updatedWallet } = ledger.processEvent(walletRef.current, event, myId, deviceId);
+                                setTimeout(() => {
+                                    updateWallet(updatedWallet);
+                                    setLastPayoutEvent(event);
+                                    setShowPostSummary(true);
+                                }, 0);
                                 const resultText = myNet > 0 ? `won ${myNet}` : myNet < 0 ? `lost ${-myNet}` : 'pushed';
                                 addActivityLog(`Blackjack: ${myNick} ${resultText} chips`);
                             }
@@ -450,10 +487,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         if (gameState.phase === 'results' && prev?.phase !== 'results') {
                             const myNet = gameState.payouts?.[myId];
                             if (myNet !== undefined && walletRef.current) {
-                                let w = walletRef.current;
-                                if (myNet > 0) w = wallet.credit(w, myNet, 'Roulette win');
-                                else if (myNet < 0) w = wallet.debit(w, -myNet, 'Roulette bet');
-                                setTimeout(() => updateWallet(w), 0);
+                                const event = new RouletteEngine(gameState).calculateResults(gameState);
+                                const deviceId = wallet.getDeviceId();
+                                const { updatedWallet } = ledger.processEvent(walletRef.current, event, myId, deviceId);
+                                setTimeout(() => {
+                                    updateWallet(updatedWallet);
+                                    setLastPayoutEvent(event);
+                                    setShowPostSummary(true);
+                                }, 0);
                             }
                         }
                         return gameState;
@@ -485,10 +526,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         if (gameState.phase === 'ended' && prev?.phase !== 'ended') {
                             const myNet = gameState.payouts?.[myId];
                             if (myNet !== undefined && walletRef.current) {
-                                let w = walletRef.current;
-                                if (myNet > 0) w = wallet.credit(w, myNet, 'Andar Bahar win');
-                                else if (myNet < 0) w = wallet.debit(w, -myNet, 'Andar Bahar bet');
-                                setTimeout(() => updateWallet(w), 0);
+                                const event = new AndarBaharEngine(gameState).calculateResults(gameState);
+                                const deviceId = wallet.getDeviceId();
+                                const { updatedWallet } = ledger.processEvent(walletRef.current, event, myId, deviceId);
+                                setTimeout(() => {
+                                    updateWallet(updatedWallet);
+                                    setLastPayoutEvent(event);
+                                    setShowPostSummary(true);
+                                }, 0);
                             }
                         }
                         return gameState;
@@ -1069,7 +1114,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 </div>
                 <div className="header-status">
                     {myWallet && (
-                        <span className="header-chips">💰 {balance.toLocaleString()}</span>
+                        <>
+                            <button
+                                className="btn-account-history"
+                                onClick={() => setShowAccountHistory(true)}
+                                title="Account History"
+                            >📊</button>
+                            <span className="header-chips">💰 {balance.toLocaleString()}</span>
+                        </>
                     )}
                     <span className={`status-dot ${connected ? '' : 'offline'}`} />
                     <span>{connected ? `${myNick} — ${peers.length} online` : 'Connecting...'}</span>
@@ -1298,6 +1350,24 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             {/* How to Play Overlay — stacked above game, internal scroll only */}
             {showHelp && (
                 <HowToPlay activeGame={helpGame} onClose={() => setShowHelp(false)} />
+            )}
+
+            {/* Post-Session Summary — shown after every completed round */}
+            {showPostSummary && lastPayoutEvent && (
+                <PostSessionSummary
+                    event={lastPayoutEvent}
+                    myId={myIdRef.current}
+                    onClose={() => setShowPostSummary(false)}
+                />
+            )}
+
+            {/* Account History — full ledger view */}
+            {showAccountHistory && (
+                <AccountHistory
+                    deviceId={wallet.getDeviceId()}
+                    myId={myIdRef.current}
+                    onClose={() => setShowAccountHistory(false)}
+                />
             )}
 
             {/* Floating chat toggle — visible only when a game overlay is open */}

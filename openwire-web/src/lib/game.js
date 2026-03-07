@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════════════
    OpenWire Web — Tic-Tac-Toe game engine (JS port of game.rs)
    ═══════════════════════════════════════════════════════════ */
+import { createNonFinancialEvent } from './core/PayoutEvent.js';
 
 const EMPTY = 0, X = 1, O = 2;
 const WINS = [
@@ -102,6 +103,44 @@ export const TICTACTOE_RULES = {
         { name: 'Loss', odds: '—', description: 'Opponent completes a line first. Hit Rematch to get even.' },
     ],
 };
+
+/**
+ * Calculate a NonFinancialEvent for a completed Tic-Tac-Toe game.
+ * Records win/loss/draw stats for each player but does NOT trigger
+ * any wallet or ledger financial transactions.
+ *
+ * @param {object} g  The game object (result must be non-null)
+ * @returns {object}  NonFinancialEvent
+ */
+export function calculateResults(g) {
+    const resultLabel =
+        g.result === 'X' ? `${g.playerX.nick} wins` :
+        g.result === 'O' ? `${g.playerO.nick} wins` :
+        'Draw';
+
+    const playerStats = [];
+    if (g.playerX) {
+        playerStats.push({
+            peer_id: g.playerX.peer_id,
+            nick: g.playerX.nick,
+            outcome: g.result === 'X' ? 'win' : g.result === 'draw' ? 'draw' : 'loss',
+        });
+    }
+    if (g.playerO) {
+        playerStats.push({
+            peer_id: g.playerO.peer_id,
+            nick: g.playerO.nick,
+            outcome: g.result === 'O' ? 'win' : g.result === 'draw' ? 'draw' : 'loss',
+        });
+    }
+
+    return createNonFinancialEvent({
+        gameType: 'tictactoe',
+        roundId: `${g.roomId}-${Date.now()}`,
+        resultLabel,
+        playerStats,
+    });
+}
 
 // Game action helpers (match the Rust format)
 export function isGameMessage(data) {
