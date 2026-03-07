@@ -14,7 +14,8 @@ import { fetchFreeModels, generateMessage } from './openrouter.js';
 import { loadStore, getCharactersDict, getGroupsDict } from './agentStore.js';
 
 const CONTEXT_BUFFER_SIZE = 20;
-const FALLBACK_MODEL = 'meta-llama/llama-3.2-3b-instruct:free';
+const FALLBACK_MODEL = 'openrouter/auto';
+const DEFAULT_ALL_MODEL = 'openrouter/auto';
 const DEFAULT_MSG_PER_MIN = 8;
 const CROSSOVER_PROBABILITY = 0.7;
 
@@ -32,6 +33,7 @@ export class AgentSwarm {
         this._freeModels     = [];
         this._allFreeModels  = [];     // unfiltered for model tester
         this._modelOverrides = {};
+        this._defaultModel   = DEFAULT_ALL_MODEL;
         this._charEnabled    = {};
         this._groupEnabled   = {};
 
@@ -186,7 +188,12 @@ export class AgentSwarm {
 
     setModelOverride(characterId, modelId) {
         this._modelOverrides[characterId] = modelId || null;
-        this._log(`[Config] ${this._characters[characterId]?.name} model -> ${modelId || 'auto'}`);
+        this._log(`[Config] ${this._characters[characterId]?.name} model -> ${modelId || 'default'}`);
+    }
+
+    setDefaultModel(modelId) {
+        this._defaultModel = modelId || DEFAULT_ALL_MODEL;
+        this._log(`[Config] Default model for ALL -> ${this._defaultModel}`);
     }
 
     setChatterLevel(level) {
@@ -216,9 +223,10 @@ export class AgentSwarm {
     get characters()    { return this._characters; }
     get groups()        { return this._groups; }
     get modelFilters()  { return this._modelFilters; }
+    get defaultModel()  { return this._defaultModel; }
 
     getAssignedModel(characterId) {
-        return this._modelOverrides[characterId] || this._assignedModels[characterId] || FALLBACK_MODEL;
+        return this._modelOverrides[characterId] || this._defaultModel || this._assignedModels[characterId] || FALLBACK_MODEL;
     }
 
     isCharacterEnabled(characterId) { return !!this._charEnabled[characterId]; }

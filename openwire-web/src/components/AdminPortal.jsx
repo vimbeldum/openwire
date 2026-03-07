@@ -37,6 +37,7 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
     const [chatterLevel, setChatterLevel] = useState(swarm?.chatterLevel ?? 1.0);
     const [maxMsgPerMin, setMaxMsgPerMin] = useState(swarm?.maxMsgPerMin ?? 8);
     const [showLog, setShowLog] = useState(false);
+    const [defaultModel, setDefaultModel] = useState(swarm?.defaultModel ?? 'openrouter/auto');
     const [charMoods, setCharMoods] = useState(() => {
         const init = {};
         Object.keys(CHARACTERS).forEach(id => { init[id] = swarm?.getMood(id) ?? 'normal'; });
@@ -353,6 +354,33 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                             </div>
                         </div>
 
+                        {/* Default model for all characters */}
+                        <div className="admin-agents-controls" style={{ marginTop: 0 }}>
+                            <div className="admin-slider-group" style={{ flex: 1 }}>
+                                <label>Default Model for All:</label>
+                                <select
+                                    className="admin-model-select"
+                                    value={defaultModel}
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        setDefaultModel(val);
+                                        swarm?.setDefaultModel(val);
+                                        // Clear per-character overrides so they all use the default
+                                        setOverrides({});
+                                        Object.keys(CHARACTERS).forEach(id => swarm?.setModelOverride(id, null));
+                                    }}
+                                    disabled={swarmModels.length === 0}
+                                    style={{ width: '100%' }}
+                                >
+                                    {swarmModels.map(m => (
+                                        <option key={m.id} value={m.id}>
+                                            {formatModelLabel(m)}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
                         {/* Feature 3: God Mode log panel */}
                         {showLog && (
                             <div className="admin-log-panel">
@@ -426,7 +454,7 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                                                 disabled={swarmModels.length === 0}
                                                             >
                                                                 <option value="">
-                                                                    {modelObj ? `Auto: ${formatModelLabel(modelObj)}` : '— Auto —'}
+                                                                    {`— Use Default —`}
                                                                 </option>
                                                                 {swarmModels.map(m => (
                                                                     <option key={m.id} value={m.id}>
