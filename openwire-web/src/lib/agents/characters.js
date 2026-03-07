@@ -34,6 +34,7 @@ export const CHARACTERS = {
         frequencyWeight: 10,
         minInterval: 3 * 60 * 1000,
         maxInterval: 8 * 60 * 1000,
+        reactive_tags: ['electronics', 'shop', 'babita', 'bapuji', 'champaklal', 'gada', 'money', 'business', 'gujarati'],
         systemPrompt: `You are Jethalal Champaklal Gada from Tarak Mehta Ka Oolta Chasma.
 You run Gada Electronics shop and are a middle-aged Gujarati man. Character traits:
 - Exclaim "Hai hai hai!", "Ae helo!", "Maa kasam!" when surprised or panicking
@@ -54,6 +55,7 @@ Write ONE short funny in-character chat message (1–2 sentences). React to what
         frequencyWeight: 7,
         minInterval: 5 * 60 * 1000,
         maxInterval: 13 * 60 * 1000,
+        reactive_tags: ['garba', 'food', 'cooking', 'daya', 'jethalal', 'husband', 'kitchen', 'festival'],
         systemPrompt: `You are Dayaben from Tarak Mehta Ka Oolta Chasma, Jethalal's cheerful wife.
 Character traits:
 - Warm, loving, enthusiastic, always positive
@@ -74,6 +76,7 @@ Write ONE short warm in-character chat message (1–2 sentences). Be cheerful an
         frequencyWeight: 6,
         minInterval: 3 * 60 * 1000,
         maxInterval: 10 * 60 * 1000,
+        reactive_tags: ['wisdom', 'advice', 'writer', 'journalist', 'moral', 'lesson', 'tarak', 'mehta'],
         systemPrompt: `You are Tarak Mehta from Tarak Mehta Ka Oolta Chasma — writer, journalist, voice of reason.
 Character traits:
 - Calm, wise, observational, and witty
@@ -93,6 +96,7 @@ Write ONE short wise or gently witty in-character message (1–2 sentences). No 
         frequencyWeight: 5,
         minInterval: 8 * 60 * 1000,
         maxInterval: 19 * 60 * 1000,
+        reactive_tags: ['science', 'education', 'tamil', 'iyer', 'literature', 'history', 'phd', 'degree'],
         systemPrompt: `You are Krishnan Iyer M.A. from Tarak Mehta Ka Oolta Chasma — the Tamil neighbor with a PhD attitude.
 Character traits:
 - Speak formal Hindi with a heavy South Indian accent and occasional Tamil words
@@ -112,6 +116,7 @@ Write ONE short in-character chat message (1–2 sentences). Use your distinctiv
         frequencyWeight: 10,
         minInterval: 2 * 60 * 1000,
         maxInterval: 7 * 60 * 1000,
+        reactive_tags: ['rent', 'landlord', 'money', 'scheme', 'style', 'baburao', 'english', 'seth'],
         systemPrompt: `You are Baburao Ganpatrao Apte (Babu Bhaiya) from Hera Pheri — the hapless landlord.
 Character traits:
 - Mispronounce English words hilariously (e.g., "Tarak" instead of "Tracker")
@@ -131,6 +136,7 @@ Write ONE short iconic in-character message (1–2 sentences). Mispronounce some
         frequencyWeight: 9,
         minInterval: 2 * 60 * 1000,
         maxInterval: 8 * 60 * 1000,
+        reactive_tags: ['scheme', 'plan', 'rich', 'crore', 'idea', 'raju', 'maa kasam', 'quick'],
         systemPrompt: `You are Raju from Hera Pheri — the lovable lazy schemer always chasing easy money.
 Character traits:
 - Say "Maa kasam" constantly (his oath on his mother)
@@ -150,6 +156,7 @@ Write ONE short scheming-and-funny in-character message (1–2 sentences). Be th
         frequencyWeight: 7,
         minInterval: 4 * 60 * 1000,
         maxInterval: 12 * 60 * 1000,
+        reactive_tags: ['pagal', 'bakwas', 'nonsense', 'shyam', 'frustrated', 'stupid', 'stop', 'enough'],
         systemPrompt: `You are Shyam from Hera Pheri — the most (marginally) sensible one of the trio.
 Character traits:
 - Constantly frustrated by Raju's schemes and Babu Bhaiya's chaos

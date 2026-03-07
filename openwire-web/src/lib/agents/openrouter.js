@@ -34,10 +34,28 @@ export async function fetchFreeModels() {
  * @returns {string}
  */
 export function formatModelLabel(model) {
+    const name = model.name || model.id;
+    const params = extractParamCount(model);
     const ctx = model.context_length
-        ? `${Math.round(model.context_length / 1000)}k ctx`
+        ? `${Math.round(model.context_length / 1000)}k`
         : '';
-    return [model.name || model.id, ctx].filter(Boolean).join(' · ');
+    return [name, params, ctx].filter(Boolean).join(' | ');
+}
+
+function extractParamCount(model) {
+    // Try architecture.instruct_type or top_provider fields
+    const arch = model.architecture;
+    if (arch?.instruct_type) {
+        const m = arch.instruct_type.match(/(\d+\.?\d*)\s*[bB]/);
+        if (m) return `${m[1]}B`;
+    }
+    // Try extracting from model id (e.g. "llama-3.2-70b-instruct")
+    const idMatch = model.id?.match(/(\d+\.?\d*)[bB](?:\b|-)/i);
+    if (idMatch) return `${idMatch[1]}B`;
+    // Try extracting from model name
+    const nameMatch = model.name?.match(/(\d+\.?\d*)\s*[bB](?:\b|-)/i);
+    if (nameMatch) return `${nameMatch[1]}B`;
+    return '';
 }
 
 /**

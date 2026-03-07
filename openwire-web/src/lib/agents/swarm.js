@@ -101,6 +101,20 @@ export class AgentSwarm {
         if (!text || typeof text !== 'string') return;
         this._context.push({ role: 'user', content: `${nick}: ${text}` });
         if (this._context.length > CONTEXT_BUFFER_SIZE) this._context.shift();
+
+        // Reactive tags: check if any active character should respond immediately
+        if (!this._running) return;
+        const lower = text.toLowerCase();
+        Object.values(CHARACTERS).forEach(c => {
+            if (!this._isActive(c.id)) return;
+            if (!c.reactive_tags?.length) return;
+            const matched = c.reactive_tags.some(tag => lower.includes(tag.toLowerCase()));
+            if (matched) {
+                // Clear scheduled timer and fire immediately, then reschedule
+                if (this._timers[c.id]) clearTimeout(this._timers[c.id]);
+                this._generate(c.id).then(() => this._scheduleNext(c.id));
+            }
+        });
     }
 
     // ── Configuration ────────────────────────────────────────
@@ -168,7 +182,11 @@ export class AgentSwarm {
             if (!this._running) return;
 
             if (this._isActive(characterId)) {
-                await this._generate(characterId);
+                // Probability check: frequencyWeight/10 chance to speak this round
+                const roll = Math.random() * 10;
+                if (roll < c.frequencyWeight) {
+                    await this._generate(characterId);
+                }
             }
 
             this._scheduleNext(characterId);
