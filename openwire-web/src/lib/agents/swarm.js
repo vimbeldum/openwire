@@ -19,7 +19,7 @@ const CONTEXT_BUFFER_SIZE = 20;
 const FALLBACK_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
 const DEFAULT_ALL_MODEL = 'openrouter/auto';
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-lite';
-const DEFAULT_MSG_PER_MIN = 8;
+const DEFAULT_MSG_PER_MIN = 60;
 const CROSSOVER_PROBABILITY = 0.7;
 const MAX_RETRIES = 3;
 const BASE_BACKOFF_MS = 2000;
@@ -225,7 +225,7 @@ export class AgentSwarm {
     }
 
     setMaxMsgPerMin(limit) {
-        this._maxMsgPerMin = Math.max(1, Math.min(30, limit));
+        this._maxMsgPerMin = Math.max(1, Math.min(999, limit));
         this._log(`[Config] Max msg/min -> ${this._maxMsgPerMin}`);
     }
 

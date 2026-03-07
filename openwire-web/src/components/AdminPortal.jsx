@@ -347,15 +347,16 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                 />
                             </div>
                             <div className="admin-slider-group">
-                                <label>Max msg/min: <strong>{maxMsgPerMin}</strong></label>
+                                <label>Max msg/min:</label>
                                 <input
-                                    type="range" min="1" max="20" step="1"
+                                    type="number" min="1" max="999"
                                     value={maxMsgPerMin}
                                     onChange={e => {
-                                        const v = parseInt(e.target.value);
+                                        const v = Math.max(1, parseInt(e.target.value) || 1);
                                         setMaxMsgPerMin(v);
                                         swarm?.setMaxMsgPerMin(v);
                                     }}
+                                    style={{ width: 70, padding: '4px 8px', background: 'var(--bg-primary, #111)', color: 'var(--text, #ccc)', border: '1px solid var(--border, #333)', borderRadius: 4 }}
                                 />
                             </div>
                         </div>
