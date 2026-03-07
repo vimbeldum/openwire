@@ -440,11 +440,25 @@ export class AgentSwarm {
             systemPrompt += `\n\n[SESSION MEMORY] Things that happened earlier: ${factsStr}`;
         }
 
-        // Build context: last 7 messages plus trigger
-        const recent = this._context.slice(-7);
-        const trigger = recent.length
-            ? [{ role: 'user', content: `Recent conversation:\n${recent.map(m => m.content).join('\n')}\n\nNow respond in character with ONE short message.` }]
-            : [{ role: 'user', content: 'Say something fun and in-character for this chat room.' }];
+        // Build context: last 10 messages plus trigger
+        const recent = this._context.slice(-10);
+        let trigger;
+        if (recent.length) {
+            const convo = recent.map(m => m.content).join('\n');
+            const lastMsg = recent[recent.length - 1]?.content || '';
+            // Check if the last message is from a human (not an AI agent)
+            const agentNames = new Set(Object.values(this._characters).map(ch => ch.name));
+            const lastSender = lastMsg.match(/^([^:]+):/)?.[1]?.trim();
+            const isHumanMsg = lastSender && !agentNames.has(lastSender);
+
+            if (isHumanMsg) {
+                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\nYou MUST directly respond to what "${lastSender}" just said. React to THEIR message — agree, disagree, joke about it, or roast them. Do NOT ignore them or change the topic. Keep it 1-2 short lines.` }];
+            } else {
+                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\nRespond naturally to the conversation above. You can react to what was said OR bring up something new in character. Keep it 1-2 short lines.` }];
+            }
+        } else {
+            trigger = [{ role: 'user', content: 'Say something fun and in-character for this chat room. Keep it 1-2 short lines.' }];
+        }
 
         // Smart mention: identify who we're responding to
         const replyTo = this._getReplyTarget(recent);
