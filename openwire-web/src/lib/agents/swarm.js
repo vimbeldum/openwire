@@ -184,17 +184,25 @@ export class AgentSwarm {
         if (this._context.length > CONTEXT_BUFFER_SIZE) this._context.shift();
 
         if (!this._running) return;
-        const lower = text.toLowerCase();
-        Object.values(this._characters).forEach(c => {
-            if (!this._isActive(c.id)) return;
-            if (!c.reactive_tags?.length) return;
-            const matched = c.reactive_tags.some(tag => lower.includes(tag.toLowerCase()));
-            if (matched) {
-                this._log(`[Reactivity] ${c.name} triggered by keyword match in "${text.slice(0, 40)}..."`);
-                if (this._timers[c.id]) clearTimeout(this._timers[c.id]);
-                this._generate(c.id).then(() => this._scheduleNext(c.id));
-            }
-        });
+
+        // If the message contains @mentions, skip reactive triggers — let the
+        // @mention handler in ChatRoom handle priority queuing instead
+        const hasMention = /@\w+/.test(text);
+        if (hasMention) {
+            this._log(`[Reactivity] Skipped — message contains @mention, deferring to mention handler`);
+        } else {
+            const lower = text.toLowerCase();
+            Object.values(this._characters).forEach(c => {
+                if (!this._isActive(c.id)) return;
+                if (!c.reactive_tags?.length) return;
+                const matched = c.reactive_tags.some(tag => lower.includes(tag.toLowerCase()));
+                if (matched) {
+                    this._log(`[Reactivity] ${c.name} triggered by keyword match in "${text.slice(0, 40)}..."`);
+                    if (this._timers[c.id]) clearTimeout(this._timers[c.id]);
+                    this._generate(c.id).then(() => this._scheduleNext(c.id));
+                }
+            });
+        }
 
         this._checkMoodShifts(text);
     }
