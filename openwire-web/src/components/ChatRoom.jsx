@@ -14,10 +14,12 @@ import GifPicker from './GifPicker';
 import HowToPlay from './HowToPlay';
 import PostSessionSummary from './PostSessionSummary';
 import AccountHistory from './AccountHistory';
+import AgentControlPanel from './AgentControlPanel';
 import LiveTicker from './chat/LiveTicker';
 import TypingBar from './chat/TypingBar';
 import * as ledger from '../lib/core/ledger.js';
 import { getRoomAlias } from '../lib/core/identity.js';
+import { AgentSwarm } from '../lib/agents/swarm.js';
 import { RouletteEngine } from '../lib/roulette';
 import { BlackjackEngine } from '../lib/blackjack';
 import { AndarBaharEngine } from '../lib/andarbahar';
@@ -76,6 +78,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
     // Invites (room-level only; game invites are now in-chat messages)
     const [pendingInvites, setPendingInvites] = useState([]);
+
+    // Pop-Culture Agent Swarm
+    const [showAgentPanel, setShowAgentPanel] = useState(false);
+    const [agentRunning, setAgentRunning] = useState(false);
+    const swarmRef = useRef(null);
 
     // Bank Ledger (House P&L Tracker)
     const [bankLedger, setBankLedger] = useState(() => {
@@ -226,6 +233,41 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             reactions: {},
             ...extra,
         }]);
+        // Feed real chat messages into swarm context (not system/game messages)
+        if ((type === 'self' || type === 'peer') && content && !extra?.isAgent) {
+            swarmRef.current?.addContext(sender, content);
+        }
+    }, []);
+
+    // ── Agent Swarm bootstrap ─────────────────────────────────
+    useEffect(() => {
+        const swarm = new AgentSwarm({
+            onMessage: (characterId, nick, avatar, text) => {
+                const activeRoom = currentRoomRef.current;
+                // Inject locally as a peer-style message
+                addMsg(`${avatar} ${nick}`, text, 'peer', {
+                    roomId: activeRoom,
+                    isAgent: true,
+                    characterId,
+                });
+                // Broadcast to room so all members see it
+                if (activeRoom) {
+                    socket.sendRoomMessage(activeRoom, JSON.stringify({
+                        type: 'agent_message',
+                        characterId,
+                        nick: `${avatar} ${nick}`,
+                        text,
+                    }));
+                }
+                // Feed back into context
+                swarm.addContext(nick, text);
+            },
+            onError: (msg) => console.warn('[AgentSwarm]', msg),
+            onModelLoad: () => setAgentRunning(true),
+        });
+        swarmRef.current = swarm;
+        return () => swarm.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const addTicker = useCallback((text, gameType = 'casino') => {
@@ -357,6 +399,15 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         to: action.to, to_nick: action.to_nick, peer_id: msg.peer_id,
                         roomId: msg.room_id,
                     });
+                }
+                break;
+            case 'agent_message':
+                // Only show if it came from another peer (not ourself — we already showed it locally)
+                if (msg.peer_id !== myIdRef.current) {
+                    addMsg(action.nick, action.text, 'peer', {
+                        roomId: msg.room_id, isAgent: true, characterId: action.characterId,
+                    });
+                    swarmRef.current?.addContext(action.nick, action.text);
                 }
                 break;
         }
@@ -785,7 +836,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     if (!isBjMsg && !isRlMsg && !isAbMsg && !isGameMsg && msg.data?.startsWith('{')) {
                         try {
                             const parsed = JSON.parse(msg.data);
-                            const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper'];
+                            const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message'];
                             if (CUSTOM.includes(parsed.type)) customAction = parsed;
                         } catch { /* not JSON */ }
                     }
@@ -1295,6 +1346,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                             <span className="header-chips">💰 {balance.toLocaleString()}</span>
                         </>
                     )}
+                    <button
+                        className={`btn-agent-panel ${agentRunning ? 'active' : ''}`}
+                        onClick={() => setShowAgentPanel(v => !v)}
+                        title="Pop-Culture Agent Swarm"
+                    >🤖</button>
                     <span className={`status-dot ${connected ? '' : 'offline'}`} />
                     <span>{connected ? `${myNick} — ${peers.length} online` : 'Connecting...'}</span>
                 </div>
@@ -1580,6 +1636,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     deviceId={wallet.getDeviceId()}
                     myId={myIdRef.current}
                     onClose={() => setShowAccountHistory(false)}
+                />
+            )}
+
+            {/* Pop-Culture Agent Swarm Control Panel */}
+            {showAgentPanel && (
+                <AgentControlPanel
+                    swarm={swarmRef.current}
+                    onClose={() => setShowAgentPanel(false)}
                 />
             )}
 

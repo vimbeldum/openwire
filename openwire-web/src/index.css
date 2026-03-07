@@ -5414,3 +5414,269 @@ body {
 }
 .whisper-btn:hover, .tip-btn:hover { opacity: 1 !important; }
 .btn-account-history:hover { opacity: 1; }
+
+/* ── Agent Panel header button ───────────────────────────────── */
+.btn-agent-panel {
+  padding: 0 0.4rem;
+  background: transparent;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s, filter 0.15s;
+}
+.btn-agent-panel:hover  { opacity: 0.9; }
+.btn-agent-panel.active { opacity: 1; filter: drop-shadow(0 0 4px #a78bfa88); }
+
+/* ── Agent Control Panel ─────────────────────────────────────── */
+.acp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+}
+
+.acp-panel {
+  width: min(520px, 100vw);
+  height: 100dvh;
+  background: var(--glass-bg, #0e0e14);
+  border-left: 1px solid var(--glass-border, rgba(255,255,255,0.1));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header */
+.acp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  background: rgba(167,139,250,0.08);
+  border-bottom: 1px solid rgba(167,139,250,0.2);
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+.acp-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text, #e2e8f0);
+}
+.acp-model-count {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #a78bfa;
+  background: rgba(167,139,250,0.12);
+  border: 1px solid rgba(167,139,250,0.25);
+  border-radius: 10px;
+  padding: 0.1rem 0.45rem;
+}
+.acp-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.acp-toggle-swarm {
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid rgba(167,139,250,0.35);
+  background: rgba(167,139,250,0.1);
+  color: #c4b5fd;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.acp-toggle-swarm:hover  { background: rgba(167,139,250,0.2); }
+.acp-toggle-swarm.active { background: rgba(167,139,250,0.25); border-color: #a78bfa; color: #fff; }
+.acp-toggle-swarm:disabled { opacity: 0.5; cursor: wait; }
+.acp-close {
+  padding: 0.3rem 0.6rem;
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.acp-close:hover { color: var(--text); }
+
+/* Notices */
+.acp-error {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.8rem;
+  color: #f87171;
+  background: rgba(239,68,68,0.08);
+  border-bottom: 1px solid rgba(239,68,68,0.15);
+  flex-shrink: 0;
+}
+.acp-idle-notice {
+  padding: 0.6rem 1.25rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--glass-border);
+  font-style: italic;
+  flex-shrink: 0;
+}
+
+/* Scrollable body */
+.acp-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.5rem 0;
+}
+.acp-body::-webkit-scrollbar { width: 4px; }
+.acp-body::-webkit-scrollbar-track { background: transparent; }
+.acp-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+/* Show section */
+.acp-show-section {
+  margin-bottom: 0.25rem;
+}
+.acp-show-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.25rem;
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid var(--glass-border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.acp-show-emoji { font-size: 1rem; }
+.acp-show-name {
+  flex: 1;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-dim, #94a3b8);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.acp-all-btn {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.5rem;
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.acp-all-btn:hover { color: var(--text-dim); }
+
+/* Character row */
+.acp-char-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1.25rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.1s;
+}
+.acp-char-row:hover { background: rgba(255,255,255,0.02); }
+.acp-char-row.disabled { opacity: 0.4; }
+.acp-char-avatar { font-size: 1.3rem; flex-shrink: 0; }
+.acp-char-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.acp-char-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.acp-char-meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Model dropdown */
+.acp-model-select {
+  max-width: 180px;
+  font-size: 0.72rem;
+  padding: 0.25rem 0.4rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.acp-model-select:focus { outline: none; border-color: #a78bfa44; }
+.acp-model-select:disabled { opacity: 0.35; cursor: default; }
+
+/* Toggle switch */
+.acp-show-toggle,
+.acp-char-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.acp-show-toggle input,
+.acp-char-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.acp-toggle-track {
+  display: block;
+  width: 34px;
+  height: 18px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 9px;
+  transition: background 0.2s;
+  position: relative;
+}
+.acp-toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+.acp-show-toggle input:checked + .acp-toggle-track,
+.acp-char-toggle input:checked + .acp-toggle-track {
+  background: #a78bfa;
+}
+.acp-show-toggle input:checked + .acp-toggle-track::after,
+.acp-char-toggle input:checked + .acp-toggle-track::after {
+  transform: translateX(16px);
+}
+
+/* Agent messages in chat */
+.msg.peer[data-agent='true'],
+.msg.peer.agent {
+  border-left: 2px solid rgba(167,139,250,0.4);
+  padding-left: 0.4rem;
+}
+
+/* Footer */
+.acp-footer {
+  padding: 0.65rem 1.25rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--glass-border);
+  flex-shrink: 0;
+  font-style: italic;
+}
