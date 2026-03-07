@@ -18,7 +18,7 @@ import { loadStore, getCharactersDict, getGroupsDict } from './agentStore.js';
 const CONTEXT_BUFFER_SIZE = 20;
 const FALLBACK_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
 const DEFAULT_ALL_MODEL = 'openrouter/auto';
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-lite';
 const DEFAULT_MSG_PER_MIN = 8;
 const CROSSOVER_PROBABILITY = 0.7;
 const MAX_RETRIES = 3;
@@ -258,7 +258,8 @@ export class AgentSwarm {
                 }
             }
             // Auto-select gemini-2.5-flash as default
-            const flash = this._geminiModels.find(m => m.id.includes('gemini-2.5-flash'));
+            const flash = this._geminiModels.find(m => m.id.includes('gemini-2.5-flash-lite'))
+                || this._geminiModels.find(m => m.id.includes('gemini-2.5-flash'));
             this._defaultModel = flash?.id || this._geminiModels[0]?.id || DEFAULT_GEMINI_MODEL;
             this._log(`[Config] Default model -> ${this._defaultModel}`);
         } else {
