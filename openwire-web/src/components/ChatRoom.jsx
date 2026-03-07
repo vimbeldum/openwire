@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import * as socket from '../lib/socket';
 import * as game from '../lib/game';
 import * as bj from '../lib/blackjack';
@@ -1272,9 +1272,18 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     }, []);
 
     // ── @mention detection helper ─────────────────────────────
-    const agentNameMap = Object.fromEntries(
-        Object.values(CHARACTERS).map(c => [c.name.toLowerCase(), c.id])
-    );
+    // Map full name AND word aliases so @babita matches "Babita Ji", @hathi matches "Dr. Hathi", etc.
+    const agentNameMap = useMemo(() => {
+        const map = {};
+        Object.values(CHARACTERS).forEach(c => {
+            const full = c.name.toLowerCase();
+            map[full] = c.id;
+            // Add each word as an alias (e.g. "babita" & "ji" for "Babita Ji", "dr" & "hathi" for "Dr. Hathi")
+            const words = full.split(/[\s.]+/).filter(Boolean);
+            words.forEach(w => { if (!map[w]) map[w] = c.id; });
+        });
+        return map;
+    }, []);
 
     // Build cached list of all mentionable names (agents + online peers), sorted alphabetically
     const allMentionables = useCallback(() => {
