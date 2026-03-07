@@ -365,9 +365,12 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                 <div style={{ display: 'flex', gap: 8 }}>
                                     <button
                                         className={`admin-btn ${provider === 'openrouter' ? 'adjust' : ''}`}
-                                        onClick={() => {
+                                        onClick={async () => {
                                             setProvider('openrouter');
-                                            swarm?.setProvider('openrouter');
+                                            await swarm?.setProvider('openrouter');
+                                            setDefaultModel(swarm?.defaultModel ?? 'openrouter/auto');
+                                            setOverrides({});
+                                            Object.keys(CHARACTERS).forEach(id => swarm?.setModelOverride(id, null));
                                         }}
                                     >
                                         OpenRouter
@@ -381,11 +384,10 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                             try {
                                                 await swarm?.setProvider('gemini');
                                                 setGeminiModels(swarm?.geminiModels ?? []);
-                                                if (swarm?.geminiModels?.length > 0) {
-                                                    const first = swarm.geminiModels[0].id;
-                                                    setDefaultModel(first);
-                                                    swarm?.setDefaultModel(first);
-                                                }
+                                                // Read back the auto-selected default (gemini-2.5-flash)
+                                                setDefaultModel(swarm?.defaultModel ?? '');
+                                                setOverrides({});
+                                                Object.keys(CHARACTERS).forEach(id => swarm?.setModelOverride(id, null));
                                             } catch (_) {}
                                             setGeminiLoading(false);
                                         }}

@@ -18,6 +18,7 @@ import { loadStore, getCharactersDict, getGroupsDict } from './agentStore.js';
 const CONTEXT_BUFFER_SIZE = 20;
 const FALLBACK_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
 const DEFAULT_ALL_MODEL = 'openrouter/auto';
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 const DEFAULT_MSG_PER_MIN = 8;
 const CROSSOVER_PROBABILITY = 0.7;
 const MAX_RETRIES = 3;
@@ -122,10 +123,10 @@ export class AgentSwarm {
 
         try {
             this._freeModels = await fetchFreeModels(this._modelFilters);
-            this._log(`[Swarm] Fetched ${this._freeModels.length} free models (filtered)`);
+            this._log(`[Swarm] Fetched ${this._freeModels.length} free OpenRouter models`);
         } catch (e) {
             this._onError(`[Swarm] Model fetch failed: ${e.message}. Using fallback.`);
-            this._log(`[Swarm] Model fetch FAILED: ${e.message}`);
+            this._log(`[Swarm] OpenRouter model fetch FAILED: ${e.message}`);
             this._freeModels = [];
         }
 
@@ -246,14 +247,23 @@ export class AgentSwarm {
         this._provider = provider;
         this._log(`[Config] Provider -> ${provider}`);
 
-        if (provider === 'gemini' && this._geminiModels.length === 0) {
-            try {
-                this._geminiModels = await fetchGeminiModels();
-                this._log(`[Gemini] Fetched ${this._geminiModels.length} models`);
-            } catch (e) {
-                this._log(`[Gemini] Model fetch failed: ${e.message}`);
-                this._onError(`Gemini model fetch failed: ${e.message}`);
+        if (provider === 'gemini') {
+            if (this._geminiModels.length === 0) {
+                try {
+                    this._geminiModels = await fetchGeminiModels();
+                    this._log(`[Gemini] Fetched ${this._geminiModels.length} models`);
+                } catch (e) {
+                    this._log(`[Gemini] Model fetch failed: ${e.message}`);
+                    this._onError(`Gemini model fetch failed: ${e.message}`);
+                }
             }
+            // Auto-select gemini-2.5-flash as default
+            const flash = this._geminiModels.find(m => m.id.includes('gemini-2.5-flash'));
+            this._defaultModel = flash?.id || this._geminiModels[0]?.id || DEFAULT_GEMINI_MODEL;
+            this._log(`[Config] Default model -> ${this._defaultModel}`);
+        } else {
+            this._defaultModel = DEFAULT_ALL_MODEL;
+            this._log(`[Config] Default model -> ${this._defaultModel}`);
         }
     }
 
