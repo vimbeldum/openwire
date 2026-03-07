@@ -19,6 +19,7 @@ import LiveTicker from './chat/LiveTicker';
 import TypingBar from './chat/TypingBar';
 import * as ledger from '../lib/core/ledger.js';
 import { getRoomAlias } from '../lib/core/identity.js';
+import { CHARACTERS } from '../lib/agents/characters.js';
 
 function timeStr() {
     const d = new Date();
@@ -78,6 +79,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     // Pop-Culture Agent Swarm
     const [showAgentPanel, setShowAgentPanel] = useState(false);
     const [agentRunning, setAgentRunning] = useState(false);
+    const [mentionToasts, setMentionToasts] = useState([]);
     const swarmRef = useRef(null);
 
     // Bank Ledger (House P&L Tracker)
@@ -243,22 +245,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         if (cancelled) return;
         const swarm = new AgentSwarm({
             onMessage: (characterId, nick, avatar, text) => {
-                const activeRoom = currentRoomRef.current;
-                // Inject locally as a peer-style message
+                // Always post agent messages to General Chat (roomId: null)
                 addMsg(`${avatar} ${nick}`, text, 'peer', {
-                    roomId: activeRoom,
+                    roomId: null,
                     isAgent: true,
                     characterId,
                 });
-                // Broadcast to room so all members see it
-                if (activeRoom) {
-                    socket.sendRoomMessage(activeRoom, JSON.stringify({
-                        type: 'agent_message',
-                        characterId,
-                        nick: `${avatar} ${nick}`,
-                        text,
-                    }));
-                }
                 // Feed back into context
                 swarm.addContext(nick, text);
             },
@@ -266,6 +258,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             onModelLoad: () => setAgentRunning(true),
         });
         swarmRef.current = swarm;
+        // Auto-start the swarm so agents begin chatting immediately
+        swarm.start().catch(e => console.warn('[AgentSwarm] auto-start failed:', e));
         }); // end dynamic import
         return () => {
             cancelled = true;
@@ -413,6 +407,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         roomId: msg.room_id, isAgent: true, characterId: action.characterId,
                     });
                     swarmRef.current?.addContext(action.nick, action.text);
+                }
+                break;
+            case 'mention_notify':
+                if (action.to === myId) {
+                    const toastId = Date.now() + Math.random();
+                    setMentionToasts(prev => [...prev, { id: toastId, from: action.from_nick, text: action.text }]);
+                    setTimeout(() => setMentionToasts(prev => prev.filter(t => t.id !== toastId)), 5000);
                 }
                 break;
         }
@@ -804,6 +805,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     break;
                 case 'message':
                     addMsg(msg.nick, msg.data, 'peer');
+                    // Check if we were @mentioned in the general chat message
+                    if (msg.data && nickRef.current && msg.data.toLowerCase().includes(`@${nickRef.current.toLowerCase()}`)) {
+                        const toastId = Date.now() + Math.random();
+                        setMentionToasts(prev => [...prev, { id: toastId, from: msg.nick, text: msg.data }]);
+                        setTimeout(() => setMentionToasts(prev => prev.filter(t => t.id !== toastId)), 5000);
+                    }
                     break;
                 case 'room_created':
                     setRooms(prev => {
@@ -841,7 +848,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     if (!isBjMsg && !isRlMsg && !isAbMsg && !isGameMsg && msg.data?.startsWith('{')) {
                         try {
                             const parsed = JSON.parse(msg.data);
-                            const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message'];
+                            const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify'];
                             if (CUSTOM.includes(parsed.type)) customAction = parsed;
                         } catch { /* not JSON */ }
                     }
@@ -866,6 +873,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                             addMsg(msg.nick, '', 'peer', { gif: gifMatch[1], roomId: msg.room_id });
                         } else if (msg.data) {
                             addMsg(msg.nick, msg.data, 'peer', { roomId: msg.room_id });
+                            // Check if we were @mentioned
+                            if (nickRef.current && msg.data.toLowerCase().includes(`@${nickRef.current.toLowerCase()}`)) {
+                                const toastId = Date.now() + Math.random();
+                                setMentionToasts(prev => [...prev, { id: toastId, from: msg.nick, text: msg.data }]);
+                                setTimeout(() => setMentionToasts(prev => prev.filter(t => t.id !== toastId)), 5000);
+                            }
                         }
                     }
                     break;
@@ -1149,6 +1162,69 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         }
     }, [addMsg]);
 
+    // ── Render message content with @mention highlights ──────
+    const renderContent = useCallback((text) => {
+        if (!text || typeof text !== 'string') return text;
+        const parts = text.split(/(@\w+)/g);
+        if (parts.length === 1) return text;
+        return parts.map((part, i) => {
+            if (part.startsWith('@')) {
+                return <span key={i} className="mention-highlight">{part}</span>;
+            }
+            return part;
+        });
+    }, []);
+
+    // ── @mention detection helper ─────────────────────────────
+    const agentNameMap = Object.fromEntries(
+        Object.values(CHARACTERS).map(c => [c.name.toLowerCase(), c.id])
+    );
+
+    const processMentions = useCallback((text, senderNick) => {
+        const mentions = text.match(/@(\w+)/g);
+        if (!mentions) return;
+        const myNick = nickRef.current;
+        const currentPeers = peersRef.current;
+
+        mentions.forEach(raw => {
+            const name = raw.slice(1).toLowerCase();
+
+            // Check if it's an AI agent mention
+            const agentId = agentNameMap[name];
+            if (agentId && swarmRef.current?.running) {
+                // Feed the message into swarm context and trigger immediate response
+                swarmRef.current.addContext(senderNick, text);
+                const c = CHARACTERS[agentId];
+                if (c && swarmRef.current._isActive(agentId)) {
+                    if (swarmRef.current._timers[agentId]) clearTimeout(swarmRef.current._timers[agentId]);
+                    swarmRef.current._generate(agentId).then(() => swarmRef.current._scheduleNext(agentId));
+                }
+                return;
+            }
+
+            // Check if it's a user mention — notify via toast if it's us
+            if (name === myNick?.toLowerCase()) {
+                const toastId = Date.now() + Math.random();
+                setMentionToasts(prev => [...prev, { id: toastId, from: senderNick, text }]);
+                setTimeout(() => setMentionToasts(prev => prev.filter(t => t.id !== toastId)), 5000);
+            }
+            // Check if mentioning another peer — send notification via room
+            const target = currentPeers.find(p => p.nick?.toLowerCase() === name);
+            if (target && target.nick !== myNick) {
+                const activeRoom = currentRoomRef.current;
+                if (activeRoom) {
+                    socket.sendRoomMessage(activeRoom, JSON.stringify({
+                        type: 'mention_notify', to: target.peer_id, from_nick: senderNick, text,
+                    }));
+                } else {
+                    socket.sendChat(JSON.stringify({
+                        type: 'mention_notify', to: target.peer_id, from_nick: senderNick, text,
+                    }));
+                }
+            }
+        });
+    }, [agentNameMap]);
+
     // ── Command handler ──────────────────────────────────────
     const handleSend = (e) => {
         e.preventDefault();
@@ -1298,6 +1374,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             addMsg(myNick, text, 'self');
             socket.sendChat(text);
         }
+
+        // Process @mentions for user toasts and AI agent triggers
+        processMentions(text, myNick);
     };
 
     // ── Game move ────────────────────────────────────────────
@@ -1377,6 +1456,19 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 </div>
             )}
 
+            {/* @mention toasts */}
+            {mentionToasts.length > 0 && (
+                <div className="mention-toasts">
+                    {mentionToasts.map(t => (
+                        <div key={t.id} className="mention-toast">
+                            <span className="mention-toast-icon">@</span>
+                            <span><strong>{t.from}</strong> mentioned you: {t.text.length > 60 ? t.text.slice(0, 60) + '…' : t.text}</span>
+                            <button className="mention-toast-close" onClick={() => setMentionToasts(prev => prev.filter(x => x.id !== t.id))}>✕</button>
+                        </div>
+                    ))}
+                </div>
+            )}
+
             {/* Casino Live Ticker — game events only, separate from chat */}
             <LiveTicker items={tickerItems} />
 
@@ -1404,7 +1496,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                                 {m.gif ? (
                                     <img src={m.gif} alt="GIF" className="msg-gif" />
                                 ) : (
-                                    <span className="msg-content"> {m.content}</span>
+                                    <span className="msg-content"> {renderContent(m.content)}</span>
                                 )}
                                 {/* Emoji reaction display */}
                                 {m.reactions && Object.keys(m.reactions).length > 0 && (
@@ -1679,7 +1771,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                                 {m.gif ? (
                                     <img src={m.gif} alt="GIF" className="msg-gif" style={{ maxWidth: '140px' }} />
                                 ) : (
-                                    <span className="msg-content"> {m.content}</span>
+                                    <span className="msg-content"> {renderContent(m.content)}</span>
                                 )}
                             </div>
                         ))}
@@ -1718,6 +1810,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     activityLog={activityLog}
                     bannedIps={bannedIps}
                     bankLedger={bankLedger}
+                    swarm={swarmRef.current}
                     onKick={handleAdminKick}
                     onBanIp={handleAdminBanIp}
                     onUnbanIp={handleAdminUnbanIp}

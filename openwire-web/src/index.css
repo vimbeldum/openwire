@@ -1206,6 +1206,85 @@ body {
   color: var(--text-primary);
 }
 
+/* ── @Mention Toasts ──────────────────────────────────── */
+.mention-toasts {
+  position: fixed;
+  top: 70px;
+  left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 9999;
+  max-width: 360px;
+  pointer-events: all;
+}
+
+.mention-toast {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+  box-shadow: var(--shadow-elevated), 0 0 12px rgba(102, 161, 238, 0.3);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  animation: toastSlide 0.3s ease-out;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.mention-toast-icon {
+  font-weight: 900;
+  font-size: 1rem;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.mention-toast-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ── @Mention highlight in messages ──────────────────── */
+.mention-highlight {
+  color: var(--accent);
+  font-weight: 600;
+  background: rgba(102, 161, 238, 0.12);
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+/* ── Admin Agents tab ────────────────────────────────── */
+.admin-agents-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.admin-agents-show {
+  margin-bottom: 0.75rem;
+}
+
+.admin-agents-show-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--glass-border);
+  margin-bottom: 0.4rem;
+}
+
 /* ── Game Challenge Popup ───────────────────────── */
 .game-challenge {
   position: fixed;

@@ -1,14 +1,41 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getTotalHousePnl } from '../lib/casinoState.js';
+import { CHARACTERS, SHOWS, getShowCharacters } from '../lib/agents/characters.js';
+import { formatModelLabel } from '../lib/agents/openrouter.js';
 
-const TABS = ['Players', 'Ban List', 'Activity Log', 'Stats'];
+const TABS = ['Players', 'Ban List', 'Activity Log', 'Stats', 'Agents'];
 const GAME_LABELS = { roulette: '🎰 Roulette', blackjack: '🃏 Blackjack', andarbahar: '🎴 Andar Bahar', slots: '🎲 Slots' };
 
-export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, activityLog, bannedIps, bankLedger, casinoState, onClose }) {
+export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, activityLog, bannedIps, bankLedger, casinoState, swarm, onClose }) {
     const [tab, setTab] = useState('Players');
     const [adjustTarget, setAdjustTarget] = useState(null);
     const [adjustAmount, setAdjustAmount] = useState(100);
     const [pnlFilter, setPnlFilter] = useState('all');
+
+    // Agent swarm state
+    const [swarmRunning, setSwarmRunning] = useState(swarm?.running ?? false);
+    const [swarmModels, setSwarmModels] = useState(swarm?.freeModels ?? []);
+    const [charEnabled, setCharEnabled] = useState(() => {
+        const init = {};
+        Object.keys(CHARACTERS).forEach(id => { init[id] = swarm?.isCharacterEnabled(id) ?? true; });
+        return init;
+    });
+    const [showEnabled, setShowEnabled] = useState(() => {
+        const init = {};
+        Object.keys(SHOWS).forEach(id => { init[id] = swarm?.isShowEnabled(id) ?? true; });
+        return init;
+    });
+    const [swarmLoading, setSwarmLoading] = useState(false);
+    const [assigned, setAssigned] = useState({});
+
+    useEffect(() => {
+        if (!swarm) return;
+        setSwarmRunning(swarm.running);
+        setSwarmModels(swarm.freeModels);
+        const map = {};
+        Object.keys(CHARACTERS).forEach(id => { map[id] = swarm.getAssignedModel(id); });
+        setAssigned(map);
+    }, [swarm]);
 
     const totalChips = peers.reduce((s, p) => s + (p.balance || 0), 0);
     const richest = peers.reduce((best, p) => (!best || (p.balance || 0) > (best.balance || 0)) ? p : best, null);
@@ -227,6 +254,105 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                         </div>
                     );
                 })()}
+
+                {/* Agents tab */}
+                {tab === 'Agents' && (
+                    <div className="admin-content">
+                        <div className="admin-agents-header">
+                            <button
+                                className={`admin-btn ${swarmRunning ? 'ban' : 'adjust'}`}
+                                onClick={async () => {
+                                    if (!swarm) return;
+                                    if (swarmRunning) {
+                                        swarm.stop();
+                                        setSwarmRunning(false);
+                                    } else {
+                                        setSwarmLoading(true);
+                                        try {
+                                            await swarm.start();
+                                            setSwarmRunning(true);
+                                            setSwarmModels(swarm.freeModels);
+                                            const map = {};
+                                            Object.keys(CHARACTERS).forEach(id => { map[id] = swarm.getAssignedModel(id); });
+                                            setAssigned(map);
+                                        } catch (_) { /* handled by swarm onError */ }
+                                        setSwarmLoading(false);
+                                    }
+                                }}
+                                disabled={swarmLoading}
+                            >
+                                {swarmLoading ? '⏳ Loading…' : swarmRunning ? '⏸ Stop Swarm' : '▶ Start Swarm'}
+                            </button>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85em' }}>
+                                {swarmModels.length > 0 ? `${swarmModels.length} free models loaded` : 'Start swarm to load models'}
+                            </span>
+                        </div>
+
+                        {Object.values(SHOWS).map(show => {
+                            const chars = getShowCharacters(show.id);
+                            return (
+                                <div key={show.id} className="admin-agents-show">
+                                    <div className="admin-agents-show-header">
+                                        <span>{show.emoji} {show.name}</span>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={showEnabled[show.id] ?? true}
+                                                onChange={e => {
+                                                    swarm?.setShowEnabled(show.id, e.target.checked);
+                                                    setShowEnabled(prev => ({ ...prev, [show.id]: e.target.checked }));
+                                                }}
+                                            />
+                                            Enabled
+                                        </label>
+                                    </div>
+                                    <table className="admin-table" style={{ marginBottom: 12 }}>
+                                        <thead>
+                                            <tr>
+                                                <th></th>
+                                                <th>Character</th>
+                                                <th>Model</th>
+                                                <th>Interval</th>
+                                                <th>Weight</th>
+                                                <th>Active</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {chars.map(c => {
+                                                const modelId = assigned[c.id] || '';
+                                                const modelObj = swarmModels.find(m => m.id === modelId);
+                                                return (
+                                                    <tr key={c.id} style={{ opacity: (charEnabled[c.id] && showEnabled[show.id]) ? 1 : 0.4 }}>
+                                                        <td>{c.avatar}</td>
+                                                        <td>{c.name}</td>
+                                                        <td style={{ fontSize: '0.8em', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                            {modelObj ? formatModelLabel(modelObj) : (modelId || '—')}
+                                                        </td>
+                                                        <td>{Math.round(c.minInterval / 60000)}–{Math.round(c.maxInterval / 60000)}m</td>
+                                                        <td>{c.frequencyWeight}/10</td>
+                                                        <td>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={charEnabled[c.id] ?? true}
+                                                                onChange={e => {
+                                                                    swarm?.setCharacterEnabled(c.id, e.target.checked);
+                                                                    setCharEnabled(prev => ({ ...prev, [c.id]: e.target.checked }));
+                                                                }}
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            );
+                        })}
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.8em', marginTop: 8 }}>
+                            Agent messages appear in General Chat only.
+                        </div>
+                    </div>
+                )}
             </div>
         </div >
     );
