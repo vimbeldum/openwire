@@ -19,7 +19,7 @@ import LiveTicker from './chat/LiveTicker';
 import TypingBar from './chat/TypingBar';
 import * as ledger from '../lib/core/ledger.js';
 import { getRoomAlias } from '../lib/core/identity.js';
-import { CHARACTERS } from '../lib/agents/characters.js';
+import { loadStore, getCharactersDict } from '../lib/agents/agentStore.js';
 
 function timeStr() {
     const d = new Date();
@@ -45,6 +45,9 @@ function saveMessages(messages) {
 }
 
 export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin }) {
+    // Dynamic agent characters from store (for @mention matching)
+    const CHARACTERS = getCharactersDict(loadStore());
+
     const [messages, setMessages] = useState(() => loadMessages());
     const [input, setInput] = useState('');
     const [peers, setPeers] = useState([]);

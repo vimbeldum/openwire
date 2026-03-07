@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getTotalHousePnl } from '../lib/casinoState.js';
-import { CHARACTERS, SHOWS, getShowCharacters } from '../lib/agents/characters.js';
+import { loadStore, getCharactersDict, getGroupsDict, getGroupCharacters } from '../lib/agents/agentStore.js';
 import { formatModelLabel } from '../lib/agents/openrouter.js';
 
 const TABS = ['Players', 'Ban List', 'Activity Log', 'Stats', 'Agents'];
@@ -12,6 +12,11 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
     const [adjustTarget, setAdjustTarget] = useState(null);
     const [adjustAmount, setAdjustAmount] = useState(100);
     const [pnlFilter, setPnlFilter] = useState('all');
+
+    // Dynamic store
+    const [agentStore] = useState(loadStore);
+    const CHARACTERS = getCharactersDict(agentStore);
+    const SHOWS = getGroupsDict(agentStore);
 
     // Agent swarm state
     const [swarmRunning, setSwarmRunning] = useState(swarm?.running ?? false);
@@ -372,7 +377,7 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
 
                         {/* Character table per show */}
                         {Object.values(SHOWS).map(show => {
-                            const chars = getShowCharacters(show.id);
+                            const chars = getGroupCharacters(agentStore, show.id);
                             return (
                                 <div key={show.id} className="admin-agents-show">
                                     <div className="admin-agents-show-header">

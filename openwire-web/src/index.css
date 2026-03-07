@@ -5839,3 +5839,266 @@ body {
   flex-shrink: 0;
   font-style: italic;
 }
+
+/* ── ACP Tab Bar ─────────────────────────────────────── */
+.acp-tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0;
+}
+
+.acp-tab-btn {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.acp-tab-btn.active {
+  color: var(--accent, #66a1ee);
+  border-bottom-color: var(--accent, #66a1ee);
+}
+
+.acp-tab-btn:hover:not(.active) {
+  color: var(--text-primary);
+}
+
+/* ── ACP Section Titles ──────────────────────────────── */
+.acp-section-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.5rem;
+}
+
+/* ── ACP Entity List (groups/chars) ──────────────────── */
+.acp-entity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 0.75rem;
+}
+
+.acp-entity-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm, 4px);
+  font-size: 0.82rem;
+}
+
+.acp-entity-id {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  margin-left: auto;
+}
+
+.acp-entity-count {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.acp-entity-del {
+  background: none;
+  border: none;
+  color: #f44336;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.acp-entity-del:hover {
+  background: rgba(244, 67, 54, 0.15);
+}
+
+/* ── ACP Add Forms ───────────────────────────────────── */
+.acp-add-form {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.acp-char-form {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.acp-form-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.acp-form-row label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.acp-add-form input,
+.acp-add-form select,
+.acp-add-form textarea {
+  background: var(--bg-secondary, #1a1a2e);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm, 4px);
+  padding: 0.3rem 0.5rem;
+  font-size: 0.78rem;
+  font-family: var(--font);
+  flex: 1;
+  min-width: 80px;
+}
+
+.acp-add-form textarea {
+  resize: vertical;
+  min-height: 50px;
+}
+
+.acp-add-btn {
+  background: var(--accent, #66a1ee);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm, 4px);
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.acp-add-btn:hover { opacity: 0.85; }
+.acp-add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.acp-reset-btn {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm, 4px);
+  padding: 0.3rem 0.75rem;
+  font-size: 0.72rem;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.acp-reset-btn:hover { color: #f44336; border-color: #f44336; }
+
+/* ── ACP Model Tester ────────────────────────────────── */
+.acp-tester-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.acp-test-result {
+  padding: 0.75rem;
+  border-radius: var(--radius-sm, 4px);
+  margin-bottom: 0.75rem;
+  font-size: 0.82rem;
+}
+
+.acp-test-result.ok {
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.acp-test-result.fail {
+  background: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+}
+
+.acp-test-label {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.acp-test-text {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.acp-test-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.acp-wl-btn, .acp-bl-btn {
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius-sm, 4px);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+
+.acp-wl-btn {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+}
+
+.acp-bl-btn {
+  background: rgba(244, 67, 54, 0.2);
+  color: #f44336;
+}
+
+.acp-wl-btn:hover { background: rgba(76, 175, 80, 0.35); }
+.acp-bl-btn:hover { background: rgba(244, 67, 54, 0.35); }
+
+/* ── ACP Filter Lists ────────────────────────────────── */
+.acp-filter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 0.5rem;
+}
+
+.acp-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm, 4px);
+  font-size: 0.78rem;
+}
+
+.acp-filter-row.wl { background: rgba(76, 175, 80, 0.08); }
+.acp-filter-row.bl { background: rgba(244, 67, 54, 0.08); }
+
+.acp-filter-row button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.acp-filter-row button:hover { color: var(--text-primary); }
+
+.acp-tester-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 0.5rem;
+}

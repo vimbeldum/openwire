@@ -3,48 +3,22 @@
    Manages per-character timers, model assignment, shared chat
    context, and message generation via the OpenRouter service.
 
-   Features:
-     - Cross-over engine (agent-to-agent reactivity)
-     - Dynamic mood states per character
-     - God-mode logging for admin debugger
-     - Ephemeral session memory (session_facts)
-     - Global throttle & chatter level
-     - Typing indicators
+   Now uses dynamic config from agentStore instead of hardcoded
+   imports. Supports hot-reload via loadConfig().
+
+   Features: cross-over, moods, god-mode logging, session memory,
+   throttle, typing indicators, smart @mention tagging.
    ═══════════════════════════════════════════════════════════ */
 
-import { CHARACTERS, SHOWS } from './characters.js';
 import { fetchFreeModels, generateMessage } from './openrouter.js';
+import { loadStore, getCharactersDict, getGroupsDict } from './agentStore.js';
 
-/** How many recent messages to keep in the shared context buffer */
 const CONTEXT_BUFFER_SIZE = 20;
-
-/** Default fallback free model if none are fetched */
 const FALLBACK_MODEL = 'meta-llama/llama-3.2-3b-instruct:free';
-
-/** Max global messages per minute before throttle kicks in */
 const DEFAULT_MSG_PER_MIN = 8;
-
-/** Cross-over probability (0–1): chance an agent responds to a triggering agent */
 const CROSSOVER_PROBABILITY = 0.7;
 
-/**
- * AgentSwarm — orchestrates multiple character agents.
- *
- * Usage:
- *   const swarm = new AgentSwarm({ onMessage, onError, onModelLoad, onLog, onTyping });
- *   await swarm.start();
- *   swarm.addContext('UserNick', 'some message text');
- *   swarm.stop();
- */
 export class AgentSwarm {
-    /**
-     * @param {object} opts
-     * @param {Function} opts.onMessage    Called with (characterId, nick, avatar, text)
-     * @param {Function} [opts.onError]    Called with (errorString)
-     * @param {Function} [opts.onModelLoad] Called with (modelsArray) after init
-     * @param {Function} [opts.onLog]      Called with (logString) for god-mode debugger
-     * @param {Function} [opts.onTyping]   Called with (characterId, nick, avatar, isTyping)
-     */
     constructor({ onMessage, onError, onModelLoad, onLog, onTyping }) {
         this._onMessage   = onMessage;
         this._onError     = onError   || (() => {});
@@ -53,52 +27,88 @@ export class AgentSwarm {
         this._onTyping    = onTyping  || (() => {});
 
         this._running = false;
-        this._timers  = {};            // { characterId: timeoutId }
+        this._timers  = {};
 
-        this._freeModels     = [];     // cached from OpenRouter
-        this._modelOverrides = {};     // { characterId: modelId }
-        this._charEnabled    = {};     // { characterId: bool }
-        this._showEnabled    = {};     // { showId: bool }
+        this._freeModels     = [];
+        this._allFreeModels  = [];     // unfiltered for model tester
+        this._modelOverrides = {};
+        this._charEnabled    = {};
+        this._groupEnabled   = {};
 
-        // Shared context: last N messages for agents to react to
-        this._context = [];            // [{ role:'user', content:'Nick: text' }]
-
-        // Per-character assigned model (randomised on init, sticks until override)
+        this._context = [];
         this._assignedModels = {};
+        this._moods = {};
+        this._sessionFacts = [];
+        this._factTimer = null;
 
-        // Feature 2: Dynamic mood states
-        this._moods = {};              // { characterId: 'normal' | 'panicking' | etc. }
-
-        // Feature 4: Ephemeral session memory
-        this._sessionFacts = [];       // ["User Nick claimed he owed Raju money", ...]
-        this._factTimer = null;        // periodic summarizer interval
-
-        // Feature 5: Throttle
         this._messagesThisMinute = 0;
         this._throttleTimer = null;
         this._maxMsgPerMin = DEFAULT_MSG_PER_MIN;
-        this._chatterLevel = 1.0;      // 0.25 = quiet, 1.0 = normal, 2.0 = chaotic
+        this._chatterLevel = 1.0;
 
-        // Seed enabled state from character defaults
-        Object.values(CHARACTERS).forEach(c => {
-            this._charEnabled[c.id] = true;
-            this._moods[c.id] = 'normal';
+        // Dynamic config — loaded from agentStore
+        this._characters = {};  // dict { id: charObj }
+        this._groups = {};      // dict { id: groupObj }
+        this._modelFilters = { whitelist: [], blacklist: [] };
+
+        // Load initial config from store
+        this._loadFromStore();
+    }
+
+    // ── Config loading ────────────────────────────────────────
+
+    _loadFromStore() {
+        const store = loadStore();
+        this._characters = getCharactersDict(store);
+        this._groups = getGroupsDict(store);
+        this._modelFilters = store.modelFilters || { whitelist: [], blacklist: [] };
+
+        // Seed enabled state
+        Object.keys(this._characters).forEach(id => {
+            if (this._charEnabled[id] === undefined) {
+                this._charEnabled[id] = true;
+                this._moods[id] = 'normal';
+            }
         });
-        Object.values(SHOWS).forEach(s => { this._showEnabled[s.id] = true; });
+        Object.keys(this._groups).forEach(id => {
+            if (this._groupEnabled[id] === undefined) this._groupEnabled[id] = true;
+        });
+    }
+
+    /** Hot-reload config from agentStore without stopping the swarm */
+    loadConfig() {
+        const wasRunning = this._running;
+
+        // Stop existing timers
+        Object.values(this._timers).forEach(t => clearTimeout(t));
+        this._timers = {};
+
+        this._loadFromStore();
+        this._log('[Config] Hot-reloaded from agentStore');
+
+        // Restart timers for any new characters
+        if (wasRunning) {
+            Object.keys(this._characters).forEach((id, idx) => {
+                if (!this._timers[id]) {
+                    setTimeout(() => this._scheduleNext(id), idx * 3_000);
+                }
+            });
+        }
     }
 
     // ── Public lifecycle ─────────────────────────────────────
 
-    /** Load models, assign them to characters, and start all timers. */
     async start() {
         if (this._running) return;
         this._running = true;
-
         this._log('[Swarm] Starting...');
 
+        // Re-load latest config
+        this._loadFromStore();
+
         try {
-            this._freeModels = await fetchFreeModels();
-            this._log(`[Swarm] Fetched ${this._freeModels.length} free models`);
+            this._freeModels = await fetchFreeModels(this._modelFilters);
+            this._log(`[Swarm] Fetched ${this._freeModels.length} free models (filtered)`);
         } catch (e) {
             this._onError(`[Swarm] Model fetch failed: ${e.message}. Using fallback.`);
             this._log(`[Swarm] Model fetch FAILED: ${e.message}`);
@@ -108,18 +118,15 @@ export class AgentSwarm {
         this._onModelLoad(this._freeModels);
         this._assignModels();
 
-        // Throttle reset timer: reset counter every 60s
         this._throttleTimer = setInterval(() => { this._messagesThisMinute = 0; }, 60_000);
 
-        // Stagger initial timers so characters don't all fire simultaneously
-        Object.keys(CHARACTERS).forEach((id, idx) => {
+        Object.keys(this._characters).forEach((id, idx) => {
             setTimeout(() => this._scheduleNext(id), idx * 7_000);
         });
 
         this._log('[Swarm] All timers scheduled');
     }
 
-    /** Stop all character timers. */
     stop() {
         this._running = false;
         Object.values(this._timers).forEach(t => clearTimeout(t));
@@ -129,21 +136,29 @@ export class AgentSwarm {
         this._log('[Swarm] Stopped');
     }
 
+    /** Refresh model pool after filter changes (without full restart) */
+    async refreshModels() {
+        this._loadFromStore(); // pick up latest filters
+        try {
+            this._freeModels = await fetchFreeModels(this._modelFilters);
+            this._log(`[Swarm] Refreshed models: ${this._freeModels.length} available`);
+            this._onModelLoad(this._freeModels);
+            this._assignModels();
+        } catch (e) {
+            this._log(`[Swarm] Model refresh failed: ${e.message}`);
+        }
+    }
+
     // ── Context management ───────────────────────────────────
 
-    /**
-     * Feed a new chat message into the shared context buffer.
-     * Call this from ChatRoom whenever a user or peer sends a message.
-     */
     addContext(nick, text) {
         if (!text || typeof text !== 'string') return;
         this._context.push({ role: 'user', content: `${nick}: ${text}` });
         if (this._context.length > CONTEXT_BUFFER_SIZE) this._context.shift();
 
-        // Reactive tags: check if any active character should respond immediately
         if (!this._running) return;
         const lower = text.toLowerCase();
-        Object.values(CHARACTERS).forEach(c => {
+        Object.values(this._characters).forEach(c => {
             if (!this._isActive(c.id)) return;
             if (!c.reactive_tags?.length) return;
             const matched = c.reactive_tags.some(tag => lower.includes(tag.toLowerCase()));
@@ -154,7 +169,6 @@ export class AgentSwarm {
             }
         });
 
-        // Feature 2: Mood shift based on sentiment triggers
         this._checkMoodShifts(text);
     }
 
@@ -162,100 +176,88 @@ export class AgentSwarm {
 
     setCharacterEnabled(characterId, enabled) {
         this._charEnabled[characterId] = enabled;
-        this._log(`[Config] ${CHARACTERS[characterId]?.name} ${enabled ? 'enabled' : 'disabled'}`);
+        this._log(`[Config] ${this._characters[characterId]?.name} ${enabled ? 'enabled' : 'disabled'}`);
     }
 
     setShowEnabled(showId, enabled) {
-        this._showEnabled[showId] = enabled;
-        this._log(`[Config] Show ${SHOWS[showId]?.name} ${enabled ? 'enabled' : 'disabled'}`);
+        this._groupEnabled[showId] = enabled;
+        this._log(`[Config] Group ${this._groups[showId]?.name} ${enabled ? 'enabled' : 'disabled'}`);
     }
 
     setModelOverride(characterId, modelId) {
         this._modelOverrides[characterId] = modelId || null;
-        this._log(`[Config] ${CHARACTERS[characterId]?.name} model → ${modelId || 'auto'}`);
+        this._log(`[Config] ${this._characters[characterId]?.name} model -> ${modelId || 'auto'}`);
     }
 
-    /** Set the chatter level multiplier (0.25 = quiet, 1.0 = normal, 2.0 = chaotic) */
     setChatterLevel(level) {
         this._chatterLevel = Math.max(0.1, Math.min(3.0, level));
-        this._log(`[Config] Chatter level → ${this._chatterLevel.toFixed(2)}`);
+        this._log(`[Config] Chatter level -> ${this._chatterLevel.toFixed(2)}`);
     }
 
-    /** Set the max messages per minute */
     setMaxMsgPerMin(limit) {
         this._maxMsgPerMin = Math.max(1, Math.min(30, limit));
-        this._log(`[Config] Max msg/min → ${this._maxMsgPerMin}`);
+        this._log(`[Config] Max msg/min -> ${this._maxMsgPerMin}`);
     }
 
-    /** Set a character's mood */
     setMood(characterId, mood) {
-        const c = CHARACTERS[characterId];
+        const c = this._characters[characterId];
         if (!c || !c.moods?.[mood]) return;
         this._moods[characterId] = mood;
-        this._log(`[Mood] ${c.name} → ${mood}`);
+        this._log(`[Mood] ${c.name} -> ${mood}`);
     }
 
     // ── Read-only state ──────────────────────────────────────
 
     get running()       { return this._running; }
     get freeModels()    { return this._freeModels; }
-    get logs()          { return this._logBuffer; }
     get chatterLevel()  { return this._chatterLevel; }
     get maxMsgPerMin()  { return this._maxMsgPerMin; }
     get sessionFacts()  { return this._sessionFacts; }
+    get characters()    { return this._characters; }
+    get groups()        { return this._groups; }
+    get modelFilters()  { return this._modelFilters; }
 
     getAssignedModel(characterId) {
         return this._modelOverrides[characterId] || this._assignedModels[characterId] || FALLBACK_MODEL;
     }
 
-    isCharacterEnabled(characterId) {
-        return !!this._charEnabled[characterId];
-    }
+    isCharacterEnabled(characterId) { return !!this._charEnabled[characterId]; }
+    isShowEnabled(showId)           { return !!this._groupEnabled[showId]; }
 
-    isShowEnabled(showId) {
-        return !!this._showEnabled[showId];
-    }
-
-    getMood(characterId) {
-        return this._moods[characterId] || 'normal';
-    }
+    getMood(characterId) { return this._moods[characterId] || 'normal'; }
 
     getMoods(characterId) {
-        return Object.keys(CHARACTERS[characterId]?.moods || {});
+        return Object.keys(this._characters[characterId]?.moods || { normal: '' });
     }
 
     // ── Private helpers ──────────────────────────────────────
 
     _log(msg) {
         const ts = new Date().toLocaleTimeString('en-GB', { hour12: false });
-        const line = `[${ts}] ${msg}`;
-        this._onLog(line);
+        this._onLog(`[${ts}] ${msg}`);
     }
 
-    /** Randomly assign a free model to each character on start */
     _assignModels() {
         const pool = this._freeModels.length ? this._freeModels : [{ id: FALLBACK_MODEL }];
-        Object.keys(CHARACTERS).forEach(id => {
+        Object.keys(this._characters).forEach(id => {
             const model = pool[Math.floor(Math.random() * pool.length)];
             this._assignedModels[id] = model.id;
-            this._log(`[Model] ${CHARACTERS[id].name} → ${model.id.split('/').pop()}`);
+            this._log(`[Model] ${this._characters[id].name} -> ${model.id.split('/').pop()}`);
         });
     }
 
     _isActive(characterId) {
-        const c = CHARACTERS[characterId];
+        const c = this._characters[characterId];
         return c
             && this._charEnabled[characterId]
-            && this._showEnabled[c.show];
+            && this._groupEnabled[c.groupId || c.show];
     }
 
-    /** Schedule the next message for a character within their configured window */
     _scheduleNext(characterId) {
         if (!this._running) return;
-        const c = CHARACTERS[characterId];
+        const c = this._characters[characterId];
         if (!c) return;
 
-        // Chatter level scales intervals inversely: higher level = shorter delays
         const scale = 1 / Math.max(0.1, this._chatterLevel);
         const delay = (c.minInterval + Math.random() * (c.maxInterval - c.minInterval)) * scale;
 
@@ -265,10 +267,10 @@ export class AgentSwarm {
             if (this._isActive(characterId)) {
                 const roll = Math.random() * 10;
                 if (roll < c.frequencyWeight) {
-                    this._log(`[Timer] ${c.name} fired → rolled ${roll.toFixed(1)} (needed < ${c.frequencyWeight}) → Generating...`);
+                    this._log(`[Timer] ${c.name} fired -> rolled ${roll.toFixed(1)} (needed < ${c.frequencyWeight}) -> Generating...`);
                     await this._generate(characterId);
                 } else {
-                    this._log(`[Timer] ${c.name} fired → rolled ${roll.toFixed(1)} (needed < ${c.frequencyWeight}) → Skipped`);
+                    this._log(`[Timer] ${c.name} fired -> rolled ${roll.toFixed(1)} (needed < ${c.frequencyWeight}) -> Skipped`);
                 }
             }
 
@@ -276,54 +278,60 @@ export class AgentSwarm {
         }, delay);
     }
 
-    /** Generate and emit a message for the given character */
     async _generate(characterId) {
-        // Feature 5: Throttle check
         if (this._messagesThisMinute >= this._maxMsgPerMin) {
-            this._log(`[Throttle] ${CHARACTERS[characterId].name} blocked — ${this._messagesThisMinute}/${this._maxMsgPerMin} msg/min`);
+            this._log(`[Throttle] ${this._characters[characterId]?.name} blocked — ${this._messagesThisMinute}/${this._maxMsgPerMin} msg/min`);
             return;
         }
 
-        const c = CHARACTERS[characterId];
+        const c = this._characters[characterId];
+        if (!c) return;
         const modelId = this.getAssignedModel(characterId);
 
-        // Feature 2: Build system prompt with mood modifier
+        // Build system prompt with mood modifier
         let systemPrompt = c.systemPrompt;
         const mood = this._moods[characterId];
         if (mood && mood !== 'normal' && c.moods?.[mood]) {
             systemPrompt += `\n\n[CURRENT MOOD: ${mood.toUpperCase()}] ${c.moods[mood]}`;
         }
 
-        // Feature 4: Inject session facts into system prompt
+        // Inject session facts
         if (this._sessionFacts.length > 0) {
             const factsStr = this._sessionFacts.slice(-5).join('; ');
             systemPrompt += `\n\n[SESSION MEMORY] Things that happened earlier: ${factsStr}`;
         }
 
-        // Build context: last 7 messages plus a trigger prompt
+        // Build context: last 7 messages plus trigger
         const recent = this._context.slice(-7);
         const trigger = recent.length
             ? [{ role: 'user', content: `Recent conversation:\n${recent.map(m => m.content).join('\n')}\n\nNow respond in character with ONE short message.` }]
             : [{ role: 'user', content: 'Say something fun and in-character for this chat room.' }];
 
-        // Feature 6: Typing indicator ON
+        // Smart mention: identify who we're responding to
+        const replyTo = this._getReplyTarget(recent);
+
+        // Typing indicator ON
         this._onTyping(characterId, c.name, c.avatar, true);
 
         try {
-            const text = await generateMessage(modelId, systemPrompt, trigger, 120);
-
-            // Feature 6: Typing indicator OFF
+            let text = await generateMessage(modelId, systemPrompt, trigger, 120);
             this._onTyping(characterId, c.name, c.avatar, false);
 
             if (text) {
+                // Smart tagging: prepend @Nickname if we have a reply target
+                if (replyTo) {
+                    // Don't double-tag if the model already mentioned them
+                    if (!text.toLowerCase().includes(`@${replyTo.toLowerCase()}`)) {
+                        text = `@${replyTo}, ${text}`;
+                    }
+                    this._log(`[Tag] ${c.name} -> @${replyTo}`);
+                }
+
                 this._messagesThisMinute++;
                 this._onMessage(characterId, c.name, c.avatar, text);
                 this._log(`[Message] ${c.name}: "${text.slice(0, 50)}${text.length > 50 ? '...' : ''}"`);
 
-                // Feature 4: Extract notable facts from agent messages
                 this._extractFact(c.name, text);
-
-                // Feature 1: Cross-over engine — check if this agent triggers others
                 this._checkCrossOver(characterId);
             }
         } catch (e) {
@@ -333,21 +341,41 @@ export class AgentSwarm {
         }
     }
 
-    // ── Feature 1: Cross-Over Engine ─────────────────────────
+    // ── Smart Mention: identify reply target ─────────────────
 
-    /** After an agent speaks, check if any other agent is triggered to respond */
+    _getReplyTarget(recentMessages) {
+        if (!recentMessages || recentMessages.length === 0) return null;
+
+        // Get the most recent message's sender
+        const last = recentMessages[recentMessages.length - 1];
+        if (!last?.content) return null;
+
+        // Parse "Nick: text" format
+        const match = last.content.match(/^([^:]+):/);
+        if (!match) return null;
+
+        const nick = match[1].trim();
+
+        // Don't tag other agents — only tag human users
+        const agentNames = new Set(Object.values(this._characters).map(c => c.name));
+        if (agentNames.has(nick)) return null;
+
+        return nick;
+    }
+
+    // ── Cross-Over Engine ────────────────────────────────────
+
     _checkCrossOver(speakerId) {
         if (!this._running) return;
 
-        Object.values(CHARACTERS).forEach(c => {
+        Object.values(this._characters).forEach(c => {
             if (c.id === speakerId) return;
             if (!this._isActive(c.id)) return;
             if (!c.agent_triggers?.includes(speakerId)) return;
 
             const roll = Math.random();
             if (roll < CROSSOVER_PROBABILITY) {
-                this._log(`[CrossOver] ${c.name} triggered by ${CHARACTERS[speakerId].name} (rolled ${roll.toFixed(2)} < ${CROSSOVER_PROBABILITY})`);
-                // Small delay (1-3s) so it feels like a natural reply
+                this._log(`[CrossOver] ${c.name} triggered by ${this._characters[speakerId]?.name} (rolled ${roll.toFixed(2)} < ${CROSSOVER_PROBABILITY})`);
                 setTimeout(() => {
                     if (this._timers[c.id]) clearTimeout(this._timers[c.id]);
                     this._generate(c.id).then(() => this._scheduleNext(c.id));
@@ -358,78 +386,50 @@ export class AgentSwarm {
         });
     }
 
-    // ── Feature 2: Dynamic Mood Shifts ───────────────────────
+    // ── Dynamic Mood Shifts ──────────────────────────────────
 
-    /** Check chat text for mood-shifting keywords */
     _checkMoodShifts(text) {
         const lower = text.toLowerCase();
 
-        // Jethalal mood triggers
-        if (lower.includes('bapuji') || lower.includes('trouble') || lower.includes('problem')) {
-            this._shiftMood('jethalal', 'panicking', 0.4);
-        }
-        if (lower.includes('babita')) {
-            this._shiftMood('jethalal', 'lovesick', 0.5);
-        }
+        // Generic mood triggers based on reactive_tags overlap
+        Object.values(this._characters).forEach(c => {
+            if (!c.moods || !this._isActive(c.id)) return;
+            const moodKeys = Object.keys(c.moods).filter(k => k !== 'normal');
+            if (!moodKeys.length) return;
 
-        // Dayaben mood triggers
-        if (lower.includes('garba') || lower.includes('festival') || lower.includes('celebrate')) {
-            this._shiftMood('daya', 'excited', 0.5);
-        }
-        if (lower.includes('jethalal') && (lower.includes('problem') || lower.includes('trouble'))) {
-            this._shiftMood('daya', 'worried', 0.4);
-        }
-
-        // Raju mood triggers
-        if (lower.includes('crore') || lower.includes('scheme') || lower.includes('plan')) {
-            this._shiftMood('raju', 'scheming', 0.5);
-        }
-
-        // Shyam mood triggers
-        if (lower.includes('bakwas') || lower.includes('nonsense') || lower.includes('pagal')) {
-            this._shiftMood('shyam', 'exasperated', 0.5);
-        }
-
-        // Baburao mood triggers
-        if (lower.includes('rent') || lower.includes('pay')) {
-            this._shiftMood('babu_bhaiya', 'angry', 0.4);
-        }
-
-        // Iyer mood triggers
-        if (lower.includes('science') || lower.includes('history') || lower.includes('education')) {
-            this._shiftMood('iyer', 'lecturing', 0.5);
-        }
+            // Check if any reactive tag matches and probabilistically shift to a random non-normal mood
+            const hasMatch = (c.reactive_tags || []).some(tag => lower.includes(tag.toLowerCase()));
+            if (hasMatch && Math.random() < 0.3) {
+                const mood = moodKeys[Math.floor(Math.random() * moodKeys.length)];
+                this._shiftMood(c.id, mood, 0.5);
+            }
+        });
     }
 
-    /** Probabilistically shift a character's mood */
     _shiftMood(characterId, mood, probability) {
         if (this._moods[characterId] === mood) return;
         if (Math.random() > probability) return;
         const prevMood = this._moods[characterId];
         this._moods[characterId] = mood;
-        this._log(`[Mood] ${CHARACTERS[characterId]?.name}: ${prevMood} → ${mood}`);
+        this._log(`[Mood] ${this._characters[characterId]?.name}: ${prevMood} -> ${mood}`);
 
-        // Auto-revert to normal after 2-5 minutes
         setTimeout(() => {
             if (this._moods[characterId] === mood) {
                 this._moods[characterId] = 'normal';
-                this._log(`[Mood] ${CHARACTERS[characterId]?.name}: ${mood} → normal (auto-revert)`);
+                this._log(`[Mood] ${this._characters[characterId]?.name}: ${mood} -> normal (auto-revert)`);
             }
         }, 120_000 + Math.random() * 180_000);
     }
 
-    // ── Feature 4: Ephemeral Session Memory ──────────────────
+    // ── Ephemeral Session Memory ─────────────────────────────
 
-    /** Extract a short fact from a message for session memory */
     _extractFact(nick, text) {
-        // Simple heuristic: store notable messages as facts
         if (text.length > 30 && this._sessionFacts.length < 30) {
             const fact = `${nick} said: "${text.slice(0, 60)}${text.length > 60 ? '...' : ''}"`;
             this._sessionFacts.push(fact);
         }
     }
 
-    /** Add an external fact to session memory (e.g., from user chat) */
     addSessionFact(fact) {
         if (this._sessionFacts.length < 50) {
             this._sessionFacts.push(fact);

@@ -2,24 +2,40 @@
    OpenWire — Shared Core: OpenRouter Service
    Client-side wrapper that calls our /api/openrouter proxy.
    The OPENROUTER_KEY lives server-side only.
+   Supports model whitelist/blacklist filtering.
    ═══════════════════════════════════════════════════════════ */
 
 const PROXY = '/api/openrouter';
 
 /**
  * Fetch all models available on OpenRouter, then filter to free-only.
- * Free models have pricing.prompt === '0' and pricing.completion === '0'.
+ * Applies whitelist/blacklist from modelFilters if provided.
  *
+ * @param {object} [modelFilters] { whitelist: string[], blacklist: string[] }
  * @returns {Promise<Array>} Sorted array of free model objects
  */
-export async function fetchFreeModels() {
+export async function fetchFreeModels(modelFilters) {
     const resp = await fetch(PROXY);
     if (!resp.ok) throw new Error(`Model fetch failed: ${resp.status}`);
     const data = await resp.json();
 
-    const models = (data.data || []).filter(
+    let models = (data.data || []).filter(
         m => m.pricing?.prompt === '0' && m.pricing?.completion === '0'
     );
+
+    // Apply whitelist/blacklist filters
+    if (modelFilters) {
+        const wl = modelFilters.whitelist || [];
+        const bl = modelFilters.blacklist || [];
+
+        if (wl.length > 0) {
+            // Whitelist mode: only include models in the whitelist
+            models = models.filter(m => wl.includes(m.id));
+        } else if (bl.length > 0) {
+            // Blacklist mode: exclude models in the blacklist
+            models = models.filter(m => !bl.includes(m.id));
+        }
+    }
 
     // Sort by context length descending so largest-context models come first
     models.sort((a, b) => (b.context_length || 0) - (a.context_length || 0));
@@ -27,11 +43,24 @@ export async function fetchFreeModels() {
 }
 
 /**
+ * Fetch ALL free models without any filtering (for Model Tester UI).
+ * @returns {Promise<Array>}
+ */
+export async function fetchAllFreeModels() {
+    const resp = await fetch(PROXY);
+    if (!resp.ok) throw new Error(`Model fetch failed: ${resp.status}`);
+    const data = await resp.json();
+
+    const models = (data.data || []).filter(
+        m => m.pricing?.prompt === '0' && m.pricing?.completion === '0'
+    );
+    models.sort((a, b) => (b.context_length || 0) - (a.context_length || 0));
+    return models;
+}
+
+/**
  * Format a model's display label for dropdowns.
  * Shows name, context window, and parameter count if available.
- *
- * @param {object} model  OpenRouter model object
- * @returns {string}
  */
 export function formatModelLabel(model) {
     const name = model.name || model.id;
@@ -43,16 +72,13 @@ export function formatModelLabel(model) {
 }
 
 function extractParamCount(model) {
-    // Try architecture.instruct_type or top_provider fields
     const arch = model.architecture;
     if (arch?.instruct_type) {
         const m = arch.instruct_type.match(/(\d+\.?\d*)\s*[bB]/);
         if (m) return `${m[1]}B`;
     }
-    // Try extracting from model id (e.g. "llama-3.2-70b-instruct")
     const idMatch = model.id?.match(/(\d+\.?\d*)[bB](?:\b|-)/i);
     if (idMatch) return `${idMatch[1]}B`;
-    // Try extracting from model name
     const nameMatch = model.name?.match(/(\d+\.?\d*)\s*[bB](?:\b|-)/i);
     if (nameMatch) return `${nameMatch[1]}B`;
     return '';
@@ -60,12 +86,6 @@ function extractParamCount(model) {
 
 /**
  * Generate a character message via the OpenRouter proxy.
- *
- * @param {string} modelId          OpenRouter model id
- * @param {string} systemPrompt     Character's personality system prompt
- * @param {Array}  contextMessages  Recent chat as [{role, content}]
- * @param {number} [maxTokens=120]
- * @returns {Promise<string|null>}  Generated text, or null on failure
  */
 export async function generateMessage(modelId, systemPrompt, contextMessages, maxTokens = 120) {
     const messages = [
