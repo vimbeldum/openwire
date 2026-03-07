@@ -12,6 +12,7 @@
    ═══════════════════════════════════════════════════════════ */
 
 import { fetchFreeModels, generateMessage } from './openrouter.js';
+import { fetchGeminiModels, generateGeminiMessage } from './gemini.js';
 import { loadStore, getCharactersDict, getGroupsDict } from './agentStore.js';
 
 const CONTEXT_BUFFER_SIZE = 20;
@@ -39,6 +40,10 @@ export class AgentSwarm {
         this._defaultModel   = DEFAULT_ALL_MODEL;
         this._charEnabled    = {};
         this._groupEnabled   = {};
+
+        // Provider: 'openrouter' or 'gemini'
+        this._provider = 'openrouter';
+        this._geminiModels = [];
 
         this._context = [];
         this._assignedModels = {};
@@ -234,6 +239,23 @@ export class AgentSwarm {
     get modelFilters()  { return this._modelFilters; }
     get defaultModel()  { return this._defaultModel; }
     get queueLength()   { return this._messageQueue.length; }
+    get provider()      { return this._provider; }
+    get geminiModels()  { return this._geminiModels; }
+
+    async setProvider(provider) {
+        this._provider = provider;
+        this._log(`[Config] Provider -> ${provider}`);
+
+        if (provider === 'gemini' && this._geminiModels.length === 0) {
+            try {
+                this._geminiModels = await fetchGeminiModels();
+                this._log(`[Gemini] Fetched ${this._geminiModels.length} models`);
+            } catch (e) {
+                this._log(`[Gemini] Model fetch failed: ${e.message}`);
+                this._onError(`Gemini model fetch failed: ${e.message}`);
+            }
+        }
+    }
 
     getAssignedModel(characterId) {
         return this._modelOverrides[characterId] || this._defaultModel || this._assignedModels[characterId] || FALLBACK_MODEL;
@@ -374,14 +396,17 @@ export class AgentSwarm {
         this._onTyping(characterId, c.name, c.avatar, true);
 
         try {
-            let text = await generateMessage(modelId, systemPrompt, trigger, 120);
+            const useGemini = this._provider === 'gemini';
+            const gen = useGemini ? generateGeminiMessage : generateMessage;
+            let text = await gen(modelId, systemPrompt, trigger, 120);
 
-            // If primary model returns empty, retry with a known-good free model
-            if (!text && this._freeModels.length > 0) {
-                const fallbackModel = this._freeModels.find(m => m.id !== modelId)?.id;
+            // If primary model returns empty, retry with a fallback
+            if (!text) {
+                const pool = useGemini ? this._geminiModels : this._freeModels;
+                const fallbackModel = pool.find(m => m.id !== modelId)?.id;
                 if (fallbackModel) {
                     this._log(`[Generate] ${c.name} got empty from ${modelId}, retrying with ${fallbackModel}`);
-                    text = await generateMessage(fallbackModel, systemPrompt, trigger, 120);
+                    text = await gen(fallbackModel, systemPrompt, trigger, 120);
                 }
             }
 

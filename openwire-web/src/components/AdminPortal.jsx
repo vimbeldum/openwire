@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getTotalHousePnl } from '../lib/casinoState.js';
 import { loadStore, getCharactersDict, getGroupsDict, getGroupCharacters } from '../lib/agents/agentStore.js';
 import { formatModelLabel } from '../lib/agents/openrouter.js';
+import { formatGeminiLabel } from '../lib/agents/gemini.js';
 
 const TABS = ['Players', 'Ban List', 'Activity Log', 'Stats', 'Agents'];
 const CHATTER_LABELS = { 0.25: 'Quiet', 0.5: 'Calm', 1: 'Normal', 1.5: 'Active', 2: 'Chaotic' };
@@ -38,6 +39,9 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
     const [maxMsgPerMin, setMaxMsgPerMin] = useState(swarm?.maxMsgPerMin ?? 8);
     const [showLog, setShowLog] = useState(false);
     const [defaultModel, setDefaultModel] = useState(swarm?.defaultModel ?? 'openrouter/auto');
+    const [provider, setProvider] = useState(swarm?.provider ?? 'openrouter');
+    const [geminiModels, setGeminiModels] = useState(swarm?.geminiModels ?? []);
+    const [geminiLoading, setGeminiLoading] = useState(false);
     const [charMoods, setCharMoods] = useState(() => {
         const init = {};
         Object.keys(CHARACTERS).forEach(id => { init[id] = swarm?.getMood(id) ?? 'normal'; });
@@ -354,6 +358,44 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                             </div>
                         </div>
 
+                        {/* AI Provider toggle */}
+                        <div className="admin-agents-controls" style={{ marginTop: 0 }}>
+                            <div className="admin-slider-group" style={{ flex: 1 }}>
+                                <label>AI Provider:</label>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                    <button
+                                        className={`admin-btn ${provider === 'openrouter' ? 'adjust' : ''}`}
+                                        onClick={() => {
+                                            setProvider('openrouter');
+                                            swarm?.setProvider('openrouter');
+                                        }}
+                                    >
+                                        OpenRouter
+                                    </button>
+                                    <button
+                                        className={`admin-btn ${provider === 'gemini' ? 'adjust' : ''}`}
+                                        disabled={geminiLoading}
+                                        onClick={async () => {
+                                            setProvider('gemini');
+                                            setGeminiLoading(true);
+                                            try {
+                                                await swarm?.setProvider('gemini');
+                                                setGeminiModels(swarm?.geminiModels ?? []);
+                                                if (swarm?.geminiModels?.length > 0) {
+                                                    const first = swarm.geminiModels[0].id;
+                                                    setDefaultModel(first);
+                                                    swarm?.setDefaultModel(first);
+                                                }
+                                            } catch (_) {}
+                                            setGeminiLoading(false);
+                                        }}
+                                    >
+                                        {geminiLoading ? 'Loading...' : 'Gemini'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Default model for all characters */}
                         <div className="admin-agents-controls" style={{ marginTop: 0 }}>
                             <div className="admin-slider-group" style={{ flex: 1 }}>
@@ -365,18 +407,24 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                         const val = e.target.value;
                                         setDefaultModel(val);
                                         swarm?.setDefaultModel(val);
-                                        // Clear per-character overrides so they all use the default
                                         setOverrides({});
                                         Object.keys(CHARACTERS).forEach(id => swarm?.setModelOverride(id, null));
                                     }}
-                                    disabled={swarmModels.length === 0}
+                                    disabled={provider === 'openrouter' ? swarmModels.length === 0 : geminiModels.length === 0}
                                     style={{ width: '100%' }}
                                 >
-                                    {swarmModels.map(m => (
-                                        <option key={m.id} value={m.id}>
-                                            {formatModelLabel(m)}
-                                        </option>
-                                    ))}
+                                    {provider === 'openrouter'
+                                        ? swarmModels.map(m => (
+                                            <option key={m.id} value={m.id}>
+                                                {formatModelLabel(m)}
+                                            </option>
+                                        ))
+                                        : geminiModels.map(m => (
+                                            <option key={m.id} value={m.id}>
+                                                {formatGeminiLabel(m)}
+                                            </option>
+                                        ))
+                                    }
                                 </select>
                             </div>
                         </div>
@@ -451,14 +499,14 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                                                     swarm?.setModelOverride(c.id, val);
                                                                     setOverrides(prev => ({ ...prev, [c.id]: val }));
                                                                 }}
-                                                                disabled={swarmModels.length === 0}
+                                                                disabled={provider === 'openrouter' ? swarmModels.length === 0 : geminiModels.length === 0}
                                                             >
                                                                 <option value="">
                                                                     {`— Use Default —`}
                                                                 </option>
-                                                                {swarmModels.map(m => (
+                                                                {(provider === 'openrouter' ? swarmModels : geminiModels).map(m => (
                                                                     <option key={m.id} value={m.id}>
-                                                                        {formatModelLabel(m)}
+                                                                        {provider === 'openrouter' ? formatModelLabel(m) : formatGeminiLabel(m)}
                                                                     </option>
                                                                 ))}
                                                             </select>
