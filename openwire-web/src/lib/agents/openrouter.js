@@ -121,7 +121,10 @@ export async function generateMessage(modelId, systemPrompt, contextMessages, ma
     }
 
     const data = await resp.json();
-    if (isDebug) console.log('[OpenRouter] Response:', data);
     const text = data.choices?.[0]?.message?.content?.trim();
+    if (isDebug) {
+        console.log('[OpenRouter] Response:', { model: data.model, text: text || '(empty)', id: data.id });
+        if (!text) console.warn('[OpenRouter] Empty response! Full data:', data);
+    }
     return text || null;
 }

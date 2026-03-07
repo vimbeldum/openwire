@@ -376,6 +376,7 @@ export class AgentSwarm {
         try {
             let text = await generateMessage(modelId, systemPrompt, trigger, 120);
             this._onTyping(characterId, c.name, c.avatar, false);
+            this._log(`[Generate] ${c.name} result: ${text ? `"${text.slice(0, 60)}..."` : 'NULL/EMPTY'}`);
 
             if (text) {
                 // Smart tagging: prepend @Nickname if we have a reply target

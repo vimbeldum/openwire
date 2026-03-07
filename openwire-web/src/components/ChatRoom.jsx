@@ -308,9 +308,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         if (cancelled) return;
         const swarm = new AgentSwarm({
             onMessage: (characterId, nick, avatar, text) => {
-                // Always post agent messages to General Chat (roomId: null)
+                // Post agent messages to whichever room the user is currently viewing
                 addMsg(`${avatar} ${nick}`, text, 'peer', {
-                    roomId: null,
+                    roomId: currentRoomRef.current || null,
                     isAgent: true,
                     characterId,
                 });
