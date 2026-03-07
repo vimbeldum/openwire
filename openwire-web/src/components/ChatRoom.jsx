@@ -11,6 +11,7 @@ import RouletteBoard from './RouletteBoard';
 import AndarBaharBoard from './AndarBaharBoard';
 import AdminPortal from './AdminPortal';
 import GifPicker from './GifPicker';
+import HowToPlay from './HowToPlay';
 
 function timeStr() {
     const d = new Date();
@@ -49,6 +50,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const [blackjackGame, setBlackjackGame] = useState(null);
     const [rouletteGame, setRouletteGame] = useState(null);
     const [andarBaharGame, setAndarBaharGame] = useState(null);
+
+    // How to Play
+    const [showHelp, setShowHelp] = useState(false);
+    const [helpGame, setHelpGame] = useState(null);
+    const openHelp = (gameType) => { setHelpGame(gameType); setShowHelp(true); };
 
     // Admin
     const [showAdmin, setShowAdmin] = useState(false);
@@ -1259,10 +1265,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
             {/* Game Overlays */}
             {activeGame && (
-                <GameBoard game={activeGame} myId={myIdRef.current} onMove={handleGameMove} onRematch={handleRematch} onClose={() => setActiveGame(null)} />
+                <GameBoard game={activeGame} myId={myIdRef.current} onMove={handleGameMove} onRematch={handleRematch} onClose={() => setActiveGame(null)} onHelp={() => openHelp('tictactoe')} />
             )}
             {blackjackGame && (
-                <BlackjackBoard game={blackjackGame} myId={myIdRef.current} myNick={myNick} wallet={myWallet} onAction={handleBjAction} onClose={() => setBlackjackGame(null)} isHost={bjHostRef.current === myIdRef.current} />
+                <BlackjackBoard game={blackjackGame} myId={myIdRef.current} myNick={myNick} wallet={myWallet} onAction={handleBjAction} onClose={() => setBlackjackGame(null)} onHelp={() => openHelp('blackjack')} isHost={bjHostRef.current === myIdRef.current} />
             )}
             {rouletteGame && (
                 <RouletteBoard
@@ -1272,6 +1278,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     wallet={myWallet}
                     onAction={handleRlAction}
                     onClose={() => setRouletteGame(null)}
+                    onHelp={() => openHelp('roulette')}
                     isHost={amIHost(rouletteHostRef.current)}
                 />
             )}
@@ -1283,8 +1290,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     wallet={myWallet}
                     onAction={handleAbAction}
                     onClose={() => setAndarBaharGame(null)}
+                    onHelp={() => openHelp('andarbahar')}
                     isHost={amIHost(abHostRef.current)}
                 />
+            )}
+
+            {/* How to Play Overlay — stacked above game, internal scroll only */}
+            {showHelp && (
+                <HowToPlay activeGame={helpGame} onClose={() => setShowHelp(false)} />
             )}
 
             {/* Floating chat toggle — visible only when a game overlay is open */}

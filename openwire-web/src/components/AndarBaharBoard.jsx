@@ -104,7 +104,7 @@ function HistoryStrip({ history }) {
 const BET_AMOUNTS = [10, 25, 50, 100, 250, 500];
 
 /* ── Main Board ─────────────────────────────────── */
-export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, onClose, isHost }) {
+export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost }) {
     const [selectedAmount, setSelectedAmount] = useState(50);
 
     if (!game) return null;
@@ -146,6 +146,7 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
                         {wallet && <span className="chip-display">💰 {balance.toLocaleString()}</span>}
                         {game.phase === 'betting' && <BettingCountdown bettingEndsAt={game.bettingEndsAt} />}
                     </div>
+                    {onHelp && <button className="btn-icon-help" onClick={onHelp} title="How to Play">?</button>}
                     <button className="btn-icon-close" onClick={onClose}>✕</button>
                 </div>
 

@@ -2874,6 +2874,29 @@ body {
   border-color: var(--red);
 }
 
+.btn-icon-help {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(94, 58, 238, 0.15);
+  border: 1px solid rgba(94, 58, 238, 0.35);
+  color: rgba(94, 58, 238, 0.9);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 800;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon-help:hover {
+  background: rgba(94, 58, 238, 0.8);
+  color: white;
+  border-color: rgba(94, 58, 238, 0.9);
+}
+
 .section-mini-title {
   font-size: 0.6rem;
   font-weight: 700;

@@ -193,7 +193,7 @@ function OutsideBtn({ label, type, target, myBets, onBet, disabled, className = 
 const BET_AMOUNTS = [5, 10, 25, 50, 100, 250];
 
 /* ── Main Board ─────────────────────────────────── */
-export default function RouletteBoard({ game, myId, myNick, wallet, onAction, onClose, isHost }) {
+export default function RouletteBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost }) {
     const [betAmount, setBetAmount] = useState(25);
     const [spinning, setSpinning] = useState(false);
 
@@ -245,6 +245,7 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
                         {wallet && <span className="chip-display">💰 {balance.toLocaleString()}</span>}
                         <Countdown nextSpinAt={game.nextSpinAt} phase={game.phase} />
                     </div>
+                    {onHelp && <button className="btn-icon-help" onClick={onHelp} title="How to Play">?</button>}
                     <button className="btn-icon-close" onClick={onClose}>✕</button>
                 </div>
 

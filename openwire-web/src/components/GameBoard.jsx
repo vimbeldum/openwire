@@ -1,6 +1,6 @@
 import * as game from '../lib/game';
 
-export default function GameBoard({ game: g, myId, onMove, onRematch, onClose }) {
+export default function GameBoard({ game: g, myId, onMove, onRematch, onClose, onHelp }) {
     const isOver = g.result !== null;
     const myTurn = game.isMyTurn(g, myId);
 
@@ -73,6 +73,7 @@ export default function GameBoard({ game: g, myId, onMove, onRematch, onClose })
                     {isOver && (
                         <button className="primary" onClick={onRematch}>Rematch</button>
                     )}
+                    {onHelp && <button onClick={onHelp}>? Rules</button>}
                     <button onClick={onClose}>Close</button>
                 </div>
             </div>

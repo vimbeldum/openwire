@@ -1,34 +1,17 @@
 import { useState } from 'react';
 import { ROULETTE_RULES } from '../lib/roulette.js';
+import { BLACKJACK_RULES } from '../lib/blackjack.js';
+import { ANDARBAHAR_RULES } from '../lib/andarbahar.js';
 import { SLOTS_RULES } from '../lib/slots.js';
+import { TICTACTOE_RULES } from '../lib/game.js';
 
-/* ── Rules for games that live entirely in their lib ────────── */
-
-const BJ_RULES = {
-    name: 'Blackjack',
-    description: 'Get closer to 21 than the dealer without going over. Ace = 1 or 11. Face cards = 10.',
-    bets: [
-        { name: 'Bet', odds: '1:1', description: 'Win even money when your hand beats the dealer without busting.' },
-        { name: 'Blackjack', odds: '3:2', description: 'Ace + any 10-value card on the first two cards pays 1.5× your bet.' },
-        { name: 'Push (Tie)', odds: '0', description: 'Equal totals — your bet is returned, no gain or loss.' },
-        { name: 'Bust', odds: '−1×', description: 'Going over 21 means an instant loss regardless of the dealer.' },
-    ],
-};
-
-const AB_RULES = {
-    name: 'Andar Bahar',
-    description: 'A Joker card is drawn face-up. Bet on which side — Andar (inside/left) or Bahar (outside/right) — will receive a card matching the Joker\'s rank first.',
-    bets: [
-        { name: 'Andar', odds: '~1:1', description: 'Bet the matching card appears on the Andar (left) side.' },
-        { name: 'Bahar', odds: '~1:1', description: 'Bet the matching card appears on the Bahar (right) side.' },
-    ],
-};
-
+/* ── Game Rules Registry (each entry sourced from its bounded context lib) */
 const GAME_RULES = {
     roulette:   ROULETTE_RULES,
-    blackjack:  BJ_RULES,
-    andarbahar: AB_RULES,
+    blackjack:  BLACKJACK_RULES,
+    andarbahar: ANDARBAHAR_RULES,
     slots:      SLOTS_RULES,
+    tictactoe:  TICTACTOE_RULES,
 };
 
 const GAME_ICONS = {
@@ -36,16 +19,19 @@ const GAME_ICONS = {
     blackjack:  '🃏',
     andarbahar: '🎴',
     slots:      '🎲',
+    tictactoe:  '✕○',
 };
 
-/* ── Component ──────────────────────────────────────────────── */
+/* ── Shared Presentation Domain: Rules Overlay ──────────────
+   Single reusable component for all game rules.
+   - Viewport is locked (game-overlay has overflow:hidden)
+   - Panel has overflow-y:auto for internal scroll only
+   - Defaults to the calling game's rules, tabs let user browse all
+   ─────────────────────────────────────────────────────────── */
 
 /**
- * Dynamic "How to Play" panel.
- * Automatically loads the correct rules based on the activeGame prop.
- * The user can also browse other games via the tab bar.
- *
  * @param {{ activeGame?: string, onClose?: () => void }} props
+ *   activeGame — one of 'roulette'|'blackjack'|'andarbahar'|'slots'|'tictactoe'
  */
 export default function HowToPlay({ activeGame, onClose }) {
     const initial = activeGame && GAME_RULES[activeGame] ? activeGame : 'roulette';
@@ -78,7 +64,7 @@ export default function HowToPlay({ activeGame, onClose }) {
                     ))}
                 </div>
 
-                {/* Rules body */}
+                {/* Rules body — overflows internally, never the viewport */}
                 {rules && (
                     <div className="howtoplay-content">
                         <h2 className="howtoplay-title">

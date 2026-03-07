@@ -103,7 +103,7 @@ function Countdown({ game }) {
 }
 
 /* ── Main Board ───────────────────────────────────── */
-export default function BlackjackBoard({ game, myId, myNick, wallet, onAction, onClose, isHost }) {
+export default function BlackjackBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost }) {
     const [selectedBet, setSelectedBet] = useState(50);
 
     if (!game) return null;
@@ -131,6 +131,7 @@ export default function BlackjackBoard({ game, myId, myNick, wallet, onAction, o
                         {wallet && <span className="chip-display">💰 {balance.toLocaleString()}</span>}
                         <Countdown game={game} />
                     </div>
+                    {onHelp && <button className="btn-icon-help" onClick={onHelp} title="How to Play">?</button>}
                     <button className="btn-icon-close" onClick={onClose}>✕</button>
                 </div>
 

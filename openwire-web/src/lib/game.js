@@ -91,6 +91,18 @@ export function turnSymbol(game) {
 
 export const CELL = { EMPTY, X, O };
 
+/* ── Rules (used by HowToPlay) ────────────────────────────── */
+
+export const TICTACTOE_RULES = {
+    name: 'Tic-Tac-Toe',
+    description: 'Take turns marking cells in a 3×3 grid. First to place three marks in a row, column, or diagonal wins. No chips wagered — pure strategy.',
+    bets: [
+        { name: 'Win', odds: '—', description: 'Your mark completes any row, column, or diagonal first. Claim bragging rights!' },
+        { name: 'Draw', odds: '—', description: 'All 9 cells filled with no winner — an honourable tie. Score counted for both.' },
+        { name: 'Loss', odds: '—', description: 'Opponent completes a line first. Hit Rematch to get even.' },
+    ],
+};
+
 // Game action helpers (match the Rust format)
 export function isGameMessage(data) {
     return typeof data === 'string' && data.startsWith('GAME:');
