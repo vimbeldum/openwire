@@ -39,6 +39,8 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
     const [maxMsgPerMin, setMaxMsgPerMin] = useState(swarm?.maxMsgPerMin ?? 8);
     const [showLog, setShowLog] = useState(false);
     const [defaultModel, setDefaultModel] = useState(swarm?.defaultModel ?? 'openrouter/auto');
+    const [perCharCooldown, setPerCharCooldown] = useState(swarm?.perCharCooldown ?? 10);
+    const [globalCooldown, setGlobalCooldown] = useState(swarm?.globalCooldown ?? 5);
     const [provider, setProvider] = useState(swarm?.provider ?? 'openrouter');
     const [geminiModels, setGeminiModels] = useState(swarm?.geminiModels ?? []);
     const [geminiLoading, setGeminiLoading] = useState(false);
@@ -353,6 +355,34 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                         const v = parseInt(e.target.value);
                                         setMaxMsgPerMin(v);
                                         swarm?.setMaxMsgPerMin(v);
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* AI Cooldown controls */}
+                        <div className="admin-agents-controls" style={{ marginTop: 0 }}>
+                            <div className="admin-slider-group">
+                                <label>Per-character cooldown: <strong>{perCharCooldown}s</strong></label>
+                                <input
+                                    type="range" min="1" max="30" step="1"
+                                    value={perCharCooldown}
+                                    onChange={e => {
+                                        const v = parseInt(e.target.value);
+                                        setPerCharCooldown(v);
+                                        swarm?.setPerCharCooldown(v);
+                                    }}
+                                />
+                            </div>
+                            <div className="admin-slider-group">
+                                <label>Global AI cooldown: <strong>{globalCooldown}s</strong></label>
+                                <input
+                                    type="range" min="1" max="20" step="1"
+                                    value={globalCooldown}
+                                    onChange={e => {
+                                        const v = parseInt(e.target.value);
+                                        setGlobalCooldown(v);
+                                        swarm?.setGlobalCooldown(v);
                                     }}
                                 />
                             </div>

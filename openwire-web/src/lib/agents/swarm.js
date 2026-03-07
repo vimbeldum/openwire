@@ -66,6 +66,8 @@ export class AgentSwarm {
         // Cooldown tracking for AI output rate limiting
         this._lastMsgByChar = {};   // characterId → timestamp
         this._lastMsgGlobal = 0;    // timestamp of last AI message
+        this._perCharCooldown = PER_CHAR_COOLDOWN_MS;
+        this._globalCooldown = GLOBAL_COOLDOWN_MS;
 
         // Dynamic config — loaded from agentStore
         this._characters = {};  // dict { id: charObj }
@@ -227,6 +229,19 @@ export class AgentSwarm {
         this._log(`[Config] Max msg/min -> ${this._maxMsgPerMin}`);
     }
 
+    setPerCharCooldown(seconds) {
+        this._perCharCooldown = Math.max(1, seconds) * 1000;
+        this._log(`[Config] Per-character cooldown -> ${seconds}s`);
+    }
+
+    setGlobalCooldown(seconds) {
+        this._globalCooldown = Math.max(1, seconds) * 1000;
+        this._log(`[Config] Global cooldown -> ${seconds}s`);
+    }
+
+    get perCharCooldown() { return this._perCharCooldown / 1000; }
+    get globalCooldown()  { return this._globalCooldown / 1000; }
+
     setMood(characterId, mood) {
         const c = this._characters[characterId];
         if (!c || !c.moods?.[mood]) return;
@@ -353,7 +368,7 @@ export class AgentSwarm {
         // Per-character cooldown: 1 msg per 10s per character
         if (!force) {
             const lastChar = this._lastMsgByChar[characterId] || 0;
-            if (Date.now() - lastChar < PER_CHAR_COOLDOWN_MS) {
+            if (Date.now() - lastChar < this._perCharCooldown) {
                 this._log(`[Cooldown] ${c.name} blocked — per-character 10s cooldown`);
                 return;
             }
@@ -386,8 +401,8 @@ export class AgentSwarm {
 
         // Global cooldown: wait if last AI message was < 5s ago
         const sinceLastGlobal = Date.now() - this._lastMsgGlobal;
-        if (sinceLastGlobal < GLOBAL_COOLDOWN_MS) {
-            const waitMs = GLOBAL_COOLDOWN_MS - sinceLastGlobal;
+        if (sinceLastGlobal < this._globalCooldown) {
+            const waitMs = this._globalCooldown - sinceLastGlobal;
             this._log(`[Cooldown] Global 5s cooldown — waiting ${(waitMs / 1000).toFixed(1)}s`);
             await new Promise(r => setTimeout(r, waitMs));
         }
