@@ -380,8 +380,16 @@ export class AgentSwarm {
             return;
         }
 
-        this._messageQueue.push({ characterId, retries: 0, force });
-        this._log(`[Queue] ${c.name} added (queue: ${this._messageQueue.length})`);
+        const task = { characterId, retries: 0, force };
+        if (force) {
+            // @mentions jump to front of queue (after any other force tasks, preserving FIFO among mentions)
+            const lastForceIdx = this._messageQueue.reduce((idx, t, i) => t.force ? i : idx, -1);
+            this._messageQueue.splice(lastForceIdx + 1, 0, task);
+            this._log(`[Queue] ${c.name} PRIORITY added at position ${lastForceIdx + 2} (queue: ${this._messageQueue.length})`);
+        } else {
+            this._messageQueue.push(task);
+            this._log(`[Queue] ${c.name} added (queue: ${this._messageQueue.length})`);
+        }
 
         // Show typing indicator while in queue
         this._onTyping(characterId, c.name, c.avatar, true);
