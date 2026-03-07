@@ -80,6 +80,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const [showAgentPanel, setShowAgentPanel] = useState(false);
     const [agentRunning, setAgentRunning] = useState(false);
     const [mentionToasts, setMentionToasts] = useState([]);
+    const [agentTyping, setAgentTyping] = useState({});   // { characterId: { nick, avatar, ts } }
+    const [swarmLogs, setSwarmLogs] = useState([]);
     const swarmRef = useRef(null);
 
     // Bank Ledger (House P&L Tracker)
@@ -256,6 +258,18 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             },
             onError: (msg) => console.warn('[AgentSwarm]', msg),
             onModelLoad: () => setAgentRunning(true),
+            onLog: (line) => setSwarmLogs(prev => [...prev.slice(-200), line]),
+            onTyping: (characterId, nick, avatar, isTyping) => {
+                if (isTyping) {
+                    setAgentTyping(prev => ({ ...prev, [characterId]: { nick, avatar, ts: Date.now() } }));
+                } else {
+                    setAgentTyping(prev => {
+                        const next = { ...prev };
+                        delete next[characterId];
+                        return next;
+                    });
+                }
+            },
         });
         swarmRef.current = swarm;
         // Auto-start the swarm so agents begin chatting immediately
@@ -1523,7 +1537,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 <div ref={messagesEnd} />
             </div>
 
-            <TypingBar typingPeers={typingPeers} myId={myIdRef.current} />
+            <TypingBar typingPeers={typingPeers} agentTyping={agentTyping} myId={myIdRef.current} />
 
             {whisperTarget && (
                 <div className="whisper-mode-bar">
@@ -1811,6 +1825,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     bannedIps={bannedIps}
                     bankLedger={bankLedger}
                     swarm={swarmRef.current}
+                    swarmLogs={swarmLogs}
                     onKick={handleAdminKick}
                     onBanIp={handleAdminBanIp}
                     onUnbanIp={handleAdminUnbanIp}

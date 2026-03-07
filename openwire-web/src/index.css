@@ -1303,6 +1303,65 @@ body {
   cursor: not-allowed;
 }
 
+/* ── Admin Agents Controls (sliders) ─────────────────── */
+.admin-agents-controls {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.admin-slider-group {
+  flex: 1;
+  min-width: 180px;
+}
+
+.admin-slider-group label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.admin-slider-group input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent, #66a1ee);
+  height: 4px;
+}
+
+/* ── God Mode Log Panel ──────────────────────────────── */
+.admin-log-panel {
+  background: #0a0a1a;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm, 4px);
+  margin-bottom: 0.75rem;
+  max-height: 200px;
+  overflow: hidden;
+}
+
+.admin-log-panel-inner {
+  padding: 0.5rem;
+  overflow-y: auto;
+  max-height: 200px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.admin-log-line {
+  color: #8892b0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-log-line.error { color: #f44336; }
+.admin-log-line.warn { color: #ff9800; }
+.admin-log-line.success { color: #4caf50; }
+.admin-log-line.crossover { color: #e040fb; }
+.admin-log-line.mood { color: #29b6f6; }
+.admin-log-line.reactive { color: #ffd740; }
+
 /* ── Game Challenge Popup ───────────────────────── */
 .game-challenge {
   position: fixed;

@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getTotalHousePnl } from '../lib/casinoState.js';
 import { CHARACTERS, SHOWS, getShowCharacters } from '../lib/agents/characters.js';
 import { formatModelLabel } from '../lib/agents/openrouter.js';
 
 const TABS = ['Players', 'Ban List', 'Activity Log', 'Stats', 'Agents'];
+const CHATTER_LABELS = { 0.25: 'Quiet', 0.5: 'Calm', 1: 'Normal', 1.5: 'Active', 2: 'Chaotic' };
 const GAME_LABELS = { roulette: '🎰 Roulette', blackjack: '🃏 Blackjack', andarbahar: '🎴 Andar Bahar', slots: '🎲 Slots' };
 
-export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, activityLog, bannedIps, bankLedger, casinoState, swarm, onClose }) {
+export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, activityLog, bannedIps, bankLedger, casinoState, swarm, swarmLogs, onClose }) {
     const [tab, setTab] = useState('Players');
     const [adjustTarget, setAdjustTarget] = useState(null);
     const [adjustAmount, setAdjustAmount] = useState(100);
@@ -28,6 +29,15 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
     const [overrides, setOverrides] = useState({});
     const [swarmLoading, setSwarmLoading] = useState(false);
     const [assigned, setAssigned] = useState({});
+    const [chatterLevel, setChatterLevel] = useState(swarm?.chatterLevel ?? 1.0);
+    const [maxMsgPerMin, setMaxMsgPerMin] = useState(swarm?.maxMsgPerMin ?? 8);
+    const [showLog, setShowLog] = useState(false);
+    const [charMoods, setCharMoods] = useState(() => {
+        const init = {};
+        Object.keys(CHARACTERS).forEach(id => { init[id] = swarm?.getMood(id) ?? 'normal'; });
+        return init;
+    });
+    const logEndRef = useRef(null);
 
     useEffect(() => {
         if (!swarm) return;
@@ -36,7 +46,16 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
         const map = {};
         Object.keys(CHARACTERS).forEach(id => { map[id] = swarm.getAssignedModel(id); });
         setAssigned(map);
+        setChatterLevel(swarm.chatterLevel ?? 1.0);
+        setMaxMsgPerMin(swarm.maxMsgPerMin ?? 8);
     }, [swarm]);
+
+    // Auto-scroll log panel
+    useEffect(() => {
+        if (showLog && logEndRef.current) {
+            logEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [swarmLogs, showLog]);
 
     const totalChips = peers.reduce((s, p) => s + (p.balance || 0), 0);
     const richest = peers.reduce((best, p) => (!best || (p.balance || 0) > (best.balance || 0)) ? p : best, null);
@@ -259,6 +278,7 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                 {/* Agents tab */}
                 {tab === 'Agents' && (
                     <div className="admin-content">
+                        {/* Controls row */}
                         <div className="admin-agents-header">
                             <button
                                 className={`admin-btn ${swarmRunning ? 'ban' : 'adjust'}`}
@@ -285,10 +305,72 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                 {swarmLoading ? '⏳ Loading…' : swarmRunning ? '⏸ Stop Swarm' : '▶ Start Swarm'}
                             </button>
                             <span style={{ color: 'var(--text-muted)', fontSize: '0.85em' }}>
-                                {swarmModels.length > 0 ? `${swarmModels.length} free models loaded` : 'Start swarm to load models'}
+                                {swarmModels.length > 0 ? `${swarmModels.length} free models` : 'Start swarm to load'}
                             </span>
+                            <button
+                                className={`admin-btn ${showLog ? 'kick' : ''}`}
+                                onClick={() => setShowLog(v => !v)}
+                                style={{ marginLeft: 'auto' }}
+                            >
+                                {showLog ? '✕ Close Log' : '🛠 God Mode'}
+                            </button>
                         </div>
 
+                        {/* Feature 5: Chatter level slider + throttle */}
+                        <div className="admin-agents-controls">
+                            <div className="admin-slider-group">
+                                <label>Chatter Level: <strong>{
+                                    Object.entries(CHATTER_LABELS).reduce((best, [k, v]) =>
+                                        Math.abs(k - chatterLevel) < Math.abs(best[0] - chatterLevel) ? [k, v] : best,
+                                    [1, 'Normal'])[1]
+                                }</strong> ({chatterLevel.toFixed(2)}x)</label>
+                                <input
+                                    type="range" min="0.25" max="2" step="0.25"
+                                    value={chatterLevel}
+                                    onChange={e => {
+                                        const v = parseFloat(e.target.value);
+                                        setChatterLevel(v);
+                                        swarm?.setChatterLevel(v);
+                                    }}
+                                />
+                            </div>
+                            <div className="admin-slider-group">
+                                <label>Max msg/min: <strong>{maxMsgPerMin}</strong></label>
+                                <input
+                                    type="range" min="1" max="20" step="1"
+                                    value={maxMsgPerMin}
+                                    onChange={e => {
+                                        const v = parseInt(e.target.value);
+                                        setMaxMsgPerMin(v);
+                                        swarm?.setMaxMsgPerMin(v);
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Feature 3: God Mode log panel */}
+                        {showLog && (
+                            <div className="admin-log-panel">
+                                <div className="admin-log-panel-inner">
+                                    {(swarmLogs || []).length === 0 && (
+                                        <div style={{ color: 'var(--text-muted)', padding: '0.5rem' }}>No logs yet. Start the swarm to see activity.</div>
+                                    )}
+                                    {(swarmLogs || []).map((line, i) => (
+                                        <div key={i} className={`admin-log-line ${
+                                            line.includes('[Error]') ? 'error' :
+                                            line.includes('[Throttle]') ? 'warn' :
+                                            line.includes('[Message]') ? 'success' :
+                                            line.includes('[CrossOver]') ? 'crossover' :
+                                            line.includes('[Mood]') ? 'mood' :
+                                            line.includes('[Reactivity]') ? 'reactive' : ''
+                                        }`}>{line}</div>
+                                    ))}
+                                    <div ref={logEndRef} />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Character table per show */}
                         {Object.values(SHOWS).map(show => {
                             const chars = getShowCharacters(show.id);
                             return (
@@ -313,15 +395,16 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                                 <th></th>
                                                 <th>Character</th>
                                                 <th>Model</th>
-                                                <th>Interval</th>
-                                                <th>Weight</th>
-                                                <th>Active</th>
+                                                <th>Mood</th>
+                                                <th>Wt</th>
+                                                <th>On</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {chars.map(c => {
                                                 const modelId = assigned[c.id] || '';
                                                 const modelObj = swarmModels.find(m => m.id === modelId);
+                                                const moods = Object.keys(c.moods || {});
                                                 return (
                                                     <tr key={c.id} style={{ opacity: (charEnabled[c.id] && showEnabled[show.id]) ? 1 : 0.4 }}>
                                                         <td>{c.avatar}</td>
@@ -347,7 +430,20 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                                                 ))}
                                                             </select>
                                                         </td>
-                                                        <td>{Math.round(c.minInterval / 60000)}–{Math.round(c.maxInterval / 60000)}m</td>
+                                                        <td>
+                                                            <select
+                                                                className="admin-model-select"
+                                                                value={charMoods[c.id] || 'normal'}
+                                                                onChange={e => {
+                                                                    swarm?.setMood(c.id, e.target.value);
+                                                                    setCharMoods(prev => ({ ...prev, [c.id]: e.target.value }));
+                                                                }}
+                                                            >
+                                                                {moods.map(m => (
+                                                                    <option key={m} value={m}>{m}</option>
+                                                                ))}
+                                                            </select>
+                                                        </td>
                                                         <td>{c.frequencyWeight}/10</td>
                                                         <td>
                                                             <input
@@ -368,7 +464,7 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                             );
                         })}
                         <div style={{ color: 'var(--text-muted)', fontSize: '0.8em', marginTop: 8 }}>
-                            Agent messages appear in General Chat only.
+                            Agent messages appear in General Chat only. Cross-overs and moods shift automatically based on chat context.
                         </div>
                     </div>
                 )}
