@@ -19,7 +19,6 @@ import LiveTicker from './chat/LiveTicker';
 import TypingBar from './chat/TypingBar';
 import * as ledger from '../lib/core/ledger.js';
 import { getRoomAlias } from '../lib/core/identity.js';
-import { AgentSwarm } from '../lib/agents/swarm.js';
 
 function timeStr() {
     const d = new Date();
@@ -238,6 +237,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
     // ── Agent Swarm bootstrap ─────────────────────────────────
     useEffect(() => {
+        let cancelled = false;
+        import('../lib/agents/swarm.js').then(({ AgentSwarm }) => {
+        if (cancelled) return;
         const swarm = new AgentSwarm({
             onMessage: (characterId, nick, avatar, text) => {
                 const activeRoom = currentRoomRef.current;
@@ -263,7 +265,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             onModelLoad: () => setAgentRunning(true),
         });
         swarmRef.current = swarm;
-        return () => swarm.stop();
+        }); // end dynamic import
+        return () => {
+            cancelled = true;
+            swarmRef.current?.stop();
+            swarmRef.current = null;
+        };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
