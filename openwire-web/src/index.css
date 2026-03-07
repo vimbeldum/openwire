@@ -1285,6 +1285,24 @@ body {
   margin-bottom: 0.4rem;
 }
 
+.admin-model-select {
+  background: var(--bg-secondary, #1a1a2e);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm, 4px);
+  padding: 0.25rem 0.4rem;
+  font-size: 0.75rem;
+  font-family: var(--font);
+  max-width: 200px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.admin-model-select:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ── Game Challenge Popup ───────────────────────── */
 .game-challenge {
   position: fixed;

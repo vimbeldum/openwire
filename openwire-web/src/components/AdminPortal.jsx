@@ -25,6 +25,7 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
         Object.keys(SHOWS).forEach(id => { init[id] = swarm?.isShowEnabled(id) ?? true; });
         return init;
     });
+    const [overrides, setOverrides] = useState({});
     const [swarmLoading, setSwarmLoading] = useState(false);
     const [assigned, setAssigned] = useState({});
 
@@ -325,8 +326,26 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                                     <tr key={c.id} style={{ opacity: (charEnabled[c.id] && showEnabled[show.id]) ? 1 : 0.4 }}>
                                                         <td>{c.avatar}</td>
                                                         <td>{c.name}</td>
-                                                        <td style={{ fontSize: '0.8em', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                            {modelObj ? formatModelLabel(modelObj) : (modelId || '—')}
+                                                        <td>
+                                                            <select
+                                                                className="admin-model-select"
+                                                                value={overrides[c.id] || ''}
+                                                                onChange={e => {
+                                                                    const val = e.target.value || null;
+                                                                    swarm?.setModelOverride(c.id, val);
+                                                                    setOverrides(prev => ({ ...prev, [c.id]: val }));
+                                                                }}
+                                                                disabled={swarmModels.length === 0}
+                                                            >
+                                                                <option value="">
+                                                                    {modelObj ? `Auto: ${formatModelLabel(modelObj)}` : '— Auto —'}
+                                                                </option>
+                                                                {swarmModels.map(m => (
+                                                                    <option key={m.id} value={m.id}>
+                                                                        {formatModelLabel(m)}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
                                                         </td>
                                                         <td>{Math.round(c.minInterval / 60000)}–{Math.round(c.maxInterval / 60000)}m</td>
                                                         <td>{c.frequencyWeight}/10</td>
