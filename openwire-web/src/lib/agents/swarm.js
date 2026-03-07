@@ -7,7 +7,8 @@
    imports. Supports hot-reload via loadConfig().
 
    Features: cross-over, moods, god-mode logging, session memory,
-   throttle, typing indicators, smart @mention tagging.
+   throttle, typing indicators, smart @mention tagging,
+   rate-limit-aware retry queue with exponential backoff.
    ═══════════════════════════════════════════════════════════ */
 
 import { fetchFreeModels, generateMessage } from './openrouter.js';
@@ -18,6 +19,8 @@ const FALLBACK_MODEL = 'openrouter/auto';
 const DEFAULT_ALL_MODEL = 'openrouter/auto';
 const DEFAULT_MSG_PER_MIN = 8;
 const CROSSOVER_PROBABILITY = 0.7;
+const MAX_RETRIES = 3;
+const BASE_BACKOFF_MS = 2000;
 
 export class AgentSwarm {
     constructor({ onMessage, onError, onModelLoad, onLog, onTyping }) {
@@ -47,6 +50,10 @@ export class AgentSwarm {
         this._throttleTimer = null;
         this._maxMsgPerMin = DEFAULT_MSG_PER_MIN;
         this._chatterLevel = 1.0;
+
+        // Rate-limit-aware message queue
+        this._messageQueue = [];
+        this._isProcessingQueue = false;
 
         // Dynamic config — loaded from agentStore
         this._characters = {};  // dict { id: charObj }
@@ -133,6 +140,8 @@ export class AgentSwarm {
         this._running = false;
         Object.values(this._timers).forEach(t => clearTimeout(t));
         this._timers = {};
+        this._messageQueue = [];
+        this._isProcessingQueue = false;
         if (this._throttleTimer) { clearInterval(this._throttleTimer); this._throttleTimer = null; }
         if (this._factTimer) { clearInterval(this._factTimer); this._factTimer = null; }
         this._log('[Swarm] Stopped');
@@ -224,6 +233,7 @@ export class AgentSwarm {
     get groups()        { return this._groups; }
     get modelFilters()  { return this._modelFilters; }
     get defaultModel()  { return this._defaultModel; }
+    get queueLength()   { return this._messageQueue.length; }
 
     getAssignedModel(characterId) {
         return this._modelOverrides[characterId] || this._defaultModel || this._assignedModels[characterId] || FALLBACK_MODEL;
@@ -286,6 +296,12 @@ export class AgentSwarm {
         }, delay);
     }
 
+    // ── Queue-based generation ────────────────────────────────
+
+    /**
+     * Push a generation task onto the queue instead of calling API directly.
+     * This ensures serial execution and rate-limit-aware retries.
+     */
     async _generate(characterId, { force = false } = {}) {
         if (!force && this._messagesThisMinute >= this._maxMsgPerMin) {
             this._log(`[Throttle] ${this._characters[characterId]?.name} blocked — ${this._messagesThisMinute}/${this._maxMsgPerMin} msg/min`);
@@ -294,6 +310,42 @@ export class AgentSwarm {
 
         const c = this._characters[characterId];
         if (!c) return;
+
+        // Don't queue duplicate tasks for the same character
+        if (this._messageQueue.some(t => t.characterId === characterId)) {
+            this._log(`[Queue] ${c.name} already queued — skipping duplicate`);
+            return;
+        }
+
+        this._messageQueue.push({ characterId, retries: 0, force });
+        this._log(`[Queue] ${c.name} added (queue: ${this._messageQueue.length})`);
+
+        // Show typing indicator while in queue
+        this._onTyping(characterId, c.name, c.avatar, true);
+
+        this._processQueue();
+    }
+
+    /**
+     * Process the message queue one task at a time.
+     * Handles 429 rate limits with exponential backoff + jitter.
+     */
+    async _processQueue() {
+        if (this._isProcessingQueue || this._messageQueue.length === 0) return;
+        if (!this._running) return;
+
+        this._isProcessingQueue = true;
+
+        const task = this._messageQueue.shift();
+        const { characterId, retries, force } = task;
+        const c = this._characters[characterId];
+
+        if (!c) {
+            this._isProcessingQueue = false;
+            this._processQueue();
+            return;
+        }
+
         const modelId = this.getAssignedModel(characterId);
 
         // Build system prompt with mood modifier
@@ -318,7 +370,7 @@ export class AgentSwarm {
         // Smart mention: identify who we're responding to
         const replyTo = this._getReplyTarget(recent);
 
-        // Typing indicator ON
+        // Ensure typing indicator is on
         this._onTyping(characterId, c.name, c.avatar, true);
 
         try {
@@ -328,7 +380,6 @@ export class AgentSwarm {
             if (text) {
                 // Smart tagging: prepend @Nickname if we have a reply target
                 if (replyTo) {
-                    // Don't double-tag if the model already mentioned them
                     if (!text.toLowerCase().includes(`@${replyTo.toLowerCase()}`)) {
                         text = `@${replyTo}, ${text}`;
                     }
@@ -342,10 +393,51 @@ export class AgentSwarm {
                 this._extractFact(c.name, text);
                 this._checkCrossOver(characterId);
             }
+
+            // Success — release lock and process next
+            this._isProcessingQueue = false;
+            this._processQueue();
+
         } catch (e) {
-            this._onTyping(characterId, c.name, c.avatar, false);
-            this._onError(`[${c.name}] ${e.message}`);
-            this._log(`[Error] ${c.name}: ${e.message}`);
+            const is429 = e.status === 429
+                || e.message?.includes('429')
+                || e.message?.toLowerCase().includes('rate limit')
+                || e.message?.toLowerCase().includes('too many requests');
+
+            if (is429) {
+                const nextRetries = retries + 1;
+
+                if (nextRetries > MAX_RETRIES) {
+                    // Give up — agent "forgets" what they were going to say
+                    this._onTyping(characterId, c.name, c.avatar, false);
+                    this._log(`[RateLimit] ${c.name} dropped after ${MAX_RETRIES} retries — giving up`);
+                    this._isProcessingQueue = false;
+                    this._processQueue();
+                    return;
+                }
+
+                // Put back at front of queue
+                this._messageQueue.unshift({ characterId, retries: nextRetries, force });
+                const backoff = BASE_BACKOFF_MS * Math.pow(2, nextRetries);
+                const jitter = Math.random() * 1000;
+                const waitMs = backoff + jitter;
+
+                this._log(`[RateLimit] 429 hit for ${c.name} — retry ${nextRetries}/${MAX_RETRIES} in ${(waitMs / 1000).toFixed(1)}s (queue: ${this._messageQueue.length})`);
+
+                // Keep typing indicator on during backoff
+                await new Promise(r => setTimeout(r, waitMs));
+
+                this._isProcessingQueue = false;
+                this._processQueue();
+
+            } else {
+                // Non-429 error — drop the task and move on
+                this._onTyping(characterId, c.name, c.avatar, false);
+                this._onError(`[${c.name}] ${e.message}`);
+                this._log(`[Error] ${c.name}: ${e.message}`);
+                this._isProcessingQueue = false;
+                this._processQueue();
+            }
         }
     }
 

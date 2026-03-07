@@ -37,6 +37,14 @@ export default async function handler(req, res) {
                 headers: baseHeaders,
                 body: JSON.stringify(req.body),
             });
+
+            // Forward rate limit headers from OpenRouter
+            const rlHeaders = ['x-ratelimit-limit', 'x-ratelimit-remaining', 'x-ratelimit-reset', 'retry-after'];
+            rlHeaders.forEach(h => {
+                const val = upstream.headers.get(h);
+                if (val) res.setHeader(h, val);
+            });
+
             const data = await upstream.json();
             return res.status(upstream.status).json(data);
         }

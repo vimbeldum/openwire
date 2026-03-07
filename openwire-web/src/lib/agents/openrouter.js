@@ -106,7 +106,10 @@ export async function generateMessage(modelId, systemPrompt, contextMessages, ma
 
     if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
-        throw new Error(err?.error?.message || `HTTP ${resp.status}`);
+        const msg = err?.error?.message || `HTTP ${resp.status}`;
+        const error = new Error(msg);
+        error.status = resp.status;
+        throw error;
     }
 
     const data = await resp.json();
