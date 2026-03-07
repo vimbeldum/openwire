@@ -389,6 +389,21 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                             </div>
                         </div>
 
+                        {/* Flush AI context */}
+                        <div className="admin-agents-controls" style={{ marginTop: 0 }}>
+                            <button
+                                className="admin-btn"
+                                style={{ background: '#c0392b', color: '#fff', width: '100%' }}
+                                onClick={() => {
+                                    if (!swarm) return;
+                                    swarm.flushContext();
+                                    alert('AI context and session memory cleared.');
+                                }}
+                            >
+                                Flush AI Context
+                            </button>
+                        </div>
+
                         {/* AI Provider toggle */}
                         <div className="admin-agents-controls" style={{ marginTop: 0 }}>
                             <div className="admin-slider-group" style={{ flex: 1 }}>

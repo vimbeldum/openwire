@@ -274,6 +274,14 @@ export class AgentSwarm {
     get provider()      { return this._provider; }
     get geminiModels()  { return this._geminiModels; }
 
+    flushContext() {
+        const ctxLen = this._context.length;
+        const factsLen = this._sessionFacts.length;
+        this._context = [];
+        this._sessionFacts = [];
+        this._log(`[Flush] Cleared ${ctxLen} context messages and ${factsLen} session facts`);
+    }
+
     async setProvider(provider) {
         this._provider = provider;
         this._log(`[Config] Provider -> ${provider}`);
