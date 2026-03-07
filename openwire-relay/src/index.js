@@ -101,7 +101,7 @@ export class RelayRoom {
                         peer_id,
                         nick,
                         peers: this.peerList(),
-                        rooms: [],
+                        rooms: this.roomList(),
                     });
 
                     this.broadcast({ type: "peer_joined", peer_id, nick }, ws);
@@ -145,7 +145,9 @@ export class RelayRoom {
                 case "room_join": {
                     if (!peerInfo) return;
                     const room = this.rooms.get(msg.room_id);
-                    if (!room) { this.send(ws, { type: "error", message: "Room not found" }); return; }
+                    if (!room) { this.send(ws, { type: "error", message: "Room not found", room_id: msg.room_id }); return; }
+                    // Cancel pending deletion if someone rejoins
+                    if (room._deleteTimer) { clearTimeout(room._deleteTimer); room._deleteTimer = null; }
                     room.members.add(peerInfo.peer_id);
                     peerInfo.rooms.add(msg.room_id);
                     this.broadcastToRoom(msg.room_id, {
@@ -361,7 +363,13 @@ export class RelayRoom {
         peerInfo.rooms.delete(room_id);
 
         if (room.members.size === 0) {
-            this.rooms.delete(room_id);
+            // Keep empty rooms alive for 60s so refreshing users can rejoin
+            if (!room._deleteTimer) {
+                room._deleteTimer = setTimeout(() => {
+                    const r = this.rooms.get(room_id);
+                    if (r && r.members.size === 0) this.rooms.delete(room_id);
+                }, 60000);
+            }
         } else if (!silent) {
             this.broadcastToRoom(room_id, {
                 type: "room_peer_left",
