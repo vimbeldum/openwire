@@ -69,8 +69,7 @@ export async function generateGeminiMessage(modelId, systemPrompt, contextMessag
         contents.push({ role, parts: [{ text: m.content }] });
     });
 
-    // Gemini needs more tokens — Hinglish uses more tokens per word than English
-    const geminiTokens = 500;
+    const geminiTokens = 2000;
 
     const payload = {
         model: modelId,
