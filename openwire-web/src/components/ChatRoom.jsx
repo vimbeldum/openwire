@@ -20,9 +20,6 @@ import TypingBar from './chat/TypingBar';
 import * as ledger from '../lib/core/ledger.js';
 import { getRoomAlias } from '../lib/core/identity.js';
 import { AgentSwarm } from '../lib/agents/swarm.js';
-import { RouletteEngine } from '../lib/roulette';
-import { BlackjackEngine } from '../lib/blackjack';
-import { AndarBaharEngine } from '../lib/andarbahar';
 
 function timeStr() {
     const d = new Date();
@@ -457,7 +454,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 }
 
                 if (myNet !== undefined && walletRef.current) {
-                    const event = new RouletteEngine(resultsGame).calculateResults(resultsGame);
+                    const event = new rl.RouletteEngine(resultsGame).calculateResults(resultsGame);
                     resolvePayoutEvent(event, myId, walletRef.current);
                 }
 
@@ -553,7 +550,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     const myId = myIdRef.current;
                     const myNet = next.payouts?.[myId];
                     if (myNet !== undefined && walletRef.current) {
-                        const event = new AndarBaharEngine(next).calculateResults(next);
+                        const event = new ab.AndarBaharEngine(next).calculateResults(next);
                         resolvePayoutEvent(event, myId, walletRef.current);
                     }
                     addActivityLog(`Andar Bahar: ${next.result?.toUpperCase()} wins! Trump: ${next.trumpCard?.value}${next.trumpCard?.suit}`);
@@ -643,7 +640,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     setBlackjackGame(prev => {
                         // Apply wallet changes when game ends
                         if (gameState.phase === 'ended' && prev?.phase !== 'ended') {
-                            const event = new BlackjackEngine(gameState).calculateResults(gameState);
+                            const event = new bj.BlackjackEngine(gameState).calculateResults(gameState);
                             const myNet = event.totals?.[myId];
                             if (myNet !== undefined && walletRef.current) {
                                 setTimeout(() => resolvePayoutEvent(event, myId, walletRef.current), 0);
@@ -707,7 +704,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         if (gameState.phase === 'results' && prev?.phase !== 'results') {
                             const myNet = gameState.payouts?.[myId];
                             if (myNet !== undefined && walletRef.current) {
-                                const event = new RouletteEngine(gameState).calculateResults(gameState);
+                                const event = new rl.RouletteEngine(gameState).calculateResults(gameState);
                                 setTimeout(() => resolvePayoutEvent(event, myId, walletRef.current), 0);
                             }
                         }
@@ -741,7 +738,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         if (gameState.phase === 'ended' && prev?.phase !== 'ended') {
                             const myNet = gameState.payouts?.[myId];
                             if (myNet !== undefined && walletRef.current) {
-                                const event = new AndarBaharEngine(gameState).calculateResults(gameState);
+                                const event = new ab.AndarBaharEngine(gameState).calculateResults(gameState);
                                 setTimeout(() => resolvePayoutEvent(event, myId, walletRef.current), 0);
                             }
                         }
