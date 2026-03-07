@@ -20,11 +20,13 @@ export function createDeck() {
     return shuffleDeck(deck);
 }
 
-// Fisher-Yates shuffle
+// Fisher-Yates shuffle using cryptographically secure RNG
 export function shuffleDeck(deck) {
     const shuffled = [...deck];
+    const buf = new Uint32Array(shuffled.length);
+    crypto.getRandomValues(buf);
     for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+        const j = buf[i] % (i + 1);
         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     return shuffled;

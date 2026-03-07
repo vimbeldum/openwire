@@ -15,6 +15,10 @@ export function connect(nick, onEvent) {
     // Only keep the most recent listener to prevent duplicates on reconnect
     listeners = [onEvent];
 
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && !RELAY_URL.startsWith('wss://')) {
+        console.warn('[OpenWire] Security warning: WebSocket relay is using an unencrypted connection (ws://) on an https:// page. Set VITE_RELAY_URL to a wss:// endpoint.');
+    }
+
     ws = new WebSocket(RELAY_URL);
 
     ws.onopen = () => {

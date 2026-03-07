@@ -7,7 +7,7 @@ export default function Landing({ onJoin }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        const nick = name.trim() || 'Anonymous';
+        const nick = name.trim().replace(/[\x00-\x1f\x7f]/g, '').slice(0, 24) || 'Anonymous';
         onJoin(nick, false);
     };
 

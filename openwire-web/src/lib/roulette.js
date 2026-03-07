@@ -107,7 +107,9 @@ export function clearBets(game, peer_id) {
 
 // Spin the wheel — returns new game state with result + payouts
 export function spin(game) {
-    const result = Math.floor(Math.random() * 37); // 0-36
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    const result = buf[0] % 37; // 0-36
 
     // Compute net change per player
     const payouts = {};

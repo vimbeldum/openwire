@@ -33,7 +33,9 @@ export const SLOT_PAYOUTS = {
 
 function weightedSpin() {
     const total = SYMBOL_WEIGHTS.reduce((a, b) => a + b, 0);
-    let r = Math.random() * total;
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    let r = (buf[0] / 0x100000000) * total;
     for (let i = 0; i < SYMBOLS.length; i++) {
         r -= SYMBOL_WEIGHTS[i];
         if (r <= 0) return SYMBOLS[i];
