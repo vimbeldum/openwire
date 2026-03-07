@@ -87,6 +87,48 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const [swarmLogs, setSwarmLogs] = useState([]);
     const swarmRef = useRef(null);
 
+    // Per-user muted agents (localStorage-backed)
+    const [mutedAgents, setMutedAgents] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('openwire_muted_agents')) || {}; }
+        catch { return {}; }
+    });
+    const [showMuteMenu, setShowMuteMenu] = useState(false);
+    const muteMenuRef = useRef(null);
+    const allAgentsMuted = Object.keys(CHARACTERS).length > 0 && Object.keys(CHARACTERS).every(id => mutedAgents[id]);
+
+    // Close mute menu on outside click
+    useEffect(() => {
+        if (!showMuteMenu) return;
+        const handler = (e) => {
+            if (muteMenuRef.current && !muteMenuRef.current.contains(e.target)) setShowMuteMenu(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showMuteMenu]);
+
+    const toggleMuteAgent = useCallback((charId) => {
+        setMutedAgents(prev => {
+            const next = { ...prev, [charId]: !prev[charId] };
+            localStorage.setItem('openwire_muted_agents', JSON.stringify(next));
+            return next;
+        });
+    }, []);
+
+    const toggleMuteAll = useCallback(() => {
+        setMutedAgents(prev => {
+            const allMuted = Object.keys(CHARACTERS).every(id => prev[id]);
+            const next = {};
+            Object.keys(CHARACTERS).forEach(id => { next[id] = !allMuted; });
+            localStorage.setItem('openwire_muted_agents', JSON.stringify(next));
+            return next;
+        });
+    }, [CHARACTERS]);
+
+    const isAgentMuted = useCallback((msg) => {
+        if (!msg.isAgent || !msg.characterId) return false;
+        return !!mutedAgents[msg.characterId];
+    }, [mutedAgents]);
+
     // Bank Ledger (House P&L Tracker)
     const [bankLedger, setBankLedger] = useState(() => {
         try { return JSON.parse(sessionStorage.getItem('bank_ledger')) || { roulette: 0, blackjack: 0, andarbahar: 0 }; }
@@ -1452,6 +1494,33 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         onClick={() => setShowAgentPanel(v => !v)}
                         title="Pop-Culture Agent Swarm"
                     >🤖</button>
+                    <div className="mute-agents-wrapper" ref={muteMenuRef}>
+                        <button
+                            className={`btn-mute-agents ${allAgentsMuted ? 'muted' : ''}`}
+                            onClick={() => setShowMuteMenu(v => !v)}
+                            title={allAgentsMuted ? 'AI characters muted' : 'Mute AI characters'}
+                        >{allAgentsMuted ? '🔇' : '🔊'}</button>
+                        {showMuteMenu && (
+                            <div className="mute-agents-menu">
+                                <div className="mute-menu-header">
+                                    <span>AI Characters</span>
+                                    <button className="mute-menu-toggle-all" onClick={toggleMuteAll}>
+                                        {allAgentsMuted ? 'Unmute All' : 'Mute All'}
+                                    </button>
+                                </div>
+                                {Object.values(CHARACTERS).map(c => (
+                                    <label key={c.id} className="mute-menu-row">
+                                        <input
+                                            type="checkbox"
+                                            checked={!mutedAgents[c.id]}
+                                            onChange={() => toggleMuteAgent(c.id)}
+                                        />
+                                        <span>{c.avatar} {c.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                     <span className={`status-dot ${connected ? '' : 'offline'}`} />
                     <span>{connected ? `${myNick} — ${peers.length} online` : 'Connecting...'}</span>
                 </div>
@@ -1491,7 +1560,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
             <div className="messages-area">
                 {messages
-                    .filter(m => m.roomId === (currentRoom || null))
+                    .filter(m => m.roomId === (currentRoom || null) && !isAgentMuted(m))
                     .map((m) => (
                     <div key={m.id} className={`msg ${m.type}${m.type === 'whisper' ? ' whisper' : ''}`}>
                         {m.type === 'game_invite' && !m.inviteUsed ? (
@@ -1781,7 +1850,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         <button onClick={() => setShowGameChat(false)}>✕</button>
                     </div>
                     <div className="floating-chat-messages">
-                        {messages.slice(-50).map((m) => (
+                        {messages.filter(m => !isAgentMuted(m)).slice(-50).map((m) => (
                             <div key={m.id} className={`msg ${m.type}`}>
                                 <span className="msg-time">[{m.time}]</span>
                                 {m.sender && <span className={`msg-sender ${m.type}`}>{m.sender}:</span>}

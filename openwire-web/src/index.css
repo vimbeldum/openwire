@@ -5587,6 +5587,74 @@ body {
 .btn-agent-panel:hover  { opacity: 0.9; }
 .btn-agent-panel.active { opacity: 1; filter: drop-shadow(0 0 4px #a78bfa88); }
 
+/* ── Mute AI Characters Menu ────────────────────────────────── */
+.mute-agents-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+.btn-mute-agents {
+  padding: 0 0.4rem;
+  background: transparent;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+.btn-mute-agents:hover { opacity: 0.9; }
+.btn-mute-agents.muted { opacity: 1; filter: drop-shadow(0 0 4px #f4433688); }
+.mute-agents-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 999;
+  background: var(--glass-bg, rgba(20, 20, 30, 0.95));
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.08));
+  border-radius: 10px;
+  padding: 0.5rem;
+  min-width: 200px;
+  max-height: 340px;
+  overflow-y: auto;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.mute-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0.3rem 0.5rem;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text-muted, #999);
+}
+.mute-menu-toggle-all {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  color: var(--accent, #a78bfa);
+  font-size: 0.72rem;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+.mute-menu-toggle-all:hover { background: rgba(255,255,255,0.1); }
+.mute-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--text-primary, #eee);
+}
+.mute-menu-row:hover { background: rgba(255,255,255,0.05); }
+.mute-menu-row input[type="checkbox"] {
+  accent-color: var(--accent, #a78bfa);
+  width: 14px;
+  height: 14px;
+}
+
 /* ── Agent Control Panel ─────────────────────────────────────── */
 .acp-overlay {
   position: fixed;
