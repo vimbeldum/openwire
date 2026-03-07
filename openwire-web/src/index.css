@@ -3014,8 +3014,9 @@ body {
   flex-direction: column;
   align-items: center;
   margin-bottom: 0;
-  padding: 0.25rem 0;
+  padding: 0.1rem 0;
   background: radial-gradient(circle, rgba(0, 0, 0, 0.5) 0%, transparent 70%);
+  flex-shrink: 0;
 }
 
 /* ── Two-Column Layout ── */
@@ -3031,9 +3032,9 @@ body {
 .rl-left-col {
   display: flex;
   flex-direction: column;
-  flex: 0 0 220px;
+  flex: 0 0 240px;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.3rem;
   overflow: hidden;
   min-height: 0;
 }
@@ -3121,9 +3122,9 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 60px;
-  flex: 1;
-  padding-top: 1rem;
+  min-height: 30px;
+  flex: 0 0 auto;
+  padding-top: 0.25rem;
 }
 
 .rl-spinning-text {
@@ -3317,6 +3318,18 @@ body {
   flex: 1;
 }
 
+/* Outside-bet rows sit directly in .rl-grid-vertical — keep them auto height */
+.rl-grid-vertical > .rl-grid-row {
+  flex: 0 0 auto;
+  min-height: 2.2em;
+}
+
+/* Number rows inside .rl-numbers-grid share remaining space equally */
+.rl-numbers-grid > .rl-grid-row {
+  flex: 1;
+  min-height: 0;
+}
+
 .rl-col-bets-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -3421,11 +3434,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 1rem;
-  padding: 0.75rem 1rem;
+  margin-top: 0.25rem;
+  padding: 0.4rem 0.75rem;
   background: rgba(0, 0, 0, 0.3);
   border-radius: var(--radius-sm);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
 }
 
 .rl-clear-btn {
@@ -3444,7 +3457,9 @@ body {
 }
 
 .rl-all-bets {
-  margin-top: 1.5rem;
+  margin-top: 0.4rem;
+  overflow-y: auto;
+  max-height: 80px;
 }
 
 .rl-bets-list {
@@ -3462,11 +3477,13 @@ body {
 }
 
 .rl-results {
-  margin-top: 1.5rem;
-  padding: 1rem;
+  margin-top: 0.4rem;
+  padding: 0.4rem 0.5rem;
   background: rgba(0, 0, 0, 0.3);
   border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow-y: auto;
+  max-height: 100px;
 }
 
 .rl-payouts-list {
