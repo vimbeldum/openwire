@@ -286,8 +286,8 @@ export class AgentSwarm {
         }, delay);
     }
 
-    async _generate(characterId) {
-        if (this._messagesThisMinute >= this._maxMsgPerMin) {
+    async _generate(characterId, { force = false } = {}) {
+        if (!force && this._messagesThisMinute >= this._maxMsgPerMin) {
             this._log(`[Throttle] ${this._characters[characterId]?.name} blocked — ${this._messagesThisMinute}/${this._maxMsgPerMin} msg/min`);
             return;
         }

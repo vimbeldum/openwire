@@ -1250,14 +1250,21 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
             // Check if it's an AI agent mention
             const agentId = agentNameMap[name];
-            if (agentId && swarmRef.current?.running) {
+            if (agentId) {
+                const sw = swarmRef.current;
+                if (!sw) { console.warn(`[@Mention] No swarm instance for @${name}`); return; }
+                if (!sw.running) { console.warn(`[@Mention] Swarm not running for @${name}`); return; }
                 // Feed the message into swarm context and trigger immediate response
-                swarmRef.current.addContext(senderNick, text);
+                sw.addContext(senderNick, text);
                 const c = CHARACTERS[agentId];
-                if (c && swarmRef.current._isActive(agentId)) {
-                    if (swarmRef.current._timers[agentId]) clearTimeout(swarmRef.current._timers[agentId]);
-                    swarmRef.current._generate(agentId).then(() => swarmRef.current._scheduleNext(agentId));
+                if (!c) { console.warn(`[@Mention] Character not found: ${agentId}`); return; }
+                if (!sw._isActive(agentId)) {
+                    console.warn(`[@Mention] ${c.name} is disabled (char=${sw._charEnabled[agentId]}, group=${sw._groupEnabled[c.groupId || c.show]})`);
+                    return;
                 }
+                sw._log(`[@Mention] ${c.name} triggered by @${name} from ${senderNick}`);
+                if (sw._timers[agentId]) clearTimeout(sw._timers[agentId]);
+                sw._generate(agentId, { force: true }).then(() => sw._scheduleNext(agentId));
                 return;
             }
 
