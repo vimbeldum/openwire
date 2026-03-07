@@ -15,7 +15,7 @@ import { fetchFreeModels, generateMessage } from './openrouter.js';
 import { loadStore, getCharactersDict, getGroupsDict } from './agentStore.js';
 
 const CONTEXT_BUFFER_SIZE = 20;
-const FALLBACK_MODEL = 'openrouter/auto';
+const FALLBACK_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
 const DEFAULT_ALL_MODEL = 'openrouter/auto';
 const DEFAULT_MSG_PER_MIN = 8;
 const CROSSOVER_PROBABILITY = 0.7;
@@ -375,6 +375,16 @@ export class AgentSwarm {
 
         try {
             let text = await generateMessage(modelId, systemPrompt, trigger, 120);
+
+            // If primary model returns empty, retry with a known-good free model
+            if (!text && this._freeModels.length > 0) {
+                const fallbackModel = this._freeModels.find(m => m.id !== modelId)?.id;
+                if (fallbackModel) {
+                    this._log(`[Generate] ${c.name} got empty from ${modelId}, retrying with ${fallbackModel}`);
+                    text = await generateMessage(fallbackModel, systemPrompt, trigger, 120);
+                }
+            }
+
             this._onTyping(characterId, c.name, c.avatar, false);
             this._log(`[Generate] ${c.name} result: ${text ? `"${text.slice(0, 60)}..."` : 'NULL/EMPTY'}`);
 
