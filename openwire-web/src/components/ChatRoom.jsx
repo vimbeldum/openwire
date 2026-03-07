@@ -263,8 +263,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     }, [activeGame]);
 
     useEffect(() => {
-        if (currentRoom) localStorage.setItem('openwire_current_room', currentRoom);
-        else localStorage.removeItem('openwire_current_room');
+        if (currentRoom) {
+            localStorage.setItem('openwire_current_room', currentRoom);
+        } else {
+            localStorage.removeItem('openwire_current_room');
+            localStorage.removeItem('openwire_current_room_name');
+        }
     }, [currentRoom]);
 
     // ── Wallet init ──────────────────────────────────────────
@@ -878,6 +882,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         return updated;
                     });
                     setCurrentRoom(msg.room_id);
+                    localStorage.setItem('openwire_current_room_name', msg.name);
                     addMsg('★', `🏠 Room "${msg.name}" created! ID: ${msg.room_id}`, 'system');
                     break;
                 case 'room_joined':
@@ -887,6 +892,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         return updated;
                     });
                     setCurrentRoom(msg.room_id);
+                    localStorage.setItem('openwire_current_room_name', msg.name);
                     addMsg('★', `🏠 Joined room "${msg.name}"`, 'system');
                     break;
                 case 'room_invite':
@@ -950,6 +956,19 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     break;
                 case 'room_list':
                     setRooms(msg.rooms || []);
+                    break;
+                case 'error':
+                    // If saved room was not found, auto-recreate it
+                    if (msg.message === 'Room not found' && msg.room_id) {
+                        const savedName = localStorage.getItem('openwire_current_room_name');
+                        if (savedName) {
+                            addMsg('★', `🏠 Room expired — recreating "${savedName}"...`, 'system');
+                            socket.createRoom(savedName);
+                        } else {
+                            localStorage.removeItem('openwire_current_room');
+                            setCurrentRoom(null);
+                        }
+                    }
                     break;
 
                 // ── Host migration ───────────────────────────────────
