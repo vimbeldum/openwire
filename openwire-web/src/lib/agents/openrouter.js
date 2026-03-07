@@ -88,31 +88,40 @@ function extractParamCount(model) {
  * Generate a character message via the OpenRouter proxy.
  */
 export async function generateMessage(modelId, systemPrompt, contextMessages, maxTokens = 120) {
+    const isDebug = typeof localStorage !== 'undefined' && localStorage.getItem('openwire_debug') === 'true';
     const messages = [
         { role: 'system', content: systemPrompt },
         ...contextMessages,
     ];
 
+    const payload = {
+        model: modelId,
+        messages,
+        max_tokens: maxTokens,
+        temperature: 0.92,
+    };
+
+    if (isDebug) {
+        console.log('[OpenRouter] Request:', { model: modelId, contextCount: contextMessages.length, maxTokens });
+    }
+
     const resp = await fetch(PROXY, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            model: modelId,
-            messages,
-            max_tokens: maxTokens,
-            temperature: 0.92,
-        }),
+        body: JSON.stringify(payload),
     });
 
     if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         const msg = err?.error?.message || `HTTP ${resp.status}`;
+        if (isDebug) console.error('[OpenRouter] Error:', resp.status, err);
         const error = new Error(msg);
         error.status = resp.status;
         throw error;
     }
 
     const data = await resp.json();
+    if (isDebug) console.log('[OpenRouter] Response:', data);
     const text = data.choices?.[0]?.message?.content?.trim();
     return text || null;
 }

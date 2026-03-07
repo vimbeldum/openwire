@@ -1252,6 +1252,43 @@ body {
   flex-shrink: 0;
 }
 
+/* ── @Mention autocomplete dropdown ─────────────────── */
+.mention-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bg-secondary, #1e1e2e);
+  border: 1px solid var(--border, #333);
+  border-radius: 8px 8px 0 0;
+  z-index: 100;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.4);
+}
+.mention-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text, #ccc);
+}
+.mention-item:hover,
+.mention-item-active {
+  background: var(--accent, #66a1ee);
+  color: #fff;
+}
+.mention-avatar { font-size: 1.1rem; flex-shrink: 0; }
+.mention-name { flex: 1; font-weight: 500; }
+.mention-type {
+  font-size: 0.7rem;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 /* ── @Mention highlight in messages ──────────────────── */
 .mention-highlight {
   color: var(--accent);

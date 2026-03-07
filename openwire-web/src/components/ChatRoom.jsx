@@ -158,6 +158,18 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const messagesEnd = useRef(null);
     const gameChatEnd = useRef(null);
 
+    // @mention autocomplete
+    const [mentionQuery, setMentionQuery] = useState(null); // null = closed, '' = show all
+    const [mentionIndex, setMentionIndex] = useState(0);
+    const [mentionSuggestions, setMentionSuggestions] = useState([]);
+    const inputRef = useRef(null);
+    const floatingInputRef = useRef(null);
+
+    // Debug mode
+    const [debugMode, setDebugMode] = useState(() => localStorage.getItem('openwire_debug') === 'true');
+    const debugModeRef = useRef(debugMode);
+    useEffect(() => { debugModeRef.current = debugMode; }, [debugMode]);
+
     const myIdRef = useRef(null);
     const nickRef = useRef(initialNick);
     const isAdminRef = useRef(initialIsAdmin);
@@ -305,9 +317,15 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 // Feed back into context
                 swarm.addContext(nick, text);
             },
-            onError: (msg) => console.warn('[AgentSwarm]', msg),
+            onError: (msg) => {
+                console.warn('[AgentSwarm]', msg);
+                if (debugModeRef.current) addMsg('🔧', `[AI Error] ${msg}`, 'system');
+            },
             onModelLoad: () => setAgentRunning(true),
-            onLog: (line) => setSwarmLogs(prev => [...prev.slice(-200), line]),
+            onLog: (line) => {
+                setSwarmLogs(prev => [...prev.slice(-200), line]);
+                if (debugModeRef.current) console.log('[AgentSwarm]', line);
+            },
             onTyping: (characterId, nick, avatar, isTyping) => {
                 if (isTyping) {
                     setAgentTyping(prev => ({ ...prev, [characterId]: { nick, avatar, ts: Date.now() } }));
@@ -1258,6 +1276,108 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         Object.values(CHARACTERS).map(c => [c.name.toLowerCase(), c.id])
     );
 
+    // Build cached list of all mentionable names (agents + online peers), sorted alphabetically
+    const allMentionables = useCallback(() => {
+        const names = new Map(); // lowercase → display name
+        // Add agent characters
+        Object.values(CHARACTERS).forEach(c => {
+            names.set(c.name.toLowerCase(), { display: c.name, avatar: c.avatar, type: 'agent' });
+        });
+        // Add online peers (excluding self)
+        peersRef.current.forEach(p => {
+            if (p.nick && p.nick !== nickRef.current) {
+                const key = p.nick.toLowerCase();
+                if (!names.has(key)) names.set(key, { display: p.nick, avatar: '👤', type: 'peer' });
+            }
+        });
+        return [...names.entries()]
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([key, val]) => ({ key, ...val }));
+    }, [CHARACTERS]);
+
+    // Update suggestions when query changes
+    useEffect(() => {
+        if (mentionQuery === null) { setMentionSuggestions([]); return; }
+        const all = allMentionables();
+        if (!mentionQuery) { setMentionSuggestions(all); setMentionIndex(0); return; }
+        const q = mentionQuery.toLowerCase();
+        const filtered = all.filter(m => m.key.startsWith(q));
+        setMentionSuggestions(filtered);
+        setMentionIndex(0);
+    }, [mentionQuery, allMentionables]);
+
+    // Handle input changes to detect @mention trigger
+    const handleInputChange = useCallback((e) => {
+        const val = e.target.value;
+        setInput(val);
+
+        // Detect @mention: find the last '@' before the cursor
+        const cursorPos = e.target.selectionStart;
+        const textBefore = val.slice(0, cursorPos);
+        const atIdx = textBefore.lastIndexOf('@');
+
+        if (atIdx >= 0) {
+            // Only trigger if '@' is at start or preceded by a space
+            const charBefore = atIdx > 0 ? textBefore[atIdx - 1] : ' ';
+            if (charBefore === ' ' || atIdx === 0) {
+                const query = textBefore.slice(atIdx + 1);
+                // Only show if query has no spaces (still typing the name)
+                if (!/\s/.test(query)) {
+                    setMentionQuery(query);
+                    return;
+                }
+            }
+        }
+        setMentionQuery(null);
+    }, []);
+
+    // Handle keyboard navigation in mention dropdown
+    const handleInputKeyDown = useCallback((e) => {
+        if (mentionQuery === null || mentionSuggestions.length === 0) return;
+
+        if (e.key === 'Tab' || e.key === 'Enter') {
+            // Don't submit form on Enter when dropdown is open
+            if (e.key === 'Enter') e.stopPropagation();
+            e.preventDefault();
+            const selected = mentionSuggestions[mentionIndex];
+            if (!selected) return;
+
+            // Replace the @query with @SelectedName + space
+            const cursorPos = e.target.selectionStart;
+            const textBefore = input.slice(0, cursorPos);
+            const atIdx = textBefore.lastIndexOf('@');
+            const before = input.slice(0, atIdx);
+            const after = input.slice(cursorPos);
+            const newVal = `${before}@${selected.display} ${after}`;
+            setInput(newVal);
+            setMentionQuery(null);
+
+            // Move cursor after the inserted name + space
+            const newCursorPos = atIdx + 1 + selected.display.length + 1;
+            requestAnimationFrame(() => {
+                e.target.setSelectionRange(newCursorPos, newCursorPos);
+            });
+            return;
+        }
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setMentionIndex(prev => Math.min(prev + 1, mentionSuggestions.length - 1));
+            return;
+        }
+
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setMentionIndex(prev => Math.max(prev - 1, 0));
+            return;
+        }
+
+        if (e.key === 'Escape') {
+            setMentionQuery(null);
+            return;
+        }
+    }, [mentionQuery, mentionSuggestions, mentionIndex, input]);
+
     const processMentions = useCallback((text, senderNick) => {
         const mentions = text.match(/@(\w+)/g);
         if (!mentions) return;
@@ -1336,6 +1456,15 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             addMsg('★', '/balance  — show your chip balance', 'system');
             addMsg('★', '/tip <nick> <amount>  — send chips to a peer', 'system');
             addMsg('★', '/clear  — clear current chat history', 'system');
+            addMsg('★', '/debug  — toggle AI debug mode (shows API calls & errors)', 'system');
+            return;
+        }
+
+        if (text === '/debug') {
+            const next = !debugMode;
+            setDebugMode(next);
+            localStorage.setItem('openwire_debug', String(next));
+            addMsg('★', `🔧 Debug mode ${next ? 'ON' : 'OFF'} — ${next ? 'AI API calls will be logged to browser console & chat' : 'Debug logging disabled'}`, 'system');
             return;
         }
 
@@ -1644,14 +1773,47 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 </div>
             )}
 
-            <form className="chat-input" onSubmit={handleSend}>
+            <form className="chat-input" onSubmit={(e) => { if (mentionQuery !== null && mentionSuggestions.length > 0) { e.preventDefault(); return; } handleSend(e); }}>
                 <div className="chat-input-wrapper" style={{ flex: 1, position: 'relative' }}>
+                    {mentionSuggestions.length > 0 && mentionQuery !== null && (
+                        <div className="mention-dropdown">
+                            {mentionSuggestions.map((m, i) => (
+                                <div
+                                    key={m.key}
+                                    className={`mention-item${i === mentionIndex ? ' mention-item-active' : ''}`}
+                                    onMouseDown={(ev) => {
+                                        ev.preventDefault();
+                                        const el = inputRef.current;
+                                        if (!el) return;
+                                        const cursorPos = el.selectionStart;
+                                        const textBefore = input.slice(0, cursorPos);
+                                        const atIdx = textBefore.lastIndexOf('@');
+                                        const before = input.slice(0, atIdx);
+                                        const after = input.slice(cursorPos);
+                                        const newVal = `${before}@${m.display} ${after}`;
+                                        setInput(newVal);
+                                        setMentionQuery(null);
+                                        requestAnimationFrame(() => {
+                                            const pos = atIdx + 1 + m.display.length + 1;
+                                            el.setSelectionRange(pos, pos);
+                                            el.focus();
+                                        });
+                                    }}
+                                >
+                                    <span className="mention-avatar">{m.avatar}</span>
+                                    <span className="mention-name">{m.display}</span>
+                                    <span className="mention-type">{m.type === 'agent' ? 'AI' : 'User'}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                     <input
+                        ref={inputRef}
                         type="text"
                         placeholder={currentRoom ? `Message #${rooms.find(r => r.room_id === currentRoom)?.name || 'room'}...` : 'Message General Chat... (or /help)'}
                         value={input}
                         onChange={(e) => {
-                            setInput(e.target.value);
+                            handleInputChange(e);
                             const now = Date.now();
                             if (now - lastTypingSentRef.current > 1500 && currentRoomRef.current) {
                                 lastTypingSentRef.current = now;
@@ -1660,6 +1822,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                                 }));
                             }
                         }}
+                        onKeyDown={handleInputKeyDown}
                         onPaste={handlePaste}
                         autoFocus
                     />
