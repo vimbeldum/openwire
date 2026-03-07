@@ -69,8 +69,8 @@ export async function generateGeminiMessage(modelId, systemPrompt, contextMessag
         contents.push({ role, parts: [{ text: m.content }] });
     });
 
-    // Use higher token limit for Gemini to avoid truncation
-    const geminiTokens = Math.max(maxTokens, 300);
+    // Gemini needs more tokens — Hinglish uses more tokens per word than English
+    const geminiTokens = 500;
 
     const payload = {
         model: modelId,
