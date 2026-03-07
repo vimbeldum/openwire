@@ -3014,7 +3014,7 @@ body {
   flex-direction: column;
   align-items: center;
   margin-bottom: 0;
-  padding: 0.1rem 0;
+  padding: 28px 0 0.1rem;
   background: radial-gradient(circle, rgba(0, 0, 0, 0.5) 0%, transparent 70%);
   flex-shrink: 0;
 }
@@ -3149,6 +3149,38 @@ body {
   50% {
     opacity: 1;
   }
+}
+
+.rl-countdown-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 100px;
+}
+
+.rl-countdown-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.rl-countdown-text strong {
+  color: #E8B730;
+  font-family: var(--font-mono);
+}
+
+.rl-countdown-track {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.rl-countdown-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #E8B730, #FFD700);
+  border-radius: 2px;
+  transition: width 0.5s linear;
 }
 
 .rl-result-badge {
@@ -4527,20 +4559,50 @@ body {
 /* ── Roulette responsive ─── */
 @media (max-width: 700px) {
   .rl-wheel-container {
-    width: 260px;
-    height: 260px;
+    width: 180px;
+    height: 180px;
+  }
+
+  .rl-left-col {
+    flex: 0 0 210px;
   }
 
   .rl-wheel-section {
-    flex-direction: column;
-    align-items: center;
+    padding-top: 26px;
   }
 
   .rl-wheel-info {
     padding-top: 0;
   }
 
+  .rl-cell {
+    font-size: 0.85rem;
+  }
+
   .floating-chat-panel {
     width: calc(100vw - 3rem);
+  }
+}
+
+@media (max-height: 600px) {
+  .rl-wheel-container {
+    width: 140px;
+    height: 140px;
+  }
+
+  .rl-wheel-section {
+    padding-top: 20px;
+  }
+
+  .rl-cell {
+    font-size: 0.75rem;
+  }
+
+  .rl-zero-row {
+    height: 1.8em;
+  }
+
+  .rl-grid-vertical > .rl-grid-row {
+    min-height: 1.8em;
   }
 }
