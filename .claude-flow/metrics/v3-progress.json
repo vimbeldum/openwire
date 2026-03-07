@@ -1,16 +1,29 @@
 {
   "version": "3.0.0",
   "initialized": "2026-03-07T06:55:41.016Z",
+  "lastUpdated": "2026-03-07T08:00:00.000Z",
   "domains": {
-    "completed": 0,
+    "completed": 5,
     "total": 5,
-    "status": "INITIALIZING"
+    "status": "COMPLETE"
   },
   "ddd": {
-    "progress": 0,
-    "modules": 0,
-    "totalFiles": 0,
-    "totalLines": 0
+    "progress": 100,
+    "modules": 10,
+    "totalFiles": 11,
+    "totalLines": 650,
+    "contexts": [
+      "identity-access",
+      "messaging-presence",
+      "casino-platform",
+      "roulette",
+      "blackjack",
+      "andar-bahar",
+      "slots",
+      "classic-games",
+      "administration",
+      "frontend-shell"
+    ]
   },
   "swarm": {
     "activeAgents": 0,
@@ -19,8 +32,8 @@
   },
   "learning": {
     "status": "READY",
-    "patternsLearned": 0,
-    "sessionsCompleted": 0
+    "patternsLearned": 3,
+    "sessionsCompleted": 1
   },
-  "_note": "Metrics will update as you use Claude Flow. Run: npx @claude-flow/cli@latest daemon start"
+  "_note": "DDD bounded contexts documented in /docs/ddd/ — 10 contexts mapped"
 }
