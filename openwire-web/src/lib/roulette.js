@@ -2,7 +2,10 @@
    OpenWire Web — Roulette game engine
    European roulette (0–36, single zero)
    Auto-spin every 2 minutes. P2P host-resilient.
+   Implements the universal GameEngine interface.
    ═══════════════════════════════════════════════════════════ */
+
+import { GameEngine, registerGame } from './GameEngine.js';
 
 export const SPIN_INTERVAL_MS = 1 * 60 * 1000; // 1 minute
 export const SPIN_PHASE_MS = 10 * 1000;        // 10s spinning animation
@@ -165,3 +168,55 @@ export function serializeGame(game) {
 export function deserializeGame(data) {
     try { return typeof data === 'string' ? JSON.parse(data) : data; } catch { return null; }
 }
+
+/* ── Rules (used by HowToPlay) ────────────────────────────── */
+
+export const ROULETTE_RULES = {
+    name: 'European Roulette',
+    description: 'European roulette with a single zero (0–36). Place bets before the wheel spins every minute. The house edge is 2.7%.',
+    bets: [
+        { name: 'Single Number', odds: '35:1', description: 'Bet on one specific number (0–36). Highest payout.' },
+        { name: 'Red / Black', odds: '1:1', description: 'Bet on whether the result will be red or black. Zero loses.' },
+        { name: 'Even / Odd', odds: '1:1', description: 'Bet on even or odd. Zero counts as neither.' },
+        { name: 'Low (1–18)', odds: '1:1', description: 'Bet the result falls in the lower half (1–18).' },
+        { name: 'High (19–36)', odds: '1:1', description: 'Bet the result falls in the upper half (19–36).' },
+        { name: 'Dozen', odds: '2:1', description: '1st (1–12), 2nd (13–24), or 3rd (25–36) group of twelve.' },
+        { name: 'Column', odds: '2:1', description: 'One of the three vertical columns on the betting board.' },
+    ],
+};
+
+/* ── GameEngine implementation ────────────────────────────── */
+
+export class RouletteEngine extends GameEngine {
+    constructor(game) {
+        super();
+        this._game = game;
+    }
+
+    getGameState() {
+        return this._game;
+    }
+
+    /**
+     * @param {Array<{peer_id: string, nick: string, betType: string, betTarget: *, amount: number}>} bets
+     * @param {number} result  Winning number (0–36)
+     * @returns {{ [peer_id: string]: number }}
+     */
+    calculatePayout(bets, result) {
+        const payouts = {};
+        for (const bet of bets) {
+            const multiplier = getPayout(bet.betType, bet.betTarget, result);
+            const net = multiplier > 0
+                ? bet.amount * (multiplier - 1)
+                : -bet.amount;
+            payouts[bet.peer_id] = (payouts[bet.peer_id] ?? 0) + net;
+        }
+        return payouts;
+    }
+
+    getRules() {
+        return ROULETTE_RULES;
+    }
+}
+
+registerGame('roulette', RouletteEngine);

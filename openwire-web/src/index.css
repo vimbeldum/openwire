@@ -3544,6 +3544,174 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   HOW TO PLAY PANEL
+   ═══════════════════════════════════════════════════════════ */
+
+.howtoplay-panel {
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(94, 58, 238, 0.12) 0%, transparent 60%),
+    linear-gradient(180deg, #0d0a16 0%, #130d20 100%);
+  border: 1px solid rgba(94, 58, 238, 0.3);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  width: min(95vw, 720px);
+  max-height: 90dvh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: var(--shadow-elevated), 0 0 40px rgba(94, 58, 238, 0.08);
+}
+
+.howtoplay-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.howtoplay-tab {
+  padding: 0.4rem 0.85rem;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.howtoplay-tab:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.howtoplay-tab.active {
+  background: rgba(94, 58, 238, 0.2);
+  border-color: rgba(94, 58, 238, 0.5);
+  color: white;
+}
+
+.howtoplay-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.howtoplay-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: white;
+  margin: 0;
+}
+
+.howtoplay-desc {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.howtoplay-section {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(94, 58, 238, 0.8);
+  margin: 0.25rem 0 0;
+}
+
+.howtoplay-bets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.howtoplay-bet-row {
+  display: grid;
+  grid-template-columns: 1fr 60px 2fr;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.6rem 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+}
+
+.howtoplay-bet-name {
+  font-weight: 700;
+  color: white;
+}
+
+.howtoplay-bet-odds {
+  font-weight: 700;
+  color: #E8B730;
+  font-family: var(--font-mono);
+  text-align: center;
+}
+
+.howtoplay-bet-desc {
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ── Admin PnL additions ─────────────────────────────────── */
+
+.admin-pnl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-pnl-title {
+  color: #ffb300;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.admin-pnl-total {
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.admin-pnl-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.admin-filter-btn {
+  padding: 0.3rem 0.75rem;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.admin-filter-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.admin-filter-btn.active {
+  background: rgba(232, 183, 48, 0.15);
+  border-color: rgba(232, 183, 48, 0.4);
+  color: #E8B730;
+}
+
+/* ═══════════════════════════════════════════════════════════
    ANDAR BAHAR TABLE (redesigned)
    ═══════════════════════════════════════════════════════════ */
 

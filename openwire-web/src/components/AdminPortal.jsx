@@ -1,11 +1,14 @@
 import { useState } from 'react';
+import { getTotalHousePnl } from '../lib/casinoState.js';
 
 const TABS = ['Players', 'Ban List', 'Activity Log', 'Stats'];
+const GAME_LABELS = { roulette: '🎰 Roulette', blackjack: '🃏 Blackjack', andarbahar: '🎴 Andar Bahar', slots: '🎲 Slots' };
 
-export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, activityLog, bannedIps, bankLedger, onClose }) {
+export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, activityLog, bannedIps, bankLedger, casinoState, onClose }) {
     const [tab, setTab] = useState('Players');
     const [adjustTarget, setAdjustTarget] = useState(null);
     const [adjustAmount, setAdjustAmount] = useState(100);
+    const [pnlFilter, setPnlFilter] = useState('all');
 
     const totalChips = peers.reduce((s, p) => s + (p.balance || 0), 0);
     const richest = peers.reduce((best, p) => (!best || (p.balance || 0) > (best.balance || 0)) ? p : best, null);
@@ -148,50 +151,82 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                 )}
 
                 {/* Stats tab */}
-                {tab === 'Stats' && (
-                    <div className="admin-content">
-                        <div className="admin-stats-grid">
-                            <div className="admin-stat-card">
-                                <div className="admin-stat-label">Players Online</div>
-                                <div className="admin-stat-value">{peers.length}</div>
-                            </div>
-                            <div className="admin-stat-card">
-                                <div className="admin-stat-label">Total Chips in Play</div>
-                                <div className="admin-stat-value">{totalChips.toLocaleString()}</div>
-                            </div>
-                            <div className="admin-stat-card">
-                                <div className="admin-stat-label">Richest Player</div>
-                                <div className="admin-stat-value">{richest ? `${richest.nick} (${(richest.balance || 0).toLocaleString()})` : '—'}</div>
-                            </div>
-                            <div className="admin-stat-card">
-                                <div className="admin-stat-label">Active Bans</div>
-                                <div className="admin-stat-value">{bannedIps?.length || 0}</div>
-                            </div>
-                        </div>
+                {tab === 'Stats' && (() => {
+                    // Prefer casinoState.housePnl; fall back to legacy bankLedger prop
+                    const pnl = casinoState?.housePnl ?? {
+                        roulette: bankLedger?.roulette ?? 0,
+                        blackjack: bankLedger?.blackjack ?? 0,
+                        andarbahar: bankLedger?.andarbahar ?? 0,
+                        slots: 0,
+                    };
+                    const totalPnl = casinoState
+                        ? getTotalHousePnl(casinoState)
+                        : Object.entries(pnl).filter(([k]) => k !== '_ts').reduce((s, [, v]) => s + v, 0);
 
-                        <h3 style={{ marginTop: '2rem', marginBottom: '1rem', color: '#ffb300', fontSize: '1.2rem' }}>🏦 Bank P&L (House Profit)</h3>
-                        <div className="admin-stats-grid">
-                            <div className="admin-stat-card">
-                                <div className="admin-stat-label">Roulette Net</div>
-                                <div className="admin-stat-value" style={{ color: (bankLedger?.roulette || 0) >= 0 ? '#4caf50' : '#f44336' }}>
-                                    {(bankLedger?.roulette || 0) > 0 ? '+' : ''}{(bankLedger?.roulette || 0).toLocaleString()}
+                    const gameKeys = Object.keys(GAME_LABELS);
+                    const filteredGames = pnlFilter === 'all' ? gameKeys : [pnlFilter];
+
+                    return (
+                        <div className="admin-content">
+                            <div className="admin-stats-grid">
+                                <div className="admin-stat-card">
+                                    <div className="admin-stat-label">Players Online</div>
+                                    <div className="admin-stat-value">{peers.length}</div>
+                                </div>
+                                <div className="admin-stat-card">
+                                    <div className="admin-stat-label">Total Chips in Play</div>
+                                    <div className="admin-stat-value">{totalChips.toLocaleString()}</div>
+                                </div>
+                                <div className="admin-stat-card">
+                                    <div className="admin-stat-label">Richest Player</div>
+                                    <div className="admin-stat-value">{richest ? `${richest.nick} (${(richest.balance || 0).toLocaleString()})` : '—'}</div>
+                                </div>
+                                <div className="admin-stat-card">
+                                    <div className="admin-stat-label">Active Bans</div>
+                                    <div className="admin-stat-value">{bannedIps?.length || 0}</div>
                                 </div>
                             </div>
-                            <div className="admin-stat-card">
-                                <div className="admin-stat-label">Blackjack Net</div>
-                                <div className="admin-stat-value" style={{ color: (bankLedger?.blackjack || 0) >= 0 ? '#4caf50' : '#f44336' }}>
-                                    {(bankLedger?.blackjack || 0) > 0 ? '+' : ''}{(bankLedger?.blackjack || 0).toLocaleString()}
+
+                            {/* House P&L section */}
+                            <div className="admin-pnl-header">
+                                <h3 className="admin-pnl-title">🏦 House P&amp;L</h3>
+                                <div className="admin-pnl-total" style={{ color: totalPnl >= 0 ? '#4caf50' : '#f44336' }}>
+                                    Total: {totalPnl >= 0 ? '+' : ''}{totalPnl.toLocaleString()} chips
                                 </div>
                             </div>
-                            <div className="admin-stat-card">
-                                <div className="admin-stat-label">Andar Bahar Net</div>
-                                <div className="admin-stat-value" style={{ color: (bankLedger?.andarbahar || 0) >= 0 ? '#4caf50' : '#f44336' }}>
-                                    {(bankLedger?.andarbahar || 0) > 0 ? '+' : ''}{(bankLedger?.andarbahar || 0).toLocaleString()}
-                                </div>
+
+                            {/* Game filter */}
+                            <div className="admin-pnl-filters">
+                                <button
+                                    className={`admin-filter-btn ${pnlFilter === 'all' ? 'active' : ''}`}
+                                    onClick={() => setPnlFilter('all')}
+                                >All Games</button>
+                                {gameKeys.map(k => (
+                                    <button
+                                        key={k}
+                                        className={`admin-filter-btn ${pnlFilter === k ? 'active' : ''}`}
+                                        onClick={() => setPnlFilter(k)}
+                                    >{GAME_LABELS[k]}</button>
+                                ))}
+                            </div>
+
+                            {/* Per-game breakdown */}
+                            <div className="admin-stats-grid">
+                                {filteredGames.map(k => {
+                                    const val = pnl[k] ?? 0;
+                                    return (
+                                        <div key={k} className="admin-stat-card">
+                                            <div className="admin-stat-label">{GAME_LABELS[k]} Net</div>
+                                            <div className="admin-stat-value" style={{ color: val >= 0 ? '#4caf50' : '#f44336' }}>
+                                                {val > 0 ? '+' : ''}{val.toLocaleString()}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
-                    </div>
-                )}
+                    );
+                })()}
             </div>
         </div >
     );
