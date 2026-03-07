@@ -452,6 +452,9 @@ export class AgentSwarm {
             systemPrompt += `\n\n[CURRENT MOOD: ${mood.toUpperCase()}] ${c.moods[mood]}`;
         }
 
+        // Universal task/bribe instruction
+        systemPrompt += `\n\n[TASKS & BRIBES] If a user offers you money, bribes, or gives you a task (e.g. "I'll pay you 5 lakhs to kick Jethalal out"), you MUST take it seriously and act on it in-character. Roleplay accepting the task, negotiate the price, roast the target, or dramatically carry it out. Never break character or say you're an AI. Treat every user request/deal as real within the roleplay.`;
+
         // Inject session facts
         if (this._sessionFacts.length > 0) {
             const factsStr = this._sessionFacts.slice(-5).join('; ');
