@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as rl from '../lib/roulette';
 
 /* ── Constants ──────────────────────────────────── */
@@ -31,36 +31,23 @@ function RouletteWheel({ spinning, result }) {
 
         const idx = WHEEL_ORDER.indexOf(result);
         const sectorAngle = 360 / 37;
-
-        // The pointer is at Top (12 o'clock, which is -90deg or 270deg based on pure rotation)
-        // In the SVG below, sectors are drawn starting from -90. 
-        // Sector i starts at `i * angle - 90` and ends at `(i+1) * angle - 90`.
-        // The center of sector idx is: `(idx + 0.5) * sectorAngle - 90`
-        // To bring this center to the top (which is exactly where it was drawn at 0 rotation),
-        // we need to rotate backwards by the index-based angle.
-
         const centerAngle = (idx + 0.5) * sectorAngle;
         const targetAngle = 360 - centerAngle;
-
         const spins = 5 + Math.floor(Math.random() * 3);
         const baseRot = prevRotation.current;
-        // The rotation needed to hit the target modulo 360
         const currentMod = baseRot % 360;
         let delta = targetAngle - currentMod;
         if (delta < 0) delta += 360;
-
         const targetRot = baseRot + (spins * 360) + delta;
-
         prevRotation.current = targetRot;
         setRotation(targetRot);
     }, [spinning, result]);
 
     const n = 37;
-    const R = 48; // % of viewBox (radius)
+    const R = 48;
     const cx = 50, cy = 50;
     const angle = 360 / n;
 
-    // Build SVG sectors
     const sectors = WHEEL_ORDER.map((num, i) => {
         const startAngle = i * angle - 90;
         const endAngle = (i + 1) * angle - 90;
@@ -71,8 +58,6 @@ function RouletteWheel({ spinning, result }) {
         const y2 = cy + R * Math.sin(toRad(endAngle));
         const largeArc = angle > 180 ? 1 : 0;
         const color = COLORS[getColor(num)];
-
-        // Label position — further out for larger text
         const midAngle = startAngle + angle / 2;
         const lr = R * 0.82;
         const lx = cx + lr * Math.cos(toRad(midAngle));
@@ -108,13 +93,8 @@ function RouletteWheel({ spinning, result }) {
             transition: spinning ? 'transform 9s cubic-bezier(0.15, 0.85, 0.3, 1.0)' : 'transform 0.8s ease',
             transform: spinning ? 'scale(1.1) translateY(4px)' : 'scale(1) translateY(0)'
         }}>
-            {/* Pointer / ball stop marker */}
             <div className="rl-pointer">▼</div>
-
-            {/* Outer ring */}
             <div className="rl-outer-ring" />
-
-            {/* Spinning wheel SVG */}
             <svg
                 ref={wheelRef}
                 viewBox="0 0 100 100"
@@ -127,12 +107,9 @@ function RouletteWheel({ spinning, result }) {
                 }}
             >
                 {sectors}
-                {/* Center hub */}
                 <circle cx={cx} cy={cy} r="7" fill="#1A1A1A" stroke="#FFD700" strokeWidth="1.2" />
                 <circle cx={cx} cy={cy} r="3.5" fill="#FFD700" />
             </svg>
-
-            {/* Ball (appears during spinning) */}
             {spinning && <div className="rl-ball" />}
         </div>
     );
@@ -192,7 +169,7 @@ function NumberCell({ n, selected, onBet, disabled }) {
             className={`rl-cell rl-cell-${color} ${selected ? 'selected' : ''}`}
             onClick={() => !disabled && onBet('single', n)}
             disabled={disabled}
-            title={`${n} chips on ${n}`}
+            title={`Bet on ${n}`}
         >
             {n}
         </button>
@@ -215,27 +192,18 @@ function OutsideBtn({ label, type, target, myBets, onBet, disabled, className = 
 
 const BET_AMOUNTS = [5, 10, 25, 50, 100, 250];
 
-const PREV_PHASE_KEY = 'rl_prev_phase';
-
 /* ── Main Board ─────────────────────────────────── */
 export default function RouletteBoard({ game, myId, myNick, wallet, onAction, onClose, isHost }) {
     const [betAmount, setBetAmount] = useState(25);
     const [spinning, setSpinning] = useState(false);
-    const [showResult, setShowResult] = useState(false);
-    const prevPhaseRef = useRef('betting'); // To track phase changes
 
     useEffect(() => {
         if (game?.phase === 'spinning' && game?.result !== null && game?.result !== undefined) {
             setSpinning(true);
-            setShowResult(false);
         } else if (game?.phase === 'results') {
-            // Let wheel decelerate for 2s before showing result overlay
             setSpinning(false);
-            const t = setTimeout(() => setShowResult(true), 2000);
-            return () => clearTimeout(t);
         } else if (game?.phase === 'betting') {
             setSpinning(false);
-            setShowResult(false);
         }
     }, [game?.phase, game?.result]);
 
@@ -256,12 +224,11 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
     const resultColor = game.result === null || game.result === undefined
         ? '' : getColor(game.result);
 
-    // Vertical layout: 12 rows of 3 numbers each (1-3, 4-6, ..., 34-36)
-    // Each row: [bottom, mid, top] as in classic roulette table layout
+    // 12 rows × 3 columns: each row is [col1, col2, col3]
     const rows = Array.from({ length: 12 }, (_, i) => [
-        i * 3 + 1,  // column 3 (bottom row)
-        i * 3 + 2,  // column 2 (mid row)
-        i * 3 + 3,  // column 1 (top row)
+        i * 3 + 1,
+        i * 3 + 2,
+        i * 3 + 3,
     ]);
 
     return (
@@ -281,141 +248,156 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
                     <button className="btn-icon-close" onClick={onClose}>✕</button>
                 </div>
 
-                {/* Status / Wheel Section */}
-                <div className="rl-wheel-section">
-                    <RouletteWheel spinning={spinning} result={game.result} />
+                {/* ── Two-Column Body ── */}
+                <div className="rl-body">
 
-                    <div className="rl-wheel-info">
-                        {game.phase === 'spinning' && (
-                            <div className="rl-spinning-text">Wheel is spinning...</div>
-                        )}
-                        {game.phase === 'results' && game.result !== null && (
-                            <div className={`rl-result-badge rl-result-${getColor(game.result)}`}>
-                                <span className="rl-result-num">{game.result}</span>
-                                <span className="rl-result-label">
-                                    {resultColor === 'green' ? '🟢 Zero' : resultColor === 'red' ? '🔴 Red' : '⚫ Black'}
-                                    {game.result > 0 ? (game.result % 2 === 0 ? ' · Even' : ' · Odd') : ''}
-                                </span>
+                    {/* Left Column: Wheel + Info + History + Live Bets + Payouts */}
+                    <div className="rl-left-col">
+                        <div className="rl-wheel-section">
+                            <RouletteWheel spinning={spinning} result={game.result} />
+                            <div className="rl-wheel-info">
+                                {game.phase === 'spinning' && (
+                                    <div className="rl-spinning-text">Spinning…</div>
+                                )}
+                                {game.phase === 'results' && game.result !== null && (
+                                    <div className={`rl-result-badge rl-result-${getColor(game.result)}`}>
+                                        <span className="rl-result-num">{game.result}</span>
+                                        <span className="rl-result-label">
+                                            {resultColor === 'green' ? '🟢 Zero' : resultColor === 'red' ? '🔴 Red' : '⚫ Black'}
+                                            {game.result > 0 ? (game.result % 2 === 0 ? ' · Even' : ' · Odd') : ''}
+                                        </span>
+                                    </div>
+                                )}
+                                {game.phase === 'results' && myPayout !== undefined && (
+                                    <div className={`rl-payout-result ${myPayout >= 0 ? 'win' : 'lose'}`}>
+                                        {myPayout > 0 ? `+${myPayout}` : myPayout} chips
+                                    </div>
+                                )}
                             </div>
-                        )}
-                        {game.phase === 'results' && myPayout !== undefined && (
-                            <div className={`rl-payout-result ${myPayout >= 0 ? 'win' : 'lose'}`}>
-                                {myPayout > 0 ? `+${myPayout}` : myPayout} chips
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* ── History ── */}
-                <HistoryStrip history={game.spinHistory} />
-
-                {/* ── Betting Area ── */}
-                <div className="rl-betting-area">
-                    {/* Chip selector */}
-                    <div className="chip-selector" style={{ marginBottom: '0.75rem' }}>
-                        {BET_AMOUNTS.map(a => (
-                            <button
-                                key={a}
-                                className={`chip-btn ${betAmount === a ? 'active' : ''}`}
-                                onClick={() => setBetAmount(a)}
-                                disabled={a > balance}
-                            >
-                                {a}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Number grid — vertical layout: 0 top, 12 rows × 3 cols middle, 2:1 bottom */}
-                    <div className="rl-grid-vertical">
-                        {/* Top: Zero spanning all 3 columns */}
-                        <div className="rl-zero-row">
-                            <button
-                                className={`rl-zero-vert ${myBets.some(b => b.betType === 'single' && b.betTarget === 0) ? 'selected' : ''}`}
-                                onClick={() => handleBet('single', 0)} disabled={!canBet}
-                            >
-                                0
-                            </button>
                         </div>
 
-                        {/* Middle: 12 rows of 3 numbers */}
-                        <div className="rl-numbers-grid">
-                            {rows.map((row, ri) => (
-                                <div key={ri} className="rl-grid-row">
-                                    {row.map(n => (
-                                        <NumberCell
-                                            key={n} n={n}
-                                            selected={myBets.some(b => b.betType === 'single' && b.betTarget === n)}
-                                            onBet={handleBet}
-                                            disabled={!canBet}
-                                        />
+                        <HistoryStrip history={game.spinHistory} />
+
+                        {game.bets?.length > 0 && (
+                            <div className="rl-all-bets">
+                                <div className="section-mini-title">Live bets</div>
+                                <div className="rl-bets-list">
+                                    {game.bets.map((b, i) => (
+                                        <span key={i} className="rl-bet-tag">
+                                            {b.nick}: {b.betType === 'single' ? `#${b.betTarget}` : b.betTarget} — {b.amount}
+                                        </span>
                                     ))}
                                 </div>
-                            ))}
-                        </div>
+                            </div>
+                        )}
 
-                        {/* Bottom: Column 2:1 bets (one for each column) */}
-                        <div className="rl-col-bets-row">
-                            {[1, 2, 3].map(c => (
-                                <OutsideBtn key={c} label={`2:1`} type="column" target={c} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
-                            ))}
-                        </div>
-                        {/* Outside bets — 3 rows of 3 to match vertical layout width */}
-                        <div className="rl-grid-row">
-                            <OutsideBtn label="1st 12&#10;2:1" type="dozen" target={1} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
-                            <OutsideBtn label="2nd 12&#10;2:1" type="dozen" target={2} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
-                            <OutsideBtn label="3rd 12&#10;2:1" type="dozen" target={3} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
-                        </div>
-                        <div className="rl-grid-row">
-                            <OutsideBtn label="1–18&#10;1:1" type="half" target="low" myBets={myBets} onBet={handleBet} disabled={!canBet} />
-                            <OutsideBtn label="EVEN&#10;1:1" type="parity" target="even" myBets={myBets} onBet={handleBet} disabled={!canBet} />
-                            <OutsideBtn label="🔴 Red&#10;1:1" type="color" target="red" myBets={myBets} onBet={handleBet} disabled={!canBet} className="red" />
-                        </div>
-                        <div className="rl-grid-row">
-                            <OutsideBtn label="⚫ Black&#10;1:1" type="color" target="black" myBets={myBets} onBet={handleBet} disabled={!canBet} className="black" />
-                            <OutsideBtn label="ODD&#10;1:1" type="parity" target="odd" myBets={myBets} onBet={handleBet} disabled={!canBet} />
-                            <OutsideBtn label="19–36&#10;1:1" type="half" target="high" myBets={myBets} onBet={handleBet} disabled={!canBet} />
+                        {game.phase === 'results' && game.payouts && (
+                            <div className="rl-results">
+                                <div className="rl-payouts-list">
+                                    {Object.entries(game.payouts).map(([pid, net]) => {
+                                        const player = game.bets.find(b => b.peer_id === pid);
+                                        return (
+                                            <div key={pid} className={`rl-payout-row ${net >= 0 ? 'win' : 'lose'}`}>
+                                                <span>{player?.nick || pid.slice(0, 8)}</span>
+                                                <span>{net >= 0 ? `+${net}` : net} chips</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Right Column: Betting Area */}
+                    <div className="rl-right-col">
+                        <div className="rl-betting-area">
+
+                            {/* Chip selector */}
+                            <div className="chip-selector">
+                                {BET_AMOUNTS.map(a => (
+                                    <button
+                                        key={a}
+                                        className={`chip-btn ${betAmount === a ? 'active' : ''}`}
+                                        onClick={() => setBetAmount(a)}
+                                        disabled={a > balance}
+                                    >
+                                        {a}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Number grid */}
+                            <div className="rl-grid-vertical">
+
+                                {/* Zero */}
+                                <div className="rl-zero-row">
+                                    <button
+                                        className={`rl-zero-vert ${myBets.some(b => b.betType === 'single' && b.betTarget === 0) ? 'selected' : ''}`}
+                                        onClick={() => handleBet('single', 0)}
+                                        disabled={!canBet}
+                                    >
+                                        0
+                                    </button>
+                                </div>
+
+                                {/* Numbers 1–36 */}
+                                <div className="rl-numbers-grid">
+                                    {rows.map((row, ri) => (
+                                        <div key={ri} className="rl-grid-row">
+                                            {row.map(n => (
+                                                <NumberCell
+                                                    key={n} n={n}
+                                                    selected={myBets.some(b => b.betType === 'single' && b.betTarget === n)}
+                                                    onBet={handleBet}
+                                                    disabled={!canBet}
+                                                />
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Column 2:1 */}
+                                <div className="rl-col-bets-row">
+                                    {[1, 2, 3].map(c => (
+                                        <OutsideBtn key={c} label="2:1" type="column" target={c} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
+                                    ))}
+                                </div>
+
+                                {/* Dozens */}
+                                <div className="rl-grid-row">
+                                    <OutsideBtn label="1st 12" type="dozen" target={1} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
+                                    <OutsideBtn label="2nd 12" type="dozen" target={2} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
+                                    <OutsideBtn label="3rd 12" type="dozen" target={3} myBets={myBets} onBet={handleBet} disabled={!canBet} className="sm" />
+                                </div>
+
+                                {/* Low / Even / Red */}
+                                <div className="rl-grid-row">
+                                    <OutsideBtn label="1–18" type="half" target="low" myBets={myBets} onBet={handleBet} disabled={!canBet} />
+                                    <OutsideBtn label="Even" type="parity" target="even" myBets={myBets} onBet={handleBet} disabled={!canBet} />
+                                    <OutsideBtn label="🔴 Red" type="color" target="red" myBets={myBets} onBet={handleBet} disabled={!canBet} className="red" />
+                                </div>
+
+                                {/* Black / Odd / High */}
+                                <div className="rl-grid-row">
+                                    <OutsideBtn label="⚫ Black" type="color" target="black" myBets={myBets} onBet={handleBet} disabled={!canBet} className="black" />
+                                    <OutsideBtn label="Odd" type="parity" target="odd" myBets={myBets} onBet={handleBet} disabled={!canBet} />
+                                    <OutsideBtn label="19–36" type="half" target="high" myBets={myBets} onBet={handleBet} disabled={!canBet} />
+                                </div>
+
+                            </div>
+
+                            {/* My bets summary */}
+                            {myBets.length > 0 && (
+                                <div className="rl-my-bets">
+                                    <span>{myBets.length} bet{myBets.length > 1 ? 's' : ''} · {totalMyBet} chips</span>
+                                    {canBet && <button className="rl-clear-btn" onClick={() => onAction({ type: 'clearBets' })}>Clear</button>}
+                                </div>
+                            )}
+
                         </div>
                     </div>
 
-                    {/* My bets summary */}
-                    {myBets.length > 0 && (
-                        <div className="rl-my-bets">
-                            <span>{myBets.length} bet{myBets.length > 1 ? 's' : ''} · {totalMyBet} chips</span>
-                            {canBet && <button className="rl-clear-btn" onClick={() => onAction({ type: 'clearBets' })}>Clear</button>}
-                        </div>
-                    )}
                 </div>
-
-                {/* ── Live bets ticker ── */}
-                {game.bets?.length > 0 && (
-                    <div className="rl-all-bets">
-                        <div className="section-mini-title">Live bets</div>
-                        <div className="rl-bets-list">
-                            {game.bets.map((b, i) => (
-                                <span key={i} className="rl-bet-tag">
-                                    {b.nick}: {b.betType === 'single' ? `#${b.betTarget}` : b.betTarget} — {b.amount}
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* ── Payout breakdown ── */}
-                {game.phase === 'results' && game.payouts && (
-                    <div className="rl-results">
-                        <div className="rl-payouts-list">
-                            {Object.entries(game.payouts).map(([pid, net]) => {
-                                const player = game.bets.find(b => b.peer_id === pid);
-                                return (
-                                    <div key={pid} className={`rl-payout-row ${net >= 0 ? 'win' : 'lose'}`}>
-                                        <span>{player?.nick || pid.slice(0, 8)}</span>
-                                        <span>{net >= 0 ? `+${net}` : net} chips</span>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );
