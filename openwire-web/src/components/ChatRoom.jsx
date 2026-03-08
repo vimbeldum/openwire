@@ -595,7 +595,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 // Only show if it came from another peer (not ourself — we already showed it locally)
                 if (msg.peer_id !== myIdRef.current) {
                     addMsg(action.nick, action.text, 'peer', {
-                        roomId: msg.room_id, isAgent: true, characterId: action.characterId,
+                        roomId: msg.room_id || null, isAgent: true, characterId: action.characterId,
                     });
                     // Pass forceIsAgent=true to prevent P2P emoji-nick loop
                     swarmRef.current?.addContext(action.nick, action.text, true);
