@@ -227,20 +227,32 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     useEffect(() => { currentRoomRef.current = currentRoom; }, [currentRoom]);
     useEffect(() => { walletRef.current = myWallet; }, [myWallet]);
 
+    // Save messages on a fixed 5s interval via ref — prevents debounce starvation
+    // when high message rates keep resetting the old setTimeout
+    const messagesRef = useRef(messages);
+    useEffect(() => { messagesRef.current = messages; }, [messages]);
     useEffect(() => {
-        const timer = setTimeout(() => saveMessages(messages), 2000);
-        return () => clearTimeout(timer);
-    }, [messages]);
+        const timer = setInterval(() => saveMessages(messagesRef.current), 5000);
+        return () => clearInterval(timer);
+    }, []);
 
     // ── Typing peer cleanup (stale after 3s) ─────────────────
     useEffect(() => {
         const cleanup = setInterval(() => {
             const cutoff = Date.now() - 3000;
             setTypingPeers(prev => {
-                const next = Object.fromEntries(
-                    Object.entries(prev).filter(([, v]) => v.ts > cutoff)
-                );
-                return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+                // Avoid Object.fromEntries/Object.entries GC thrashing —
+                // mutate-then-shallow-copy only when stale entries exist
+                let dirty = false;
+                for (const key in prev) {
+                    if (prev[key].ts <= cutoff) { dirty = true; break; }
+                }
+                if (!dirty) return prev;
+                const next = {};
+                for (const key in prev) {
+                    if (prev[key].ts > cutoff) next[key] = prev[key];
+                }
+                return next;
             });
         }, 1000);
         return () => clearInterval(cleanup);
@@ -335,9 +347,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
     // ── Swarm host election: admin gets priority, otherwise oldest peer (lowest id) ──
     const shouldRunSwarm = useCallback(() => {
-        if (isAdminRef.current) return true;
-        // Check if any admin is online (admins have priority)
-        // If no admin, the oldest peer (lowest alphabetical peer_id) hosts
+        // Single-host election: lowest alphabetical peer_id wins.
+        // Prevents duplicate swarms when multiple admins are online.
         const allIds = peersRef.current.map(p => p.peer_id).filter(Boolean);
         if (!allIds.length || !myIdRef.current) return false;
         const sorted = [...allIds].sort();
@@ -990,6 +1001,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             case 'peers':
                 setPeers(msg.peers || []);
                 if (msg.rooms) setRooms(msg.rooms);
+                break;
+            case 'peer_balance_update':
+                // Lightweight balance diff — update single peer instead of replacing entire list
+                setPeers(prev => prev.map(p =>
+                    p.peer_id === msg.peer_id ? { ...p, balance: msg.balance } : p
+                ));
                 break;
             case 'peer_joined':
                 setPeers(prev => [...prev.filter(p => p.peer_id !== msg.peer_id), { peer_id: msg.peer_id, nick: msg.nick }]);

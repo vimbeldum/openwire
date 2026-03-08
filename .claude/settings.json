@@ -32,16 +32,6 @@
             "timeout": 10000
           }
         ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/helpers/hook-handler.cjs post-bash",
-            "timeout": 5000
-          }
-        ]
       }
     ],
     "UserPromptSubmit": [
@@ -62,11 +52,6 @@
             "type": "command",
             "command": "node .claude/helpers/hook-handler.cjs session-restore",
             "timeout": 15000
-          },
-          {
-            "type": "command",
-            "command": "node .claude/helpers/auto-memory-hook.mjs import",
-            "timeout": 8000
           }
         ]
       }
@@ -82,17 +67,7 @@
         ]
       }
     ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/helpers/auto-memory-hook.mjs sync",
-            "timeout": 10000
-          }
-        ]
-      }
-    ],
+    "Stop": [],
     "PreCompact": [
       {
         "matcher": "manual",

@@ -122,8 +122,8 @@ export class RelayRoom {
                 case "balance_update": {
                     if (!peerInfo) return;
                     peerInfo.balance = msg.balance || 0;
-                    // Broadcast updated peer list (with balances) to everyone
-                    this.broadcast({ type: "peers", peers: this.peerList() });
+                    // Broadcast lightweight diff instead of full peerList (O(N) not O(N²))
+                    this.broadcast({ type: "peer_balance_update", peer_id: peerInfo.peer_id, balance: peerInfo.balance });
                     break;
                 }
 
