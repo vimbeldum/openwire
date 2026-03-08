@@ -516,6 +516,17 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     setTimeout(() => setMentionToasts(prev => prev.filter(t => t.id !== toastId)), 5000);
                 }
                 break;
+            case 'swarm_config':
+                // Admin broadcast — apply provider/model changes to local swarm
+                if (msg.peer_id !== myIdRef.current && swarmRef.current) {
+                    if (action.provider) {
+                        swarmRef.current.setProvider(action.provider);
+                    }
+                    if (action.defaultModel) {
+                        swarmRef.current.defaultModel = action.defaultModel;
+                    }
+                }
+                break;
         }
     }, [addMsg, addReaction, addTicker, updateWallet]);
 
@@ -909,7 +920,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     if (msg.data?.startsWith('{')) {
                         try {
                             const parsed = JSON.parse(msg.data);
-                            const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify'];
+                            const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config'];
                             if (CUSTOM.includes(parsed.type)) msgCustom = parsed;
                         } catch { /* not JSON */ }
                     }
@@ -964,7 +975,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     if (!isBjMsg && !isRlMsg && !isAbMsg && !isGameMsg && msg.data?.startsWith('{')) {
                         try {
                             const parsed = JSON.parse(msg.data);
-                            const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify'];
+                            const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config'];
                             if (CUSTOM.includes(parsed.type)) customAction = parsed;
                         } catch { /* not JSON */ }
                     }
@@ -2128,6 +2139,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     onBanIp={handleAdminBanIp}
                     onUnbanIp={handleAdminUnbanIp}
                     onAdjustBalance={handleAdminAdjustBalance}
+                    onProviderChange={(provider, defaultModel) => {
+                        socket.sendChat(JSON.stringify({
+                            type: 'swarm_config', provider, defaultModel,
+                        }));
+                    }}
                     onClose={() => setShowAdmin(false)}
                 />
             </Suspense>)}

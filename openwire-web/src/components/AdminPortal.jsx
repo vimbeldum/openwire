@@ -8,7 +8,7 @@ const TABS = ['Players', 'Ban List', 'Activity Log', 'Stats', 'Agents'];
 const CHATTER_LABELS = { 0.25: 'Quiet', 0.5: 'Calm', 1: 'Normal', 1.5: 'Active', 2: 'Chaotic' };
 const GAME_LABELS = { roulette: '🎰 Roulette', blackjack: '🃏 Blackjack', andarbahar: '🎴 Andar Bahar', slots: '🎲 Slots' };
 
-export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, activityLog, bannedIps, bankLedger, casinoState, swarm, swarmLogs, onClose }) {
+export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, activityLog, bannedIps, bankLedger, casinoState, swarm, swarmLogs, onProviderChange, onClose }) {
     const [tab, setTab] = useState('Players');
     const [adjustTarget, setAdjustTarget] = useState(null);
     const [adjustAmount, setAdjustAmount] = useState(100);
@@ -414,9 +414,11 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                         onClick={async () => {
                                             setProvider('openrouter');
                                             await swarm?.setProvider('openrouter');
-                                            setDefaultModel(swarm?.defaultModel ?? 'openrouter/auto');
+                                            const model = swarm?.defaultModel ?? 'openrouter/auto';
+                                            setDefaultModel(model);
                                             setOverrides({});
                                             Object.keys(CHARACTERS).forEach(id => swarm?.setModelOverride(id, null));
+                                            onProviderChange?.('openrouter', model);
                                         }}
                                     >
                                         OpenRouter
@@ -430,10 +432,11 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                             try {
                                                 await swarm?.setProvider('gemini');
                                                 setGeminiModels(swarm?.geminiModels ?? []);
-                                                // Read back the auto-selected default (gemini-2.5-flash)
-                                                setDefaultModel(swarm?.defaultModel ?? '');
+                                                const model = swarm?.defaultModel ?? '';
+                                                setDefaultModel(model);
                                                 setOverrides({});
                                                 Object.keys(CHARACTERS).forEach(id => swarm?.setModelOverride(id, null));
+                                                onProviderChange?.('gemini', model);
                                             } catch (_) {}
                                             setGeminiLoading(false);
                                         }}

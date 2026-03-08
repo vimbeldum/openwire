@@ -293,6 +293,7 @@ export class AgentSwarm {
     get groups()        { return this._groups; }
     get modelFilters()  { return this._modelFilters; }
     get defaultModel()  { return this._defaultModel; }
+    set defaultModel(v) { this._defaultModel = v; this._log(`[Config] Default model -> ${v}`); }
     get queueLength()   { return this._messageQueue.length; }
     get provider()      { return this._provider; }
     get geminiModels()  { return this._geminiModels; }
