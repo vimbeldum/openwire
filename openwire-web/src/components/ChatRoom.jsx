@@ -675,6 +675,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     // ── Andar Bahar auto-cycle (host-driven) ─────────────────
     const abCycleTimerRef = useRef(null);
     const abGenRef = useRef(0);
+    const startAbCycleRef = useRef(null);
 
     const startAbCycle = useCallback((initialGame) => {
         // Clear any existing timers
@@ -732,14 +733,17 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         const reset = ab.newRound(andarBaharRef.current || next);
                         setAndarBaharGame(reset);
                         socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(reset) }));
-                        // Restart cycle
-                        startAbCycle(reset);
+                        // Restart cycle via ref to avoid stale closure
+                        startAbCycleRef.current?.(reset);
                     }, ab.RESULTS_DISPLAY_MS);
                 }
             }, ab.DEAL_INTERVAL_MS);
 
         }, bettingMs);
-    }, [addActivityLog, amIHost, updateWallet]);
+    }, [addActivityLog, amIHost, updateBankLedger, resolvePayoutEvent]);
+
+    // Keep ref in sync so recursive calls always use latest closure
+    useEffect(() => { startAbCycleRef.current = startAbCycle; }, [startAbCycle]);
 
     useEffect(() => {
         return () => {

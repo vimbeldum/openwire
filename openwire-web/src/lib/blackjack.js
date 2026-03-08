@@ -192,6 +192,8 @@ export function hit(game, peer_id) {
 
     // Determine which hand is active (main or split)
     if (player.playingSplit && player.splitHand) {
+        // Guard: can't hit a split hand that's already done
+        if (player.splitStatus !== 'playing') return game;
         player.splitHand = [...player.splitHand, card];
         if (isBust(player.splitHand)) {
             player.splitStatus = 'bust';
@@ -254,9 +256,11 @@ export function stand(game, peer_id) {
     let players = [...game.players];
     const player = { ...players[playerIndex] };
 
-    // If playing split hand, stand on split
+    // If playing split hand, stand on split (only if still playing)
     if (player.playingSplit && player.splitHand) {
-        player.splitStatus = 'stand';
+        if (player.splitStatus === 'playing') {
+            player.splitStatus = 'stand';
+        }
     } else {
         player.status = 'stand';
         // If has split hand pending, switch to it
@@ -336,6 +340,24 @@ export function split(game, peer_id) {
     }
 
     players[playerIndex] = player;
+
+    // If both hands are done (e.g. both auto-stood at 21), advance to next player
+    const mainDone = player.status === 'bust' || player.status === 'stand' || player.status === 'blackjack';
+    const splitDone = !player.splitHand || player.splitStatus !== 'playing';
+    if (mainDone && splitDone) {
+        let currentPlayerIndex = players.findIndex((p, i) => i > playerIndex && p.status === 'playing');
+        if (currentPlayerIndex === -1) {
+            currentPlayerIndex = players.findIndex(p => p.status === 'playing');
+        }
+        let phase = game.phase;
+        let dealer = { ...game.dealer };
+        if (currentPlayerIndex === -1) {
+            phase = 'dealer';
+            dealer.revealed = true;
+        }
+        return { ...game, deck, players, currentPlayerIndex, phase, dealer };
+    }
+
     return { ...game, deck, players };
 }
 
