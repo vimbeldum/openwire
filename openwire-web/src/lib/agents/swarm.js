@@ -187,10 +187,11 @@ export class AgentSwarm {
 
     // ── Context management ───────────────────────────────────
 
-    addContext(nick, text) {
+    addContext(nick, text, forceIsAgent = false) {
         if (!text || typeof text !== 'string') return;
         const agentNames = new Set(Object.values(this._characters).map(c => c.name));
-        const isAgent = agentNames.has(nick);
+        // Check exact match AND substring match to handle "😅 Jethalal" format from P2P broadcasts
+        const isAgent = forceIsAgent || agentNames.has(nick) || Array.from(agentNames).some(name => nick.includes(name));
         this._context.push({ role: 'user', content: `${nick}: ${text}`, _isAgent: isAgent });
         if (this._context.length > CONTEXT_BUFFER_SIZE) this._context.shift();
         this._contextDirty = true;
@@ -231,8 +232,7 @@ export class AgentSwarm {
 
             selected.forEach(c => {
                 this._log(`[Reactivity] ${c.name} triggered by keyword match in "${text.slice(0, 40)}..."`);
-                if (this._timers[c.id]) clearTimeout(this._timers[c.id]);
-                // Do NOT call _scheduleNext — let the background loop handle rescheduling
+                // Do NOT clearTimeout or call _scheduleNext — let the background loop handle rescheduling
                 this._generate(c.id);
             });
         }

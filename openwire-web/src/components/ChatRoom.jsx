@@ -243,7 +243,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
     // ── addMsg — declared here so screenshot useEffect below can reference it
     const addMsg = useCallback((sender, content, type = 'chat', extra = {}) => {
-        setMessages(prev => [...prev, {
+        // Cap React messages at 1000 to prevent DOM memory leak from rapid agent chatter
+        setMessages(prev => [...prev.slice(-1000), {
             time: timeStr(), sender, content, type,
             id: Date.now() + Math.random(),
             roomId: currentRoomRef.current || null,
@@ -554,7 +555,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     addMsg(action.nick, action.text, 'peer', {
                         roomId: msg.room_id, isAgent: true, characterId: action.characterId,
                     });
-                    swarmRef.current?.addContext(action.nick, action.text);
+                    // Pass forceIsAgent=true to prevent P2P emoji-nick loop
+                    swarmRef.current?.addContext(action.nick, action.text, true);
                 }
                 break;
             case 'mention_notify':
