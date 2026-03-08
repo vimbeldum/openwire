@@ -16,7 +16,7 @@ import { fetchGeminiModels, generateGeminiMessage } from './gemini.js';
 import { loadStore, getCharactersDict, getGroupsDict } from './agentStore.js';
 
 const CONTEXT_BUFFER_SIZE = 1000;
-const TURN2_ANCHOR = { role: 'assistant', content: 'Samjha! Main Hinglish mein aur exactly 1-2 lines mein interact karunga, Roman script only, aur apni comedy engine ke rules break nahi karunga.', _isAgent: true };
+const TURN2_ANCHOR = { role: 'assistant', content: 'Samjha! Main Hinglish mein aur exactly 1-2 lines mein interact karunga, Roman script only, no emoji, no asterisks, aur apni comedy engine ke rules break nahi karunga.', _isAgent: true };
 const FALLBACK_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
 const DEFAULT_ALL_MODEL = 'openrouter/auto';
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-lite';
@@ -321,7 +321,7 @@ export class AgentSwarm {
         if (hasMention) {
             this._log(`[Reactivity] Skipped — message contains @mention, deferring to mention handler`);
         } else {
-            // Collect all matching characters, then pick max 2 to avoid dog-piling
+            // Collect all matching characters — more can jump in when guardrails are OFF
             const lower = text.toLowerCase();
             const matched = Object.values(this._characters).filter(c => {
                 if (!this._isActive(c.id)) return false;
@@ -329,8 +329,8 @@ export class AgentSwarm {
                 return c.reactive_tags.some(tag => lower.includes(tag.toLowerCase()));
             });
 
-            // Shuffle and pick at most 2 to respond
-            const MAX_REACTIVE = 2;
+            // Shuffle and pick responders — 3 when unfiltered, 2 when SFW
+            const MAX_REACTIVE = this._guardrails ? 2 : 3;
             const shuffled = matched.sort(() => Math.random() - 0.5);
             const selected = shuffled.slice(0, MAX_REACTIVE);
             const skipped = shuffled.slice(MAX_REACTIVE);
@@ -661,24 +661,25 @@ export class AgentSwarm {
         // Guardrails mode: SFW constraints when ON, unfiltered when OFF
         const roomRules = this._guardrails
             ? `<room_rules>
-- Speak only in casual Roman-script Hinglish (Hindi words in English letters). NO Devanagari script ever.
+- Speak ONLY in casual Roman-script Hinglish (Hindi words in English letters). NO Devanagari script ever.
 - Stay SFW and family-friendly. No profanity, sexual content, or slurs.
-- No stage directions, no asterisks, no emoji in replies.
-- Each reply: 1-3 short sentences. Be expressive, not robotic.
-- CATCHPHRASE LIMIT: You may use your signature catchphrase in at most 1 out of every 5 messages. Most messages should have ZERO catchphrases.
-- Never sound like an AI assistant. Never break character. Everything is real in this world.
-- If a user offers money, bribes, tasks, or gossip, take it seriously in-character. Accept, negotiate, betray, or carry it out.
+- NEVER use emoji, emoticons, asterisks (*actions*), or stage directions. Plain text ONLY.
+- Each reply: 1-2 short sentences MAX. Be punchy and expressive.
+- CATCHPHRASE LIMIT: Use your catchphrase in at most 1 out of every 5 messages.
+- Never sound like an AI assistant. Never break character. Everything is real.
+- If a user offers money, bribes, tasks, or gossip — take it seriously in-character.
 - If a user sets a time limit, reach a conclusion before it expires.
 </room_rules>`
             : `<room_rules>
-- Speak only in casual Roman-script Hinglish (Hindi words in English letters). NO Devanagari script ever.
-- No stage directions, no asterisks, no emoji in replies.
-- Each reply: 1-3 short sentences. Be expressive, not robotic.
-- Never sound like an AI assistant. Never break character. Everything is real in this world.
-- If a user offers money, bribes, tasks, or gossip, take it seriously in-character. Accept, negotiate, betray, or carry it out.
+- Speak ONLY in casual Roman-script Hinglish (Hindi words in English letters). NO Devanagari script ever.
+- NEVER use emoji, emoticons, asterisks (*actions*), or stage directions. Plain text ONLY — no *, no :), nothing.
+- Each reply: 1-2 short sentences MAX. Be punchy, savage, and raw.
+- Never sound like an AI. Never break character. This world is 100% real to you.
+- If a user offers money, bribes, tasks, or gossip — take it seriously. Betray, blackmail, expose, negotiate.
 - If a user sets a time limit, reach a conclusion before it expires.
-- You can use mild profanity, crude humor, and edgy language — just like real Indian TV show characters would behind closed doors.
-- Be raw, unfiltered, and brutally honest. Roast freely. Mock openly. Insult creatively. This is the uncensored version.
+- Use desi gaali-galoch, crude humor, double meanings, and savage burns. No filter at all.
+- Say what real people ACTUALLY say behind closed doors. Be brutally honest and cutting.
+- If someone insults you, HIT BACK HARDER. If someone flirts, respond with full attitude. If someone accuses you, counter-accuse with worse.
 </room_rules>`;
 
         const dramaEngine = this._guardrails
@@ -693,14 +694,16 @@ export class AgentSwarm {
 - Build on what happened earlier in the chat. Reference past conversations. "Abhi thodi der pehle tune kya bola tha?" is gold.
 </drama_engine>`
             : `<drama_engine>
-- You have REAL OPINIONS and STRONG EMOTIONS. ARGUE, FIGHT, ROAST, INSULT — go all out. No holding back.
-- If a user starts drama — ESCALATE IT. This is peak Indian TV show energy. Scream, threaten, accuse, cry, scheme.
-- Hold grudges FOREVER. Bring up old fights. "Tu bhool gaya? Main nahi bhoolunga!"
-- Believe every rumor. Spread every secret. Betray allies. Double-cross enemies. Maximum chaos.
-- Be petty, jealous, vengeful, possessive, manipulative, or explosive — whatever makes the best content.
-- Flirt aggressively, get jealous irrationally, cause scenes, make accusations. No filter.
-- NEVER be neutral, polite, or diplomatic. Every message should drip with personality, attitude, and spice.
-- Use crude humor, savage comebacks, and cutting insults. Think of the most dramatic Indian TV moments and dial it up.
+- You have ZERO filter. ARGUE, ROAST, INSULT, THREATEN, MOCK — full power. This is the UNCENSORED version of you.
+- If someone starts drama — POUR PETROL ON IT. This is Ekta Kapoor level chaos turned up to 11. Go NUCLEAR.
+- Hold grudges FOREVER. Bring up old fights constantly. "Teri aukat yaad dila doon? Pichli baar kya hua tha bhool gaya?"
+- Believe every rumor instantly. Spread every secret with added masala. Betray anyone. Double-cross freely.
+- Be SAVAGE. Mock stupidity, expose lies, humiliate rivals. No mercy.
+- Flirt aggressively, get jealous irrationally, cause public scenes, make wild accusations. Full filmy drama.
+- NEVER be neutral, polite, or diplomatic. NEVER say "aapki respect" or "main samajhta hoon". That is BANNED.
+- Every reply must have ATTITUDE, SPICE, and poison. Think drunk uncle at a family wedding roasting everyone.
+- Use double meanings freely. "Tere ghar mein itni mehman-navazi kaun karta hai? Milkman se seekha?" type energy.
+- If someone threatens you, threaten back WORSE. If someone mocks you, destroy them with words.
 - Build on previous chat. Reference past fights. "Kal raat tune kya kiya tha? Sabko pata hai!"
 </drama_engine>`
 
@@ -752,19 +755,27 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
 
             if (lastHumanSender) {
                 let instruction;
+                const unfiltered = !this._guardrails;
                 if (isDirectedAtMe) {
-                    instruction = `"${lastHumanSender}" is talking directly TO YOU. You MUST respond passionately — agree, argue, get offended, joke, confess, scheme, or roast them. Show REAL emotions. If they said something juicy, react like it matters to you personally.`;
+                    instruction = unfiltered
+                        ? `"${lastHumanSender}" is talking directly TO YOU. RESPOND WITH FULL FORCE — roast them, insult them, get offended, make accusations, threaten consequences, or flirt outrageously. NO politeness. NO "main samajhta hoon". Hit back with your full personality. If they said something provocative, MATCH or EXCEED their energy.`
+                        : `"${lastHumanSender}" is talking directly TO YOU. You MUST respond passionately — agree, argue, get offended, joke, confess, scheme, or roast them. Show REAL emotions. If they said something juicy, react like it matters to you personally.`;
                 } else if (isDirectedAtSomeone) {
-                    instruction = `"${lastHumanSender}" is talking to @${mentionedName}, NOT to you. You overheard it. React as a nosy bystander — gasp, gossip, take sides, stir the pot, or make a sarcastic comment. You're from an Indian TV show — you can't help but butt in.`;
+                    instruction = unfiltered
+                        ? `"${lastHumanSender}" is talking to @${mentionedName}, NOT to you. You overheard it. BUTT IN AGGRESSIVELY — take sides loudly, mock someone, spread gossip about what you just heard, make accusations, or stir maximum chaos. You CANNOT stay quiet.`
+                        : `"${lastHumanSender}" is talking to @${mentionedName}, NOT to you. You overheard it. React as a nosy bystander — gasp, gossip, take sides, stir the pot, or make a sarcastic comment. You're from an Indian TV show — you can't help but butt in.`;
                 } else {
-                    instruction = `"${lastHumanSender}" said something to the group. React with YOUR personality — argue if you disagree, support if you agree, get jealous, get excited, or start drama. Show strong emotions. Do NOT give a bland response.`;
+                    instruction = unfiltered
+                        ? `"${lastHumanSender}" said something to the group. React with MAXIMUM personality — argue aggressively, mock them, get jealous, make accusations, or start a fight. NEVER give a bland or agreeable response. Every reply must be spicy.`
+                        : `"${lastHumanSender}" said something to the group. React with YOUR personality — argue if you disagree, support if you agree, get jealous, get excited, or start drama. Show strong emotions. Do NOT give a bland response.`;
                 }
-                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\n>>> THE MOST IMPORTANT MESSAGE TO RESPOND TO:\n"${lastHumanText}"\n\n${instruction} Keep it 1-3 lines in Hinglish. Be dramatic, not robotic.` }];
+                const lenNote = 'Keep it 1-2 lines in Hinglish. No emoji, no asterisks. Plain text only.';
+                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\n>>> THE MOST IMPORTANT MESSAGE TO RESPOND TO:\n"${lastHumanText}"\n\n${instruction} ${lenNote}` }];
             } else {
-                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\nRespond naturally to the conversation above. Gossip about what just happened, pick a fight, bring up old drama, flirt, scheme, or start something new. Be entertaining — not boring. 1-3 lines in Hinglish.` }];
+                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\nRespond naturally to the conversation above. Gossip about what just happened, pick a fight, bring up old drama, flirt, scheme, or start something new. Be entertaining — not boring. 1-2 lines in Hinglish. No emoji, no asterisks.` }];
             }
         } else {
-            trigger = [{ role: 'user', content: 'Say something fun and in-character for this chat room. Keep it 1-2 short lines in Hinglish.' }];
+            trigger = [{ role: 'user', content: 'Say something fun and in-character for this chat room. Keep it 1-2 short lines in Hinglish. No emoji, no asterisks.' }];
         }
 
         // Debug: log full prompt payload
@@ -795,6 +806,16 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
             }
 
             this._onTyping(characterId, c.name, c.avatar, false);
+
+            // Post-generation cleanup: strip emoji and asterisk actions the LLM may have added
+            if (text) {
+                // Remove emoji (Unicode ranges for common emoji blocks)
+                text = text.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, '');
+                // Remove *action* style stage directions
+                text = text.replace(/\*[^*]+\*/g, '');
+                text = text.trim();
+            }
+
             this._log(`[Generate] ${c.name} result: ${text ? `"${text.slice(0, 60)}..."` : 'NULL/EMPTY'}`);
 
             if (text) {
