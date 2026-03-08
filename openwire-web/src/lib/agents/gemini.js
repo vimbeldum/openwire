@@ -104,7 +104,7 @@ export async function generateGeminiMessage(modelId, systemPrompt, contextMessag
     if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         const msg = err?.error?.message || `HTTP ${resp.status}`;
-        if (isDebug) console.error('[Gemini] Error:', resp.status, err);
+        if (IS_DEBUG_GM) console.error('[Gemini] Error:', resp.status, err);
         const error = new Error(msg);
         error.status = resp.status;
         throw error;

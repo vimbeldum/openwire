@@ -344,9 +344,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         if (cancelled) return;
         const swarm = new AgentSwarm({
             onMessage: (characterId, nick, avatar, text) => {
-                // Agent messages only appear in the general chat, never in rooms
-                if (currentRoomRef.current) return;
                 const displayNick = `${avatar} ${nick}`;
+                // Always add to general chat (roomId: null) regardless of host's current view
                 addMsg(displayNick, text, 'peer', {
                     roomId: null,
                     isAgent: true,
@@ -386,6 +385,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 }
             },
         });
+        // Broadcast context summaries to peers when compaction runs
+        swarm.onSummaryUpdate = (summary) => {
+            socket.sendChat(JSON.stringify({
+                type: 'context_summary',
+                summary,
+            }));
+        };
         swarmRef.current = swarm;
         // Only start if this session is the elected swarm host
         if (shouldRunSwarm()) {
@@ -560,6 +566,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     });
                     // Pass forceIsAgent=true to prevent P2P emoji-nick loop
                     swarmRef.current?.addContext(action.nick, action.text, true);
+                }
+                break;
+            case 'context_summary':
+                // Receive compacted context summary from swarm host
+                if (msg.peer_id !== myIdRef.current) {
+                    swarmRef.current?.loadSummary(action.summary);
                 }
                 break;
             case 'mention_notify':
@@ -973,7 +985,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     if (msg.data?.startsWith('{')) {
                         try {
                             const parsed = JSON.parse(msg.data);
-                            const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config'];
+                            const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary'];
                             if (CUSTOM.includes(parsed.type)) msgCustom = parsed;
                         } catch { /* not JSON */ }
                     }
@@ -1028,7 +1040,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     if (!isBjMsg && !isRlMsg && !isAbMsg && !isGameMsg && msg.data?.startsWith('{')) {
                         try {
                             const parsed = JSON.parse(msg.data);
-                            const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config'];
+                            const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary'];
                             if (CUSTOM.includes(parsed.type)) customAction = parsed;
                         } catch { /* not JSON */ }
                     }

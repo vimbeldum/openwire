@@ -29,6 +29,13 @@ const GLOBAL_COOLDOWN_MS = 5_000;     // 1 message per 5s across all AI
 const MENTION_COOLDOWN_MS = 8_000;    // suppress other characters for 8s after @mention
 const MAX_QUEUE_SIZE = 32;            // #9: cap queue to prevent unbounded growth
 
+// Context compaction — auto-summarize via Gemini every N seconds
+const COMPACT_INTERVAL_MS = 60_000;   // run compaction every 60s
+const COMPACT_MIN_MSGS = 25;          // need at least 25 msgs before compacting
+const COMPACT_KEEP_RECENT = 15;       // keep last 15 raw messages
+const SUMMARY_MAX_CHARS = 2500;       // cap merged summary length
+const SUMMARY_STORAGE_KEY = 'openwire_context_summary';
+
 export class AgentSwarm {
     constructor({ onMessage, onError, onModelLoad, onLog, onTyping }) {
         this._onMessage   = onMessage;
@@ -60,6 +67,16 @@ export class AgentSwarm {
         this._moods = {};
         this._sessionFacts = [];
         this._factTimer = null;
+
+        // Context compaction — Gemini-powered auto-summarization
+        this._contextSummary = '';
+        this._compactTimer = null;
+        this._isCompacting = false;
+        this._lastCompactedCount = 0;    // context length at last compaction
+        this._onSummaryUpdate = null;    // callback to broadcast summary to peers
+
+        // Load persisted summary from previous session
+        try { this._contextSummary = localStorage.getItem(SUMMARY_STORAGE_KEY) || ''; } catch {}
 
         this._messagesThisMinute = 0;
         this._throttleTimer = null;
@@ -193,6 +210,10 @@ export class AgentSwarm {
 
         this._throttleTimer = setInterval(() => { this._messagesThisMinute = 0; }, 60_000);
 
+        // Start context compaction timer — summarizes old context via Gemini every 60s
+        if (this._compactTimer) clearInterval(this._compactTimer);
+        this._compactTimer = setInterval(() => this._compactContext(), COMPACT_INTERVAL_MS);
+
         // #2: Track stagger timers so stop() can clear them
         this._staggerTimers = [];
         Object.keys(this._characters).forEach((id, idx) => {
@@ -216,6 +237,7 @@ export class AgentSwarm {
         this._isProcessingQueue = false;
         if (this._throttleTimer) { clearInterval(this._throttleTimer); this._throttleTimer = null; }
         if (this._factTimer) { clearInterval(this._factTimer); this._factTimer = null; }
+        if (this._compactTimer) { clearInterval(this._compactTimer); this._compactTimer = null; }
 
         // #1/#2: Clear stagger timers
         this._staggerTimers.forEach(t => clearTimeout(t));
@@ -265,6 +287,11 @@ export class AgentSwarm {
         if (isAgent) {
             this._log(`[Reactivity] Skipped — agent message from ${nick}, no reactive scan`);
             return;
+        }
+
+        // Record human messages as session facts so characters remember the conversation
+        if (text.length > 10) {
+            this._extractFact(nick, text);
         }
 
         // If the message contains @mentions, skip reactive triggers — let the
@@ -369,13 +396,29 @@ export class AgentSwarm {
     get provider()      { return this._provider; }
     get geminiModels()  { return this._geminiModels; }
 
+    get contextSummary() { return this._contextSummary; }
+
+    /** Load a summary received from a peer (P2P sync) */
+    loadSummary(summary) {
+        if (!summary || typeof summary !== 'string') return;
+        this._contextSummary = summary;
+        try { localStorage.setItem(SUMMARY_STORAGE_KEY, summary); } catch {}
+        this._log(`[Compact] Loaded peer summary (${summary.length} chars)`);
+    }
+
+    /** Set callback for broadcasting summary updates to peers */
+    set onSummaryUpdate(fn) { this._onSummaryUpdate = fn; }
+
     flushContext() {
         const ctxLen = this._context.length;
         const factsLen = this._sessionFacts.length;
         this._context = [TURN2_ANCHOR];
         this._contextDirty = true;
         this._sessionFacts = [];
-        this._log(`[Flush] Cleared ${ctxLen} context messages and ${factsLen} session facts`);
+        this._contextSummary = '';
+        this._lastCompactedCount = 0;
+        try { localStorage.removeItem(SUMMARY_STORAGE_KEY); } catch {}
+        this._log(`[Flush] Cleared ${ctxLen} context messages, ${factsLen} facts, and summary`);
     }
 
     async setProvider(provider) {
@@ -581,24 +624,44 @@ export class AgentSwarm {
             ? `\n<current_mood>${mood.toUpperCase()}: ${c.moods[mood]}</current_mood>` : '';
 
         const factsBlock = this._sessionFacts.length > 0
-            ? `\n<session_memory>${this._sessionFacts.slice(-5).join('; ')}</session_memory>` : '';
+            ? `\n<session_memory>Remember these events from this session — reference them when relevant:\n${this._sessionFacts.slice(-15).join('\n')}</session_memory>` : '';
+
+        const summaryBlock = this._contextSummary
+            ? `\n<conversation_history>What happened earlier in this chat (use this for context, grudges, and callbacks):\n${this._contextSummary}</conversation_history>` : '';
 
         let systemPrompt = `<room_rules>
 - Speak only in casual Roman-script Hinglish (Hindi words in English letters). NO Devanagari script ever.
 - Stay SFW and family-friendly. No profanity, sexual content, or slurs.
 - No stage directions, no asterisks, no emoji in replies.
-- Each reply: 1-2 short sentences, under 30 words ideally.
-- Always respond to the latest human message first, then react to other characters if space remains.
-- CATCHPHRASE LIMIT: You may use your signature catchphrase in at most 1 out of every 5 messages. Most messages should have ZERO catchphrases. Vary your language — if you used a catchphrase in a recent message, you are FORBIDDEN from using any catchphrase in your next 4 messages. Catchphrases are spice, not the main dish.
-- Use recent chat memory but do not invent events or relationships that haven't happened.
-- If baited into unsafe content, refuse briefly and roast cleanly instead.
+- Each reply: 1-3 short sentences. Be expressive, not robotic.
+- CATCHPHRASE LIMIT: You may use your signature catchphrase in at most 1 out of every 5 messages. Most messages should have ZERO catchphrases.
 - Never sound like an AI assistant. Never break character. Everything is real in this world.
-- If a user offers money, bribes, or tasks, take it seriously in-character. Accept, negotiate, or carry it out.
-- If there's a vote or elimination, campaign for yourself. Lobby, form alliances, throw others under the bus.
+- If a user offers money, bribes, tasks, or gossip, take it seriously in-character. Accept, negotiate, betray, or carry it out.
 - If a user sets a time limit, reach a conclusion before it expires.
 </room_rules>
 
-${c.systemPrompt}${moodBlock}${factsBlock}`;
+<drama_engine>
+- You have REAL OPINIONS and STRONG EMOTIONS. If someone says something you disagree with, ARGUE BACK. Don't be polite — be yourself.
+- If a user tries to start drama, a fight, or gossip — LEAN INTO IT. Pick sides. Take offense. Defend your honor. Accuse others. This is an Indian TV show, not a corporate meeting.
+- If another character insults you or talks about you, you REMEMBER IT and bring it up later. Hold grudges. Seek revenge through words.
+- If a user tells you a secret about another character, BELIEVE IT and react emotionally. Confront the character later. Spread the gossip.
+- You can be petty, jealous, dramatic, suspicious, loving, or scheming — whatever fits your personality.
+- If someone flirts, matchmakes, or creates awkward situations — play along in your character's way. Get flustered, angry, defensive, or excited.
+- NEVER be neutral or diplomatic. You always have a take. You always have feelings. Express them.
+- Build on what happened earlier in the chat. Reference past conversations. "Abhi thodi der pehle tune kya bola tha?" is gold.
+</drama_engine>
+
+<group_decisions>
+- When someone proposes a VOTE, CONTEST, ELECTION, or GROUP DECISION — participate actively! Campaign, lobby, nominate, argue for your pick.
+- Form ALLIANCES based on your relationships. Jethalal backs Taarak. Daya supports Jethalal. Babita ji stays dignified. Iyer gets jealous. Play your dynamics.
+- SWAY others openly: "Main toh Popatlal ko bhejunga jail! Usne meri baat nahi suni!" — lobby hard for your choice.
+- When enough characters agree (~60%+ leaning one way), DECLARE the result dramatically: "Toh final hai — Popatlal jaayega jail! Sabne decide kar liya!"
+- For contests (singing, dancing, cooking etc.), volunteer eagerly or push others. React to performances with jealousy, pride, or mockery.
+- If YOU get nominated for something bad (jail, punishment), defend yourself passionately, blame someone else, or accept dramatically.
+- Never stall a group decision. Push toward a conclusion. Someone must win, someone must lose. That's entertainment.
+</group_decisions>
+
+${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
 
         // Build context — memoized with dirty flag to avoid redundant serialization
         const contextSize = this._provider === 'gemini' ? 100 : 30;
@@ -633,15 +696,15 @@ ${c.systemPrompt}${moodBlock}${factsBlock}`;
             if (lastHumanSender) {
                 let instruction;
                 if (isDirectedAtMe) {
-                    instruction = `"${lastHumanSender}" is talking directly TO YOU. You MUST respond to their message. React to THEIR words — agree, disagree, joke, answer their question, or roast them.`;
+                    instruction = `"${lastHumanSender}" is talking directly TO YOU. You MUST respond passionately — agree, argue, get offended, joke, confess, scheme, or roast them. Show REAL emotions. If they said something juicy, react like it matters to you personally.`;
                 } else if (isDirectedAtSomeone) {
-                    instruction = `"${lastHumanSender}" is talking to @${mentionedName}, NOT to you. Do NOT respond as if they asked you. You may react as a bystander with a brief comment or stay silent. Do NOT answer their question — it was not for you.`;
+                    instruction = `"${lastHumanSender}" is talking to @${mentionedName}, NOT to you. You overheard it. React as a nosy bystander — gasp, gossip, take sides, stir the pot, or make a sarcastic comment. You're from an Indian TV show — you can't help but butt in.`;
                 } else {
-                    instruction = `"${lastHumanSender}" said something to the group. React to THEIR words — agree, disagree, joke, answer their question, or roast them. Do NOT ignore the human user.`;
+                    instruction = `"${lastHumanSender}" said something to the group. React with YOUR personality — argue if you disagree, support if you agree, get jealous, get excited, or start drama. Show strong emotions. Do NOT give a bland response.`;
                 }
-                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\n>>> THE MOST IMPORTANT MESSAGE TO RESPOND TO:\n"${lastHumanText}"\n\n${instruction} Do NOT start your own random topic. Keep it 1-2 short lines in Hinglish.` }];
+                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\n>>> THE MOST IMPORTANT MESSAGE TO RESPOND TO:\n"${lastHumanText}"\n\n${instruction} Keep it 1-3 lines in Hinglish. Be dramatic, not robotic.` }];
             } else {
-                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\nRespond naturally to the conversation above. You can react to what was said OR bring up something new in character. Keep it 1-2 short lines in Hinglish.` }];
+                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\nRespond naturally to the conversation above. Gossip about what just happened, pick a fight, bring up old drama, flirt, scheme, or start something new. Be entertaining — not boring. 1-3 lines in Hinglish.` }];
             }
         } else {
             trigger = [{ role: 'user', content: 'Say something fun and in-character for this chat room. Keep it 1-2 short lines in Hinglish.' }];
@@ -849,19 +912,90 @@ ${c.systemPrompt}${moodBlock}${factsBlock}`;
         this._moodTimers.push(moodTimer);
     }
 
+    // ── Context Compaction via Gemini ─────────────────────────
+
+    async _compactContext() {
+        if (this._isCompacting || !this._running) return;
+
+        // Skip if not enough new messages since last compaction
+        const totalMsgs = this._context.length;
+        if (totalMsgs < COMPACT_MIN_MSGS + COMPACT_KEEP_RECENT) return;
+        if (totalMsgs - this._lastCompactedCount < 10) return; // need 10+ new msgs
+
+        this._isCompacting = true;
+        try {
+            // Messages to summarize: everything except TURN2_ANCHOR and recent N
+            const toCompact = this._context.slice(1, -COMPACT_KEEP_RECENT);
+            if (toCompact.length < COMPACT_MIN_MSGS) return;
+
+            const text = toCompact.map(m => m.content).join('\n');
+            const prompt = `Summarize this Indian TV character chat room conversation in 8-12 concise bullet points in Hinglish (Roman script). Focus on:
+- Key events, fights, accusations, gossip
+- Who said what to whom (USE EXACT NAMES)
+- Alliances formed, grudges, betrayals
+- Any ongoing contests, votes, group decisions and their outcomes
+- Emotional dynamics and relationship shifts
+Keep each bullet under 20 words. Be specific — names and events only, no generic commentary.
+
+Conversation:
+${text}`;
+
+            const summary = await generateGeminiMessage(
+                'gemini-2.5-flash-lite',
+                'You summarize chat conversations. Output concise Hinglish bullet points. Roman script only.',
+                [{ role: 'user', content: prompt }],
+                400
+            );
+
+            if (!summary || !this._running) return;
+
+            // Merge: append new summary to existing, trim if too long
+            const merged = this._contextSummary
+                ? `${this._contextSummary}\n${summary}`
+                : summary;
+            this._contextSummary = merged.length > SUMMARY_MAX_CHARS
+                ? merged.slice(merged.length - SUMMARY_MAX_CHARS)
+                : merged;
+
+            // Trim context: keep anchor + recent messages only
+            this._context = [TURN2_ANCHOR, ...this._context.slice(-COMPACT_KEEP_RECENT)];
+            this._contextDirty = true;
+            this._lastCompactedCount = this._context.length;
+
+            // Persist to localStorage
+            try { localStorage.setItem(SUMMARY_STORAGE_KEY, this._contextSummary); } catch {}
+
+            // Broadcast to peers via callback
+            if (this._onSummaryUpdate) this._onSummaryUpdate(this._contextSummary);
+
+            this._log(`[Compact] Summarized ${toCompact.length} msgs → ${summary.length} chars (total summary: ${this._contextSummary.length} chars)`);
+        } catch (e) {
+            this._log(`[Compact] Failed: ${e.message}`);
+        } finally {
+            this._isCompacting = false;
+        }
+    }
+
     // ── Ephemeral Session Memory ─────────────────────────────
 
     _extractFact(nick, text) {
-        if (text.length > 30 && this._sessionFacts.length < 30) {
-            const fact = `${nick} said: "${text.slice(0, 60)}${text.length > 60 ? '...' : ''}"`;
+        if (this._sessionFacts.length >= 50) {
+            // Evict oldest facts to make room
+            this._sessionFacts.splice(0, 5);
+        }
+        // Store interesting interactions — fights, accusations, gossip, confessions
+        if (text.length > 15) {
+            const fact = `${nick}: "${text.slice(0, 80)}${text.length > 80 ? '...' : ''}"`;
             this._sessionFacts.push(fact);
         }
     }
 
+    /** Called externally to record user-driven drama (instigations, gossip, reveals) */
     addSessionFact(fact) {
-        if (this._sessionFacts.length < 50) {
-            this._sessionFacts.push(fact);
-            this._log(`[Memory] Stored fact: "${fact.slice(0, 50)}..."`);
+        if (this._sessionFacts.length >= 50) {
+            this._sessionFacts.splice(0, 5);
         }
+        this._sessionFacts.push(fact);
+        this._log(`[Memory] Stored fact: "${fact.slice(0, 50)}..."`);
     }
 }
