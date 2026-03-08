@@ -492,6 +492,13 @@ ${c.systemPrompt}${moodBlock}${factsBlock}`;
             trigger = [{ role: 'user', content: 'Say something fun and in-character for this chat room. Keep it 1-2 short lines in Hinglish.' }];
         }
 
+        // Debug: log full prompt payload
+        this._log(`[Prompt] ${c.name} | system: ${systemPrompt.length} chars | trigger: ${trigger[0]?.content?.length || 0} chars | context: ${recent.length} msgs | mood: ${mood || 'normal'} | facts: ${this._sessionFacts.length}`);
+        if (typeof localStorage !== 'undefined' && localStorage.getItem('openwire_debug') === 'true') {
+            console.log(`[PromptDebug] ${c.name} SYSTEM:\n`, systemPrompt);
+            console.log(`[PromptDebug] ${c.name} TRIGGER:\n`, trigger[0]?.content);
+        }
+
         // Smart mention: identify who we're responding to
         const replyTo = this._getReplyTarget(recent);
 
