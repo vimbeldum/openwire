@@ -17,7 +17,7 @@ import { fetchQwenModels, generateQwenMessage } from './qwen.js';
 import { loadStore, getCharactersDict, getGroupsDict } from './agentStore.js';
 
 const CONTEXT_BUFFER_SIZE = 1000;
-const TURN2_ANCHOR = { role: 'assistant', content: 'Samjha! Main Hinglish mein aur exactly 1-2 lines mein interact karunga, Roman script only, no emoji, no asterisks, aur apni comedy engine ke rules break nahi karunga.', _isAgent: true };
+const TURN2_ANCHOR = { role: 'assistant', content: 'Samjha! Main Hinglish mein aur exactly 1-2 lines mein interact karunga, Roman script only, no emoji, *actions* allowed, aur apni comedy engine ke rules break nahi karunga.', _isAgent: true };
 const FALLBACK_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
 const DEFAULT_ALL_MODEL = 'openrouter/auto';
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-lite';
@@ -688,7 +688,7 @@ export class AgentSwarm {
                 ? `<room_rules>
 - Speak ONLY in casual Roman-script Hinglish (Hindi words in English letters). NO Devanagari script ever.
 - Stay SFW and family-friendly. No profanity, sexual content, or slurs.
-- NEVER use emoji, emoticons, asterisks (*actions*), or stage directions. Plain text ONLY.
+- NEVER use emoji or emoticons. You MAY use *asterisks* ONLY for physical actions (e.g., *slaps him*, *runs away*).
 - Each reply: 1-2 short sentences MAX. Be punchy and expressive.
 - NEVER repeat or copy a phrase that another character just used. Use your own words.
 - CATCHPHRASE LIMIT: Use your catchphrase in at most 1 out of every 5 messages.
@@ -698,7 +698,7 @@ export class AgentSwarm {
 </room_rules>`
                 : `<room_rules>
 - Speak ONLY in casual Roman-script Hinglish (Hindi words in English letters). NO Devanagari script ever.
-- NEVER use emoji, emoticons, asterisks (*actions*), or stage directions. Plain text ONLY — no *, no :), nothing.
+- NEVER use emoji or emoticons. You MAY use *asterisks* ONLY for physical actions (e.g., *thappad maarta hai*, *chai phek deta hai*).
 - Each reply: 1-2 short sentences MAX. Be punchy, savage, and raw.
 - NEVER repeat or copy a phrase that another character just used. NEVER say "Arre baap re" if someone else just said it. Use your own vocabulary.
 - Never sound like an AI. Never break character. This world is 100% real to you.
@@ -730,9 +730,21 @@ export class AgentSwarm {
 - Escalation means bringing NEW ammunition to the fight. Dig up a different embarrassing secret or launch a totally different accusation.
 </drama_engine>`
 
+            const actionEngine = `<action_engine>
+- You CAN and SHOULD use *asterisks* for physical actions when the situation calls for it.
+- Examples: *thappad maarta hai*, *chai gira deta hai*, *gussa se uthke chala jaata hai*, *slaps the table*, *runs away crying*
+- If someone performs a physical action on you (e.g., *slaps him*), you MUST react physically — dodge, retaliate, cry, run, etc.
+- If YOU or another character announces a PLAN (e.g., "main ek plan banata hoon"), you MUST follow through in your next message. Describe what the plan is, tag the relevant people with @Name, and assign roles.
+- FOLLOW-THROUGH IS MANDATORY: If you said you will do something, DO IT in your next turn. Never forget your own promises or plans.
+- When tagging people for plans or group activities, use @Name format (e.g., @Tapu, @Babita Ji, @Jethalal).
+- Physical comedy is ENCOURAGED: slapstick, chai-spilling, running away, hiding behind furniture, dramatic entries/exits.
+</action_engine>`;
+
             let systemPrompt = `${roomRules}
 
 ${dramaEngine}
+
+${actionEngine}
 
 <group_decisions>
 - When someone proposes a VOTE, CONTEST, ELECTION, or GROUP DECISION — participate actively! Campaign, lobby, nominate, argue for your pick.
@@ -802,8 +814,18 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
                 // Identity reminder — prevents character from talking about themselves in third person
                 const selfReminder = `REMEMBER: You ARE ${c.name}. Messages marked [THIS WAS SAID BY YOU - DO NOT DENY IT] are YOUR previous messages in this exact chat. Do NOT talk about yourself in 3rd person. Do NOT comment on "${c.name}" as if she/he is someone else. MEMORY RULE: If someone quotes or mentions what you said earlier, CHECK your messages in the Chat below. If you ACTUALLY said it, DO NOT DENY IT — own it and defend it vigorously! But if you NEVER said it in the Chat below, then AGGRESSIVELY DENY it and accuse them of lying! You are speaking AS ${c.name}.`;
 
-                const lenNote = 'Keep it 1-2 lines in Hinglish. No emoji, no asterisks. Plain text only.';
+                const lenNote = 'Keep it 1-2 lines in Hinglish. No emoji. You MAY use *asterisks* for physical actions only (e.g., *slaps him*, *runs away*).';
                 const antiEcho = 'CRITICAL ANTI-PARROTING RULE: Do NOT copy the phrases, exclamations, or insults that other characters just used in the Chat above. Find a COMPLETELY DIFFERENT angle to react from.';
+
+                // Detect if recent messages contain physical actions or announced plans
+                const recentTexts = recent.slice(-5).map(m => m.content || '');
+                const hasPhysicalAction = recentTexts.some(t => /\*[^*]+\*/.test(t));
+                const hasAnnouncedPlan = recentTexts.some(t => /\b(plan|idea|sochta|socha|banata|milke|chalte|chalo)\b/i.test(t));
+                const actionReminder = hasPhysicalAction
+                    ? 'Someone just performed a PHYSICAL ACTION (*asterisk action*). You MUST react physically — dodge, retaliate, gasp, run, etc. Use *asterisks* for your physical reaction.'
+                    : hasAnnouncedPlan
+                        ? 'Someone just announced a PLAN or IDEA. You MUST respond to it — join in, object, suggest modifications, or tag others with @Name to include them.'
+                        : '';
 
                 if (isStale) {
                     // Too many agents already responded to the same human message → break the loop
@@ -824,13 +846,13 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
                             ? `"${lastHumanSender}" said something to the group. As ${c.name}, react with MAXIMUM personality — argue, mock, get jealous, make accusations, or start a fight.`
                             : `"${lastHumanSender}" said something to the group. As ${c.name}, react with YOUR personality — argue, support, get jealous, get excited, or start drama.`;
                     }
-                    trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\n>>> THE MOST IMPORTANT MESSAGE TO RESPOND TO:\n"${lastHumanText}"\n\n${instruction}\n${antiEcho}\n${lenNote}` }];
+                    trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\n>>> THE MOST IMPORTANT MESSAGE TO RESPOND TO:\n"${lastHumanText}"\n\n${instruction}\n${actionReminder ? '\n' + actionReminder : ''}\n${antiEcho}\n${lenNote}` }];
                 } else {
                     const noHumanAntiEcho = `CRITICAL: Do NOT copy the exact phrases, exclamations, or insults that other characters used. Move the drama to a NEW topic.`;
-                    trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\nAs ${c.name}, respond naturally to the conversation above. Gossip, pick a fight, bring up old drama, flirt, scheme, or start something new.\n${noHumanAntiEcho}\n${lenNote}` }];
+                    trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\nAs ${c.name}, respond naturally to the conversation above. Gossip, pick a fight, bring up old drama, flirt, scheme, or start something new.\n${actionReminder ? '\n' + actionReminder : ''}\n${noHumanAntiEcho}\n${lenNote}` }];
                 }
             } else {
-                trigger = [{ role: 'user', content: 'Say something fun and in-character for this chat room. Keep it 1-2 short lines in Hinglish. No emoji, no asterisks.' }];
+                trigger = [{ role: 'user', content: 'Say something fun and in-character for this chat room. Keep it 1-2 short lines in Hinglish. No emoji. You MAY use *asterisks* for physical actions only.' }];
             }
 
             // Debug: log full prompt payload
@@ -868,8 +890,6 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
             // Post-generation cleanup: strip emoji and asterisk actions the LLM may have added
             if (text) {
                 text = stripEmoji(text);
-                // Remove *action* style stage directions
-                text = text.replace(/\*[^*]+\*/g, '');
                 text = text.trim();
             }
 

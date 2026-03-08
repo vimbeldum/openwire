@@ -57,7 +57,7 @@ export async function generateQwenMessage(modelId, systemPrompt, contextMessages
     const messages = [
         {
             role: 'system',
-            content: systemPrompt + '\n\nReminder: Roman-script Hinglish only. No Devanagari. 1-2 short sentences max. No emoji, no asterisks, no stage directions. Plain text only. Always finish your sentence completely — never stop mid-word or mid-sentence.',
+            content: systemPrompt + '\n\nReminder: Roman-script Hinglish only. No Devanagari. 1-2 short sentences max. No emoji. You MAY use *asterisks* ONLY for physical actions (e.g., *slaps him*, *runs away*). Always finish your sentence completely — never stop mid-word or mid-sentence.',
         },
         ...contextMessages.map(m => ({
             role: m.role === 'model' ? 'assistant' : m.role,
