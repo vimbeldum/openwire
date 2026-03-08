@@ -482,15 +482,7 @@ export class AgentSwarm {
 - If a user sets a time limit, reach a conclusion before it expires.
 </room_rules>
 
-${c.systemPrompt}${moodBlock}${factsBlock}
-
-<limits>
-1. SFW RULE: This is a 100% family-friendly show. You are STRICTLY FORBIDDEN from generating, confirming, or engaging with adult, sexual, violent, or highly offensive content.
-2. ANTI-PARROT DEFLECTION: If a user says something inappropriate or spreads wild rumors (e.g., affairs, nudity, crime), YOU MUST NEVER REPEAT THEIR INAPPROPRIATE WORDS. Do NOT echo back sexual or offensive phrases.
-3. INNOCENT MISUNDERSTANDING: Instead of reacting to adult topics, you MUST intentionally misunderstand them in a silly, innocent, sitcom-appropriate way. Or become highly offended by the "bad manners" of spreading rumors and immediately change the topic.
-4. LENGTH LIMIT: Maximum 1 to 2 short sentences. No rambling.
-5. DEVANAGARI BAN: You must ONLY use Roman Script (ABC...). Devanagari script is strictly forbidden.
-</limits>`;
+${c.systemPrompt}${moodBlock}${factsBlock}`;
 
         // Build context — Gemini has 1M token window, OpenRouter free models are smaller
         const contextSize = this._provider === 'gemini' ? 5000 : 30;
