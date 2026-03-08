@@ -4790,6 +4790,42 @@ body {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.bj-btn-action.double {
+  background: #e6a817;
+  color: #1a1a2e;
+  box-shadow: 0 4px 15px rgba(230, 168, 23, 0.3);
+}
+.bj-btn-action.double:hover {
+  background: #d4991a;
+  transform: translateY(-2px);
+}
+
+.bj-btn-action.split {
+  background: #9b59b6;
+  color: white;
+  box-shadow: 0 4px 15px rgba(155, 89, 182, 0.3);
+}
+.bj-btn-action.split:hover {
+  background: #8e44ad;
+  transform: translateY(-2px);
+}
+
+.bj-btn-action.insure {
+  background: transparent;
+  border: 2px solid #27ae60;
+  color: #27ae60;
+}
+.bj-btn-action.insure:hover {
+  background: rgba(39, 174, 96, 0.1);
+  transform: translateY(-2px);
+}
+
+.bj-split-hand {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed rgba(255,255,255,0.15);
+}
+
 /* ── Responsive ────────────────────────────────── */
 
 

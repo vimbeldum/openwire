@@ -1020,6 +1020,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         updated = bj.hit(prev, action.peer_id);
                     } else if (action.action === 'stand') {
                         updated = bj.stand(prev, action.peer_id);
+                    } else if (action.action === 'split') {
+                        updated = bj.split(prev, action.peer_id);
+                    } else if (action.action === 'insurance') {
+                        updated = bj.takeInsurance(prev, action.peer_id);
+                    } else if (action.action === 'doubleDown') {
+                        updated = bj.doubleDown(prev, action.peer_id);
                     } else return prev;
                     const prevPhase = prev.phase;
                     setTimeout(() => {
@@ -1467,7 +1473,21 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 }));
                 return;
             }
-            if (action.type === 'hit' || action.type === 'stand') {
+            if (['hit', 'stand', 'split', 'insurance', 'doubleDown'].includes(action.type)) {
+                const myBet = blackjackGame.players.find(p => p.peer_id === myId)?.bet || 0;
+                // For split/double, debit additional chips equal to original bet
+                if (action.type === 'split' || action.type === 'doubleDown') {
+                    const w = walletRef.current;
+                    if (!w || !wallet.canAfford(w, myBet)) { addMsg('★', `⚠ Insufficient chips.`, 'system'); return; }
+                    updateWallet(wallet.debit(w, myBet, `Blackjack ${action.type}`));
+                }
+                // Insurance costs half the original bet
+                if (action.type === 'insurance') {
+                    const insCost = Math.floor(myBet / 2);
+                    const w = walletRef.current;
+                    if (!w || !wallet.canAfford(w, insCost)) { addMsg('★', `⚠ Insufficient chips.`, 'system'); return; }
+                    updateWallet(wallet.debit(w, insCost, 'Blackjack insurance'));
+                }
                 socket.sendRoomMessage(blackjackGame.roomId, bj.serializeBlackjackAction({
                     type: 'bj_player_action', peer_id: myId, action: action.type,
                 }));
@@ -1495,6 +1515,30 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             case 'deal': newGame = bj.dealInitialCards(blackjackGame); break;
             case 'hit': newGame = bj.hit(blackjackGame, myId); break;
             case 'stand': newGame = bj.stand(blackjackGame, myId); break;
+            case 'split': {
+                const splitCost = blackjackGame.players.find(p => p.peer_id === myId)?.bet || 0;
+                const w = walletRef.current;
+                if (!w || !wallet.canAfford(w, splitCost)) { addMsg('★', '⚠ Insufficient chips for split.', 'system'); return; }
+                updateWallet(wallet.debit(w, splitCost, 'Blackjack split'));
+                newGame = bj.split(blackjackGame, myId);
+                break;
+            }
+            case 'insurance': {
+                const insCost = Math.floor((blackjackGame.players.find(p => p.peer_id === myId)?.bet || 0) / 2);
+                const w = walletRef.current;
+                if (!w || !wallet.canAfford(w, insCost)) { addMsg('★', '⚠ Insufficient chips for insurance.', 'system'); return; }
+                updateWallet(wallet.debit(w, insCost, 'Blackjack insurance'));
+                newGame = bj.takeInsurance(blackjackGame, myId);
+                break;
+            }
+            case 'doubleDown': {
+                const ddCost = blackjackGame.players.find(p => p.peer_id === myId)?.bet || 0;
+                const w = walletRef.current;
+                if (!w || !wallet.canAfford(w, ddCost)) { addMsg('★', '⚠ Insufficient chips for double down.', 'system'); return; }
+                updateWallet(wallet.debit(w, ddCost, 'Blackjack double down'));
+                newGame = bj.doubleDown(blackjackGame, myId);
+                break;
+            }
             case 'dealerPlay': newGame = bj.runDealerTurn(blackjackGame); break;
             case 'newRound':
                 newGame = bj.newRound(blackjackGame);

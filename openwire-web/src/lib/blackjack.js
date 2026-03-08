@@ -13,6 +13,9 @@ const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'
 
 export const BETTING_DURATION_MS = 60 * 1000;  // 60s betting window
 export const DEALER_PLAY_MS = 3 * 1000;        // 3s delay before round ends
+export const DEAL_CARD_DELAY_MS = 600;         // delay between each dealt card
+export const DEALER_REVEAL_DELAY_MS = 1500;    // delay before showing dealer result
+export const MIN_DECK_CARDS = 15;              // reshuffle threshold
 
 // Create a fresh deck
 export function createDeck() {
@@ -174,7 +177,7 @@ export function dealInitialCards(game) {
     };
 }
 
-// Player hits (takes a card)
+// Player hits (takes a card) — handles split hands
 export function hit(game, peer_id) {
     const playerIndex = game.players.findIndex(p => p.peer_id === peer_id);
     if (playerIndex === -1 || game.phase !== 'playing') return game;
@@ -186,23 +189,40 @@ export function hit(game, peer_id) {
 
     let players = [...game.players];
     const player = { ...players[playerIndex] };
-    player.hand = [...player.hand, card];
 
-    if (isBust(player.hand)) {
-        player.status = 'bust';
-    } else if (calculateHand(player.hand) === 21) {
-        player.status = 'stand'; // auto-stand on 21
+    // Determine which hand is active (main or split)
+    if (player.playingSplit && player.splitHand) {
+        player.splitHand = [...player.splitHand, card];
+        if (isBust(player.splitHand)) {
+            player.splitStatus = 'bust';
+        } else if (calculateHand(player.splitHand) === 21) {
+            player.splitStatus = 'stand';
+        }
+    } else {
+        player.hand = [...player.hand, card];
+        if (isBust(player.hand)) {
+            player.status = 'bust';
+        } else if (calculateHand(player.hand) === 21) {
+            player.status = 'stand'; // auto-stand on 21
+        }
+        // If bust/stand on main hand and has split hand pending, switch to it
+        if ((player.status === 'bust' || player.status === 'stand') && player.splitHand && player.splitStatus === 'playing') {
+            player.playingSplit = true;
+            players[playerIndex] = player;
+            return { ...game, deck, players };
+        }
     }
 
     players[playerIndex] = player;
 
-    // Move to next player if bust or stand
+    // Move to next player if all hands done
     let currentPlayerIndex = game.currentPlayerIndex;
     let phase = game.phase;
     let dealer = { ...game.dealer };
 
-    if (player.status === 'bust' || player.status === 'stand') {
-        // Find next playing player
+    const mainDone = player.status === 'bust' || player.status === 'stand' || player.status === 'blackjack';
+    const splitDone = !player.splitHand || player.splitStatus !== 'playing';
+    if (mainDone && splitDone) {
         let nextIndex = players.findIndex((p, i) => i > currentPlayerIndex && p.status === 'playing');
         if (nextIndex === -1) {
             nextIndex = players.findIndex(p => p.status === 'playing');
@@ -225,14 +245,29 @@ export function hit(game, peer_id) {
     };
 }
 
-// Player stands (ends turn)
+// Player stands (ends turn) — handles split hands
 export function stand(game, peer_id) {
     const playerIndex = game.players.findIndex(p => p.peer_id === peer_id);
     if (playerIndex === -1 || game.phase !== 'playing') return game;
     if (game.currentPlayerIndex !== playerIndex) return game;
 
     let players = [...game.players];
-    players[playerIndex] = { ...players[playerIndex], status: 'stand' };
+    const player = { ...players[playerIndex] };
+
+    // If playing split hand, stand on split
+    if (player.playingSplit && player.splitHand) {
+        player.splitStatus = 'stand';
+    } else {
+        player.status = 'stand';
+        // If has split hand pending, switch to it
+        if (player.splitHand && player.splitStatus === 'playing') {
+            player.playingSplit = true;
+            players[playerIndex] = player;
+            return { ...game, players };
+        }
+    }
+
+    players[playerIndex] = player;
 
     // Find next playing player
     let currentPlayerIndex = players.findIndex((p, i) => i > playerIndex && p.status === 'playing');
@@ -257,6 +292,136 @@ export function stand(game, peer_id) {
     };
 }
 
+// Check if player can split (two cards of same value)
+export function canSplit(game, peer_id) {
+    if (game.phase !== 'playing') return false;
+    const playerIndex = game.players.findIndex(p => p.peer_id === peer_id);
+    if (playerIndex === -1 || game.currentPlayerIndex !== playerIndex) return false;
+    const player = game.players[playerIndex];
+    if (player.hand.length !== 2 || player.splitHand) return false; // already split or wrong card count
+    const v0 = player.hand[0].value;
+    const v1 = player.hand[1].value;
+    // Same face value (10, J, Q, K all count as 10)
+    const val = (v) => ['10', 'J', 'Q', 'K'].includes(v) ? 10 : v;
+    return val(v0) === val(v1);
+}
+
+// Player splits hand (requires additional bet equal to original)
+export function split(game, peer_id) {
+    if (!canSplit(game, peer_id)) return game;
+    const playerIndex = game.players.findIndex(p => p.peer_id === peer_id);
+    let deck = [...game.deck];
+    if (deck.length < 2) return game; // need 2 cards for split
+
+    let players = [...game.players];
+    const player = { ...players[playerIndex] };
+    const card1 = player.hand[0];
+    const card2 = player.hand[1];
+
+    // Main hand gets first card + new card
+    player.hand = [card1, deck.pop()];
+    // Split hand gets second card + new card
+    player.splitHand = [card2, deck.pop()];
+    player.splitBet = player.bet; // equal bet on split hand
+    player.splitStatus = 'playing';
+    player.playingSplit = false; // currently playing main hand
+
+    // Check for auto-stand on 21
+    if (calculateHand(player.hand) === 21) {
+        player.status = 'stand';
+        player.playingSplit = true; // move to split hand
+        if (calculateHand(player.splitHand) === 21) {
+            player.splitStatus = 'stand';
+        }
+    }
+
+    players[playerIndex] = player;
+    return { ...game, deck, players };
+}
+
+// Check if player can take insurance (dealer shows Ace)
+export function canInsure(game, peer_id) {
+    if (game.phase !== 'playing') return false;
+    const player = game.players.find(p => p.peer_id === peer_id);
+    if (!player || player.insured) return false;
+    // Insurance only on initial deal (all players have 2 cards, dealer's up card is Ace)
+    if (game.dealer.hand.length < 2) return false;
+    return game.dealer.hand[0].value === 'A';
+}
+
+// Player takes insurance (costs half the original bet)
+export function takeInsurance(game, peer_id) {
+    if (!canInsure(game, peer_id)) return game;
+    return {
+        ...game,
+        players: game.players.map(p =>
+            p.peer_id === peer_id
+                ? { ...p, insured: true, insuranceBet: Math.floor(p.bet / 2) }
+                : p
+        ),
+    };
+}
+
+// Check if player can double down (first two cards only)
+export function canDoubleDown(game, peer_id) {
+    if (game.phase !== 'playing') return false;
+    const playerIndex = game.players.findIndex(p => p.peer_id === peer_id);
+    if (playerIndex === -1 || game.currentPlayerIndex !== playerIndex) return false;
+    const player = game.players[playerIndex];
+    const hand = player.playingSplit ? player.splitHand : player.hand;
+    return hand && hand.length === 2;
+}
+
+// Player doubles down (doubles bet, takes exactly one card, then stands)
+export function doubleDown(game, peer_id) {
+    if (!canDoubleDown(game, peer_id)) return game;
+    const playerIndex = game.players.findIndex(p => p.peer_id === peer_id);
+    let deck = [...game.deck];
+    if (deck.length === 0) return game;
+    const card = deck.pop();
+
+    let players = [...game.players];
+    const player = { ...players[playerIndex] };
+
+    if (player.playingSplit && player.splitHand) {
+        player.splitHand = [...player.splitHand, card];
+        player.splitBet = (player.splitBet || player.bet) * 2;
+        player.splitStatus = isBust(player.splitHand) ? 'bust' : 'stand';
+    } else {
+        player.hand = [...player.hand, card];
+        player.bet *= 2;
+        if (isBust(player.hand)) {
+            player.status = 'bust';
+        } else {
+            player.status = 'stand';
+        }
+        // If has split hand, move to it
+        if (player.splitHand && player.splitStatus === 'playing') {
+            player.playingSplit = true;
+        }
+    }
+
+    players[playerIndex] = player;
+
+    // Check if we need to advance to next player or dealer
+    let currentPlayerIndex = game.currentPlayerIndex;
+    let phase = game.phase;
+    let dealer = { ...game.dealer };
+
+    const isDone = player.status !== 'playing' && (!player.splitHand || player.splitStatus !== 'playing');
+    if (isDone) {
+        let nextIndex = players.findIndex((p, i) => i > currentPlayerIndex && p.status === 'playing');
+        if (nextIndex === -1) nextIndex = players.findIndex(p => p.status === 'playing');
+        currentPlayerIndex = nextIndex;
+        if (currentPlayerIndex === -1) {
+            phase = 'dealer';
+            dealer.revealed = true;
+        }
+    }
+
+    return { ...game, deck, players, currentPlayerIndex, phase, dealer };
+}
+
 // Dealer plays (hits until 17 or higher)
 export function dealerPlay(game) {
     if (game.phase !== 'dealer') return game;
@@ -278,7 +443,19 @@ export function dealerPlay(game) {
     };
 }
 
-// Settle bets (determine winners/losers)
+// Settle a single hand against dealer
+function settleHand(hand, handStatus, dealerTotal, dealerBust, dealerBlackjack) {
+    if (handStatus === 'bust') return 'lose';
+    const playerTotal = calculateHand(hand);
+    const playerBj = isBlackjack(hand);
+    if (playerBj && !dealerBlackjack) return 'blackjack-win';
+    if (dealerBust) return 'win';
+    if (playerTotal > dealerTotal) return 'win';
+    if (playerTotal < dealerTotal) return 'lose';
+    return 'push';
+}
+
+// Settle bets (determine winners/losers) — handles split + insurance
 export function settle(game) {
     if (game.phase !== 'settlement') return game;
 
@@ -287,28 +464,20 @@ export function settle(game) {
     const dealerBlackjack = isBlackjack(game.dealer.hand);
 
     let players = game.players.map(p => {
-        if (p.status === 'bust') {
-            return { ...p, status: 'lose' };
+        const mainResult = settleHand(p.hand, p.status, dealerTotal, dealerBust, dealerBlackjack);
+        let updated = { ...p, status: mainResult };
+
+        // Settle split hand if it exists
+        if (p.splitHand) {
+            updated.splitStatus = settleHand(p.splitHand, p.splitStatus, dealerTotal, dealerBust, dealerBlackjack);
         }
 
-        const playerTotal = calculateHand(p.hand);
-        const playerBlackjack = isBlackjack(p.hand);
-
-        if (playerBlackjack && !dealerBlackjack) {
-            return { ...p, status: 'blackjack-win' };
+        // Settle insurance: pays 2:1 if dealer has blackjack
+        if (p.insured) {
+            updated.insuranceWon = dealerBlackjack;
         }
 
-        if (dealerBust) {
-            return { ...p, status: 'win' };
-        }
-
-        if (playerTotal > dealerTotal) {
-            return { ...p, status: 'win' };
-        } else if (playerTotal < dealerTotal) {
-            return { ...p, status: 'lose' };
-        } else {
-            return { ...p, status: 'push' };
-        }
+        return updated;
     });
 
     return {
@@ -323,10 +492,16 @@ export function runDealerTurn(game) {
     return settle(dealerPlay(game));
 }
 
-// Start a new round (keep players, reset cards)
+// Start a new round (keep players, reuse deck if enough cards remain)
 export function newRound(game) {
+    // Persist deck across rounds — only reshuffle when too few cards
+    let deck = game.deck && game.deck.length >= MIN_DECK_CARDS
+        ? game.deck
+        : createDeck();
+
     return {
         ...createGame(game.roomId, game.dealer.peer_id),
+        deck,
         players: game.players.map(p => ({
             peer_id: p.peer_id,
             nick: p.nick,
@@ -382,28 +557,48 @@ export function deserializeGame(data) {
     }
 }
 
+// Net for a single hand result
+function handNet(status, bet) {
+    if (status === 'win') return Math.floor(bet);
+    if (status === 'blackjack-win') return Math.floor(bet * 1.5);
+    if (status === 'push') return 0;
+    return -bet;
+}
+
 // Returns { peer_id → net chip change } for a settled game (phase === 'ended')
-// win: +bet, blackjack-win: +bet*1.5, push: 0, lose: -bet
+// Handles main hand, split hand, and insurance
 export function getPayouts(game) {
     if (game.phase !== 'ended') return {};
-    return settleBets(game.players, (p) => {
-        if (p.status === 'win') return Math.floor(p.bet);
-        if (p.status === 'blackjack-win') return Math.floor(p.bet * 1.5);
-        if (p.status === 'push') return 0;
-        return -p.bet;
-    });
+    const payouts = {};
+    for (const p of game.players) {
+        if (!p.bet) continue;
+        let net = handNet(p.status, p.bet);
+        // Split hand payout
+        if (p.splitHand && p.splitStatus) {
+            net += handNet(p.splitStatus, p.splitBet || p.bet);
+        }
+        // Insurance payout: wins 2:1 if dealer has blackjack
+        if (p.insured && p.insuranceBet) {
+            net += p.insuranceWon ? p.insuranceBet * 2 : -p.insuranceBet;
+        }
+        payouts[p.peer_id] = (payouts[p.peer_id] || 0) + net;
+    }
+    return payouts;
 }
 
 /* ── Rules (used by HowToPlay) ────────────────────────────── */
 
 export const BLACKJACK_RULES = {
     name: 'Blackjack',
-    description: 'Beat the dealer by getting closer to 21 without going over. Dealer hits on 16 or less, stands on 17+.',
+    description: 'Beat the dealer by getting closer to 21 without going over. Dealer hits on 16 or less, stands on 17+. Single deck — cards persist across rounds until reshuffled.',
     bets: [
         { name: 'Win', odds: '1:1', description: 'Your hand beats the dealer — you win your bet.' },
         { name: 'Blackjack', odds: '3:2', description: 'Natural 21 on first two cards beats any non-blackjack dealer hand.' },
         { name: 'Push', odds: '0', description: 'Tie with dealer — your bet is returned.' },
         { name: 'Bust / Loss', odds: '-1', description: 'Exceed 21 or dealer scores higher — you lose your bet.' },
+        { name: 'Double Down', odds: '1:1', description: 'Double your bet and receive exactly one more card. Available on first two cards only.' },
+        { name: 'Split', odds: '1:1 each', description: 'Split matching cards into two hands with equal bets. Each hand plays independently.' },
+        { name: 'Insurance', odds: '2:1', description: 'Side bet (half your wager) when dealer shows Ace. Pays 2:1 if dealer has Blackjack.' },
     ],
 };
 
@@ -419,18 +614,16 @@ export class BlackjackEngine extends GameEngine {
         return this._game;
     }
 
-    /**
-     * @param {Array<{peer_id: string, bet: number, status: string}>} players  game.players after settlement
-     * @param {*} _result  Not used — outcome is encoded in player statuses
-     * @returns {{ [peer_id: string]: number }}
-     */
     calculatePayout(players, _result) {
-        return settleBets(players, (p) => {
-            if (p.status === 'win') return Math.floor(p.bet);
-            if (p.status === 'blackjack-win') return Math.floor(p.bet * 1.5);
-            if (p.status === 'push') return 0;
-            return -p.bet;
-        });
+        const payouts = {};
+        for (const p of players) {
+            if (!p.bet) continue;
+            let net = handNet(p.status, p.bet);
+            if (p.splitHand && p.splitStatus) net += handNet(p.splitStatus, p.splitBet || p.bet);
+            if (p.insured && p.insuranceBet) net += p.insuranceWon ? p.insuranceBet * 2 : -p.insuranceBet;
+            payouts[p.peer_id] = (payouts[p.peer_id] || 0) + net;
+        }
+        return payouts;
     }
 
     getRules() {
@@ -453,18 +646,36 @@ export class BlackjackEngine extends GameEngine {
         const breakdown = (players || [])
             .filter(p => p.bet > 0)
             .map(p => {
-                let net, outcome, betLabel;
-                if (p.status === 'win') {
-                    net = Math.floor(p.bet); outcome = 'win'; betLabel = 'Win (1:1)';
-                } else if (p.status === 'blackjack-win') {
-                    net = Math.floor(p.bet * 1.5); outcome = 'blackjack'; betLabel = 'Blackjack (3:2)';
-                } else if (p.status === 'push') {
-                    net = 0; outcome = 'push'; betLabel = 'Push';
-                } else {
-                    net = -p.bet; outcome = 'loss';
-                    betLabel = p.status === 'bust' ? 'Bust' : 'Loss';
+                let mainNet = handNet(p.status, p.bet);
+                let totalWager = p.bet;
+                let labels = [];
+
+                // Main hand
+                if (p.status === 'blackjack-win') labels.push('Blackjack (3:2)');
+                else if (p.status === 'win') labels.push('Win (1:1)');
+                else if (p.status === 'push') labels.push('Push');
+                else labels.push(p.status === 'bust' ? 'Bust' : 'Loss');
+
+                let net = mainNet;
+
+                // Split hand
+                if (p.splitHand && p.splitStatus) {
+                    const splitNet = handNet(p.splitStatus, p.splitBet || p.bet);
+                    net += splitNet;
+                    totalWager += p.splitBet || p.bet;
+                    labels.push(`Split: ${p.splitStatus === 'win' ? 'Win' : p.splitStatus === 'push' ? 'Push' : 'Loss'}`);
                 }
-                return { peer_id: p.peer_id, nick: p.nick, betLabel, wager: p.bet, net, outcome };
+
+                // Insurance
+                if (p.insured && p.insuranceBet) {
+                    const insNet = p.insuranceWon ? p.insuranceBet * 2 : -p.insuranceBet;
+                    net += insNet;
+                    totalWager += p.insuranceBet;
+                    labels.push(`Insurance: ${p.insuranceWon ? 'Won' : 'Lost'}`);
+                }
+
+                const outcome = net > 0 ? 'win' : net === 0 ? 'push' : 'loss';
+                return { peer_id: p.peer_id, nick: p.nick, betLabel: labels.join(' + '), wager: totalWager, net, outcome };
             });
 
         const totals = {};
