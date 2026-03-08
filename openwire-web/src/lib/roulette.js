@@ -96,6 +96,7 @@ export function createRoulette(roomId) {
 
 // Place a bet (or replace existing bet of same type+target)
 export function placeBet(game, peer_id, nick, betType, betTarget, amount) {
+    if (!amount || typeof amount !== 'number' || amount <= 0 || !isFinite(amount)) return game;
     const bets = game.bets.filter(
         b => !(b.peer_id === peer_id && b.betType === betType && b.betTarget === betTarget)
     );

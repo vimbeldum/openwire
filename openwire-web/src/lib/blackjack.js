@@ -119,6 +119,7 @@ export function removePlayer(game, peer_id) {
 
 // Player places bet
 export function placeBet(game, peer_id, bet) {
+    if (!bet || typeof bet !== 'number' || bet <= 0 || !isFinite(bet)) return game;
     return {
         ...game,
         players: game.players.map(p =>
@@ -364,18 +365,18 @@ export function serializeBlackjackAction(action) {
     return 'BJ:' + JSON.stringify(action);
 }
 
-// Serialize game state for transmission
+// Serialize game state for transmission (strip deck for security)
 export function serializeGame(game) {
-    return JSON.stringify({
-        ...game,
-        // Don't send full deck to prevent cheating in real implementation
-        deckCount: game.deck.length,
-    });
+    const { deck, ...rest } = game;
+    return JSON.stringify({ ...rest, deckCount: deck?.length || 0 });
 }
 
 export function deserializeGame(data) {
     try {
-        return JSON.parse(data);
+        const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+        // When deserializing, deck is not available (security) — set empty
+        if (parsed && !parsed.deck) parsed.deck = [];
+        return parsed;
     } catch {
         return null;
     }

@@ -90,11 +90,21 @@ function HistoryStrip({ history }) {
     if (!history?.length) return null;
     return (
         <div className="game-history-strip" ref={ref}>
-            {history.map((card, i) => {
-                const isRed = card.suit === '♥' || card.suit === '♦';
+            {history.map((entry, i) => {
+                // History entries can be strings ('andar'/'bahar') or card objects
+                if (typeof entry === 'string') {
+                    const label = entry === 'andar' ? 'A' : 'B';
+                    const cls = entry === 'andar' ? 'blue' : 'orange';
+                    return (
+                        <span key={i} className={`history-pip ${cls}`}>
+                            {label}
+                        </span>
+                    );
+                }
+                const isRed = entry.suit === '\u2665' || entry.suit === '\u2666';
                 return (
                     <span key={i} className={`history-pip ${isRed ? 'red' : 'black'}`}>
-                        {card.value}{card.suit}
+                        {entry.value}{entry.suit}
                     </span>
                 );
             })}
@@ -202,7 +212,7 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
                             {game.andar.length === 0
                                 ? <div className="ab-pile-empty-msg">—</div>
                                 : andarVisible.map((card, i) => (
-                                    <Card key={`a-${card}-${i}`} card={card} index={i} small />
+                                    <Card key={`a-${card.id}-${i}`} card={card} index={i} small />
                                 ))
                             }
                         </div>
@@ -221,7 +231,7 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
                             {game.bahar.length === 0
                                 ? <div className="ab-pile-empty-msg">—</div>
                                 : baharVisible.map((card, i) => (
-                                    <Card key={`b-${card}-${i}`} card={card} index={i} small />
+                                    <Card key={`b-${card.id}-${i}`} card={card} index={i} small />
                                 ))
                             }
                         </div>

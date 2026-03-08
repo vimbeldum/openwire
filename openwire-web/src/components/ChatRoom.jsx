@@ -645,6 +645,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 break;
             }
             case 'game_new_round': {
+                // Skip if this is our own broadcast (host already processed locally)
+                if (action.peer_id === myIdRef.current) break;
                 // Any player can request a new round — host processes it
                 const gt = action.gameType;
                 if (gt === 'blackjack' && amIHost(bjHostRef.current)) {
@@ -730,7 +732,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
                 // Apply winnings via Global Ledger Service
                 const myId = myIdRef.current;
-                const myNet = spun.payouts?.[myId];
+                const myNet = resultsGame.payouts?.[myId];
 
                 // Track house P&L
                 if (amIHost(rouletteHostRef.current) && resultsGame.payouts) {
@@ -932,7 +934,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     if (!hasJoinedBj.current && bjHostRef.current !== myIdRef.current) break;
                     setBlackjackGame(prev => {
                         // Apply wallet changes when game ends
-                        if (gameState.phase === 'ended' && prev?.phase !== 'ended') {
+                        // Only process payouts for non-host peers (host already did it in timer callback)
+                        if (gameState.phase === 'ended' && prev?.phase !== 'ended' && !amIHost(bjHostRef.current)) {
                             const event = new bj.BlackjackEngine(gameState).calculateResults(gameState);
                             const myNet = event.totals?.[myId];
                             if (myNet !== undefined && walletRef.current) {
@@ -994,7 +997,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     if (!hasJoinedRl.current && rouletteHostRef.current !== myIdRef.current) break;
                     setRouletteGame(prev => {
                         // Apply wallet changes on results
-                        if (gameState.phase === 'results' && prev?.phase !== 'results') {
+                        // Only process payouts for non-host peers (host already did it in timer callback)
+                        if (gameState.phase === 'results' && prev?.phase !== 'results' && !amIHost(rouletteHostRef.current)) {
                             const myNet = gameState.payouts?.[myId];
                             if (myNet !== undefined && walletRef.current) {
                                 const event = new rl.RouletteEngine(gameState).calculateResults(gameState);
@@ -1028,7 +1032,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     // Only update if user has explicitly joined (or is host)
                     if (!hasJoinedAb.current && abHostRef.current !== myIdRef.current) break;
                     setAndarBaharGame(prev => {
-                        if (gameState.phase === 'ended' && prev?.phase !== 'ended') {
+                        // Only process payouts for non-host peers (host already did it in timer callback)
+                        if (gameState.phase === 'ended' && prev?.phase !== 'ended' && !amIHost(abHostRef.current)) {
                             const myNet = gameState.payouts?.[myId];
                             if (myNet !== undefined && walletRef.current) {
                                 const event = new ab.AndarBaharEngine(gameState).calculateResults(gameState);
@@ -1217,6 +1222,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         localStorage.removeItem('openwire_current_room');
                         setCurrentRoom(null);
                     }
+                } else {
+                    addMsg('★', `⚠ ${msg.message}`, 'system');
                 }
                 break;
 
@@ -1269,9 +1276,6 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             case 'disconnected':
                 setConnected(false);
                 addMsg('★', '⚠ Disconnected — reconnecting...', 'system');
-                break;
-            case 'error':
-                addMsg('★', `⚠ ${msg.message}`, 'system');
                 break;
         }
     };
@@ -1333,12 +1337,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 socket.sendRoomMessage(blackjackGame.roomId, bj.serializeBlackjackAction({ type: 'bj_join', peer_id: myId, nick: myNick }));
                 break;
             case 'bet': {
-                // Debit wallet on bet
+                // Validate affordability but do NOT debit — payout system handles net settlement
                 const w = walletRef.current;
-                if (w && wallet.canAfford(w, action.amount)) {
-                    const updated = wallet.debit(w, action.amount, 'Blackjack bet');
-                    updateWallet(updated);
-                }
+                if (!w || !wallet.canAfford(w, action.amount)) break;
                 newGame = bj.placeBet(blackjackGame, myId, action.amount);
                 break;
             }
@@ -1358,9 +1359,18 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         if (newGame.phase === 'dealer' && blackjackGame.phase !== 'dealer') {
             setTimeout(() => {
                 const settled = bj.runDealerTurn(newGame);
+                // Compute payouts for bank ledger and wallet settlement
+                const payoutEvent = new bj.BlackjackEngine(settled).calculateResults(settled);
+                settled.payouts = payoutEvent.totals || {};
                 setBlackjackGame(settled);
                 if (amIHost(bjHostRef.current) && settled.payouts) {
                     updateBankLedger('blackjack', settled.payouts);
+                }
+                // Apply wallet changes for host
+                const hostMyId = myIdRef.current;
+                const hostMyNet = settled.payouts?.[hostMyId];
+                if (hostMyNet !== undefined && walletRef.current) {
+                    resolvePayoutEvent(payoutEvent, hostMyId, walletRef.current);
                 }
                 socket.sendRoomMessage(settled.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(settled) }));
             }, 1000);
@@ -1467,7 +1477,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             : andarBaharRef.current?.roomId;
         if (roomId) {
             socket.sendRoomMessage(roomId, JSON.stringify({
-                type: 'game_new_round', gameType,
+                type: 'game_new_round', gameType, peer_id: myIdRef.current,
             }));
         }
         // If I am the host, also process locally
@@ -1526,7 +1536,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     if (amIHost(rouletteHostRef.current) && resultsGame.payouts) {
                         updateBankLedger('roulette', resultsGame.payouts);
                     }
-                    const myNet = spun.payouts?.[myId];
+                    const myNet = resultsGame.payouts?.[myId];
                     if (myNet !== undefined && walletRef.current) {
                         const event = new rl.RouletteEngine(resultsGame).calculateResults(resultsGame);
                         resolvePayoutEvent(event, myId, walletRef.current);

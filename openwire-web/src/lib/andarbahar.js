@@ -76,6 +76,7 @@ export function createGame(roomId) {
 }
 
 export function placeBet(game, peer_id, nick, side, amount) {
+    if (!amount || typeof amount !== 'number' || amount <= 0 || !isFinite(amount)) return game;
     if (game.phase !== 'betting') return game;
     // Allow multiple bets per player on different sides (like roulette)
     const bets = game.bets.filter(b => !(b.peer_id === peer_id && b.side === side));
@@ -101,7 +102,7 @@ export function dealNext(game) {
     if (game.phase !== 'dealing' || !game.trumpCard) return game;
 
     if (!game.deck || game.deck.length === 0) {
-        return { ...game, phase: 'ended', result: 'draw' };
+        return { ...game, phase: 'ended', result: 'draw', payouts: {} };
     }
 
     const deck = [...game.deck];
