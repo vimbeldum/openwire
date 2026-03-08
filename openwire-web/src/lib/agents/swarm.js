@@ -1025,11 +1025,18 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
         }
 
         // Only allow ONE crossover per trigger event (not all matching agents)
+        const speakerChar = this._characters[speakerId];
+        const speakerShow = speakerChar?.show || speakerChar?.groupId;
+
         const candidates = Object.values(this._characters).filter(c => {
             if (c.id === speakerId) return false;
             if (!this._isActive(c.id)) return false;
-            if (!c.agent_triggers?.includes(speakerId)) return false;
-            return true;
+            // Same-show triggers: check agent_triggers list
+            if (c.agent_triggers?.includes(speakerId)) return true;
+            // Cross-show triggers: 30% chance for a character from a different show to jump in
+            const cShow = c.show || c.groupId;
+            if (cShow && speakerShow && cShow !== speakerShow) return Math.random() < 0.3;
+            return false;
         });
 
         if (candidates.length === 0) return;
