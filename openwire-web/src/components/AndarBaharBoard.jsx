@@ -58,18 +58,19 @@ function TrumpCard({ card }) {
 /* ── Countdown Timer ────────────────────────────── */
 function BettingCountdown({ bettingEndsAt }) {
     const [timeLeft, setTimeLeft] = useState('');
+    const [pct, setPct] = useState(100);
     useEffect(() => {
         const update = () => {
             const ms = Math.max(0, bettingEndsAt - Date.now());
             const s = Math.ceil(ms / 1000);
             setTimeLeft(s > 0 ? `${s}s` : '0s');
+            setPct(Math.max(0, Math.min(100, (ms / ab.BETTING_DURATION_MS) * 100)));
         };
         update();
         const t = setInterval(update, 250);
         return () => clearInterval(t);
     }, [bettingEndsAt]);
 
-    const pct = Math.max(0, Math.min(100, ((bettingEndsAt - Date.now()) / ab.BETTING_DURATION_MS) * 100));
     return (
         <div className="ab-countdown">
             <div className="ab-countdown-label">Betting closes in <strong>{timeLeft}</strong></div>
@@ -201,7 +202,7 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
                             {game.andar.length === 0
                                 ? <div className="ab-pile-empty-msg">—</div>
                                 : andarVisible.map((card, i) => (
-                                    <Card key={`a${i}`} card={card} index={i} small />
+                                    <Card key={`a-${card}-${i}`} card={card} index={i} small />
                                 ))
                             }
                         </div>
@@ -220,7 +221,7 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
                             {game.bahar.length === 0
                                 ? <div className="ab-pile-empty-msg">—</div>
                                 : baharVisible.map((card, i) => (
-                                    <Card key={`b${i}`} card={card} index={i} small />
+                                    <Card key={`b-${card}-${i}`} card={card} index={i} small />
                                 ))
                             }
                         </div>

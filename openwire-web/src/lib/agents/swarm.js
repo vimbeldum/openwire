@@ -29,9 +29,8 @@ const GLOBAL_COOLDOWN_MS = 5_000;     // 1 message per 5s across all AI
 const MENTION_COOLDOWN_MS = 8_000;    // suppress other characters for 8s after @mention
 const MAX_QUEUE_SIZE = 32;            // #9: cap queue to prevent unbounded growth
 
-// Context compaction — auto-summarize via Gemini every N seconds
-const COMPACT_INTERVAL_MS = 60_000;   // run compaction every 60s
-const COMPACT_MIN_MSGS = 25;          // need at least 25 msgs before compacting
+// Context compaction — auto-summarize via Gemini when context grows large
+const COMPACT_THRESHOLD = 50;         // trigger compaction when context reaches this size
 const COMPACT_KEEP_RECENT = 15;       // keep last 15 raw messages
 const SUMMARY_MAX_CHARS = 2500;       // cap merged summary length
 const SUMMARY_STORAGE_KEY = 'openwire_context_summary';
@@ -68,11 +67,9 @@ export class AgentSwarm {
         this._sessionFacts = [];
         this._factTimer = null;
 
-        // Context compaction — Gemini-powered auto-summarization
+        // Context compaction — Gemini-powered auto-summarization (triggered by size, not timer)
         this._contextSummary = '';
-        this._compactTimer = null;
         this._isCompacting = false;
-        this._lastCompactedCount = 0;    // context length at last compaction
         this._onSummaryUpdate = null;    // callback to broadcast summary to peers
 
         // Load persisted summary from previous session
@@ -210,10 +207,6 @@ export class AgentSwarm {
 
         this._throttleTimer = setInterval(() => { this._messagesThisMinute = 0; }, 60_000);
 
-        // Start context compaction timer — summarizes old context via Gemini every 60s
-        if (this._compactTimer) clearInterval(this._compactTimer);
-        this._compactTimer = setInterval(() => this._compactContext(), COMPACT_INTERVAL_MS);
-
         // #2: Track stagger timers so stop() can clear them
         this._staggerTimers = [];
         Object.keys(this._characters).forEach((id, idx) => {
@@ -237,7 +230,6 @@ export class AgentSwarm {
         this._isProcessingQueue = false;
         if (this._throttleTimer) { clearInterval(this._throttleTimer); this._throttleTimer = null; }
         if (this._factTimer) { clearInterval(this._factTimer); this._factTimer = null; }
-        if (this._compactTimer) { clearInterval(this._compactTimer); this._compactTimer = null; }
 
         // #1/#2: Clear stagger timers
         this._staggerTimers.forEach(t => clearTimeout(t));
@@ -278,6 +270,11 @@ export class AgentSwarm {
         this._context.push({ role: 'user', content: `${nick}: ${text}`, _isAgent: isAgent });
         if (this._context.length > CONTEXT_BUFFER_SIZE) this._context.shift();
         this._contextDirty = true;
+
+        // Trigger compaction when context grows past threshold (fire-and-forget, non-blocking)
+        if (this._running && this._context.length >= COMPACT_THRESHOLD && !this._isCompacting) {
+            this._compactContext();
+        }
 
         if (!this._running) return;
 
@@ -416,7 +413,6 @@ export class AgentSwarm {
         this._contextDirty = true;
         this._sessionFacts = [];
         this._contextSummary = '';
-        this._lastCompactedCount = 0;
         try { localStorage.removeItem(SUMMARY_STORAGE_KEY); } catch {}
         this._log(`[Flush] Cleared ${ctxLen} context messages, ${factsLen} facts, and summary`);
     }
@@ -917,16 +913,14 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
     async _compactContext() {
         if (this._isCompacting || !this._running) return;
 
-        // Skip if not enough new messages since last compaction
-        const totalMsgs = this._context.length;
-        if (totalMsgs < COMPACT_MIN_MSGS + COMPACT_KEEP_RECENT) return;
-        if (totalMsgs - this._lastCompactedCount < 10) return; // need 10+ new msgs
+        // Only compact when context has grown past the threshold
+        if (this._context.length < COMPACT_THRESHOLD) return;
 
         this._isCompacting = true;
         try {
             // Messages to summarize: everything except TURN2_ANCHOR and recent N
             const toCompact = this._context.slice(1, -COMPACT_KEEP_RECENT);
-            if (toCompact.length < COMPACT_MIN_MSGS) return;
+            if (toCompact.length < 20) return;
 
             const text = toCompact.map(m => m.content).join('\n');
             const prompt = `Summarize this Indian TV character chat room conversation in 8-12 concise bullet points in Hinglish (Roman script). Focus on:
@@ -960,7 +954,6 @@ ${text}`;
             // Trim context: keep anchor + recent messages only
             this._context = [TURN2_ANCHOR, ...this._context.slice(-COMPACT_KEEP_RECENT)];
             this._contextDirty = true;
-            this._lastCompactedCount = this._context.length;
 
             // Persist to localStorage
             try { localStorage.setItem(SUMMARY_STORAGE_KEY, this._contextSummary); } catch {}
