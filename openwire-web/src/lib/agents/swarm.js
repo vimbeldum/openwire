@@ -291,12 +291,12 @@ export class AgentSwarm {
         if (!text || typeof text !== 'string') return;
         // #7: Use cached agent names set
         const agentNames = this._getAgentNames();
-        // Check exact match AND substring match to handle "😅 Jethalal" format from P2P broadcasts
+        // Check exact match or emoji-prefixed format ("😅 Jethalal") from P2P broadcasts
+        // Strip emoji first to avoid false positives on human nicks like "JethaFan"
         let isAgent = forceIsAgent || agentNames.has(nick);
         if (!isAgent) {
-            for (const name of agentNames) {
-                if (nick.includes(name)) { isAgent = true; break; }
-            }
+            const cleanNick = stripEmoji(nick);
+            isAgent = agentNames.has(cleanNick);
         }
         this._context.push({ role: 'user', content: `${nick}: ${text}`, _isAgent: isAgent });
         if (this._context.length > CONTEXT_BUFFER_SIZE) this._context.shift();
@@ -760,11 +760,14 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
                 // Build self-aware context: mark THIS character's own messages with [YOU] prefix
                 // Strip avatar emoji from nicks so LLM doesn't copy them into responses
                 const myName = c.name.toLowerCase();
+                const myId = c.id.toLowerCase();
                 const convoLines = recent.map(m => {
                     // Strip emoji from the entire line so context is clean text
                     const clean = stripEmoji(m.content || '');
-                    const sender = clean.match(/^([^:]+):/)?.[1]?.trim() || '';
-                    const isMine = sender.toLowerCase().includes(myName);
+                    const sender = clean.match(/^([^:]+):/)?.[1]?.trim()?.toLowerCase() || '';
+                    // Exact match only — prevents "Babuji" matching "Tulsidas Parekh (Babuji)"
+                    const isMine = sender === myName || sender === myId
+                        || sender.split('(')[0].trim() === myName;
                     return isMine ? `[THIS WAS SAID BY YOU - DO NOT DENY IT] ${clean}` : clean;
                 });
                 const convo = convoLines.join('\n');
@@ -787,7 +790,7 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
                 const mentionMatch = lastHumanText.match(/@(\w+)/);
                 const mentionedName = mentionMatch ? mentionMatch[1].toLowerCase() : null;
                 const isDirectedAtMe = mentionedName && (
-                    c.name.toLowerCase().includes(mentionedName) ||
+                    c.name.toLowerCase().startsWith(mentionedName) ||
                     c.id.toLowerCase() === mentionedName
                 );
                 const isDirectedAtSomeone = mentionedName && !isDirectedAtMe;
@@ -1054,7 +1057,9 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
 
         this._isCompacting = true;
         try {
-            // Messages to summarize: everything except TURN2_ANCHOR and recent N
+            // Snapshot context length before async work — messages added during
+            // compaction will be preserved by using the snapshot for trimming
+            const snapshotLen = this._context.length;
             const toCompact = this._context.slice(1, -COMPACT_KEEP_RECENT);
             if (toCompact.length < 20) return;
 
@@ -1088,8 +1093,11 @@ ${text}`;
                 this._contextSummary.splice(0, this._contextSummary.length - 5);
             }
 
-            // Trim context: keep anchor + recent messages only
-            this._context = [TURN2_ANCHOR, ...this._context.slice(-COMPACT_KEEP_RECENT)];
+            // Trim context: keep anchor + messages added since snapshot + recent N
+            // Messages added during the async compaction are preserved
+            const addedDuringCompact = this._context.length - snapshotLen;
+            const keepCount = COMPACT_KEEP_RECENT + Math.max(0, addedDuringCompact);
+            this._context = [TURN2_ANCHOR, ...this._context.slice(-keepCount)];
             this._contextDirty = true;
 
             // Persist to localStorage

@@ -68,7 +68,7 @@ export async function generateQwenMessage(modelId, systemPrompt, contextMessages
     const payload = {
         model: modelId,
         messages,
-        max_tokens: 200,
+        max_tokens: maxTokens || 200,
         temperature: 0.92,
     };
 

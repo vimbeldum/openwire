@@ -81,13 +81,11 @@ export async function generateGeminiMessage(modelId, systemPrompt, contextMessag
         contents.push({ role, parts: [{ text: m.content }] });
     });
 
-    const geminiTokens = 2000;
-
     const payload = {
         model: modelId,
         contents,
         generationConfig: {
-            maxOutputTokens: geminiTokens,
+            maxOutputTokens: maxTokens || 200,
             temperature: 0.92,
         },
     };
