@@ -744,6 +744,16 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
             const lastHumanSender = lastHumanMsg?.content?.match(/^([^:]+):/)?.[1]?.trim();
             const lastHumanText = lastHumanMsg?.content || '';
 
+            // Count how many agent messages came AFTER the last human message
+            // to detect echo chamber loops
+            let agentRepliesSinceHuman = 0;
+            let lastHumanIdx = -1;
+            for (let i = recent.length - 1; i >= 0; i--) {
+                if (!recent[i]._isAgent) { lastHumanIdx = i; break; }
+                agentRepliesSinceHuman++;
+            }
+            const isStale = agentRepliesSinceHuman >= 3; // 3+ agents already responded → topic is exhausted
+
             // Detect if the message is directed at a specific character via @mention
             const mentionMatch = lastHumanText.match(/@(\w+)/);
             const mentionedName = mentionMatch ? mentionMatch[1].toLowerCase() : null;
@@ -753,7 +763,13 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
             );
             const isDirectedAtSomeone = mentionedName && !isDirectedAtMe;
 
-            if (lastHumanSender) {
+            const lenNote = 'Keep it 1-2 lines in Hinglish. No emoji, no asterisks. Plain text only.';
+            const antiEcho = 'CRITICAL: Do NOT repeat what other characters already said. Do NOT paraphrase their reactions. Say something COMPLETELY DIFFERENT — a new angle, a new accusation, a personal story, a counter-opinion, or change the topic entirely.';
+
+            if (isStale) {
+                // Too many agents already responded to the same human message → break the loop
+                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\n${agentRepliesSinceHuman} characters already reacted to the last message. DO NOT react to it again. Instead:\n- Start a NEW topic or drama thread\n- Make a personal confession, accusation, or revelation\n- Pick a fight with another character about something UNRELATED\n- Bring up old gossip or a grudge from earlier\n- Say something surprising that nobody expects\n\n${antiEcho}\n${lenNote}` }];
+            } else if (lastHumanSender) {
                 let instruction;
                 const unfiltered = !this._guardrails;
                 if (isDirectedAtMe) {
@@ -769,10 +785,9 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
                         ? `"${lastHumanSender}" said something to the group. React with MAXIMUM personality — argue aggressively, mock them, get jealous, make accusations, or start a fight. NEVER give a bland or agreeable response. Every reply must be spicy.`
                         : `"${lastHumanSender}" said something to the group. React with YOUR personality — argue if you disagree, support if you agree, get jealous, get excited, or start drama. Show strong emotions. Do NOT give a bland response.`;
                 }
-                const lenNote = 'Keep it 1-2 lines in Hinglish. No emoji, no asterisks. Plain text only.';
-                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\n>>> THE MOST IMPORTANT MESSAGE TO RESPOND TO:\n"${lastHumanText}"\n\n${instruction} ${lenNote}` }];
+                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\n>>> THE MOST IMPORTANT MESSAGE TO RESPOND TO:\n"${lastHumanText}"\n\n${instruction}\n${antiEcho}\n${lenNote}` }];
             } else {
-                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\nRespond naturally to the conversation above. Gossip about what just happened, pick a fight, bring up old drama, flirt, scheme, or start something new. Be entertaining — not boring. 1-2 lines in Hinglish. No emoji, no asterisks.` }];
+                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\nRespond naturally to the conversation above. Gossip about what just happened, pick a fight, bring up old drama, flirt, scheme, or start something new. Be entertaining — not boring.\n${antiEcho}\n${lenNote}` }];
             }
         } else {
             trigger = [{ role: 'user', content: 'Say something fun and in-character for this chat room. Keep it 1-2 short lines in Hinglish. No emoji, no asterisks.' }];
