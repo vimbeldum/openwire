@@ -79,6 +79,7 @@ export function placeBet(game, peer_id, nick, side, amount) {
     if (game.phase !== 'betting') return game;
     // Allow multiple bets per player on different sides (like roulette)
     const bets = game.bets.filter(b => !(b.peer_id === peer_id && b.side === side));
+    if (bets.length >= 200) return game; // cap total bets per round
     return { ...game, bets: [...bets, { peer_id, nick, side, amount }] };
 }
 
@@ -98,6 +99,10 @@ export function dealTrump(game) {
 // Deal one card — alternating Bahar first then Andar
 export function dealNext(game) {
     if (game.phase !== 'dealing' || !game.trumpCard) return game;
+
+    if (!game.deck || game.deck.length === 0) {
+        return { ...game, phase: 'ended', result: 'draw' };
+    }
 
     const deck = [...game.deck];
     const card = deck.pop();
@@ -278,7 +283,15 @@ export function parseAndarBaharAction(data) {
     try { return JSON.parse(data.slice(3)); } catch { return null; }
 }
 export function serializeAndarBaharAction(action) { return 'AB:' + JSON.stringify(action); }
-export function serializeGame(game) { return JSON.stringify(game); }
+export function serializeGame(game) {
+    const { deck, ...safe } = game;
+    return JSON.stringify({ ...safe, deckCount: deck?.length || 0 });
+}
 export function deserializeGame(data) {
-    try { return typeof data === 'string' ? JSON.parse(data) : data; } catch { return null; }
+    try {
+        const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+        // Peers won't have the deck (host keeps it); ensure graceful handling
+        if (parsed && !parsed.deck) parsed.deck = null;
+        return parsed;
+    } catch { return null; }
 }

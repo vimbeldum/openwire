@@ -33,7 +33,7 @@ export function getColor(n) {
 export function getPayout(betType, betTarget, result) {
     if (result === null) return 0;
     switch (betType) {
-        case 'single': return result === betTarget ? 36 : 0; // 35:1 + stake
+        case 'single': return Number(result) === Number(betTarget) ? 36 : 0; // 35:1 + stake
         case 'color':
             if (betTarget === 'red' && isRed(result)) return 2;
             if (betTarget === 'black' && isBlack(result)) return 2;
@@ -99,6 +99,7 @@ export function placeBet(game, peer_id, nick, betType, betTarget, amount) {
     const bets = game.bets.filter(
         b => !(b.peer_id === peer_id && b.betType === betType && b.betTarget === betTarget)
     );
+    if (bets.length >= 200) return game; // cap total bets per round
     return { ...game, bets: [...bets, { peer_id, nick, betType, betTarget, amount }] };
 }
 

@@ -202,10 +202,15 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const currentRoomRef = useRef(null);
     const walletRef = useRef(null);
 
+    // Stable ref for WebSocket event handler (avoids reconnect cascades)
+    const onWsEventRef = useRef(null);
+
     // Host tracking per game type per room
     const rouletteHostRef = useRef(null);   // peer_id of roulette host
     const abHostRef = useRef(null);         // peer_id of andar bahar host
     const rouletteTimerRef = useRef(null);
+    const rouletteSpinTimeoutRef = useRef(null);
+    const rouletteResultTimeoutRef = useRef(null);
     const abDealTimerRef = useRef(null);
 
     // Consent flags: only open game board if user explicitly accepted
@@ -244,13 +249,16 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     // ── addMsg — declared here so screenshot useEffect below can reference it
     const addMsg = useCallback((sender, content, type = 'chat', extra = {}) => {
         // Cap React messages at 1000 to prevent DOM memory leak from rapid agent chatter
-        setMessages(prev => [...prev.slice(-1000), {
-            time: timeStr(), sender, content, type,
-            id: Date.now() + Math.random(),
-            roomId: currentRoomRef.current || null,
-            reactions: {},
-            ...extra,
-        }]);
+        setMessages(prev => {
+            const capped = prev.length > 1200 ? prev.slice(-1000) : prev;
+            return [...capped, {
+                time: timeStr(), sender, content, type,
+                id: Date.now() + Math.random(),
+                roomId: currentRoomRef.current || null,
+                reactions: {},
+                ...extra,
+            }];
+        });
         // Feed real chat messages into swarm context (only general chat, not rooms or game messages)
         if ((type === 'self' || type === 'peer') && content && !extra?.isAgent && !extra?.roomId) {
             swarmRef.current?.addContext(sender, content);
@@ -609,6 +617,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     // ── Roulette auto-spin ───────────────────────────────────
     const startRouletteTimer = useCallback(() => {
         if (rouletteTimerRef.current) clearInterval(rouletteTimerRef.current);
+        clearTimeout(rouletteSpinTimeoutRef.current);
+        clearTimeout(rouletteResultTimeoutRef.current);
 
         rouletteTimerRef.current = setInterval(() => {
             const currentGame = rouletteRef.current;
@@ -625,7 +635,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             addActivityLog(`Roulette wheel spinning...`);
 
             // After SPIN_PHASE_MS (10s), show results
-            setTimeout(() => {
+            rouletteSpinTimeoutRef.current = setTimeout(() => {
                 const resultsGame = rl.finishSpin(rouletteRef.current || spun);
                 setRouletteGame(resultsGame);
 
@@ -649,7 +659,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 }
 
                 // After RESULTS_DISPLAY_MS (10s), start new betting round
-                setTimeout(() => {
+                rouletteResultTimeoutRef.current = setTimeout(() => {
                     const reset = rl.newRound(rouletteRef.current || resultsGame);
                     setRouletteGame(reset);
                     if (amIHost(rouletteHostRef.current)) {
@@ -686,25 +696,32 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     useEffect(() => {
         return () => {
             if (rouletteTimerRef.current) clearInterval(rouletteTimerRef.current);
+            clearTimeout(rouletteSpinTimeoutRef.current);
+            clearTimeout(rouletteResultTimeoutRef.current);
             if (abDealTimerRef.current) clearInterval(abDealTimerRef.current);
             if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
+            abGenRef.current++;
             if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
         };
     }, []);
 
     // ── Andar Bahar auto-cycle (host-driven) ─────────────────
     const abCycleTimerRef = useRef(null);
+    const abGenRef = useRef(0);
 
     const startAbCycle = useCallback((initialGame) => {
         // Clear any existing timers
         if (abDealTimerRef.current) clearInterval(abDealTimerRef.current);
         if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
+        abGenRef.current++;
+        const gen = abGenRef.current;
 
         const roomId = initialGame.roomId;
         const bettingMs = ab.BETTING_DURATION_MS;
 
         // Phase 1: Betting window → after BETTING_DURATION_MS, deal trump
         abCycleTimerRef.current = setTimeout(() => {
+            if (gen !== abGenRef.current) return;
             if (!amIHost(abHostRef.current)) return;
             const current = andarBaharRef.current;
             if (!current || current.phase !== 'betting') return;
@@ -716,6 +733,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
             // Phase 2: Deal cards 1-by-1
             abDealTimerRef.current = setInterval(() => {
+                if (gen !== abGenRef.current) { clearInterval(abDealTimerRef.current); return; }
                 const cur = andarBaharRef.current;
                 if (!cur || !amIHost(abHostRef.current)) { clearInterval(abDealTimerRef.current); return; }
                 if (cur.phase !== 'dealing') { clearInterval(abDealTimerRef.current); return; }
@@ -742,6 +760,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
                     // Phase 3: Show results for RESULTS_DISPLAY_MS, then new round
                     abCycleTimerRef.current = setTimeout(() => {
+                        if (gen !== abGenRef.current) return;
                         if (!amIHost(abHostRef.current)) return;
                         const reset = ab.newRound(andarBaharRef.current || next);
                         setAndarBaharGame(reset);
@@ -935,228 +954,231 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         }
     }, [updateWallet]);
 
-    // ── WebSocket event handler ──────────────────────────────
-    useEffect(() => {
-        const onEvent = (msg) => {
-            switch (msg.type) {
-                case 'welcome':
-                    myIdRef.current = msg.peer_id;
-                    if (msg.nick && msg.nick !== nickRef.current) {
-                        nickRef.current = msg.nick;
-                        addMsg('★', `Your nickname was taken — assigned "${msg.nick}"`, 'system');
-                    }
-                    setConnected(true);
-                    setPeers(msg.peers || []);
-                    setRooms(msg.rooms || []);
-                    addMsg('★', `Connected! Your ID: ${msg.peer_id}`, 'system');
-                    addMsg('★', 'Type /help for commands.', 'system');
+    // ── WebSocket event handler (ref-stable to avoid reconnect cascades) ──
+    onWsEventRef.current = (msg) => {
+        switch (msg.type) {
+            case 'welcome':
+                myIdRef.current = msg.peer_id;
+                if (msg.nick && msg.nick !== nickRef.current) {
+                    nickRef.current = msg.nick;
+                    addMsg('★', `Your nickname was taken — assigned "${msg.nick}"`, 'system');
+                }
+                setConnected(true);
+                setPeers(msg.peers || []);
+                setRooms(msg.rooms || []);
+                addMsg('★', `Connected! Your ID: ${msg.peer_id}`, 'system');
+                addMsg('★', 'Type /help for commands.', 'system');
 
-                    // Auto-join previously saved room if exists
+                // Auto-join previously saved room if exists
+                {
                     const savedRoom = localStorage.getItem('openwire_current_room');
                     if (savedRoom) {
                         socket.joinRoom(savedRoom);
                         addMsg('★', `Auto-joined saved room.`, 'system');
                     }
+                }
 
-                    // Broadcast wallet balance
-                    if (walletRef.current) {
-                        setTimeout(() => socket.send({ type: 'balance_update', balance: wallet.getTotalBalance(walletRef.current) }), 500);
+                // Broadcast wallet balance
+                if (walletRef.current) {
+                    setTimeout(() => socket.send({ type: 'balance_update', balance: wallet.getTotalBalance(walletRef.current) }), 500);
+                }
+                // Fetch ban list if admin
+                if (isAdminRef.current) {
+                    setTimeout(() => socket.send({ type: 'admin_get_bans' }), 600);
+                }
+                break;
+            case 'peers':
+                setPeers(msg.peers || []);
+                if (msg.rooms) setRooms(msg.rooms);
+                break;
+            case 'peer_joined':
+                setPeers(prev => [...prev.filter(p => p.peer_id !== msg.peer_id), { peer_id: msg.peer_id, nick: msg.nick }]);
+                addMsg('★', `${msg.nick} joined`, 'system');
+                break;
+            case 'peer_left':
+                setPeers(prev => prev.filter(p => p.peer_id !== msg.peer_id));
+                addMsg('★', `${msg.nick} left`, 'system');
+                break;
+            case 'message': {
+                // Try parsing custom JSON actions (mention_notify, agent_message, etc.)
+                let msgCustom = null;
+                if (msg.data?.startsWith('{')) {
+                    try {
+                        const parsed = JSON.parse(msg.data);
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary'];
+                        if (CUSTOM.includes(parsed.type)) msgCustom = parsed;
+                    } catch { /* not JSON */ }
+                }
+                if (msgCustom) {
+                    handleCustomAction(msg, msgCustom);
+                } else {
+                    addMsg(msg.nick, msg.data, 'peer');
+                    // Check if we were @mentioned in the general chat message
+                    if (msg.data && nickRef.current && msg.data.toLowerCase().includes(`@${nickRef.current.toLowerCase()}`)) {
+                        const toastId = Date.now() + Math.random();
+                        setMentionToasts(prev => [...prev, { id: toastId, from: msg.nick, text: msg.data }]);
+                        setTimeout(() => setMentionToasts(prev => prev.filter(t => t.id !== toastId)), 5000);
                     }
-                    // Fetch ban list if admin
-                    if (isAdminRef.current) {
-                        setTimeout(() => socket.send({ type: 'admin_get_bans' }), 600);
-                    }
-                    break;
-                case 'peers':
-                    setPeers(msg.peers || []);
-                    if (msg.rooms) setRooms(msg.rooms);
-                    break;
-                case 'peer_joined':
-                    setPeers(prev => [...prev.filter(p => p.peer_id !== msg.peer_id), { peer_id: msg.peer_id, nick: msg.nick }]);
-                    addMsg('★', `${msg.nick} joined`, 'system');
-                    break;
-                case 'peer_left':
-                    setPeers(prev => prev.filter(p => p.peer_id !== msg.peer_id));
-                    addMsg('★', `${msg.nick} left`, 'system');
-                    break;
-                case 'message': {
-                    // Try parsing custom JSON actions (mention_notify, agent_message, etc.)
-                    let msgCustom = null;
-                    if (msg.data?.startsWith('{')) {
-                        try {
-                            const parsed = JSON.parse(msg.data);
-                            const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary'];
-                            if (CUSTOM.includes(parsed.type)) msgCustom = parsed;
-                        } catch { /* not JSON */ }
-                    }
-                    if (msgCustom) {
-                        handleCustomAction(msg, msgCustom);
-                    } else {
-                        addMsg(msg.nick, msg.data, 'peer');
-                        // Check if we were @mentioned in the general chat message
-                        if (msg.data && nickRef.current && msg.data.toLowerCase().includes(`@${nickRef.current.toLowerCase()}`)) {
+                }
+                break;
+            }
+            case 'room_created':
+                setRooms(prev => {
+                    const updated = [...prev, { room_id: msg.room_id, name: msg.name, members: 1 }];
+                    roomsRef.current = updated;
+                    return updated;
+                });
+                setCurrentRoom(msg.room_id);
+                localStorage.setItem('openwire_current_room_name', msg.name);
+                addMsg('★', `🏠 Room "${msg.name}" created! ID: ${msg.room_id}`, 'system');
+                break;
+            case 'room_joined':
+                setRooms(prev => {
+                    const updated = [...prev.filter(r => r.room_id !== msg.room_id), { room_id: msg.room_id, name: msg.name }];
+                    roomsRef.current = updated;
+                    return updated;
+                });
+                setCurrentRoom(msg.room_id);
+                localStorage.setItem('openwire_current_room_name', msg.name);
+                addMsg('★', `🏠 Joined room "${msg.name}"`, 'system');
+                break;
+            case 'room_invite':
+                setPendingInvites(prev => {
+                    if (prev.some(i => i.room_id === msg.room_id)) return prev;
+                    return [...prev, { id: Date.now(), room_id: msg.room_id, room_name: msg.room_name, from: msg.from, from_nick: msg.from_nick }];
+                });
+                break;
+            case 'room_message': {
+                const isCurrentRoom = currentRoomRef.current === msg.room_id;
+                const isBjMsg = bj.isBlackjackMessage(msg.data);
+                const isRlMsg = rl.isRouletteMessage(msg.data);
+                const isAbMsg = ab.isAndarBaharMessage(msg.data);
+                const isGameMsg = game.isGameMessage(msg.data);
+
+                // Try custom JSON action first (typing, react, tip, whisper, ticker, screenshot)
+                let customAction = null;
+                if (!isBjMsg && !isRlMsg && !isAbMsg && !isGameMsg && msg.data?.startsWith('{')) {
+                    try {
+                        const parsed = JSON.parse(msg.data);
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary'];
+                        if (CUSTOM.includes(parsed.type)) customAction = parsed;
+                    } catch { /* not JSON */ }
+                }
+
+                if (customAction) {
+                    handleCustomAction(msg, customAction);
+                } else if (isGameMsg) {
+                    const action = game.parseGameAction(msg.data);
+                    if (action) handleGameAction(msg, action);
+                } else if (isBjMsg) {
+                    const action = bj.parseBlackjackAction(msg.data);
+                    if (action) handleBlackjackAction(msg, action);
+                } else if (isRlMsg) {
+                    const action = rl.parseRouletteAction(msg.data);
+                    if (action) handleRouletteAction(msg, action);
+                } else if (isAbMsg) {
+                    const action = ab.parseAndarBaharAction(msg.data);
+                    if (action) handleAndarBaharAction(msg, action);
+                } else if (isCurrentRoom) {
+                    const gifMatch = msg.data.match(/^\[GIF\](.+)$/);
+                    if (gifMatch) {
+                        addMsg(msg.nick, '', 'peer', { gif: gifMatch[1], roomId: msg.room_id });
+                    } else if (msg.data) {
+                        addMsg(msg.nick, msg.data, 'peer', { roomId: msg.room_id });
+                        // Check if we were @mentioned
+                        if (nickRef.current && msg.data.toLowerCase().includes(`@${nickRef.current.toLowerCase()}`)) {
                             const toastId = Date.now() + Math.random();
                             setMentionToasts(prev => [...prev, { id: toastId, from: msg.nick, text: msg.data }]);
                             setTimeout(() => setMentionToasts(prev => prev.filter(t => t.id !== toastId)), 5000);
                         }
                     }
-                    break;
                 }
-                case 'room_created':
-                    setRooms(prev => {
-                        const updated = [...prev, { room_id: msg.room_id, name: msg.name, members: 1 }];
-                        roomsRef.current = updated;
-                        return updated;
-                    });
-                    setCurrentRoom(msg.room_id);
-                    localStorage.setItem('openwire_current_room_name', msg.name);
-                    addMsg('★', `🏠 Room "${msg.name}" created! ID: ${msg.room_id}`, 'system');
-                    break;
-                case 'room_joined':
-                    setRooms(prev => {
-                        const updated = [...prev.filter(r => r.room_id !== msg.room_id), { room_id: msg.room_id, name: msg.name }];
-                        roomsRef.current = updated;
-                        return updated;
-                    });
-                    setCurrentRoom(msg.room_id);
-                    localStorage.setItem('openwire_current_room_name', msg.name);
-                    addMsg('★', `🏠 Joined room "${msg.name}"`, 'system');
-                    break;
-                case 'room_invite':
-                    setPendingInvites(prev => {
-                        if (prev.some(i => i.room_id === msg.room_id)) return prev;
-                        return [...prev, { id: Date.now(), room_id: msg.room_id, room_name: msg.room_name, from: msg.from, from_nick: msg.from_nick }];
-                    });
-                    break;
-                case 'room_message': {
-                    const isCurrentRoom = currentRoomRef.current === msg.room_id;
-                    const isBjMsg = bj.isBlackjackMessage(msg.data);
-                    const isRlMsg = rl.isRouletteMessage(msg.data);
-                    const isAbMsg = ab.isAndarBaharMessage(msg.data);
-                    const isGameMsg = game.isGameMessage(msg.data);
-
-                    // Try custom JSON action first (typing, react, tip, whisper, ticker, screenshot)
-                    let customAction = null;
-                    if (!isBjMsg && !isRlMsg && !isAbMsg && !isGameMsg && msg.data?.startsWith('{')) {
-                        try {
-                            const parsed = JSON.parse(msg.data);
-                            const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary'];
-                            if (CUSTOM.includes(parsed.type)) customAction = parsed;
-                        } catch { /* not JSON */ }
-                    }
-
-                    if (customAction) {
-                        handleCustomAction(msg, customAction);
-                    } else if (isGameMsg) {
-                        const action = game.parseGameAction(msg.data);
-                        if (action) handleGameAction(msg, action);
-                    } else if (isBjMsg) {
-                        const action = bj.parseBlackjackAction(msg.data);
-                        if (action) handleBlackjackAction(msg, action);
-                    } else if (isRlMsg) {
-                        const action = rl.parseRouletteAction(msg.data);
-                        if (action) handleRouletteAction(msg, action);
-                    } else if (isAbMsg) {
-                        const action = ab.parseAndarBaharAction(msg.data);
-                        if (action) handleAndarBaharAction(msg, action);
-                    } else if (isCurrentRoom) {
-                        const gifMatch = msg.data.match(/^\[GIF\](.+)$/);
-                        if (gifMatch) {
-                            addMsg(msg.nick, '', 'peer', { gif: gifMatch[1], roomId: msg.room_id });
-                        } else if (msg.data) {
-                            addMsg(msg.nick, msg.data, 'peer', { roomId: msg.room_id });
-                            // Check if we were @mentioned
-                            if (nickRef.current && msg.data.toLowerCase().includes(`@${nickRef.current.toLowerCase()}`)) {
-                                const toastId = Date.now() + Math.random();
-                                setMentionToasts(prev => [...prev, { id: toastId, from: msg.nick, text: msg.data }]);
-                                setTimeout(() => setMentionToasts(prev => prev.filter(t => t.id !== toastId)), 5000);
-                            }
-                        }
-                    }
-                    break;
-                }
-                case 'room_peer_joined':
-                    addMsg('★', `${msg.nick} joined the room`, 'system');
-                    break;
-                case 'room_peer_left':
-                    addMsg('★', `${msg.nick} left the room`, 'system');
-                    break;
-                case 'room_list':
-                    setRooms(msg.rooms || []);
-                    break;
-                case 'error':
-                    // If saved room was not found, auto-recreate it
-                    if (msg.message === 'Room not found' && msg.room_id) {
-                        const savedName = localStorage.getItem('openwire_current_room_name');
-                        if (savedName) {
-                            addMsg('★', `🏠 Room expired — recreating "${savedName}"...`, 'system');
-                            socket.createRoom(savedName);
-                        } else {
-                            localStorage.removeItem('openwire_current_room');
-                            setCurrentRoom(null);
-                        }
-                    }
-                    break;
-
-                // ── Host migration ───────────────────────────────────
-                case 'host_left': {
-                    const myId = myIdRef.current;
-                    addMsg('★', `👑 Host changed — new host elected`, 'system');
-                    // Update host references
-                    if (rouletteRef.current?.roomId === msg.room_id) {
-                        rouletteHostRef.current = msg.new_host;
-                        if (msg.new_host === myId) {
-                            addMsg('★', '👑 You are now the Roulette host', 'system');
-                            startRouletteTimer();
-                        }
-                    }
-                    if (andarBaharRef.current?.roomId === msg.room_id) {
-                        abHostRef.current = msg.new_host;
-                        if (msg.new_host === myId) {
-                            addMsg('★', '👑 You are now the Andar Bahar host', 'system');
-                            // Restart the full AB cycle from current state
-                            const curAb = andarBaharRef.current;
-                            if (curAb) startAbCycle(curAb);
-                        }
-                    }
-                    break;
-                }
-
-                // ── Admin events ─────────────────────────────────────
-                case 'kicked':
-                    addMsg('★', `⚡ ${msg.message || 'You were kicked.'}`, 'system');
-                    setConnected(false);
-                    break;
-                case 'banned':
-                    addMsg('★', `🚫 ${msg.message || 'You are banned.'}`, 'system');
-                    setConnected(false);
-                    break;
-                case 'banned_ips':
-                    setBannedIps(msg.ips || []);
-                    break;
-                case 'admin_adjust_balance': {
-                    const w = walletRef.current;
-                    if (w) {
-                        const updated = wallet.adminAdjust(w, msg.delta, msg.reason);
-                        updateWallet(updated);
-                        addMsg('★', `💰 Admin ${msg.delta > 0 ? 'added' : 'deducted'} ${Math.abs(msg.delta)} chips (${msg.reason})`, 'system');
-                    }
-                    break;
-                }
-
-                case 'disconnected':
-                    setConnected(false);
-                    addMsg('★', '⚠ Disconnected — reconnecting...', 'system');
-                    break;
-                case 'error':
-                    addMsg('★', `⚠ ${msg.message}`, 'system');
-                    break;
+                break;
             }
-        };
+            case 'room_peer_joined':
+                addMsg('★', `${msg.nick} joined the room`, 'system');
+                break;
+            case 'room_peer_left':
+                addMsg('★', `${msg.nick} left the room`, 'system');
+                break;
+            case 'room_list':
+                setRooms(msg.rooms || []);
+                break;
+            case 'error':
+                // If saved room was not found, auto-recreate it
+                if (msg.message === 'Room not found' && msg.room_id) {
+                    const savedName = localStorage.getItem('openwire_current_room_name');
+                    if (savedName) {
+                        addMsg('★', `🏠 Room expired — recreating "${savedName}"...`, 'system');
+                        socket.createRoom(savedName);
+                    } else {
+                        localStorage.removeItem('openwire_current_room');
+                        setCurrentRoom(null);
+                    }
+                }
+                break;
 
-        socket.connect(nickRef.current, onEvent);
+            // ── Host migration ───────────────────────────────────
+            case 'host_left': {
+                const myId = myIdRef.current;
+                addMsg('★', `👑 Host changed — new host elected`, 'system');
+                // Update host references
+                if (rouletteRef.current?.roomId === msg.room_id) {
+                    rouletteHostRef.current = msg.new_host;
+                    if (msg.new_host === myId) {
+                        addMsg('★', '👑 You are now the Roulette host', 'system');
+                        startRouletteTimer();
+                    }
+                }
+                if (andarBaharRef.current?.roomId === msg.room_id) {
+                    abHostRef.current = msg.new_host;
+                    if (msg.new_host === myId) {
+                        addMsg('★', '👑 You are now the Andar Bahar host', 'system');
+                        // Restart the full AB cycle from current state
+                        const curAb = andarBaharRef.current;
+                        if (curAb) startAbCycle(curAb);
+                    }
+                }
+                break;
+            }
+
+            // ── Admin events ─────────────────────────────────────
+            case 'kicked':
+                addMsg('★', `⚡ ${msg.message || 'You were kicked.'}`, 'system');
+                setConnected(false);
+                break;
+            case 'banned':
+                addMsg('★', `🚫 ${msg.message || 'You are banned.'}`, 'system');
+                setConnected(false);
+                break;
+            case 'banned_ips':
+                setBannedIps(msg.ips || []);
+                break;
+            case 'admin_adjust_balance': {
+                const w = walletRef.current;
+                if (w) {
+                    const updated = wallet.adminAdjust(w, msg.delta, msg.reason);
+                    updateWallet(updated);
+                    addMsg('★', `💰 Admin ${msg.delta > 0 ? 'added' : 'deducted'} ${Math.abs(msg.delta)} chips (${msg.reason})`, 'system');
+                }
+                break;
+            }
+
+            case 'disconnected':
+                setConnected(false);
+                addMsg('★', '⚠ Disconnected — reconnecting...', 'system');
+                break;
+            case 'error':
+                addMsg('★', `⚠ ${msg.message}`, 'system');
+                break;
+        }
+    };
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        socket.connect(nickRef.current, (msg) => onWsEventRef.current?.(msg));
         return () => socket.disconnect();
-    }, [addMsg, handleGameAction, handleBlackjackAction, handleRouletteAction, handleAndarBaharAction, startRouletteTimer, startAbCycle]);
+    }, []);
 
     useEffect(() => {
         if (gameChatEnd.current && showGameChat) {
@@ -1567,18 +1589,31 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         const activeRoom = currentRoomRef.current;
 
         if (text === '/help') {
-            addMsg('★', '── COMMANDS ──────────────────────', 'system');
-            addMsg('★', '/room create <name>  — create a room', 'system');
-            addMsg('★', '/room invite <nick> <room_id>  — invite peer', 'system');
-            addMsg('★', '/room list  — list rooms', 'system');
-            addMsg('★', '/game tictactoe  — challenge room to game', 'system');
-            addMsg('★', '/blackjack  — start blackjack game', 'system');
-            addMsg('★', '/roulette  — start roulette (auto-spin every 2 min)', 'system');
-            addMsg('★', '/andarbahar  — start Andar Bahar', 'system');
-            addMsg('★', '/balance  — show your chip balance', 'system');
-            addMsg('★', '/tip <nick> <amount>  — send chips to a peer', 'system');
-            addMsg('★', '/clear  — clear current chat history', 'system');
-            addMsg('★', '/debug  — toggle AI debug mode (shows API calls & errors)', 'system');
+            const helpLines = [
+                '── COMMANDS ──────────────────────',
+                '/room create <name>  — create a room',
+                '/room invite <nick> <room_id>  — invite peer',
+                '/room list  — list rooms',
+                '/game tictactoe  — challenge room to game',
+                '/blackjack  — start blackjack game',
+                '/roulette  — start roulette (auto-spin every 2 min)',
+                '/andarbahar  — start Andar Bahar',
+                '/balance  — show your chip balance',
+                '/tip <nick> <amount>  — send chips to a peer',
+                '/clear  — clear current chat history',
+                '/debug  — toggle AI debug mode (shows API calls & errors)',
+            ];
+            const now = timeStr();
+            const roomId = currentRoomRef.current || null;
+            setMessages(prev => {
+                const capped = prev.length > 1200 ? prev.slice(-1000) : prev;
+                return [...capped, ...helpLines.map(line => ({
+                    time: now, sender: '★', content: line, type: 'system',
+                    id: Date.now() + Math.random(),
+                    roomId,
+                    reactions: {},
+                }))];
+            });
             return;
         }
 

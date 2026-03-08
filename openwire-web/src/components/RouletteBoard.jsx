@@ -135,21 +135,21 @@ function HistoryStrip({ history }) {
 /* ── Countdown ──────────────────────────────────── */
 function Countdown({ nextSpinAt, phase }) {
     const [timeLeft, setTimeLeft] = useState('');
+    const [pct, setPct] = useState(100);
+    const totalMs = rl.SPIN_INTERVAL_MS || 120000;
+
     useEffect(() => {
-        if (phase !== 'betting') { setTimeLeft(''); return; }
+        if (phase !== 'betting') { setTimeLeft(''); setPct(100); return; }
         const update = () => {
             const ms = Math.max(0, nextSpinAt - Date.now());
             const s = Math.floor(ms / 1000);
             setTimeLeft(`${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`);
+            setPct(Math.max(0, Math.min(100, (ms / totalMs) * 100)));
         };
         update();
         const t = setInterval(update, 500);
         return () => clearInterval(t);
-    }, [nextSpinAt, phase]);
-
-    const totalMs = rl.SPIN_INTERVAL_MS || 120000;
-    const msLeft = Math.max(0, nextSpinAt - Date.now());
-    const pct = Math.min(100, (msLeft / totalMs) * 100);
+    }, [nextSpinAt, phase, totalMs]);
 
     if (!timeLeft) return null;
     return (

@@ -15,8 +15,18 @@ const PROXY = '/api/openrouter';
  * @returns {Promise<Array>} Sorted array of free model objects
  */
 export async function fetchFreeModels(modelFilters) {
-    const resp = await fetch(PROXY);
-    if (!resp.ok) throw new Error(`Model fetch failed: ${resp.status}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    let resp;
+    try {
+        resp = await fetch(PROXY, { signal: controller.signal });
+    } finally {
+        clearTimeout(timeout);
+    }
+    if (!resp.ok) {
+        await resp.text().catch(() => '');
+        throw new Error(`Model fetch failed: ${resp.status}`);
+    }
     const data = await resp.json();
 
     let models = (data.data || []).filter(
@@ -47,8 +57,18 @@ export async function fetchFreeModels(modelFilters) {
  * @returns {Promise<Array>}
  */
 export async function fetchAllFreeModels() {
-    const resp = await fetch(PROXY);
-    if (!resp.ok) throw new Error(`Model fetch failed: ${resp.status}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    let resp;
+    try {
+        resp = await fetch(PROXY, { signal: controller.signal });
+    } finally {
+        clearTimeout(timeout);
+    }
+    if (!resp.ok) {
+        await resp.text().catch(() => '');
+        throw new Error(`Model fetch failed: ${resp.status}`);
+    }
     const data = await resp.json();
 
     const models = (data.data || []).filter(

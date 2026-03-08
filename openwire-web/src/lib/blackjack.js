@@ -133,6 +133,10 @@ export function dealInitialCards(game) {
     let players = game.players.map(p => ({ ...p, hand: [], status: 'playing' }));
     let dealer = { ...game.dealer, hand: [], revealed: false };
 
+    // Pre-check: enough cards for initial deal
+    const cardsNeeded = (players.length + 1) * 2;
+    if (deck.length < cardsNeeded) return game; // not enough cards
+
     // Deal 2 cards to each player and dealer
     for (let round = 0; round < 2; round++) {
         for (let i = 0; i < players.length; i++) {
@@ -176,6 +180,7 @@ export function hit(game, peer_id) {
     if (game.currentPlayerIndex !== playerIndex) return game;
 
     let deck = [...game.deck];
+    if (deck.length === 0) return game; // deck exhausted, can't hit
     const card = deck.pop();
 
     let players = [...game.players];
@@ -260,6 +265,7 @@ export function dealerPlay(game) {
 
     // Dealer hits on 16 or less, stands on 17+
     while (calculateHand(dealer.hand) < 17) {
+        if (deck.length === 0) break; // deck exhausted
         dealer.hand.push(deck.pop());
     }
 

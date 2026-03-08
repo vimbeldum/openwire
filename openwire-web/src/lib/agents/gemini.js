@@ -11,8 +11,18 @@ const PROXY = '/api/gemini';
  * Returns sorted array of model objects.
  */
 export async function fetchGeminiModels() {
-    const resp = await fetch(PROXY);
-    if (!resp.ok) throw new Error(`Gemini model fetch failed: ${resp.status}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    let resp;
+    try {
+        resp = await fetch(PROXY, { signal: controller.signal });
+    } finally {
+        clearTimeout(timeout);
+    }
+    if (!resp.ok) {
+        await resp.text().catch(() => '');
+        throw new Error(`Gemini model fetch failed: ${resp.status}`);
+    }
     const data = await resp.json();
 
     const models = (data.models || [])

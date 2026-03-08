@@ -174,3 +174,13 @@ export function adminAdjust(wallet, delta, reason = 'Admin adjustment') {
     saveWallet(updated);
     return updated;
 }
+
+/* Flush pending wallet on page unload to prevent data loss */
+if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => {
+        if (_pendingWallet) {
+            const deviceId = _pendingWallet.deviceId || getDeviceId();
+            try { localStorage.setItem(storageKey(deviceId), JSON.stringify(_pendingWallet)); } catch {}
+        }
+    });
+}

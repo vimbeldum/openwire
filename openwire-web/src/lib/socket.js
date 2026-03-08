@@ -14,7 +14,8 @@ const BASE_RECONNECT_MS = 1000;
 const MAX_RECONNECT_MS = 30000;
 
 export function connect(nick, onEvent) {
-    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+    if (pingTimer) clearInterval(pingTimer);
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.CLOSING)) return;
 
     // Only keep the most recent listener to prevent duplicates on reconnect
     listeners = [onEvent];
@@ -108,6 +109,12 @@ export function inviteToRoom(roomId, peerId) {
     send({ type: 'room_invite', room_id: roomId, peer_id: peerId });
 }
 
+let _peerId = null;
 function generateId() {
-    return 'web-' + crypto.randomUUID().slice(0, 12);
+    if (!_peerId) _peerId = 'web-' + crypto.randomUUID().slice(0, 12);
+    return _peerId;
+}
+
+if (import.meta.hot) {
+    import.meta.hot.dispose(() => disconnect());
 }

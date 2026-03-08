@@ -65,15 +65,21 @@ export class AgentSwarm {
         this._assignedModels = {};
         this._moods = {};
         this._sessionFacts = [];
-        this._factTimer = null;
+
+        // Generation counter — incremented on loadConfig()/stop() to kill stale _scheduleNext chains
+        this._generation = 0;
 
         // Context compaction — Gemini-powered auto-summarization (triggered by size, not timer)
-        this._contextSummary = '';
+        this._contextSummary = [];
         this._isCompacting = false;
         this._onSummaryUpdate = null;    // callback to broadcast summary to peers
 
         // Load persisted summary from previous session
-        try { this._contextSummary = localStorage.getItem(SUMMARY_STORAGE_KEY) || ''; } catch {}
+        try {
+            const stored = localStorage.getItem(SUMMARY_STORAGE_KEY);
+            if (stored) this._contextSummary = JSON.parse(stored);
+        } catch {}
+        if (!Array.isArray(this._contextSummary)) this._contextSummary = [];
 
         this._messagesThisMinute = 0;
         this._throttleTimer = null;
@@ -97,10 +103,10 @@ export class AgentSwarm {
 
         // #1/#2: Track stagger timers so they can be cleared on stop/reload
         this._staggerTimers = [];
-        // #3: Track crossover timers for cleanup
-        this._crossoverTimers = [];
-        // #4: Track mood revert timers for cleanup
-        this._moodTimers = [];
+        // #3: Track crossover timers for cleanup (Set — callbacks self-remove on fire)
+        this._crossoverTimers = new Set();
+        // #4: Track mood revert timers for cleanup (Set — callbacks self-remove on fire)
+        this._moodTimers = new Set();
 
         // #7: Cached agent names set (invalidated on config change)
         this._agentNamesCache = null;
@@ -161,6 +167,9 @@ export class AgentSwarm {
     loadConfig() {
         const wasRunning = this._running;
 
+        // Kill stale _scheduleNext chains
+        this._generation++;
+
         // Stop existing timers
         Object.values(this._timers).forEach(t => clearTimeout(t));
         this._timers = {};
@@ -168,6 +177,14 @@ export class AgentSwarm {
         // #1: Clear stagger timers from previous loadConfig/start
         this._staggerTimers.forEach(t => clearTimeout(t));
         this._staggerTimers = [];
+
+        // Clear crossover timers
+        for (const t of this._crossoverTimers) clearTimeout(t);
+        this._crossoverTimers.clear();
+
+        // Clear mood revert timers
+        for (const t of this._moodTimers) clearTimeout(t);
+        this._moodTimers.clear();
 
         this._loadFromStore();
         this._log('[Config] Hot-reloaded from agentStore');
@@ -219,6 +236,7 @@ export class AgentSwarm {
 
     stop() {
         this._running = false;
+        this._generation++;
         Object.values(this._timers).forEach(t => clearTimeout(t));
         this._timers = {};
         // Clear typing indicators for all queued characters before draining
@@ -229,19 +247,18 @@ export class AgentSwarm {
         this._messageQueue = [];
         this._isProcessingQueue = false;
         if (this._throttleTimer) { clearInterval(this._throttleTimer); this._throttleTimer = null; }
-        if (this._factTimer) { clearInterval(this._factTimer); this._factTimer = null; }
 
         // #1/#2: Clear stagger timers
         this._staggerTimers.forEach(t => clearTimeout(t));
         this._staggerTimers = [];
 
         // #3: Clear crossover timers
-        this._crossoverTimers.forEach(t => clearTimeout(t));
-        this._crossoverTimers = [];
+        for (const t of this._crossoverTimers) clearTimeout(t);
+        this._crossoverTimers.clear();
 
         // #4: Clear mood revert timers
-        this._moodTimers.forEach(t => clearTimeout(t));
-        this._moodTimers = [];
+        for (const t of this._moodTimers) clearTimeout(t);
+        this._moodTimers.clear();
 
         this._log('[Swarm] Stopped');
     }
@@ -266,7 +283,12 @@ export class AgentSwarm {
         // #7: Use cached agent names set
         const agentNames = this._getAgentNames();
         // Check exact match AND substring match to handle "😅 Jethalal" format from P2P broadcasts
-        const isAgent = forceIsAgent || agentNames.has(nick) || [...agentNames].some(name => nick.includes(name));
+        let isAgent = forceIsAgent || agentNames.has(nick);
+        if (!isAgent) {
+            for (const name of agentNames) {
+                if (nick.includes(name)) { isAgent = true; break; }
+            }
+        }
         this._context.push({ role: 'user', content: `${nick}: ${text}`, _isAgent: isAgent });
         if (this._context.length > CONTEXT_BUFFER_SIZE) this._context.shift();
         this._contextDirty = true;
@@ -393,14 +415,21 @@ export class AgentSwarm {
     get provider()      { return this._provider; }
     get geminiModels()  { return this._geminiModels; }
 
-    get contextSummary() { return this._contextSummary; }
+    get contextSummary() { return this._contextSummary.join('\n'); }
 
     /** Load a summary received from a peer (P2P sync) */
     loadSummary(summary) {
-        if (!summary || typeof summary !== 'string') return;
-        this._contextSummary = summary;
-        try { localStorage.setItem(SUMMARY_STORAGE_KEY, summary); } catch {}
-        this._log(`[Compact] Loaded peer summary (${summary.length} chars)`);
+        if (!summary) return;
+        // Accept both legacy string format and new array format
+        if (typeof summary === 'string') {
+            this._contextSummary = [summary];
+        } else if (Array.isArray(summary)) {
+            this._contextSummary = summary.slice(-5);
+        } else {
+            return;
+        }
+        try { localStorage.setItem(SUMMARY_STORAGE_KEY, JSON.stringify(this._contextSummary)); } catch {}
+        this._log(`[Compact] Loaded peer summary (${this._contextSummary.length} blocks)`);
     }
 
     /** Set callback for broadcasting summary updates to peers */
@@ -412,7 +441,7 @@ export class AgentSwarm {
         this._context = [TURN2_ANCHOR];
         this._contextDirty = true;
         this._sessionFacts = [];
-        this._contextSummary = '';
+        this._contextSummary = [];
         try { localStorage.removeItem(SUMMARY_STORAGE_KEY); } catch {}
         this._log(`[Flush] Cleared ${ctxLen} context messages, ${factsLen} facts, and summary`);
     }
@@ -486,8 +515,9 @@ export class AgentSwarm {
         const scale = 1 / Math.max(0.1, this._chatterLevel);
         const delay = (c.minInterval + Math.random() * (c.maxInterval - c.minInterval)) * scale;
 
+        const gen = this._generation;
         this._timers[characterId] = setTimeout(async () => {
-            if (!this._running) return;
+            if (!this._running || gen !== this._generation) return;
 
             if (this._isActive(characterId)) {
                 // Structural gate: suppress during directed @mention cooldown
@@ -594,7 +624,7 @@ export class AgentSwarm {
 
         if (!c) {
             this._isProcessingQueue = false;
-            this._processQueue();
+            queueMicrotask(() => this._processQueue());
             return;
         }
 
@@ -622,8 +652,8 @@ export class AgentSwarm {
         const factsBlock = this._sessionFacts.length > 0
             ? `\n<session_memory>Remember these events from this session — reference them when relevant:\n${this._sessionFacts.slice(-15).join('\n')}</session_memory>` : '';
 
-        const summaryBlock = this._contextSummary
-            ? `\n<conversation_history>What happened earlier in this chat (use this for context, grudges, and callbacks):\n${this._contextSummary}</conversation_history>` : '';
+        const summaryBlock = this._contextSummary.length > 0
+            ? `\n<conversation_history>What happened earlier in this chat (use this for context, grudges, and callbacks):\n${this._contextSummary.join('\n')}</conversation_history>` : '';
 
         let systemPrompt = `<room_rules>
 - Speak only in casual Roman-script Hinglish (Hindi words in English letters). NO Devanagari script ever.
@@ -862,10 +892,11 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
             this._log(`[CrossOver] ${pick.name} triggered by ${this._characters[speakerId]?.name} (rolled ${roll.toFixed(2)} < ${CROSSOVER_PROBABILITY})`);
             // #3: Track crossover timer for cleanup on stop()
             const crossTimer = setTimeout(() => {
+                this._crossoverTimers.delete(crossTimer);
                 if (!this._running) return;
                 this._generate(pick.id);
             }, 2000 + Math.random() * 3000);
-            this._crossoverTimers.push(crossTimer);
+            this._crossoverTimers.add(crossTimer);
         } else {
             this._log(`[CrossOver] All candidates skipped (rolled ${roll.toFixed(2)} >= ${CROSSOVER_PROBABILITY})`);
         }
@@ -900,12 +931,13 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
 
         // #4: Track mood revert timer for cleanup on stop()
         const moodTimer = setTimeout(() => {
+            this._moodTimers.delete(moodTimer);
             if (this._moods[characterId] === mood) {
                 this._moods[characterId] = 'normal';
                 this._log(`[Mood] ${this._characters[characterId]?.name}: ${mood} -> normal (auto-revert)`);
             }
         }, 120_000 + Math.random() * 180_000);
-        this._moodTimers.push(moodTimer);
+        this._moodTimers.add(moodTimer);
     }
 
     // ── Context Compaction via Gemini ─────────────────────────
@@ -934,34 +966,35 @@ Keep each bullet under 20 words. Be specific — names and events only, no gener
 Conversation:
 ${text}`;
 
-            const summary = await generateGeminiMessage(
-                'gemini-2.5-flash-lite',
-                'You summarize chat conversations. Output concise Hinglish bullet points. Roman script only.',
-                [{ role: 'user', content: prompt }],
-                400
-            );
+            const summary = await Promise.race([
+                generateGeminiMessage(
+                    'gemini-2.5-flash-lite',
+                    'You summarize chat conversations. Output concise Hinglish bullet points. Roman script only.',
+                    [{ role: 'user', content: prompt }],
+                    400
+                ),
+                new Promise((_, rej) => setTimeout(() => rej(new Error('Compaction timeout')), 30000))
+            ]);
 
             if (!summary || !this._running) return;
 
-            // Merge: append new summary to existing, trim if too long
-            const merged = this._contextSummary
-                ? `${this._contextSummary}\n${summary}`
-                : summary;
-            this._contextSummary = merged.length > SUMMARY_MAX_CHARS
-                ? merged.slice(merged.length - SUMMARY_MAX_CHARS)
-                : merged;
+            // Append new summary block, cap at 5 entries (FIFO eviction)
+            this._contextSummary.push(summary);
+            if (this._contextSummary.length > 5) {
+                this._contextSummary.splice(0, this._contextSummary.length - 5);
+            }
 
             // Trim context: keep anchor + recent messages only
             this._context = [TURN2_ANCHOR, ...this._context.slice(-COMPACT_KEEP_RECENT)];
             this._contextDirty = true;
 
             // Persist to localStorage
-            try { localStorage.setItem(SUMMARY_STORAGE_KEY, this._contextSummary); } catch {}
+            try { localStorage.setItem(SUMMARY_STORAGE_KEY, JSON.stringify(this._contextSummary)); } catch {}
 
             // Broadcast to peers via callback
             if (this._onSummaryUpdate) this._onSummaryUpdate(this._contextSummary);
 
-            this._log(`[Compact] Summarized ${toCompact.length} msgs → ${summary.length} chars (total summary: ${this._contextSummary.length} chars)`);
+            this._log(`[Compact] Summarized ${toCompact.length} msgs → ${summary.length} chars (${this._contextSummary.length} summary blocks)`);
         } catch (e) {
             this._log(`[Compact] Failed: ${e.message}`);
         } finally {
