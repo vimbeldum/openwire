@@ -13,7 +13,7 @@ const MAX_RECONNECT_ATTEMPTS = 10;
 const BASE_RECONNECT_MS = 1000;
 const MAX_RECONNECT_MS = 30000;
 
-export function connect(nick, onEvent) {
+export function connect(nick, onEvent, { isAdmin = false } = {}) {
     if (pingTimer) clearInterval(pingTimer);
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.CLOSING)) return;
 
@@ -28,7 +28,7 @@ export function connect(nick, onEvent) {
 
     ws.onopen = () => {
         reconnectAttempt = 0; // Reset on successful connection
-        ws.send(JSON.stringify({ type: 'join', nick, peer_id: generateId() }));
+        ws.send(JSON.stringify({ type: 'join', nick, peer_id: generateId(), is_admin: isAdmin }));
         if (pingTimer) clearInterval(pingTimer);
         const PING_BASE = 14000;
         const PING_JITTER = 2000;
@@ -62,7 +62,7 @@ export function connect(nick, onEvent) {
             MAX_RECONNECT_MS
         );
         reconnectAttempt++;
-        reconnectTimer = setTimeout(() => connect(nick, onEvent), delay);
+        reconnectTimer = setTimeout(() => connect(nick, onEvent, { isAdmin }), delay);
     };
 
     ws.onerror = () => { };

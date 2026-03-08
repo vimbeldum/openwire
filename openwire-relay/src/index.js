@@ -93,7 +93,7 @@ export class RelayRoom {
                     let base = nick, counter = 2;
                     while (takenNicks.has(nick)) nick = `${base}${counter++}`;
 
-                    peerInfo = { peer_id, nick, ip: clientIp, rooms: new Set(), balance: 0 };
+                    peerInfo = { peer_id, nick, ip: clientIp, rooms: new Set(), balance: 0, is_admin: !!msg.is_admin };
                     this.peers.set(ws, peerInfo);
 
                     this.send(ws, {
@@ -104,7 +104,7 @@ export class RelayRoom {
                         rooms: this.roomList(),
                     });
 
-                    this.broadcast({ type: "peer_joined", peer_id, nick }, ws);
+                    this.broadcast({ type: "peer_joined", peer_id, nick, is_admin: peerInfo.is_admin }, ws);
                     break;
                 }
 
@@ -344,6 +344,7 @@ export class RelayRoom {
             nick: p.nick,
             ip: p.ip,
             balance: p.balance || 0,
+            is_admin: p.is_admin || false,
         }));
     }
 

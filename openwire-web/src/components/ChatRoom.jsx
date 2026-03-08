@@ -347,19 +347,26 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
     // ── Swarm host election: admin gets priority, otherwise oldest peer (lowest id) ──
     const shouldRunSwarm = useCallback(() => {
-        // Admins always host the swarm (they have the agent control panel).
-        // Among multiple admins, lowest peer_id wins to prevent duplicate swarms.
+        const peers = peersRef.current;
+        const myId = myIdRef.current;
+        if (!myId) return false;
+
+        // Collect admin peer_ids from relay data
+        const adminIds = peers.filter(p => p.is_admin).map(p => p.peer_id);
+
         if (isAdminRef.current) {
-            // Check if any admin with a lower peer_id is online
-            // Since we can't know who else is admin from peerList, admins always return true.
-            // Multi-admin dedup is handled by the relay's single-room topology.
-            return true;
+            // Among multiple admins, lowest peer_id wins to prevent duplicate swarms
+            const allAdmins = [...new Set([...adminIds, myId])].sort();
+            return allAdmins[0] === myId;
         }
-        // Non-admins only host if no one else is online (fallback)
-        const allIds = peersRef.current.map(p => p.peer_id).filter(Boolean);
-        if (!allIds.length || !myIdRef.current) return false;
+
+        // Non-admins only host if NO admins are online (fallback)
+        if (adminIds.length > 0) return false;
+
+        const allIds = peers.map(p => p.peer_id).filter(Boolean);
+        if (!allIds.length) return false;
         const sorted = [...allIds].sort();
-        return sorted[0] === myIdRef.current;
+        return sorted[0] === myId;
     }, []);
 
     // ── Agent Swarm bootstrap (always load module, only start if elected host) ──
@@ -1016,7 +1023,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 ));
                 break;
             case 'peer_joined':
-                setPeers(prev => [...prev.filter(p => p.peer_id !== msg.peer_id), { peer_id: msg.peer_id, nick: msg.nick }]);
+                setPeers(prev => [...prev.filter(p => p.peer_id !== msg.peer_id), { peer_id: msg.peer_id, nick: msg.nick, is_admin: msg.is_admin || false }]);
                 addMsg('★', `${msg.nick} joined`, 'system');
                 break;
             case 'peer_left':
@@ -1205,7 +1212,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
-        socket.connect(nickRef.current, (msg) => onWsEventRef.current?.(msg));
+        socket.connect(nickRef.current, (msg) => onWsEventRef.current?.(msg), { isAdmin: isAdminRef.current });
         return () => socket.disconnect();
     }, []);
 
