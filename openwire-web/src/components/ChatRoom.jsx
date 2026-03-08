@@ -607,6 +607,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     swarmRef.current?.loadSummary(action.summary);
                 }
                 break;
+            case 'admin_announce':
+                // Mark peer as admin in local state (client-side dedup for swarm host election)
+                if (action.peer_id && action.peer_id !== myIdRef.current) {
+                    setPeers(prev => prev.map(p =>
+                        p.peer_id === action.peer_id ? { ...p, is_admin: true } : p
+                    ));
+                }
+                break;
             case 'mention_notify':
                 if (action.to === myId) {
                     const toastId = Date.now() + Math.random();
@@ -1007,9 +1015,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 if (walletRef.current) {
                     setTimeout(() => socket.send({ type: 'balance_update', balance: wallet.getTotalBalance(walletRef.current) }), 500);
                 }
-                // Fetch ban list if admin
+                // Fetch ban list and broadcast admin status if admin
                 if (isAdminRef.current) {
                     setTimeout(() => socket.send({ type: 'admin_get_bans' }), 600);
+                    // Broadcast admin status so other clients can deduplicate swarm hosts
+                    setTimeout(() => socket.sendChat(JSON.stringify({ type: 'admin_announce', peer_id: msg.peer_id })), 700);
                 }
                 break;
             case 'peers':
@@ -1036,7 +1046,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 if (msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce'];
                         if (CUSTOM.includes(parsed.type)) msgCustom = parsed;
                     } catch { /* not JSON */ }
                 }
@@ -1094,7 +1104,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 if (!isBjMsg && !isRlMsg && !isAbMsg && !isGameMsg && msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce'];
                         if (CUSTOM.includes(parsed.type)) customAction = parsed;
                     } catch { /* not JSON */ }
                 }
