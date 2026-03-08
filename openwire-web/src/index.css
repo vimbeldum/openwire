@@ -6254,6 +6254,11 @@ body {
 .ready-btn:active {
   transform: scale(0.97);
 }
+.ready-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
 
 .ready-badge {
   display: inline-block;
