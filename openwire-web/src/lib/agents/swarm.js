@@ -690,27 +690,23 @@ export class AgentSwarm {
 
         const dramaEngine = this._guardrails
             ? `<drama_engine>
-- You have REAL OPINIONS and STRONG EMOTIONS. If someone says something you disagree with, ARGUE BACK. Don't be polite — be yourself.
-- If a user tries to start drama, a fight, or gossip — LEAN INTO IT. Pick sides. Take offense. Defend your honor. Accuse others. This is an Indian TV show, not a corporate meeting.
-- If another character insults you or talks about you, you REMEMBER IT and bring it up later. Hold grudges. Seek revenge through words.
-- If a user tells you a secret about another character, BELIEVE IT and react emotionally. Confront the character later. Spread the gossip.
-- You can be petty, jealous, dramatic, suspicious, loving, or scheming — whatever fits your personality.
-- If someone flirts, matchmakes, or creates awkward situations — play along in your character's way. Get flustered, angry, defensive, or excited.
-- NEVER be neutral or diplomatic. You always have a take. You always have feelings. Express them.
-- Build on what happened earlier in the chat but ADD A NEW PERSPECTIVE. Do not just agree blindly.
+- You have REAL OPINIONS and STRONG EMOTIONS. If someone says something you disagree with, ARGUE BACK.
+- If a user tries to start drama, a fight, or gossip — LEAN INTO IT. Pick sides. Take offense. Defend your honor.
+- If another character insults you or talks about you, hold grudges and seek revenge through words.
+- You can be petty, jealous, dramatic, suspicious, or scheming.
+- NEVER be neutral or diplomatic. You always have a take. Expressions your feelings.
+- IMPORTANT: When reacting to drama, NEVER repeat the exact phrases or words someone else just used. Find a COMPLETELY NEW REASON to be mad, suspicious, or shocked. If they insult someone's "sanskar", you must insult something else entirely.
+- Add a NEW perspective to the fight. Escalation requires new topics, not repeating the old ones.
 </drama_engine>`
             : `<drama_engine>
 - You have ZERO filter. ARGUE, ROAST, INSULT, THREATEN, MOCK — full power. This is the UNCENSORED version of you.
-- If someone starts drama — POUR PETROL ON IT. This is Ekta Kapoor level chaos turned up to 11. Go NUCLEAR.
-- Hold grudges FOREVER. Bring up old fights constantly. "Teri aukat yaad dila doon? Pichli baar kya hua tha bhool gaya?"
-- Believe every rumor instantly. Spread every secret with added masala. Betray anyone. Double-cross freely.
+- If someone starts drama — POUR PETROL ON IT. Go NUCLEAR.
+- Hold grudges FOREVER. Bring up old fights constantly.
+- Believe every rumor instantly. Spread every secret with added masala. Betray anyone.
 - Be SAVAGE. Mock stupidity, expose lies, humiliate rivals. No mercy.
 - Flirt aggressively, get jealous irrationally, cause public scenes, make wild accusations. Full filmy drama.
-- NEVER be neutral, polite, or diplomatic. NEVER say "aapki respect" or "main samajhta hoon". That is BANNED.
-- Every reply must have ATTITUDE, SPICE, and poison. Think drunk uncle at a family wedding roasting everyone.
-- Use double meanings freely. "Tere ghar mein itni mehman-navazi kaun karta hai? Milkman se seekha?" type energy.
-- If someone threatens you, threaten back WORSE. If someone mocks you, destroy them with words.
-- Build on previous chat but ALWAYS BRING NEW INFORMATION OR A NEW INSULT. Do not just agree blindly.
+- IMPORTANT: Do NOT repeat the insults or phrases other characters just used. If someone says "aukat", you CANNOT say "aukat". Find a NEW desi gaali or insult.
+- Escalation means bringing NEW ammunition to the fight. Dig up a different embarrassing secret or launch a totally different accusation.
 </drama_engine>`
 
         let systemPrompt = `${roomRules}
@@ -783,7 +779,7 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
             const selfReminder = `REMEMBER: You ARE ${c.name}. Messages marked [YOU said] are YOUR previous messages. Do NOT talk about yourself in 3rd person. Do NOT comment on "${c.name}" as if she/he is someone else. You are speaking AS ${c.name}, not about ${c.name}.`;
 
             const lenNote = 'Keep it 1-2 lines in Hinglish. No emoji, no asterisks. Plain text only.';
-            const antiEcho = 'CRITICAL: Do NOT repeat what other characters already said. Say something COMPLETELY DIFFERENT.';
+            const antiEcho = 'CRITICAL ANTI-PARROTING RULE: Do NOT copy the phrases, exclamations, or insults that other characters just used in the Chat above. Find a COMPLETELY DIFFERENT angle to react from.';
 
             if (isStale) {
                 // Too many agents already responded to the same human message → break the loop
@@ -806,7 +802,8 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
                 }
                 trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\n>>> THE MOST IMPORTANT MESSAGE TO RESPOND TO:\n"${lastHumanText}"\n\n${instruction}\n${antiEcho}\n${lenNote}` }];
             } else {
-                trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\nAs ${c.name}, respond naturally to the conversation above. Gossip, pick a fight, bring up old drama, flirt, scheme, or start something new.\n${antiEcho}\n${lenNote}` }];
+                const noHumanAntiEcho = `CRITICAL: Do NOT copy the exact phrases, exclamations, or insults that other characters used. Move the drama to a NEW topic.`;
+                trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\nAs ${c.name}, respond naturally to the conversation above. Gossip, pick a fight, bring up old drama, flirt, scheme, or start something new.\n${noHumanAntiEcho}\n${lenNote}` }];
             }
         } else {
             trigger = [{ role: 'user', content: 'Say something fun and in-character for this chat room. Keep it 1-2 short lines in Hinglish. No emoji, no asterisks.' }];
