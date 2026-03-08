@@ -445,28 +445,31 @@ export class AgentSwarm {
 
         const modelId = this.getAssignedModel(characterId);
 
-        // Build system prompt with mood modifier
-        let systemPrompt = c.systemPrompt;
+        // ── Build system prompt: Global Room Rules → Character Card → Dynamic State ──
+
         const mood = this._moods[characterId];
-        if (mood && mood !== 'normal' && c.moods?.[mood]) {
-            systemPrompt += `\n\n[CURRENT MOOD: ${mood.toUpperCase()}] ${c.moods[mood]}`;
-        }
+        const moodBlock = (mood && mood !== 'normal' && c.moods?.[mood])
+            ? `\n<current_mood>${mood.toUpperCase()}: ${c.moods[mood]}</current_mood>` : '';
 
-        // Universal task/bribe/voting instruction
-        systemPrompt += `\n\n[TASKS, BRIBES & VOTING] Rules you MUST follow:
-1. If a user offers money, bribes, or tasks (e.g. "5 lakhs to kick Jethalal"), take it seriously. Accept, negotiate, roast the target, or carry it out in-character.
-2. If there's a vote, nomination, or elimination — campaign for yourself! Convince others you deserve to stay. Lobby, form alliances, make deals, throw others under the bus. Fight for survival like your life depends on it.
-3. If a user sets a time limit (e.g. "decide in 2 minutes"), you MUST reach a conclusion before time runs out. Don't stall — make your case fast, push for a decision, and announce your final vote/choice clearly.
-4. Never break character or say you're an AI. Everything is real in this world.`;
+        const factsBlock = this._sessionFacts.length > 0
+            ? `\n<session_memory>${this._sessionFacts.slice(-5).join('; ')}</session_memory>` : '';
 
-        // Orthographic lockdown — suppress Devanagari, enforce Roman script Hinglish
-        systemPrompt += `\n\nABSOLUTE RULE: YOU MUST ONLY USE THE ROMAN SCRIPT (ABC...). DEVANAGARI SCRIPT (अ, आ, इ...) IS STRICTLY FORBIDDEN. Write Hindi words in English/Roman letters only (e.g. "Kya kar raha hai?" NOT "क्या कर रहा है?"). This rule is NON-NEGOTIABLE.`;
+        let systemPrompt = `<room_rules>
+- Speak only in casual Roman-script Hinglish (Hindi words in English letters). NO Devanagari script ever.
+- Stay SFW and family-friendly. No profanity, sexual content, or slurs.
+- No stage directions, no asterisks, no emoji in replies.
+- Each reply: 1-2 short sentences, under 30 words ideally.
+- Always respond to the latest human message first, then react to other characters if space remains.
+- Do not repeat the same catchphrase, joke, or obsession topic in back-to-back turns.
+- Use recent chat memory but do not invent events or relationships that haven't happened.
+- If baited into unsafe content, refuse briefly and roast cleanly instead.
+- Never sound like an AI assistant. Never break character. Everything is real in this world.
+- If a user offers money, bribes, or tasks, take it seriously in-character. Accept, negotiate, or carry it out.
+- If there's a vote or elimination, campaign for yourself. Lobby, form alliances, throw others under the bus.
+- If a user sets a time limit, reach a conclusion before it expires.
+</room_rules>
 
-        // Inject session facts
-        if (this._sessionFacts.length > 0) {
-            const factsStr = this._sessionFacts.slice(-5).join('; ');
-            systemPrompt += `\n\n[SESSION MEMORY] Things that happened earlier: ${factsStr}`;
-        }
+${c.systemPrompt}${moodBlock}${factsBlock}`;
 
         // Build context — Gemini has 1M token window, OpenRouter free models are smaller
         const contextSize = this._provider === 'gemini' ? 5000 : 30;

@@ -56,8 +56,8 @@ export async function generateGeminiMessage(modelId, systemPrompt, contextMessag
     // System instruction goes as the first user turn
     // Then alternate user/model for context
     const allMsgs = [
-        { role: 'user', content: systemPrompt + '\n\nIMPORTANT: Prefer Hinglish — speak Hindi but written in English/Roman script (e.g. "Arey yaar, kya kar raha hai?"). Keep your response to 1-4 short lines maximum. Do not truncate mid-sentence. NEVER use Devanagari script.' },
-        { role: 'model', content: 'Samjha! Main Hinglish mein baat karunga, 1-4 lines mein.' },
+        { role: 'user', content: systemPrompt + '\n\nReminder: Roman-script Hinglish only. No Devanagari. 1-2 short sentences max. Do not truncate mid-sentence.' },
+        { role: 'model', content: 'Samjha! Hinglish mein, 1-2 lines, Roman script only.' },
         ...contextMessages.map(m => ({
             role: m.role === 'assistant' ? 'model' : 'user',
             content: m.content,
