@@ -1382,6 +1382,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             if (action.type === 'bet') {
                 const w = walletRef.current;
                 if (!w || !wallet.canAfford(w, action.amount)) return;
+                // Upfront debit — prevents double-spending across concurrent games
+                updateWallet(wallet.debit(w, action.amount, 'Blackjack bet'));
                 socket.sendRoomMessage(blackjackGame.roomId, bj.serializeBlackjackAction({
                     type: 'bj_player_action', peer_id: myId, nick: myNick, action: 'bet', amount: action.amount,
                 }));
@@ -1407,6 +1409,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             case 'bet': {
                 const w = walletRef.current;
                 if (!w || !wallet.canAfford(w, action.amount)) break;
+                // Upfront debit — prevents double-spending across concurrent games
+                updateWallet(wallet.debit(w, action.amount, 'Blackjack bet'));
                 newGame = bj.placeBet(blackjackGame, myId, action.amount);
                 break;
             }
@@ -1449,13 +1453,21 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             case 'bet': {
                 const w = walletRef.current;
                 if (!w || !wallet.canAfford(w, action.amount)) { addMsg('★', `⚠ Insufficient chips.`, 'system'); return; }
-                // Only deduct on spin, not on bet placement — just track the bet
+                // Upfront debit — prevents double-spending across concurrent games
+                updateWallet(wallet.debit(w, action.amount, 'Roulette bet'));
                 newGame = rl.placeBet(rouletteGame, myId, myNick, action.betType, action.betTarget, action.amount);
                 break;
             }
-            case 'clearBets':
+            case 'clearBets': {
+                // Refund all pending bets back to wallet
+                const myBets = (rouletteGame.bets || []).filter(b => b.peer_id === myId);
+                const refund = myBets.reduce((s, b) => s + (b.amount || 0), 0);
+                if (refund > 0 && walletRef.current) {
+                    updateWallet(wallet.credit(walletRef.current, refund, 'Roulette bets cleared'));
+                }
                 newGame = rl.clearBets(rouletteGame, myId);
                 break;
+            }
         }
 
         setRouletteGame(newGame);
@@ -1483,6 +1495,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         const myNick = nickRef.current;
 
         if (action.type === 'clearBets') {
+            // Refund all pending bets back to wallet
+            const myBets = (andarBaharGame.bets || []).filter(b => b.peer_id === myId);
+            const refund = myBets.reduce((s, b) => s + (b.amount || 0), 0);
+            if (refund > 0 && walletRef.current) {
+                updateWallet(wallet.credit(walletRef.current, refund, 'Andar Bahar bets cleared'));
+            }
             const newGame = ab.clearBets(andarBaharGame, myId);
             setAndarBaharGame(newGame);
             socket.sendRoomMessage(newGame.roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(newGame) }));
@@ -1493,6 +1511,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
         const w = walletRef.current;
         if (!w || !wallet.canAfford(w, action.amount)) { addMsg('★', `⚠ Insufficient chips.`, 'system'); return; }
+        // Upfront debit — prevents double-spending across concurrent games
+        updateWallet(wallet.debit(w, action.amount, 'Andar Bahar bet'));
         const newGame = ab.placeBet(andarBaharGame, myId, myNick, action.side, action.amount);
         setAndarBaharGame(newGame);
         socket.sendRoomMessage(newGame.roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(newGame) }));

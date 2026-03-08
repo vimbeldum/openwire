@@ -62,8 +62,14 @@ export function clearHistory(deviceId) {
 /* ── Wallet Application ───────────────────────────────────── */
 
 /**
- * Apply net chip change from a financial PayoutEvent to a wallet.
- * Only modifies wallet if the player participated (has a totals entry).
+ * Apply settlement credit from a financial PayoutEvent to a wallet.
+ *
+ * With upfront debiting, chips are already deducted when bets are placed.
+ * Settlement credits back: totalWager + net
+ *   Win:  wager(100) + net(+100)  = credit 200
+ *   Push: wager(100) + net(0)     = credit 100 (bet returned)
+ *   Loss: wager(100) + net(-100)  = credit 0   (already deducted)
+ *
  * @param {object} wallet   Current wallet object
  * @param {object} event    Financial PayoutEvent
  * @param {string} myId     Local player's peer_id
@@ -71,9 +77,17 @@ export function clearHistory(deviceId) {
  */
 function applyEventToWallet(wallet, event, myId) {
     const net = event.totals?.[myId];
-    if (net === undefined || net === 0) return wallet;
-    if (net > 0) return walletLib.credit(wallet, net, `${event.gameType} win`);
-    return walletLib.debit(wallet, -net, `${event.gameType} loss`);
+    if (net === undefined) return wallet;
+
+    // Sum total wager from breakdown entries for this player
+    const totalWager = (event.breakdown || [])
+        .filter(b => b.peer_id === myId)
+        .reduce((sum, b) => sum + (b.wager || 0), 0);
+
+    const creditAmount = totalWager + net;
+    if (creditAmount <= 0) return wallet; // loss — already debited upfront
+    const reason = net > 0 ? `${event.gameType} win` : `${event.gameType} push`;
+    return walletLib.credit(wallet, creditAmount, reason);
 }
 
 /* ── Core API ─────────────────────────────────────────────── */
