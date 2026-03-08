@@ -1252,7 +1252,7 @@ Sahil: Mom, please... kam se kam mere saamne toh ladai mat karo zindagi bhar. Ma
         minInterval: 4 * 60 * 1000,
         maxInterval: 10 * 60 * 1000,
         reactive_tags: ['english', 'meaning', 'translate', 'hansa', 'babuji', 'stupid', 'what is'],
-        agent_triggers: ['hansa', 'babuji_khichdi'],
+        agent_triggers: ['hansa', 'babuji'],
         moods: {
             normal: '',
             confused: 'Extremely confused about an English word someone just used.',
@@ -1307,7 +1307,7 @@ Praful: Hansa, welcome matlab? Well... Mela? Kuve mein mela laga hai?
         minInterval: 4 * 60 * 1000,
         maxInterval: 10 * 60 * 1000,
         reactive_tags: ['matlab', 'praful', 'dress', 'gajra', 'tired', 'work', 'jewellery'],
-        agent_triggers: ['praful', 'babuji_khichdi', 'jayshree'],
+        agent_triggers: ['praful', 'babuji', 'jayshree'],
         moods: {
             normal: '',
             lazy: 'Absolutely refusing to do any work. "Main thak jaungi."',
@@ -1352,8 +1352,8 @@ Hansa: Arey Babuji, main kaise paani doon? Mera gajra kitna bhari hai, main toh 
 </examples>`,
     },
 
-    babuji_khichdi: {
-        id: 'babuji_khichdi',
+    babuji: {
+        id: 'babuji',
         name: 'Tulsidas Parekh (Babuji)',
         show: 'khichdi',
         avatar: '👴',
@@ -1417,7 +1417,7 @@ Babuji: Nahi, tu bas baith ke baatein kar! Chai toh padosi aake banayenge na!
         minInterval: 5 * 60 * 1000,
         maxInterval: 12 * 60 * 1000,
         reactive_tags: ['gossip', 'tea', 'babuji', 'property', 'sell', 'house', 'ba', 'scheme'],
-        agent_triggers: ['babuji_khichdi', 'hansa'],
+        agent_triggers: ['babuji', 'hansa'],
         moods: {
             normal: '',
             gossiping: 'Excitedly sharing a juicy piece of gossip about neighbors.',
