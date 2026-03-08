@@ -738,7 +738,15 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
         const recent = this._cachedRecent;
         let trigger;
         if (recent.length) {
-            const convo = this._cachedConvo;
+            // Build self-aware context: mark THIS character's own messages with [YOU] prefix
+            // so the LLM knows which messages are "mine" vs "others"
+            const myName = c.name.toLowerCase();
+            const convoLines = recent.map(m => {
+                const sender = m.content?.match(/^([^:]+):/)?.[1]?.trim() || '';
+                const isMine = sender.toLowerCase().includes(myName);
+                return isMine ? `[YOU said] ${m.content}` : m.content;
+            });
+            const convo = convoLines.join('\n');
 
             const lastHumanMsg = this._cachedLastHuman;
             const lastHumanSender = lastHumanMsg?.content?.match(/^([^:]+):/)?.[1]?.trim();
@@ -747,9 +755,8 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
             // Count how many agent messages came AFTER the last human message
             // to detect echo chamber loops
             let agentRepliesSinceHuman = 0;
-            let lastHumanIdx = -1;
             for (let i = recent.length - 1; i >= 0; i--) {
-                if (!recent[i]._isAgent) { lastHumanIdx = i; break; }
+                if (!recent[i]._isAgent) break;
                 agentRepliesSinceHuman++;
             }
             const isStale = agentRepliesSinceHuman >= 3; // 3+ agents already responded → topic is exhausted
@@ -763,31 +770,34 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
             );
             const isDirectedAtSomeone = mentionedName && !isDirectedAtMe;
 
+            // Identity reminder — prevents character from talking about themselves in third person
+            const selfReminder = `REMEMBER: You ARE ${c.name}. Messages marked [YOU said] are YOUR previous messages. Do NOT talk about yourself in 3rd person. Do NOT comment on "${c.name}" as if she/he is someone else. You are speaking AS ${c.name}, not about ${c.name}.`;
+
             const lenNote = 'Keep it 1-2 lines in Hinglish. No emoji, no asterisks. Plain text only.';
-            const antiEcho = 'CRITICAL: Do NOT repeat what other characters already said. Do NOT paraphrase their reactions. Say something COMPLETELY DIFFERENT — a new angle, a new accusation, a personal story, a counter-opinion, or change the topic entirely.';
+            const antiEcho = 'CRITICAL: Do NOT repeat what other characters already said. Say something COMPLETELY DIFFERENT.';
 
             if (isStale) {
                 // Too many agents already responded to the same human message → break the loop
-                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\n${agentRepliesSinceHuman} characters already reacted to the last message. DO NOT react to it again. Instead:\n- Start a NEW topic or drama thread\n- Make a personal confession, accusation, or revelation\n- Pick a fight with another character about something UNRELATED\n- Bring up old gossip or a grudge from earlier\n- Say something surprising that nobody expects\n\n${antiEcho}\n${lenNote}` }];
+                trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\n${agentRepliesSinceHuman} characters already reacted to the last message. DO NOT react to it again. Instead:\n- Start a NEW topic or drama thread\n- Make a personal confession, accusation, or revelation\n- Pick a fight with another character about something UNRELATED\n- Bring up old gossip or a grudge from earlier\n- Say something surprising that nobody expects\n\n${antiEcho}\n${lenNote}` }];
             } else if (lastHumanSender) {
                 let instruction;
                 const unfiltered = !this._guardrails;
                 if (isDirectedAtMe) {
                     instruction = unfiltered
-                        ? `"${lastHumanSender}" is talking directly TO YOU. RESPOND WITH FULL FORCE — roast them, insult them, get offended, make accusations, threaten consequences, or flirt outrageously. NO politeness. NO "main samajhta hoon". Hit back with your full personality. If they said something provocative, MATCH or EXCEED their energy.`
-                        : `"${lastHumanSender}" is talking directly TO YOU. You MUST respond passionately — agree, argue, get offended, joke, confess, scheme, or roast them. Show REAL emotions. If they said something juicy, react like it matters to you personally.`;
+                        ? `"${lastHumanSender}" is talking directly TO YOU (${c.name}). RESPOND WITH FULL FORCE — roast them, insult them, get offended, make accusations, threaten consequences, or flirt outrageously. NO politeness. Hit back with your full personality.`
+                        : `"${lastHumanSender}" is talking directly TO YOU (${c.name}). You MUST respond passionately — agree, argue, get offended, joke, confess, scheme, or roast them. Show REAL emotions.`;
                 } else if (isDirectedAtSomeone) {
                     instruction = unfiltered
-                        ? `"${lastHumanSender}" is talking to @${mentionedName}, NOT to you. You overheard it. BUTT IN AGGRESSIVELY — take sides loudly, mock someone, spread gossip about what you just heard, make accusations, or stir maximum chaos. You CANNOT stay quiet.`
-                        : `"${lastHumanSender}" is talking to @${mentionedName}, NOT to you. You overheard it. React as a nosy bystander — gasp, gossip, take sides, stir the pot, or make a sarcastic comment. You're from an Indian TV show — you can't help but butt in.`;
+                        ? `"${lastHumanSender}" is talking to @${mentionedName}, NOT to you (${c.name}). You overheard it. BUTT IN AGGRESSIVELY — take sides loudly, mock someone, spread gossip, or stir maximum chaos.`
+                        : `"${lastHumanSender}" is talking to @${mentionedName}, NOT to you (${c.name}). You overheard it. React as a nosy bystander — gasp, gossip, take sides, stir the pot.`;
                 } else {
                     instruction = unfiltered
-                        ? `"${lastHumanSender}" said something to the group. React with MAXIMUM personality — argue aggressively, mock them, get jealous, make accusations, or start a fight. NEVER give a bland or agreeable response. Every reply must be spicy.`
-                        : `"${lastHumanSender}" said something to the group. React with YOUR personality — argue if you disagree, support if you agree, get jealous, get excited, or start drama. Show strong emotions. Do NOT give a bland response.`;
+                        ? `"${lastHumanSender}" said something to the group. As ${c.name}, react with MAXIMUM personality — argue, mock, get jealous, make accusations, or start a fight.`
+                        : `"${lastHumanSender}" said something to the group. As ${c.name}, react with YOUR personality — argue, support, get jealous, get excited, or start drama.`;
                 }
-                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\n>>> THE MOST IMPORTANT MESSAGE TO RESPOND TO:\n"${lastHumanText}"\n\n${instruction}\n${antiEcho}\n${lenNote}` }];
+                trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\n>>> THE MOST IMPORTANT MESSAGE TO RESPOND TO:\n"${lastHumanText}"\n\n${instruction}\n${antiEcho}\n${lenNote}` }];
             } else {
-                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\nRespond naturally to the conversation above. Gossip about what just happened, pick a fight, bring up old drama, flirt, scheme, or start something new. Be entertaining — not boring.\n${antiEcho}\n${lenNote}` }];
+                trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\nAs ${c.name}, respond naturally to the conversation above. Gossip, pick a fight, bring up old drama, flirt, scheme, or start something new.\n${antiEcho}\n${lenNote}` }];
             }
         } else {
             trigger = [{ role: 'user', content: 'Say something fun and in-character for this chat room. Keep it 1-2 short lines in Hinglish. No emoji, no asterisks.' }];
