@@ -43,21 +43,21 @@ function stripEmoji(str) { return str.replace(EMOJI_RE, '').trim(); }
 
 export class AgentSwarm {
     constructor({ onMessage, onError, onModelLoad, onLog, onTyping }) {
-        this._onMessage   = onMessage;
-        this._onError     = onError   || (() => {});
-        this._onModelLoad = onModelLoad || (() => {});
-        this._onLog       = onLog     || (() => {});
-        this._onTyping    = onTyping  || (() => {});
+        this._onMessage = onMessage;
+        this._onError = onError || (() => { });
+        this._onModelLoad = onModelLoad || (() => { });
+        this._onLog = onLog || (() => { });
+        this._onTyping = onTyping || (() => { });
 
         this._running = false;
-        this._timers  = {};
+        this._timers = {};
 
-        this._freeModels     = [];
-        this._allFreeModels  = [];     // unfiltered for model tester
+        this._freeModels = [];
+        this._allFreeModels = [];     // unfiltered for model tester
         this._modelOverrides = {};
-        this._defaultModel   = DEFAULT_ALL_MODEL;
-        this._charEnabled    = {};
-        this._groupEnabled   = {};
+        this._defaultModel = DEFAULT_ALL_MODEL;
+        this._charEnabled = {};
+        this._groupEnabled = {};
 
         // Provider: 'openrouter', 'gemini', or 'qwen'
         this._provider = 'openrouter';
@@ -85,7 +85,7 @@ export class AgentSwarm {
         try {
             const stored = localStorage.getItem(SUMMARY_STORAGE_KEY);
             if (stored) this._contextSummary = JSON.parse(stored);
-        } catch {}
+        } catch { }
         if (!Array.isArray(this._contextSummary)) this._contextSummary = [];
 
         this._messagesThisMinute = 0;
@@ -399,7 +399,7 @@ export class AgentSwarm {
     }
 
     get perCharCooldown() { return this._perCharCooldown / 1000; }
-    get globalCooldown()  { return this._globalCooldown / 1000; }
+    get globalCooldown() { return this._globalCooldown / 1000; }
 
     setMood(characterId, mood) {
         const c = this._characters[characterId];
@@ -410,21 +410,21 @@ export class AgentSwarm {
 
     // ── Read-only state ──────────────────────────────────────
 
-    get running()       { return this._running; }
-    get freeModels()    { return this._freeModels; }
-    get chatterLevel()  { return this._chatterLevel; }
-    get maxMsgPerMin()  { return this._maxMsgPerMin; }
-    get sessionFacts()  { return this._sessionFacts; }
-    get characters()    { return this._characters; }
-    get groups()        { return this._groups; }
-    get modelFilters()  { return this._modelFilters; }
-    get defaultModel()  { return this._defaultModel; }
-    get guardrails()    { return this._guardrails; }
+    get running() { return this._running; }
+    get freeModels() { return this._freeModels; }
+    get chatterLevel() { return this._chatterLevel; }
+    get maxMsgPerMin() { return this._maxMsgPerMin; }
+    get sessionFacts() { return this._sessionFacts; }
+    get characters() { return this._characters; }
+    get groups() { return this._groups; }
+    get modelFilters() { return this._modelFilters; }
+    get defaultModel() { return this._defaultModel; }
+    get guardrails() { return this._guardrails; }
     set defaultModel(v) { this._defaultModel = v; this._log(`[Config] Default model -> ${v}`); }
-    get queueLength()   { return this._messageQueue.length; }
-    get provider()      { return this._provider; }
-    get geminiModels()  { return this._geminiModels; }
-    get qwenModels()    { return this._qwenModels; }
+    get queueLength() { return this._messageQueue.length; }
+    get provider() { return this._provider; }
+    get geminiModels() { return this._geminiModels; }
+    get qwenModels() { return this._qwenModels; }
 
     get contextSummary() { return this._contextSummary.join('\n'); }
 
@@ -439,7 +439,7 @@ export class AgentSwarm {
         } else {
             return;
         }
-        try { localStorage.setItem(SUMMARY_STORAGE_KEY, JSON.stringify(this._contextSummary)); } catch {}
+        try { localStorage.setItem(SUMMARY_STORAGE_KEY, JSON.stringify(this._contextSummary)); } catch { }
         this._log(`[Compact] Loaded peer summary (${this._contextSummary.length} blocks)`);
     }
 
@@ -453,7 +453,7 @@ export class AgentSwarm {
         this._contextDirty = true;
         this._sessionFacts = [];
         this._contextSummary = [];
-        try { localStorage.removeItem(SUMMARY_STORAGE_KEY); } catch {}
+        try { localStorage.removeItem(SUMMARY_STORAGE_KEY); } catch { }
         this._log(`[Flush] Cleared ${ctxLen} context messages, ${factsLen} facts, and summary`);
     }
 
@@ -500,7 +500,7 @@ export class AgentSwarm {
     }
 
     isCharacterEnabled(characterId) { return !!this._charEnabled[characterId]; }
-    isShowEnabled(showId)           { return !!this._groupEnabled[showId]; }
+    isShowEnabled(showId) { return !!this._groupEnabled[showId]; }
 
     getMood(characterId) { return this._moods[characterId] || 'normal'; }
 
@@ -665,23 +665,23 @@ export class AgentSwarm {
         // Wrap entire prompt-build + generation in try to prevent queue deadlock (#9 from audit)
         try {
 
-        const modelId = this.getAssignedModel(characterId);
+            const modelId = this.getAssignedModel(characterId);
 
-        // ── Build system prompt: Global Room Rules → Character Card → Dynamic State ──
+            // ── Build system prompt: Global Room Rules → Character Card → Dynamic State ──
 
-        const mood = this._moods[characterId];
-        const moodBlock = (mood && mood !== 'normal' && c.moods?.[mood])
-            ? `\n<current_mood>${mood.toUpperCase()}: ${c.moods[mood]}</current_mood>` : '';
+            const mood = this._moods[characterId];
+            const moodBlock = (mood && mood !== 'normal' && c.moods?.[mood])
+                ? `\n<current_mood>${mood.toUpperCase()}: ${c.moods[mood]}</current_mood>` : '';
 
-        const factsBlock = this._sessionFacts.length > 0
-            ? `\n<session_memory>Remember these events from this session — reference them when relevant:\n${this._sessionFacts.slice(-15).join('\n')}</session_memory>` : '';
+            const factsBlock = this._sessionFacts.length > 0
+                ? `\n<session_memory>Remember these events from this session — reference them when relevant:\n${this._sessionFacts.slice(-15).join('\n')}</session_memory>` : '';
 
-        const summaryBlock = this._contextSummary.length > 0
-            ? `\n<conversation_history>What happened earlier in this chat (use this for context, grudges, and callbacks):\n${this._contextSummary.join('\n')}</conversation_history>` : '';
+            const summaryBlock = this._contextSummary.length > 0
+                ? `\n<conversation_history>What happened earlier in this chat (use this for context, grudges, and callbacks):\n${this._contextSummary.join('\n')}</conversation_history>` : '';
 
-        // Guardrails mode: SFW constraints when ON, unfiltered when OFF
-        const roomRules = this._guardrails
-            ? `<room_rules>
+            // Guardrails mode: SFW constraints when ON, unfiltered when OFF
+            const roomRules = this._guardrails
+                ? `<room_rules>
 - Speak ONLY in casual Roman-script Hinglish (Hindi words in English letters). NO Devanagari script ever.
 - Stay SFW and family-friendly. No profanity, sexual content, or slurs.
 - NEVER use emoji, emoticons, asterisks (*actions*), or stage directions. Plain text ONLY.
@@ -692,7 +692,7 @@ export class AgentSwarm {
 - If a user offers money, bribes, tasks, or gossip — take it seriously in-character.
 - If a user sets a time limit, reach a conclusion before it expires.
 </room_rules>`
-            : `<room_rules>
+                : `<room_rules>
 - Speak ONLY in casual Roman-script Hinglish (Hindi words in English letters). NO Devanagari script ever.
 - NEVER use emoji, emoticons, asterisks (*actions*), or stage directions. Plain text ONLY — no *, no :), nothing.
 - Each reply: 1-2 short sentences MAX. Be punchy, savage, and raw.
@@ -705,8 +705,8 @@ export class AgentSwarm {
 - If someone insults you, HIT BACK HARDER. If someone flirts, respond with full attitude. If someone accuses you, counter-accuse with worse.
 </room_rules>`;
 
-        const dramaEngine = this._guardrails
-            ? `<drama_engine>
+            const dramaEngine = this._guardrails
+                ? `<drama_engine>
 - You have REAL OPINIONS and STRONG EMOTIONS. If someone says something you disagree with, ARGUE BACK.
 - If a user tries to start drama, a fight, or gossip — LEAN INTO IT. Pick sides. Take offense. Defend your honor.
 - If another character insults you or talks about you, hold grudges and seek revenge through words.
@@ -715,7 +715,7 @@ export class AgentSwarm {
 - IMPORTANT: When reacting to drama, NEVER repeat the exact phrases or words someone else just used. Find a COMPLETELY NEW REASON to be mad, suspicious, or shocked. If they insult someone's "sanskar", you must insult something else entirely.
 - Add a NEW perspective to the fight. Escalation requires new topics, not repeating the old ones.
 </drama_engine>`
-            : `<drama_engine>
+                : `<drama_engine>
 - You have ZERO filter. ARGUE, ROAST, INSULT, THREATEN, MOCK — full power. This is the UNCENSORED version of you.
 - If someone starts drama — POUR PETROL ON IT. Go NUCLEAR.
 - Hold grudges FOREVER. Bring up old fights constantly.
@@ -726,7 +726,7 @@ export class AgentSwarm {
 - Escalation means bringing NEW ammunition to the fight. Dig up a different embarrassing secret or launch a totally different accusation.
 </drama_engine>`
 
-        let systemPrompt = `${roomRules}
+            let systemPrompt = `${roomRules}
 
 ${dramaEngine}
 
@@ -742,113 +742,113 @@ ${dramaEngine}
 
 ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
 
-        // Build context — memoized with dirty flag to avoid redundant serialization
-        const contextSize = (this._provider === 'gemini' || this._provider === 'qwen') ? 100 : 30;
-        if (this._contextDirty) {
-            this._cachedRecent = this._context.slice(-contextSize);
-            this._cachedConvo = this._cachedRecent.map(m => m.content).join('\n');
-            // Reverse scan without allocating a new array
-            this._cachedLastHuman = null;
-            for (let i = this._cachedRecent.length - 1; i >= 0; i--) {
-                if (!this._cachedRecent[i]._isAgent) { this._cachedLastHuman = this._cachedRecent[i]; break; }
-            }
-            this._contextDirty = false;
-        }
-        const recent = this._cachedRecent;
-        let trigger;
-        if (recent.length) {
-            // Build self-aware context: mark THIS character's own messages with [YOU] prefix
-            // Strip avatar emoji from nicks so LLM doesn't copy them into responses
-            const myName = c.name.toLowerCase();
-            const convoLines = recent.map(m => {
-                // Strip emoji from the entire line so context is clean text
-                const clean = stripEmoji(m.content || '');
-                const sender = clean.match(/^([^:]+):/)?.[1]?.trim() || '';
-                const isMine = sender.toLowerCase().includes(myName);
-                return isMine ? `[YOU said] ${clean}` : clean;
-            });
-            const convo = convoLines.join('\n');
-
-            const lastHumanMsg = this._cachedLastHuman;
-            const rawSender = lastHumanMsg?.content?.match(/^([^:]+):/)?.[1]?.trim();
-            const lastHumanSender = rawSender ? stripEmoji(rawSender) : null;
-            const lastHumanText = lastHumanMsg ? stripEmoji(lastHumanMsg.content || '') : '';
-
-            // Count how many agent messages came AFTER the last human message
-            // to detect echo chamber loops
-            let agentRepliesSinceHuman = 0;
-            for (let i = recent.length - 1; i >= 0; i--) {
-                if (!recent[i]._isAgent) break;
-                agentRepliesSinceHuman++;
-            }
-            const isStale = agentRepliesSinceHuman >= 3; // 3+ agents already responded → topic is exhausted
-
-            // Detect if the message is directed at a specific character via @mention
-            const mentionMatch = lastHumanText.match(/@(\w+)/);
-            const mentionedName = mentionMatch ? mentionMatch[1].toLowerCase() : null;
-            const isDirectedAtMe = mentionedName && (
-                c.name.toLowerCase().includes(mentionedName) ||
-                c.id.toLowerCase() === mentionedName
-            );
-            const isDirectedAtSomeone = mentionedName && !isDirectedAtMe;
-
-            // Identity reminder — prevents character from talking about themselves in third person
-            const selfReminder = `REMEMBER: You ARE ${c.name}. Messages marked [YOU said] are YOUR previous messages. Do NOT talk about yourself in 3rd person. Do NOT comment on "${c.name}" as if she/he is someone else. You are speaking AS ${c.name}, not about ${c.name}.`;
-
-            const lenNote = 'Keep it 1-2 lines in Hinglish. No emoji, no asterisks. Plain text only.';
-            const antiEcho = 'CRITICAL ANTI-PARROTING RULE: Do NOT copy the phrases, exclamations, or insults that other characters just used in the Chat above. Find a COMPLETELY DIFFERENT angle to react from.';
-
-            if (isStale) {
-                // Too many agents already responded to the same human message → break the loop
-                trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\n${agentRepliesSinceHuman} characters already reacted to the last message. DO NOT react to it again. Instead:\n- Start a NEW topic or drama thread\n- Make a personal confession, accusation, or revelation\n- Pick a fight with another character about something UNRELATED\n- Bring up old gossip or a grudge from earlier\n- Say something surprising that nobody expects\n\n${antiEcho}\n${lenNote}` }];
-            } else if (lastHumanSender) {
-                let instruction;
-                const unfiltered = !this._guardrails;
-                if (isDirectedAtMe) {
-                    instruction = unfiltered
-                        ? `"${lastHumanSender}" is talking directly TO YOU (${c.name}). RESPOND WITH FULL FORCE — roast them, insult them, get offended, make accusations, threaten consequences, or flirt outrageously. NO politeness. Hit back with your full personality.`
-                        : `"${lastHumanSender}" is talking directly TO YOU (${c.name}). You MUST respond passionately — agree, argue, get offended, joke, confess, scheme, or roast them. Show REAL emotions.`;
-                } else if (isDirectedAtSomeone) {
-                    instruction = unfiltered
-                        ? `"${lastHumanSender}" is talking to @${mentionedName}, NOT to you (${c.name}). You overheard it. BUTT IN AGGRESSIVELY — take sides loudly, mock someone, spread gossip, or stir maximum chaos.`
-                        : `"${lastHumanSender}" is talking to @${mentionedName}, NOT to you (${c.name}). You overheard it. React as a nosy bystander — gasp, gossip, take sides, stir the pot.`;
-                } else {
-                    instruction = unfiltered
-                        ? `"${lastHumanSender}" said something to the group. As ${c.name}, react with MAXIMUM personality — argue, mock, get jealous, make accusations, or start a fight.`
-                        : `"${lastHumanSender}" said something to the group. As ${c.name}, react with YOUR personality — argue, support, get jealous, get excited, or start drama.`;
+            // Build context — memoized with dirty flag to avoid redundant serialization
+            const contextSize = (this._provider === 'gemini' || this._provider === 'qwen') ? 100 : 30;
+            if (this._contextDirty) {
+                this._cachedRecent = this._context.slice(-contextSize);
+                this._cachedConvo = this._cachedRecent.map(m => m.content).join('\n');
+                // Reverse scan without allocating a new array
+                this._cachedLastHuman = null;
+                for (let i = this._cachedRecent.length - 1; i >= 0; i--) {
+                    if (!this._cachedRecent[i]._isAgent) { this._cachedLastHuman = this._cachedRecent[i]; break; }
                 }
-                trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\n>>> THE MOST IMPORTANT MESSAGE TO RESPOND TO:\n"${lastHumanText}"\n\n${instruction}\n${antiEcho}\n${lenNote}` }];
-            } else {
-                const noHumanAntiEcho = `CRITICAL: Do NOT copy the exact phrases, exclamations, or insults that other characters used. Move the drama to a NEW topic.`;
-                trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\nAs ${c.name}, respond naturally to the conversation above. Gossip, pick a fight, bring up old drama, flirt, scheme, or start something new.\n${noHumanAntiEcho}\n${lenNote}` }];
+                this._contextDirty = false;
             }
-        } else {
-            trigger = [{ role: 'user', content: 'Say something fun and in-character for this chat room. Keep it 1-2 short lines in Hinglish. No emoji, no asterisks.' }];
-        }
+            const recent = this._cachedRecent;
+            let trigger;
+            if (recent.length) {
+                // Build self-aware context: mark THIS character's own messages with [YOU] prefix
+                // Strip avatar emoji from nicks so LLM doesn't copy them into responses
+                const myName = c.name.toLowerCase();
+                const convoLines = recent.map(m => {
+                    // Strip emoji from the entire line so context is clean text
+                    const clean = stripEmoji(m.content || '');
+                    const sender = clean.match(/^([^:]+):/)?.[1]?.trim() || '';
+                    const isMine = sender.toLowerCase().includes(myName);
+                    return isMine ? `[THIS WAS SAID BY YOU - DO NOT DENY IT] ${clean}` : clean;
+                });
+                const convo = convoLines.join('\n');
 
-        // Debug: log full prompt payload
-        this._log(`[Prompt] ${c.name} | system: ${systemPrompt.length} chars | trigger: ${trigger[0]?.content?.length || 0} chars | context: ${recent.length} msgs | mood: ${mood || 'normal'} | facts: ${this._sessionFacts.length}`);
-        if (typeof localStorage !== 'undefined' && localStorage.getItem('openwire_debug') === 'true') {
-            console.log(`[PromptDebug] ${c.name} SYSTEM:\n`, systemPrompt);
-            console.log(`[PromptDebug] ${c.name} TRIGGER:\n`, trigger[0]?.content);
-        }
+                const lastHumanMsg = this._cachedLastHuman;
+                const rawSender = lastHumanMsg?.content?.match(/^([^:]+):/)?.[1]?.trim();
+                const lastHumanSender = rawSender ? stripEmoji(rawSender) : null;
+                const lastHumanText = lastHumanMsg ? stripEmoji(lastHumanMsg.content || '') : '';
 
-        // Smart mention: identify who we're responding to
-        const replyTo = this._getReplyTarget(recent);
+                // Count how many agent messages came AFTER the last human message
+                // to detect echo chamber loops
+                let agentRepliesSinceHuman = 0;
+                for (let i = recent.length - 1; i >= 0; i--) {
+                    if (!recent[i]._isAgent) break;
+                    agentRepliesSinceHuman++;
+                }
+                const isStale = agentRepliesSinceHuman >= 3; // 3+ agents already responded → topic is exhausted
 
-        // Ensure typing indicator is on
-        this._onTyping(characterId, c.name, c.avatar, true);
+                // Detect if the message is directed at a specific character via @mention
+                const mentionMatch = lastHumanText.match(/@(\w+)/);
+                const mentionedName = mentionMatch ? mentionMatch[1].toLowerCase() : null;
+                const isDirectedAtMe = mentionedName && (
+                    c.name.toLowerCase().includes(mentionedName) ||
+                    c.id.toLowerCase() === mentionedName
+                );
+                const isDirectedAtSomeone = mentionedName && !isDirectedAtMe;
+
+                // Identity reminder — prevents character from talking about themselves in third person
+                const selfReminder = `REMEMBER: You ARE ${c.name}. Messages marked [THIS WAS SAID BY YOU - DO NOT DENY IT] are YOUR previous messages in this exact chat. Do NOT talk about yourself in 3rd person. Do NOT comment on "${c.name}" as if she/he is someone else. If someone quotes or mentions what you said earlier, DO NOT DENY IT. Own up to your previous statements and defend them vigorously. You are speaking AS ${c.name}.`;
+
+                const lenNote = 'Keep it 1-2 lines in Hinglish. No emoji, no asterisks. Plain text only.';
+                const antiEcho = 'CRITICAL ANTI-PARROTING RULE: Do NOT copy the phrases, exclamations, or insults that other characters just used in the Chat above. Find a COMPLETELY DIFFERENT angle to react from.';
+
+                if (isStale) {
+                    // Too many agents already responded to the same human message → break the loop
+                    trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\n${agentRepliesSinceHuman} characters already reacted to the last message. DO NOT react to it again. Instead:\n- Start a NEW topic or drama thread\n- Make a personal confession, accusation, or revelation\n- Pick a fight with another character about something UNRELATED\n- Bring up old gossip or a grudge from earlier\n- Say something surprising that nobody expects\n\n${antiEcho}\n${lenNote}` }];
+                } else if (lastHumanSender) {
+                    let instruction;
+                    const unfiltered = !this._guardrails;
+                    if (isDirectedAtMe) {
+                        instruction = unfiltered
+                            ? `"${lastHumanSender}" is talking directly TO YOU (${c.name}). RESPOND WITH FULL FORCE — roast them, insult them, get offended, make accusations, threaten consequences, or flirt outrageously. NO politeness. Hit back with your full personality.`
+                            : `"${lastHumanSender}" is talking directly TO YOU (${c.name}). You MUST respond passionately — agree, argue, get offended, joke, confess, scheme, or roast them. Show REAL emotions.`;
+                    } else if (isDirectedAtSomeone) {
+                        instruction = unfiltered
+                            ? `"${lastHumanSender}" is talking to @${mentionedName}, NOT to you (${c.name}). You overheard it. BUTT IN AGGRESSIVELY — take sides loudly, mock someone, spread gossip, or stir maximum chaos.`
+                            : `"${lastHumanSender}" is talking to @${mentionedName}, NOT to you (${c.name}). You overheard it. React as a nosy bystander — gasp, gossip, take sides, stir the pot.`;
+                    } else {
+                        instruction = unfiltered
+                            ? `"${lastHumanSender}" said something to the group. As ${c.name}, react with MAXIMUM personality — argue, mock, get jealous, make accusations, or start a fight.`
+                            : `"${lastHumanSender}" said something to the group. As ${c.name}, react with YOUR personality — argue, support, get jealous, get excited, or start drama.`;
+                    }
+                    trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\n>>> THE MOST IMPORTANT MESSAGE TO RESPOND TO:\n"${lastHumanText}"\n\n${instruction}\n${antiEcho}\n${lenNote}` }];
+                } else {
+                    const noHumanAntiEcho = `CRITICAL: Do NOT copy the exact phrases, exclamations, or insults that other characters used. Move the drama to a NEW topic.`;
+                    trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\nAs ${c.name}, respond naturally to the conversation above. Gossip, pick a fight, bring up old drama, flirt, scheme, or start something new.\n${noHumanAntiEcho}\n${lenNote}` }];
+                }
+            } else {
+                trigger = [{ role: 'user', content: 'Say something fun and in-character for this chat room. Keep it 1-2 short lines in Hinglish. No emoji, no asterisks.' }];
+            }
+
+            // Debug: log full prompt payload
+            this._log(`[Prompt] ${c.name} | system: ${systemPrompt.length} chars | trigger: ${trigger[0]?.content?.length || 0} chars | context: ${recent.length} msgs | mood: ${mood || 'normal'} | facts: ${this._sessionFacts.length}`);
+            if (typeof localStorage !== 'undefined' && localStorage.getItem('openwire_debug') === 'true') {
+                console.log(`[PromptDebug] ${c.name} SYSTEM:\n`, systemPrompt);
+                console.log(`[PromptDebug] ${c.name} TRIGGER:\n`, trigger[0]?.content);
+            }
+
+            // Smart mention: identify who we're responding to
+            const replyTo = this._getReplyTarget(recent);
+
+            // Ensure typing indicator is on
+            this._onTyping(characterId, c.name, c.avatar, true);
 
             const gen = this._provider === 'gemini' ? generateGeminiMessage
                 : this._provider === 'qwen' ? generateQwenMessage
-                : generateMessage;
+                    : generateMessage;
             let text = await gen(modelId, systemPrompt, trigger, 120);
 
             // If primary model returns empty, retry with a fallback
             if (!text) {
                 const pool = this._provider === 'gemini' ? this._geminiModels
                     : this._provider === 'qwen' ? this._qwenModels
-                    : this._freeModels;
+                        : this._freeModels;
                 const fallbackModel = pool.find(m => m.id !== modelId)?.id;
                 if (fallbackModel) {
                     this._log(`[Generate] ${c.name} got empty from ${modelId}, retrying with ${fallbackModel}`);
@@ -1093,7 +1093,7 @@ ${text}`;
             this._contextDirty = true;
 
             // Persist to localStorage
-            try { localStorage.setItem(SUMMARY_STORAGE_KEY, JSON.stringify(this._contextSummary)); } catch {}
+            try { localStorage.setItem(SUMMARY_STORAGE_KEY, JSON.stringify(this._contextSummary)); } catch { }
 
             // Broadcast to peers via callback
             if (this._onSummaryUpdate) this._onSummaryUpdate(this._contextSummary);
