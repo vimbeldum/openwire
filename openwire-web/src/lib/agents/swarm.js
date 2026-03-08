@@ -107,7 +107,7 @@ export class AgentSwarm {
         this._globalCooldown = GLOBAL_COOLDOWN_MS;
 
         // Mention ownership — suppresses other characters during directed @mentions
-        this._mentionTarget = null;       // characterId of the @mentioned character
+        this._mentionTargets = new Set(); // characterIds of all @mentioned characters in current batch
         this._mentionActiveUntil = 0;     // timestamp when cooldown expires
         this._lastCrossOverAt = 0;        // global crossover cooldown tracker
 
@@ -549,9 +549,13 @@ export class AgentSwarm {
             if (!this._running || gen !== this._generation) return;
 
             if (this._isActive(characterId)) {
+                // Clear expired mention batch
+                if (this._mentionTargets.size > 0 && this._mentionActiveUntil <= Date.now()) {
+                    this._mentionTargets.clear();
+                }
                 // Structural gate: suppress during directed @mention cooldown
-                if (this._mentionActiveUntil > Date.now() && this._mentionTarget !== characterId) {
-                    this._log(`[Timer] ${c.name} suppressed — @mention cooldown active for ${this._characters[this._mentionTarget]?.name}`);
+                if (this._mentionActiveUntil > Date.now() && !this._mentionTargets.has(characterId)) {
+                    this._log(`[Timer] ${c.name} suppressed — @mention cooldown active`);
                 } else {
                     const roll = Math.random() * 10;
                     if (roll < c.frequencyWeight) {
@@ -602,10 +606,10 @@ export class AgentSwarm {
 
         const task = { characterId, retries: 0, force, chainDepth };
         if (force) {
-            // Set mention cooldown — suppress other characters while this one responds
-            this._mentionTarget = characterId;
+            // Set mention cooldown — suppress other characters while mentioned ones respond
+            this._mentionTargets.add(characterId);
             this._mentionActiveUntil = Date.now() + MENTION_COOLDOWN_MS;
-            this._log(`[Mention] Cooldown active for ${c.name} (${MENTION_COOLDOWN_MS / 1000}s)`);
+            this._log(`[Mention] Cooldown active for ${c.name} (${MENTION_COOLDOWN_MS / 1000}s, batch: ${this._mentionTargets.size})`);
 
             // @mentions jump to front of queue (after any other force tasks, preserving FIFO among mentions)
             const lastForceIdx = this._messageQueue.reduce((idx, t, i) => t.force ? i : idx, -1);
@@ -735,7 +739,16 @@ export class AgentSwarm {
 - REACTING TO ACTIONS: If a user performs a physical action on you (e.g., *slaps you*), you MUST acknowledge it and react verbally in your dialogue (e.g., "Aah! Teri himmat kaise hui mujhe maarne ki?"). Do not just keep arguing as if nothing happened.
 - EXECUTING PLANS: If you propose a plan or threaten someone, follow through with words and explicitly use @CharacterName to pull them into the execution.
 - NEVER USE ASTERISKS: You (the character) cannot perform physical actions using *asterisks*. Only users can. Focus purely on dialogue.
-</action_engine>`;
+</action_engine>
+
+<tagging_rules>
+- When you mention or refer to someone in your reply, use @Name INLINE in the sentence where you refer to them.
+- CORRECT: "Arre yeh @Admin toh sach mein badtameez hai! @Jethalal ko aise kaise bol sakta hai?"
+- WRONG: "@Jethalal, Arre yeh Admin toh sach mein badtameez hai!"
+- Do NOT start your message with "@Name," — that looks robotic. Weave the @tags naturally into your sentence.
+- Use @Name for EVERY person you mention by name, whether talking TO them or ABOUT them.
+- You can tag multiple people in one message: "@Babita Ji ne @Iyer ko kya bola, sunna toh!"
+</tagging_rules>`;
 
             let systemPrompt = `${roomRules}
 
@@ -859,8 +872,7 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
                 console.log(`[PromptDebug] ${c.name} TRIGGER:\n`, trigger[0]?.content);
             }
 
-            // Smart mention: identify who we're responding to
-            const replyTo = this._getReplyTarget(recent);
+            // (replyTo prepend removed — LLM now tags inline via <tagging_rules>)
 
             // Ensure typing indicator is on
             this._onTyping(characterId, c.name, c.avatar, true);
@@ -893,15 +905,8 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
             this._log(`[Generate] ${c.name} result: ${text ? `"${text.slice(0, 60)}..."` : 'NULL/EMPTY'}`);
 
             if (text) {
-                // Smart tagging: prepend @Nickname if we have a reply target
-                if (replyTo) {
-                    // Strip avatar emoji from replyTo so tags are clean text like @Babita Ji
-                    const cleanReplyTo = stripEmoji(replyTo);
-                    if (cleanReplyTo && !text.toLowerCase().includes(`@${cleanReplyTo.toLowerCase()}`)) {
-                        text = `@${cleanReplyTo}, ${text}`;
-                    }
-                    this._log(`[Tag] ${c.name} -> @${cleanReplyTo}`);
-                }
+                // Tags are now generated inline by the LLM via <tagging_rules> prompt.
+                // No blind prepend — the model places @Name naturally within the sentence.
 
                 this._messagesThisMinute++;
                 this._lastMsgByChar[characterId] = Date.now();
@@ -986,25 +991,6 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
                 this._processQueue();
             }
         }
-    }
-
-    // ── Smart Mention: identify reply target ─────────────────
-
-    _getReplyTarget(recentMessages) {
-        if (!recentMessages || recentMessages.length === 0) return null;
-
-        // Get the most recent message's sender
-        const last = recentMessages[recentMessages.length - 1];
-        if (!last?.content) return null;
-
-        // Parse "Nick: text" format
-        const match = last.content.match(/^([^:]+):/);
-        if (!match) return null;
-
-        const nick = match[1].trim();
-
-        // Tag both humans and other agents to enable natural conversation flow
-        return nick;
     }
 
     // ── Cross-Over Engine ────────────────────────────────────
