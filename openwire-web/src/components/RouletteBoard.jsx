@@ -194,7 +194,7 @@ function OutsideBtn({ label, type, target, myBets, onBet, disabled, className = 
 const BET_AMOUNTS = [5, 10, 25, 50, 100, 250];
 
 /* ── Main Board ─────────────────────────────────── */
-export default function RouletteBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost }) {
+export default function RouletteBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost, onReady, onNewRound, readyCount, totalBettors, isReady }) {
     const [betAmount, setBetAmount] = useState(25);
     const [spinning, setSpinning] = useState(false);
 
@@ -393,6 +393,20 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
                                 <div className="rl-my-bets">
                                     <span>{myBets.length} bet{myBets.length > 1 ? 's' : ''} · {totalMyBet} chips</span>
                                     {canBet && <button className="rl-clear-btn" onClick={() => onAction({ type: 'clearBets' })}>Clear</button>}
+                                    {canBet && !isReady && (
+                                        <button className="ready-btn" onClick={onReady}>Ready</button>
+                                    )}
+                                    {canBet && isReady && (
+                                        <span className="ready-badge">Ready</span>
+                                    )}
+                                </div>
+                            )}
+                            {totalBettors > 0 && game.phase === 'betting' && (
+                                <div className="ready-counter">{readyCount}/{totalBettors} Ready</div>
+                            )}
+                            {game.phase === 'results' && (
+                                <div className="rl-new-round-row">
+                                    <button className="ready-btn" onClick={onNewRound}>Next Round</button>
                                 </div>
                             )}
 

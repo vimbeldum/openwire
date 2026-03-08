@@ -94,6 +94,15 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     // Invites (room-level only; game invites are now in-chat messages)
     const [pendingInvites, setPendingInvites] = useState([]);
 
+    // Ready-Up tracking (keyed by game type: { roulette: Set, blackjack: Set, andarbahar: Set })
+    const [readyPeers, setReadyPeers] = useState({ roulette: new Set(), blackjack: new Set(), andarbahar: new Set() });
+    const readyPeersRef = useRef(readyPeers);
+    useEffect(() => { readyPeersRef.current = readyPeers; }, [readyPeers]);
+
+    const clearReadyPeers = useCallback((gameType) => {
+        setReadyPeers(prev => ({ ...prev, [gameType]: new Set() }));
+    }, []);
+
     // Pop-Culture Agent Swarm
     const [showAgentPanel, setShowAgentPanel] = useState(false);
     const [agentRunning, setAgentRunning] = useState(false);
@@ -624,6 +633,51 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     setTimeout(() => setMentionToasts(prev => prev.filter(t => t.id !== toastId)), 5000);
                 }
                 break;
+            case 'ready_up': {
+                const gameType = action.gameType; // 'roulette' | 'blackjack' | 'andarbahar'
+                const peerId = action.peer_id || msg.peer_id;
+                setReadyPeers(prev => {
+                    const next = { ...prev };
+                    next[gameType] = new Set(prev[gameType]);
+                    next[gameType].add(peerId);
+                    return next;
+                });
+                break;
+            }
+            case 'game_new_round': {
+                // Any player can request a new round — host processes it
+                const gt = action.gameType;
+                if (gt === 'blackjack' && amIHost(bjHostRef.current)) {
+                    const current = blackjackRef.current;
+                    if (current && current.phase === 'ended') {
+                        const newGame = bj.newRound(current);
+                        setBlackjackGame(newGame);
+                        clearReadyPeers('blackjack');
+                        socket.sendRoomMessage(newGame.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(newGame) }));
+                        startBlackjackTimer(newGame);
+                    }
+                } else if (gt === 'roulette' && amIHost(rouletteHostRef.current)) {
+                    const current = rouletteRef.current;
+                    if (current && current.phase === 'results') {
+                        clearTimeout(rouletteResultTimeoutRef.current);
+                        const reset = rl.newRound(current);
+                        setRouletteGame(reset);
+                        clearReadyPeers('roulette');
+                        socket.sendRoomMessage(reset.roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(reset) }));
+                    }
+                } else if (gt === 'andarbahar' && amIHost(abHostRef.current)) {
+                    const current = andarBaharRef.current;
+                    if (current && current.phase === 'ended') {
+                        if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
+                        const reset = ab.newRound(current);
+                        setAndarBaharGame(reset);
+                        clearReadyPeers('andarbahar');
+                        socket.sendRoomMessage(reset.roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(reset) }));
+                        startAbCycle(reset);
+                    }
+                }
+                break;
+            }
             case 'swarm_config':
                 // Admin broadcast — apply provider/model changes to local swarm
                 if (msg.peer_id !== myIdRef.current && swarmRef.current) {
@@ -636,7 +690,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 }
                 break;
         }
-    }, [addMsg, addReaction, addTicker, updateWallet]);
+    }, [addMsg, addReaction, addTicker, updateWallet, amIHost, clearReadyPeers, startBlackjackTimer]);
 
     // ── P2P host election ────────────────────────────────────
     const amIHost = useCallback((hostPeerId) => {
@@ -1048,7 +1102,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 if (msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round'];
                         if (CUSTOM.includes(parsed.type)) msgCustom = parsed;
                     } catch { /* not JSON */ }
                 }
@@ -1106,7 +1160,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 if (!isBjMsg && !isRlMsg && !isAbMsg && !isGameMsg && msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round'];
                         if (CUSTOM.includes(parsed.type)) customAction = parsed;
                     } catch { /* not JSON */ }
                 }
@@ -1385,6 +1439,184 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         setAndarBaharGame(newGame);
         socket.sendRoomMessage(newGame.roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(newGame) }));
     };
+
+    // ── Ready Up handler ────────────────────────────────────
+    const handleReadyUp = useCallback((gameType) => {
+        const myId = myIdRef.current;
+        // Add self locally
+        setReadyPeers(prev => {
+            const next = { ...prev };
+            next[gameType] = new Set(prev[gameType]);
+            next[gameType].add(myId);
+            return next;
+        });
+        // Broadcast to room
+        const roomId = gameType === 'roulette' ? rouletteRef.current?.roomId
+            : gameType === 'blackjack' ? blackjackRef.current?.roomId
+            : andarBaharRef.current?.roomId;
+        if (roomId) {
+            socket.sendRoomMessage(roomId, JSON.stringify({
+                type: 'ready_up', gameType, peer_id: myId,
+            }));
+        }
+    }, []);
+
+    const handleGameNewRound = useCallback((gameType) => {
+        const roomId = gameType === 'roulette' ? rouletteRef.current?.roomId
+            : gameType === 'blackjack' ? blackjackRef.current?.roomId
+            : andarBaharRef.current?.roomId;
+        if (roomId) {
+            socket.sendRoomMessage(roomId, JSON.stringify({
+                type: 'game_new_round', gameType,
+            }));
+        }
+        // If I am the host, also process locally
+        const myId = myIdRef.current;
+        if (gameType === 'blackjack' && amIHost(bjHostRef.current)) {
+            const current = blackjackRef.current;
+            if (current && current.phase === 'ended') {
+                const newGame = bj.newRound(current);
+                setBlackjackGame(newGame);
+                clearReadyPeers('blackjack');
+                socket.sendRoomMessage(newGame.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(newGame) }));
+                startBlackjackTimer(newGame);
+            }
+        } else if (gameType === 'roulette' && amIHost(rouletteHostRef.current)) {
+            const current = rouletteRef.current;
+            if (current && current.phase === 'results') {
+                clearTimeout(rouletteResultTimeoutRef.current);
+                const reset = rl.newRound(current);
+                setRouletteGame(reset);
+                clearReadyPeers('roulette');
+                socket.sendRoomMessage(reset.roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(reset) }));
+            }
+        } else if (gameType === 'andarbahar' && amIHost(abHostRef.current)) {
+            const current = andarBaharRef.current;
+            if (current && current.phase === 'ended') {
+                if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
+                const reset = ab.newRound(current);
+                setAndarBaharGame(reset);
+                clearReadyPeers('andarbahar');
+                socket.sendRoomMessage(reset.roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(reset) }));
+                startAbCycle(reset);
+            }
+        }
+    }, [amIHost, clearReadyPeers, startBlackjackTimer, startAbCycle]);
+
+    // ── Instant start: when all bettors are ready, host triggers game immediately ──
+    useEffect(() => {
+        const myId = myIdRef.current;
+
+        // Roulette: check if all bettors are ready
+        const rlGame = rouletteRef.current;
+        if (rlGame && rlGame.phase === 'betting' && amIHost(rouletteHostRef.current)) {
+            const bettorIds = [...new Set((rlGame.bets || []).map(b => b.peer_id))];
+            const readySet = readyPeers.roulette;
+            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
+                // All bettors ready — instant spin
+                clearReadyPeers('roulette');
+                if (rouletteTimerRef.current) clearInterval(rouletteTimerRef.current);
+                const spun = rl.spin(rlGame);
+                setRouletteGame(spun);
+                const roomId = rlGame.roomId;
+                socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(spun) }));
+                rouletteSpinTimeoutRef.current = setTimeout(() => {
+                    const resultsGame = rl.finishSpin(rouletteRef.current || spun);
+                    setRouletteGame(resultsGame);
+                    if (amIHost(rouletteHostRef.current) && resultsGame.payouts) {
+                        updateBankLedger('roulette', resultsGame.payouts);
+                    }
+                    const myNet = spun.payouts?.[myId];
+                    if (myNet !== undefined && walletRef.current) {
+                        const event = new rl.RouletteEngine(resultsGame).calculateResults(resultsGame);
+                        resolvePayoutEvent(event, myId, walletRef.current);
+                    }
+                    if (amIHost(rouletteHostRef.current)) {
+                        socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(resultsGame) }));
+                    }
+                    rouletteResultTimeoutRef.current = setTimeout(() => {
+                        const reset = rl.newRound(rouletteRef.current || resultsGame);
+                        setRouletteGame(reset);
+                        if (amIHost(rouletteHostRef.current)) {
+                            socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(reset) }));
+                        }
+                        startRouletteTimer();
+                    }, rl.RESULTS_DISPLAY_MS);
+                }, rl.SPIN_PHASE_MS);
+            }
+        }
+
+        // Blackjack: check if all bettors are ready
+        const bjGame = blackjackRef.current;
+        if (bjGame && bjGame.phase === 'betting' && amIHost(bjHostRef.current)) {
+            const bettorIds = bjGame.players.filter(p => p.bet > 0).map(p => p.peer_id);
+            const readySet = readyPeers.blackjack;
+            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
+                clearReadyPeers('blackjack');
+                if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
+                const dealtGame = bj.dealInitialCards(bjGame);
+                setBlackjackGame(dealtGame);
+                socket.sendRoomMessage(bjGame.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(dealtGame) }));
+            }
+        }
+
+        // Andar Bahar: check if all bettors are ready
+        const abGame = andarBaharRef.current;
+        if (abGame && abGame.phase === 'betting' && amIHost(abHostRef.current)) {
+            const bettorIds = [...new Set((abGame.bets || []).map(b => b.peer_id))];
+            const readySet = readyPeers.andarbahar;
+            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
+                clearReadyPeers('andarbahar');
+                if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
+                abGenRef.current++;
+                // Deal trump immediately
+                const withTrump = ab.dealTrump(abGame);
+                setAndarBaharGame(withTrump);
+                const roomId = abGame.roomId;
+                socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(withTrump) }));
+                // Start dealing cards
+                abDealTimerRef.current = setInterval(() => {
+                    const cur = andarBaharRef.current;
+                    if (!cur || !amIHost(abHostRef.current) || cur.phase !== 'dealing') {
+                        clearInterval(abDealTimerRef.current);
+                        return;
+                    }
+                    const next = ab.dealNext(cur);
+                    setAndarBaharGame(next);
+                    socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(next) }));
+                    if (next.phase === 'ended') {
+                        clearInterval(abDealTimerRef.current);
+                        if (amIHost(abHostRef.current) && next.payouts) {
+                            updateBankLedger('andarbahar', next.payouts);
+                        }
+                        const myNet = next.payouts?.[myId];
+                        if (myNet !== undefined && walletRef.current) {
+                            const event = new ab.AndarBaharEngine(next).calculateResults(next);
+                            resolvePayoutEvent(event, myId, walletRef.current);
+                        }
+                        abCycleTimerRef.current = setTimeout(() => {
+                            if (!amIHost(abHostRef.current)) return;
+                            const reset = ab.newRound(andarBaharRef.current || next);
+                            setAndarBaharGame(reset);
+                            socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(reset) }));
+                            startAbCycle(reset);
+                        }, ab.RESULTS_DISPLAY_MS);
+                    }
+                }, ab.DEAL_INTERVAL_MS);
+            }
+        }
+    }, [readyPeers, amIHost, clearReadyPeers, updateBankLedger, resolvePayoutEvent, startRouletteTimer, startAbCycle]);
+
+    // ── Clear ready peers when phase changes away from betting ──
+    useEffect(() => {
+        if (rouletteGame && rouletteGame.phase !== 'betting') clearReadyPeers('roulette');
+    }, [rouletteGame?.phase, clearReadyPeers]);
+    useEffect(() => {
+        if (blackjackGame && blackjackGame.phase !== 'betting') clearReadyPeers('blackjack');
+    }, [blackjackGame?.phase, clearReadyPeers]);
+    useEffect(() => {
+        if (andarBaharGame && andarBaharGame.phase !== 'betting') clearReadyPeers('andarbahar');
+    }, [andarBaharGame?.phase, clearReadyPeers]);
 
     // ── GIF handler ──────────────────────────────────────────
     const handleGifSelect = (gifUrl) => {
@@ -2168,7 +2400,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 <GameBoard game={activeGame} myId={myIdRef.current} onMove={handleGameMove} onRematch={handleRematch} onClose={() => setActiveGame(null)} onHelp={() => openHelp('tictactoe')} />
             )}
             {blackjackGame && (
-                <BlackjackBoard game={blackjackGame} myId={myIdRef.current} myNick={myNick} wallet={myWallet} onAction={handleBjAction} onClose={() => setBlackjackGame(null)} onHelp={() => openHelp('blackjack')} isHost={bjHostRef.current === myIdRef.current} />
+                <BlackjackBoard game={blackjackGame} myId={myIdRef.current} myNick={myNick} wallet={myWallet} onAction={handleBjAction} onClose={() => setBlackjackGame(null)} onHelp={() => openHelp('blackjack')} isHost={bjHostRef.current === myIdRef.current} onReady={() => handleReadyUp('blackjack')} onNewRound={() => handleGameNewRound('blackjack')} readyCount={readyPeers.blackjack.size} totalBettors={blackjackGame?.players?.filter(p => p.bet > 0).length || 0} isReady={readyPeers.blackjack.has(myIdRef.current)} />
             )}
             {rouletteGame && (
                 <RouletteBoard
@@ -2180,6 +2412,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     onClose={() => setRouletteGame(null)}
                     onHelp={() => openHelp('roulette')}
                     isHost={amIHost(rouletteHostRef.current)}
+                    onReady={() => handleReadyUp('roulette')}
+                    onNewRound={() => handleGameNewRound('roulette')}
+                    readyCount={readyPeers.roulette.size}
+                    totalBettors={[...new Set((rouletteGame?.bets || []).map(b => b.peer_id))].length}
+                    isReady={readyPeers.roulette.has(myIdRef.current)}
                 />
             )}
             {andarBaharGame && (
@@ -2192,6 +2429,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     onClose={() => setAndarBaharGame(null)}
                     onHelp={() => openHelp('andarbahar')}
                     isHost={amIHost(abHostRef.current)}
+                    onReady={() => handleReadyUp('andarbahar')}
+                    onNewRound={() => handleGameNewRound('andarbahar')}
+                    readyCount={readyPeers.andarbahar.size}
+                    totalBettors={[...new Set((andarBaharGame?.bets || []).map(b => b.peer_id))].length}
+                    isReady={readyPeers.andarbahar.has(myIdRef.current)}
                 />
             )}
 

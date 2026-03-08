@@ -6232,3 +6232,58 @@ body {
   font-style: italic;
   margin-top: 0.5rem;
 }
+
+/* ── Ready Up System ─────────────────────────────── */
+.ready-btn {
+  background: #22c55e;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  transition: background 0.15s, transform 0.1s;
+  margin-left: 8px;
+}
+.ready-btn:hover {
+  background: #16a34a;
+  transform: scale(1.04);
+}
+.ready-btn:active {
+  transform: scale(0.97);
+}
+
+.ready-badge {
+  display: inline-block;
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  border: 1px solid #22c55e;
+  border-radius: 6px;
+  padding: 3px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-left: 8px;
+}
+
+.ready-counter {
+  text-align: center;
+  font-size: 0.72rem;
+  color: #a1a1aa;
+  margin-top: 4px;
+  letter-spacing: 0.5px;
+}
+.ready-counter:not(:empty) {
+  animation: readyPulse 1.5s ease-in-out infinite;
+}
+@keyframes readyPulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+.rl-new-round-row,
+.ab-new-round-row {
+  text-align: center;
+  margin-top: 6px;
+}

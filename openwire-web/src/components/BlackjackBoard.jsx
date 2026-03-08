@@ -103,7 +103,7 @@ function Countdown({ game }) {
 }
 
 /* ── Main Board ───────────────────────────────────── */
-export default function BlackjackBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost }) {
+export default function BlackjackBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost, onReady, onNewRound, readyCount, totalBettors, isReady }) {
     const [selectedBet, setSelectedBet] = useState(50);
 
     if (!game) return null;
@@ -201,7 +201,16 @@ export default function BlackjackBoard({ game, myId, myNick, wallet, onAction, o
                             ) : (
                                 <div className="bj-bet-row">
                                     <span className="bj-bet-locked">Bet placed: <strong>{myPlayer.bet}</strong> chips</span>
+                                    {myPlayer.bet > 0 && !isReady && (
+                                        <button className="ready-btn" onClick={onReady}>Ready</button>
+                                    )}
+                                    {myPlayer.bet > 0 && isReady && (
+                                        <span className="ready-badge">Ready</span>
+                                    )}
                                 </div>
+                            )}
+                            {totalBettors > 0 && (
+                                <div className="ready-counter">{readyCount}/{totalBettors} Ready</div>
                             )}
                         </div>
                     )}
@@ -213,8 +222,8 @@ export default function BlackjackBoard({ game, myId, myNick, wallet, onAction, o
                         </div>
                     )}
 
-                    {game.phase === 'ended' && isHost && (
-                        <button className="bj-btn-primary deal" onClick={() => onAction({ type: 'newRound' })}>
+                    {game.phase === 'ended' && (
+                        <button className="bj-btn-primary deal" onClick={onNewRound}>
                             Start Next Round
                         </button>
                     )}

@@ -105,7 +105,7 @@ function HistoryStrip({ history }) {
 const BET_AMOUNTS = [10, 25, 50, 100, 250, 500];
 
 /* ── Main Board ─────────────────────────────────── */
-export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost }) {
+export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost, onReady, onNewRound, readyCount, totalBettors, isReady }) {
     const [selectedAmount, setSelectedAmount] = useState(50);
 
     if (!game) return null;
@@ -253,6 +253,11 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
                         })}
                     </div>
                 )}
+                {game.phase === 'ended' && (
+                    <div className="ab-new-round-row">
+                        <button className="ready-btn" onClick={onNewRound}>Next Round</button>
+                    </div>
+                )}
 
                 {/* Betting controls */}
                 {canBet && bettingOpen && (
@@ -311,10 +316,19 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
                 {myBets.length > 0 && game.phase === 'betting' && (
                     <div className="ab-bet-placed-msg">
                         {myBets.map((b, i) => (
-                            <span key={i}>✅ {b.amount} on <strong>{b.side.toUpperCase()}</strong>{i < myBets.length - 1 ? '  ·  ' : ''}</span>
+                            <span key={i}>{b.amount} on <strong>{b.side.toUpperCase()}</strong>{i < myBets.length - 1 ? '  ·  ' : ''}</span>
                         ))}
                         {bettingOpen && <button className="rl-clear-btn" onClick={handleClearBets}>Clear</button>}
+                        {bettingOpen && !isReady && (
+                            <button className="ready-btn" onClick={onReady}>Ready</button>
+                        )}
+                        {bettingOpen && isReady && (
+                            <span className="ready-badge">Ready</span>
+                        )}
                     </div>
+                )}
+                {totalBettors > 0 && game.phase === 'betting' && (
+                    <div className="ready-counter">{readyCount}/{totalBettors} Ready</div>
                 )}
 
                 {game.phase === 'dealing' && (
