@@ -1,170 +1,136 @@
 import { useState, memo } from 'react';
 
-/* ── Outcome Bar ───────────────────────────────── */
-function OutcomeBar({ name, price, isLeading, isWinner, isResolved, dimmed }) {
-    const width = Math.max(2, Math.min(100, price));
-    const barClass = isResolved
-        ? (isWinner ? 'pm-outcome-fill winner' : 'pm-outcome-fill dimmed')
-        : (isLeading ? 'pm-outcome-fill leading' : 'pm-outcome-fill');
+/* ── Outcome Card (Polymarket-style) ──────────── */
+function OutcomeCard({ name, price, idx, isOpen, isWinner, isResolved, dimmed, myShares, onBuy, onSell }) {
+    const pct = Math.round(price);
+    const ringColor = isResolved
+        ? (isWinner ? '#22c55e' : 'rgba(255,255,255,0.08)')
+        : pct >= 60 ? '#22c55e' : pct >= 40 ? '#3b82f6' : '#ef4444';
 
     return (
-        <div className={`pm-outcome-bar ${dimmed ? 'dimmed' : ''}`}>
-            <span className="pm-outcome-name">{name}</span>
-            <div className="pm-outcome-track">
-                <div className={barClass} style={{ width: `${width}%` }}>
-                    <span className="pm-outcome-pct">{Math.round(price)}%</span>
+        <div className={`pm-outcome-card ${isWinner ? 'winner' : ''} ${dimmed ? 'dimmed' : ''}`}>
+            <div className="pm-oc-top">
+                <div className="pm-oc-ring" style={{ '--ring-color': ringColor, '--ring-pct': pct }}>
+                    <span className="pm-oc-pct">{pct}<small>%</small></span>
+                </div>
+                <div className="pm-oc-info">
+                    <div className="pm-oc-name">{name}</div>
+                    <div className="pm-oc-price">{pct} chips per share</div>
+                    {myShares > 0 && (
+                        <div className="pm-oc-shares">{myShares} share{myShares !== 1 ? 's' : ''} held</div>
+                    )}
                 </div>
             </div>
-            <span className="pm-outcome-price">{Math.round(price)}\u00A2</span>
+            {isOpen && (
+                <div className="pm-oc-actions">
+                    <button className="pm-oc-buy" onClick={() => onBuy(idx)}>Buy</button>
+                    {myShares > 0 && (
+                        <button className="pm-oc-sell" onClick={() => onSell(idx)}>Sell</button>
+                    )}
+                </div>
+            )}
+            {isResolved && isWinner && (
+                <div className="pm-oc-winner-tag">Winner</div>
+            )}
         </div>
     );
 }
 
-/* ── Trade Panel ───────────────────────────────── */
-function TradePanel({ outcomes, prices, balance, onAction }) {
-    const [tab, setTab] = useState('buy');
-    const [outcomeIdx, setOutcomeIdx] = useState(0);
+/* ── Quick Trade Modal ────────────────────────── */
+function QuickTrade({ outcome, price, balance, side, onConfirm, onClose }) {
     const [shares, setShares] = useState(10);
-
-    const price = prices[outcomeIdx] || 50;
+    const PRESETS = [1, 5, 10, 25, 50];
     const estCost = Math.round(shares * price / 100);
-    const estRevenue = Math.round(shares * price / 100);
-    const canAfford = tab === 'buy' ? estCost <= balance : true;
-
-    const handleConfirm = () => {
-        if (tab === 'buy' && !canAfford) return;
-        onAction({ type: tab, outcomeIdx, shares });
-    };
-
-    const adjustShares = (delta) => {
-        setShares(prev => Math.max(1, prev + delta));
-    };
-
-    const PRESETS = [1, 5, 10, 25];
+    const canAfford = side === 'buy' ? estCost <= balance : true;
 
     return (
-        <div className="pm-trade-panel">
-            <div className="pm-trade-tabs">
-                <button
-                    className={`pm-tab ${tab === 'buy' ? 'active buy' : ''}`}
-                    onClick={() => setTab('buy')}
-                >Buy</button>
-                <button
-                    className={`pm-tab ${tab === 'sell' ? 'active sell' : ''}`}
-                    onClick={() => setTab('sell')}
-                >Sell</button>
+        <div className="pm-quick-trade">
+            <div className="pm-qt-header">
+                <span className="pm-qt-side" data-side={side}>{side === 'buy' ? 'Buy' : 'Sell'}</span>
+                <span className="pm-qt-outcome">{outcome}</span>
+                <button className="pm-qt-close" onClick={onClose}>&times;</button>
             </div>
-
-            <div className="pm-trade-row">
-                <label className="pm-trade-label">Outcome:</label>
-                {outcomes.length <= 3 ? (
-                    <div className="pm-outcome-btns">
-                        {outcomes.map((o, i) => (
-                            <button
-                                key={i}
-                                className={`pm-outcome-btn ${outcomeIdx === i ? 'active' : ''}`}
-                                onClick={() => setOutcomeIdx(i)}
-                            >{o}</button>
-                        ))}
-                    </div>
-                ) : (
-                    <select
-                        className="pm-outcome-select"
-                        value={outcomeIdx}
-                        onChange={(e) => setOutcomeIdx(Number(e.target.value))}
-                    >
-                        {outcomes.map((o, i) => (
-                            <option key={i} value={i}>{o} ({Math.round(prices[i])}\u00A2)</option>
-                        ))}
-                    </select>
-                )}
+            <div className="pm-qt-presets">
+                {PRESETS.map(p => (
+                    <button
+                        key={p}
+                        className={`pm-qt-preset ${shares === p ? 'active' : ''}`}
+                        onClick={() => setShares(p)}
+                    >{p}</button>
+                ))}
             </div>
-
-            <div className="pm-trade-row">
-                <label className="pm-trade-label">Shares:</label>
-                <div className="pm-share-input">
-                    <button className="pm-adj-btn" onClick={() => adjustShares(-1)}>-</button>
-                    <span className="pm-share-value">{shares}</span>
-                    <button className="pm-adj-btn" onClick={() => adjustShares(1)}>+</button>
-                </div>
-                <div className="pm-presets">
-                    {PRESETS.map(p => (
-                        <button
-                            key={p}
-                            className={`pm-preset-btn ${shares === p ? 'active' : ''}`}
-                            onClick={() => setShares(p)}
-                        >{p}</button>
-                    ))}
-                </div>
+            <div className="pm-qt-custom">
+                <button className="pm-qt-adj" onClick={() => setShares(s => Math.max(1, s - 1))}>-</button>
+                <span className="pm-qt-val">{shares}</span>
+                <button className="pm-qt-adj" onClick={() => setShares(s => s + 1)}>+</button>
+                <span className="pm-qt-label">shares</span>
             </div>
-
-            <div className="pm-cost-estimate">
-                {tab === 'buy'
-                    ? <span>Est. Cost: <strong>{estCost.toLocaleString()}</strong> chips</span>
-                    : <span>Est. Revenue: <strong>{estRevenue.toLocaleString()}</strong> chips</span>
+            <div className="pm-qt-est">
+                {side === 'buy'
+                    ? <>Est. cost: <strong>{estCost}</strong> chips</>
+                    : <>Est. return: <strong>{estCost}</strong> chips</>
                 }
             </div>
-
             <button
-                className={`pm-confirm-btn ${tab}`}
-                onClick={handleConfirm}
-                disabled={tab === 'buy' && !canAfford}
+                className={`pm-qt-confirm ${side}`}
+                onClick={() => { onConfirm(shares); onClose(); }}
+                disabled={side === 'buy' && !canAfford}
             >
-                {tab === 'buy' && !canAfford
-                    ? 'Insufficient Balance'
-                    : `Confirm ${tab === 'buy' ? 'Buy' : 'Sell'}`
-                }
+                {side === 'buy' && !canAfford ? 'Insufficient chips' : `Confirm ${side === 'buy' ? 'Buy' : 'Sell'}`}
             </button>
         </div>
     );
 }
 
-/* ── Position Display ──────────────────────────── */
-function PositionDisplay({ outcomes, prices, position }) {
-    if (!position || !position.shares) return null;
+/* ── Position Summary ─────────────────────────── */
+function PositionSummary({ outcomes, prices, position }) {
+    if (!position || !position.shares || position.shares.every(s => s === 0)) return null;
     const totalValue = position.shares.reduce((sum, s, i) => sum + Math.round(s * (prices[i] || 0) / 100), 0);
     const pnl = totalValue - (position.totalCost || 0);
 
     return (
-        <div className="pm-position">
-            <div className="pm-position-title">My Position</div>
-            <div className="pm-position-row">
+        <div className="pm-portfolio">
+            <div className="pm-portfolio-header">
+                <span className="pm-portfolio-title">Your Portfolio</span>
+                <span className={`pm-portfolio-pnl ${pnl >= 0 ? 'pos' : 'neg'}`}>
+                    {pnl >= 0 ? '+' : ''}{pnl} P&L
+                </span>
+            </div>
+            <div className="pm-portfolio-items">
                 {outcomes.map((o, i) => (
                     position.shares[i] > 0 && (
-                        <span key={i} className="pm-pos-item">
-                            {o}: <strong>{position.shares[i]}</strong> shares
-                        </span>
+                        <div key={i} className="pm-portfolio-item">
+                            <span className="pm-pi-name">{o}</span>
+                            <span className="pm-pi-shares">{position.shares[i]} shares</span>
+                            <span className="pm-pi-value">{Math.round(position.shares[i] * (prices[i] || 0) / 100)} chips</span>
+                        </div>
                     )
                 ))}
-                {position.shares.every(s => s === 0) && (
-                    <span className="pm-pos-item dim">No positions</span>
-                )}
             </div>
-            <div className="pm-position-summary">
-                <span>Invested: {(position.totalCost || 0).toLocaleString()}</span>
-                <span className={pnl >= 0 ? 'pm-pnl-pos' : 'pm-pnl-neg'}>
-                    P&L: {pnl >= 0 ? '+' : ''}{pnl.toLocaleString()}
-                </span>
+            <div className="pm-portfolio-footer">
+                Invested: {(position.totalCost || 0).toLocaleString()} chips
             </div>
         </div>
     );
 }
 
-/* ── Trade Feed ────────────────────────────────── */
-function TradeFeed({ trades, outcomes }) {
+/* ── Activity Feed ────────────────────────────── */
+function ActivityFeed({ trades, outcomes }) {
     if (!trades || trades.length === 0) return null;
-    const recent = trades.slice(-5).reverse();
+    const recent = trades.slice(-6).reverse();
 
     return (
-        <div className="pm-trade-feed">
-            <div className="pm-feed-title">Recent Trades</div>
+        <div className="pm-activity">
+            <div className="pm-activity-title">Activity</div>
             {recent.map((t, i) => (
-                <div key={i} className="pm-feed-item">
-                    <span className="pm-feed-nick">{t.nick}</span>
-                    {' '}{t.side === 'buy' ? 'bought' : 'sold'}{' '}
-                    <strong>{t.shares}</strong>{' '}
-                    {outcomes[t.outcomeIdx] || '?'}{' '}
-                    @ {Math.round(t.price)}{'\u00A2'}
+                <div key={i} className="pm-activity-item">
+                    <span className={`pm-act-badge ${t.action || (t.side === 'buy' ? 'buy' : 'sell')}`}>
+                        {(t.action || t.side) === 'buy' ? 'B' : 'S'}
+                    </span>
+                    <span className="pm-act-text">
+                        <strong>{t.nick}</strong> {(t.action || t.side) === 'buy' ? 'bought' : 'sold'} {t.shares} {outcomes[t.outcomeIdx] || '?'}
+                    </span>
+                    <span className="pm-act-cost">{t.cost || t.revenue || 0}</span>
                 </div>
             ))}
         </div>
@@ -176,22 +142,17 @@ function MarketControls({ phase, outcomes, onAction }) {
     const [winnerIdx, setWinnerIdx] = useState(0);
     const [confirmResolve, setConfirmResolve] = useState(false);
 
-    if (phase === 'open') {
-        return (
-            <div className="pm-controls">
+    return (
+        <div className="pm-controls">
+            {phase === 'open' && (
                 <button className="pm-ctrl-btn lock" onClick={() => onAction({ type: 'lock' })}>
                     Lock Market
                 </button>
-            </div>
-        );
-    }
-
-    if (phase === 'locked') {
-        return (
-            <div className="pm-controls">
+            )}
+            {phase === 'locked' && (
                 <div className="pm-resolve-row">
                     <select
-                        className="pm-outcome-select"
+                        className="pm-resolve-select"
                         value={winnerIdx}
                         onChange={(e) => { setWinnerIdx(Number(e.target.value)); setConfirmResolve(false); }}
                     >
@@ -200,33 +161,24 @@ function MarketControls({ phase, outcomes, onAction }) {
                         ))}
                     </select>
                     {!confirmResolve ? (
-                        <button className="pm-ctrl-btn resolve" onClick={() => setConfirmResolve(true)}>
-                            Resolve
-                        </button>
+                        <button className="pm-ctrl-btn resolve" onClick={() => setConfirmResolve(true)}>Resolve</button>
                     ) : (
                         <button className="pm-ctrl-btn resolve confirm" onClick={() => {
                             onAction({ type: 'resolve', winnerIdx });
                             setConfirmResolve(false);
                         }}>
-                            Confirm: {outcomes[winnerIdx]} wins?
+                            Confirm: {outcomes[winnerIdx]}?
                         </button>
                     )}
                 </div>
-            </div>
-        );
-    }
-
-    if (phase === 'resolved') {
-        return (
-            <div className="pm-controls">
+            )}
+            {phase === 'resolved' && (
                 <button className="pm-ctrl-btn new-market" onClick={() => onAction({ type: 'newMarket' })}>
                     New Market
                 </button>
-            </div>
-        );
-    }
-
-    return null;
+            )}
+        </div>
+    );
 }
 
 /* ── Create Market Form ────────────────────────── */
@@ -234,29 +186,13 @@ function CreateMarketForm({ onAction, balance }) {
     const [question, setQuestion] = useState('');
     const [outcomes, setOutcomes] = useState(['Yes', 'No']);
     const [seed, setSeed] = useState(1000);
-
     const canCreate = question.trim().length > 0 && outcomes.length >= 2 && outcomes.every(o => o.trim()) && seed > 0 && seed <= balance;
-
-    const updateOutcome = (idx, val) => {
-        setOutcomes(prev => prev.map((o, i) => i === idx ? val : o));
-    };
-
-    const addOutcome = () => {
-        if (outcomes.length < 6) setOutcomes(prev => [...prev, '']);
-    };
-
-    const removeOutcome = (idx) => {
-        if (outcomes.length > 2) setOutcomes(prev => prev.filter((_, i) => i !== idx));
-    };
-
-    const handleCreate = () => {
-        if (!canCreate) return;
-        onAction({ type: 'create', question: question.trim(), outcomes: outcomes.map(o => o.trim()), seed });
-    };
 
     return (
         <div className="pm-create-form">
-            <div className="pm-create-title">Create a New Market</div>
+            <div className="pm-create-icon">?</div>
+            <div className="pm-create-title">Create a Prediction Market</div>
+            <div className="pm-create-subtitle">Ask a question, set outcomes, and let the crowd decide.</div>
 
             <label className="pm-form-label">Question</label>
             <input
@@ -276,19 +212,23 @@ function CreateMarketForm({ onAction, balance }) {
                         type="text"
                         placeholder={`Outcome ${i + 1}`}
                         value={o}
-                        onChange={(e) => updateOutcome(i, e.target.value)}
+                        onChange={(e) => {
+                            const next = [...outcomes];
+                            next[i] = e.target.value;
+                            setOutcomes(next);
+                        }}
                         maxLength={50}
                     />
                     {outcomes.length > 2 && (
-                        <button className="pm-remove-btn" onClick={() => removeOutcome(i)}>x</button>
+                        <button className="pm-remove-btn" onClick={() => setOutcomes(outcomes.filter((_, j) => j !== i))}>x</button>
                     )}
                 </div>
             ))}
             {outcomes.length < 6 && (
-                <button className="pm-add-outcome-btn" onClick={addOutcome}>+ Add Outcome</button>
+                <button className="pm-add-outcome-btn" onClick={() => setOutcomes([...outcomes, ''])}>+ Add Outcome</button>
             )}
 
-            <label className="pm-form-label">Seed Liquidity</label>
+            <label className="pm-form-label">Liquidity Pool</label>
             <div className="pm-seed-row">
                 <input
                     className="pm-form-input seed"
@@ -301,38 +241,29 @@ function CreateMarketForm({ onAction, balance }) {
                 <span className="pm-seed-label">chips</span>
             </div>
 
-            <button
-                className="pm-confirm-btn buy"
-                onClick={handleCreate}
-                disabled={!canCreate}
-            >
+            <button className="pm-create-btn" onClick={() => {
+                if (!canCreate) return;
+                onAction({ type: 'create', question: question.trim(), outcomes: outcomes.map(o => o.trim()), seed });
+            }} disabled={!canCreate}>
                 Create Market
             </button>
         </div>
     );
 }
 
-/* ── Resolved Banner ───────────────────────────── */
+/* ── Resolved Banner ──────────────────────────── */
 function ResolvedBanner({ outcomes, result, payouts, myId }) {
     const winnerName = outcomes[result] || '?';
     const myPayout = payouts?.[myId];
 
     return (
         <div className="pm-resolved-banner">
+            <div className="pm-resolved-icon">&#10003;</div>
             <div className="pm-resolved-title">Market Resolved</div>
-            <div className="pm-resolved-winner">{winnerName} wins</div>
+            <div className="pm-resolved-winner">{winnerName}</div>
             {myPayout !== undefined && (
-                <div className={`pm-payout-chip ${myPayout >= 0 ? 'win' : 'lose'}`}>
+                <div className={`pm-resolved-payout ${myPayout >= 0 ? 'win' : 'lose'}`}>
                     {myPayout >= 0 ? `+${myPayout.toLocaleString()}` : myPayout.toLocaleString()} chips
-                </div>
-            )}
-            {payouts && Object.keys(payouts).length > 0 && (
-                <div className="pm-payouts-grid">
-                    {Object.entries(payouts).map(([pid, net]) => (
-                        <span key={pid} className={`pm-payout-chip ${net >= 0 ? 'win' : 'lose'}`}>
-                            {pid.slice(0, 8)}: {net >= 0 ? '+' : ''}{net}
-                        </span>
-                    ))}
                 </div>
             )}
         </div>
@@ -341,6 +272,8 @@ function ResolvedBanner({ outcomes, result, payouts, myId }) {
 
 /* ── Main Board ────────────────────────────────── */
 export default memo(function PolymarketBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost }) {
+    const [tradeModal, setTradeModal] = useState(null); // { idx, side }
+
     if (!game) return null;
 
     const balance = wallet ? (wallet.baseBalance + wallet.adminBonus) : 0;
@@ -350,102 +283,101 @@ export default memo(function PolymarketBoard({ game, myId, myNick, wallet, onAct
     const positions = game.positions || {};
     const myPosition = positions[myId] || null;
     const trades = game.tradeHistory || [];
-    const maxPrice = Math.max(...prices, 0);
     const isResolved = game.phase === 'resolved';
+    const isOpen = game.phase === 'open';
+
+    const handleTrade = (shares) => {
+        if (!tradeModal) return;
+        onAction({ type: tradeModal.side, outcomeIdx: tradeModal.idx, shares });
+    };
 
     return (
         <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
             <div className="pm-table">
                 {/* Header */}
-                <div className="game-table-header">
-                    <div className="game-table-title">
-                        {'\uD83D\uDCCA'} <span>Predictions</span>
-                        {isHost && <span className="host-crown" title="You are the host">{'\uD83D\uDC51'}</span>}
+                <div className="pm-header">
+                    <div className="pm-header-left">
+                        <span className="pm-logo">P</span>
+                        <span className="pm-header-title">Predictions</span>
+                        {isHost && <span className="pm-host-badge">Host</span>}
                     </div>
-                    <div className="game-table-meta">
-                        {wallet && <span className="chip-display">{'\uD83D\uDCB0'} {balance.toLocaleString()}</span>}
-                        {game.volume > 0 && <span className="pm-volume">Vol: {game.volume.toLocaleString()}</span>}
+                    <div className="pm-header-right">
+                        {wallet && <span className="pm-balance">{balance.toLocaleString()} chips</span>}
+                        {onHelp && <button className="pm-help-btn" onClick={onHelp}>?</button>}
+                        <button className="pm-close-btn" onClick={onClose}>&times;</button>
                     </div>
-                    {onHelp && <button className="btn-icon-help" onClick={onHelp} title="How to Play">?</button>}
-                    <button className="btn-icon-close" onClick={onClose}>{'\u2715'}</button>
                 </div>
 
-                {/* No market — show create form (host) or waiting message */}
-                {!hasMarket && isHost && (
-                    <CreateMarketForm onAction={onAction} balance={balance} />
-                )}
-                {!hasMarket && !isHost && (
-                    <div className="pm-waiting">Waiting for host to create a market...</div>
-                )}
-
-                {/* Market exists */}
-                {hasMarket && (
-                    <>
-                        {/* Market Question */}
-                        <div className="pm-market-question">{game.question}</div>
-
-                        {/* Phase badge */}
-                        <div className="pm-phase-row">
-                            {game.phase === 'open' && <span className="pm-phase-badge open">OPEN</span>}
-                            {game.phase === 'locked' && <span className="pm-phase-badge locked">LOCKED</span>}
-                            {game.phase === 'resolved' && <span className="pm-phase-badge resolved">RESOLVED</span>}
+                {/* Scrollable content area */}
+                <div className="pm-content">
+                    {/* No market */}
+                    {!hasMarket && isHost && <CreateMarketForm onAction={onAction} balance={balance} />}
+                    {!hasMarket && !isHost && (
+                        <div className="pm-waiting">
+                            <div className="pm-waiting-icon">...</div>
+                            <div>Waiting for host to create a market</div>
                         </div>
+                    )}
 
-                        {/* Resolved Banner */}
-                        {isResolved && game.result !== null && game.result !== undefined && (
-                            <ResolvedBanner
-                                outcomes={outcomes}
-                                result={game.result}
-                                payouts={game.payouts}
-                                myId={myId}
-                            />
-                        )}
+                    {/* Market exists */}
+                    {hasMarket && (
+                        <>
+                            {/* Question + Meta */}
+                            <div className="pm-market-header">
+                                <div className="pm-market-question">{game.question}</div>
+                                <div className="pm-market-meta">
+                                    <span className={`pm-phase-badge ${game.phase}`}>{game.phase.toUpperCase()}</span>
+                                    {game.volume > 0 && <span className="pm-volume">{game.volume.toLocaleString()} vol</span>}
+                                </div>
+                            </div>
 
-                        {/* Outcome Bars */}
-                        <div className="pm-outcomes">
-                            {outcomes.map((o, i) => (
-                                <OutcomeBar
-                                    key={i}
-                                    name={o}
-                                    price={prices[i] || 0}
-                                    isLeading={prices[i] === maxPrice}
-                                    isWinner={isResolved && game.result === i}
-                                    isResolved={isResolved}
-                                    dimmed={isResolved && game.result !== i}
+                            {/* Resolved Banner */}
+                            {isResolved && game.result !== null && game.result !== undefined && (
+                                <ResolvedBanner outcomes={outcomes} result={game.result} payouts={game.payouts} myId={myId} />
+                            )}
+
+                            {/* Outcome Cards */}
+                            <div className="pm-outcomes-grid">
+                                {outcomes.map((o, i) => (
+                                    <OutcomeCard
+                                        key={i}
+                                        name={o}
+                                        price={prices[i] || 0}
+                                        idx={i}
+                                        isOpen={isOpen}
+                                        isWinner={isResolved && game.result === i}
+                                        isResolved={isResolved}
+                                        dimmed={isResolved && game.result !== i}
+                                        myShares={myPosition?.shares?.[i] || 0}
+                                        onBuy={(idx) => setTradeModal({ idx, side: 'buy' })}
+                                        onSell={(idx) => setTradeModal({ idx, side: 'sell' })}
+                                    />
+                                ))}
+                            </div>
+
+                            {/* Quick Trade Modal */}
+                            {tradeModal && (
+                                <QuickTrade
+                                    outcome={outcomes[tradeModal.idx]}
+                                    price={prices[tradeModal.idx] || 50}
+                                    balance={balance}
+                                    side={tradeModal.side}
+                                    onConfirm={handleTrade}
+                                    onClose={() => setTradeModal(null)}
                                 />
-                            ))}
-                        </div>
+                            )}
 
-                        {/* Trade Panel — only when market is open */}
-                        {game.phase === 'open' && (
-                            <TradePanel
-                                outcomes={outcomes}
-                                prices={prices}
-                                balance={balance}
-                                onAction={onAction}
-                            />
-                        )}
+                            {/* Portfolio */}
+                            <PositionSummary outcomes={outcomes} prices={prices} position={myPosition} />
 
-                        {/* My Position */}
-                        <PositionDisplay
-                            outcomes={outcomes}
-                            prices={prices}
-                            position={myPosition}
-                        />
+                            {/* Activity Feed */}
+                            <ActivityFeed trades={trades} outcomes={outcomes} />
 
-                        {/* Recent Trades */}
-                        <TradeFeed trades={trades} outcomes={outcomes} />
-
-                        {/* Host Controls */}
-                        {isHost && (
-                            <MarketControls
-                                phase={game.phase}
-                                outcomes={outcomes}
-                                onAction={onAction}
-                            />
-                        )}
-                    </>
-                )}
+                            {/* Host Controls */}
+                            {isHost && <MarketControls phase={game.phase} outcomes={outcomes} onAction={onAction} />}
+                        </>
+                    )}
+                </div>
             </div>
         </div>
     );

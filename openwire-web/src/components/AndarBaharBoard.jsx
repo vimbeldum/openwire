@@ -156,6 +156,8 @@ export default memo(function AndarBaharBoard({ game, myId, myNick, wallet, onAct
                     </div>
                     <div className="game-table-meta">
                         {wallet && <span className="chip-display">💰 {balance.toLocaleString()}</span>}
+                        <span className="chip-display" style={{ opacity: 0.6 }}>🃏 {game.deckCount ?? game.deck?.length ?? 52}</span>
+                        {game.reshuffled && <span className="chip-display" style={{ color: '#4ecdc4' }}>♻ Reshuffled</span>}
                         {game.phase === 'betting' && <BettingCountdown bettingEndsAt={game.bettingEndsAt} />}
                     </div>
                     {onHelp && <button className="btn-icon-help" onClick={onHelp} title="How to Play">?</button>}

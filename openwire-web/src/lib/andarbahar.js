@@ -152,13 +152,19 @@ export function dealNext(game) {
     return { ...game, deck, andar, bahar, dealCount: dealCount + 1, trumpFirst };
 }
 
+export const MIN_DECK_SIZE = 10; // reshuffle when fewer than this many cards remain
+
 export function newRound(game) {
-    const deck = createDeck();
     const now = Date.now();
+    // Reuse existing deck if enough cards remain; otherwise reshuffle
+    const existingDeck = game.deck || [];
+    const needsReshuffle = existingDeck.length < MIN_DECK_SIZE;
+    const deck = needsReshuffle ? createDeck() : existingDeck;
     return {
         ...createGame(game.roomId),
         trumpHistory: game.trumpHistory || [],
         deck,
+        reshuffled: needsReshuffle,
         bettingEndsAt: now + BETTING_DURATION_MS,
         nextGameAt: now + GAME_INTERVAL_MS,
         startedAt: now,
@@ -287,7 +293,7 @@ export function parseAndarBaharAction(data) {
 export function serializeAndarBaharAction(action) { return 'AB:' + JSON.stringify(action); }
 export function serializeGame(game) {
     const { deck, ...safe } = game;
-    return JSON.stringify({ ...safe, deckCount: deck?.length || 0 });
+    return JSON.stringify({ ...safe, deckCount: deck?.length || 0, reshuffled: game.reshuffled || false });
 }
 export function deserializeGame(data) {
     try {

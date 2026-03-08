@@ -1007,9 +1007,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 break;
             }
             case 'bj_state': {
+                // Skip own state echo (host already has authoritative state)
+                if (msg.peer_id === myIdRef.current) break;
                 const gameState = bj.deserializeGame(action.state);
                 if (gameState) {
-                    // Only open/update game board if user has explicitly joined (or is host)
                     if (!hasJoinedBj.current && bjHostRef.current !== myIdRef.current) break;
                     setBlackjackGame(prev => {
                         // Apply wallet changes when game ends
@@ -1098,13 +1099,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 break;
             }
             case 'rl_state': {
+                // Skip own state echo (host already has authoritative state)
+                if (msg.peer_id === myIdRef.current) break;
                 const gameState = rl.deserializeGame(action.state);
                 if (gameState) {
-                    // Only update route game if user has explicitly joined (or is host)
                     if (!hasJoinedRl.current && rouletteHostRef.current !== myIdRef.current) break;
                     setRouletteGame(prev => {
-                        // Apply wallet changes on results
-                        // Only process payouts for non-host peers (host already did it in timer callback)
                         if (gameState.phase === 'results' && prev?.phase !== 'results' && !amIHost(rouletteHostRef.current)) {
                             const myNet = gameState.payouts?.[myId];
                             if (myNet !== undefined && walletRef.current) {
@@ -1117,8 +1117,33 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 }
                 break;
             }
+            case 'rl_bet': {
+                // Host processes remote player's bet
+                if (!amIHost(rouletteHostRef.current)) break;
+                setRouletteGame(prev => {
+                    if (!prev || prev.phase !== 'betting') return prev;
+                    const updated = rl.placeBet(prev, action.peer_id, action.nick, action.betType, action.betTarget, action.amount);
+                    setTimeout(() => {
+                        socket.sendRoomMessage(updated.roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(updated) }));
+                    }, 0);
+                    return updated;
+                });
+                break;
+            }
+            case 'rl_clearBets': {
+                if (!amIHost(rouletteHostRef.current)) break;
+                setRouletteGame(prev => {
+                    if (!prev) return prev;
+                    const updated = rl.clearBets(prev, action.peer_id);
+                    setTimeout(() => {
+                        socket.sendRoomMessage(updated.roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(updated) }));
+                    }, 0);
+                    return updated;
+                });
+                break;
+            }
         }
-    }, [updateWallet]);
+    }, [addMsg, amIHost]);
 
     // ── Andar Bahar message handler ──────────────────────────
     const handleAndarBaharAction = useCallback((msg, action) => {
@@ -1134,12 +1159,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 break;
             }
             case 'ab_state': {
+                // Skip own state echo (host already has authoritative state)
+                if (msg.peer_id === myIdRef.current) break;
                 const gameState = ab.deserializeGame(action.state);
                 if (gameState) {
-                    // Only update if user has explicitly joined (or is host)
                     if (!hasJoinedAb.current && abHostRef.current !== myIdRef.current) break;
                     setAndarBaharGame(prev => {
-                        // Only process payouts for non-host peers (host already did it in timer callback)
                         if (gameState.phase === 'ended' && prev?.phase !== 'ended' && !amIHost(abHostRef.current)) {
                             const myNet = gameState.payouts?.[myId];
                             if (myNet !== undefined && walletRef.current) {
@@ -1152,8 +1177,33 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 }
                 break;
             }
+            case 'ab_bet': {
+                // Host processes remote player's bet
+                if (!amIHost(abHostRef.current)) break;
+                setAndarBaharGame(prev => {
+                    if (!prev || prev.phase !== 'betting') return prev;
+                    const updated = ab.placeBet(prev, action.peer_id, action.nick, action.side, action.amount);
+                    setTimeout(() => {
+                        socket.sendRoomMessage(updated.roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(updated) }));
+                    }, 0);
+                    return updated;
+                });
+                break;
+            }
+            case 'ab_clearBets': {
+                if (!amIHost(abHostRef.current)) break;
+                setAndarBaharGame(prev => {
+                    if (!prev) return prev;
+                    const updated = ab.clearBets(prev, action.peer_id);
+                    setTimeout(() => {
+                        socket.sendRoomMessage(updated.roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(updated) }));
+                    }, 0);
+                    return updated;
+                });
+                break;
+            }
         }
-    }, [updateWallet]);
+    }, [addMsg, amIHost]);
 
     // ── Polymarket message handler ────────────────────────────
     const handlePolymarketAction = useCallback((msg, action) => {
@@ -1169,10 +1219,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 break;
             }
             case 'pm_state': {
+                // Skip own state echo
+                if (msg.peer_id === myIdRef.current) break;
                 const gameState = pm.deserializeGame(action.state);
                 if (gameState) {
                     if (!hasJoinedPm.current && pmHostRef.current !== myIdRef.current) break;
-                    // Verify sender is the host (prevent forged state injection)
                     if (msg.from && pmHostRef.current && msg.from !== pmHostRef.current) break;
                     setPolymarketGame(prev => {
                         if (gameState.phase === 'resolved' && prev?.phase !== 'resolved' && !amIHost(pmHostRef.current)) {
@@ -1638,19 +1689,41 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         if (!rouletteGame) return;
         const myId = myIdRef.current;
         const myNick = nickRef.current;
+
+        // Non-host: proxy bet/clearBets to host (host is authoritative)
+        if (!amIHost(rouletteHostRef.current)) {
+            if (action.type === 'bet') {
+                const w = walletRef.current;
+                if (!w || !wallet.canAfford(w, action.amount)) { addMsg('★', `⚠ Insufficient chips.`, 'system'); return; }
+                updateWallet(wallet.debit(w, action.amount, 'Roulette bet'));
+                socket.sendRoomMessage(rouletteGame.roomId, rl.serializeRouletteAction({
+                    type: 'rl_bet', peer_id: myId, nick: myNick, betType: action.betType, betTarget: action.betTarget, amount: action.amount,
+                }));
+            } else if (action.type === 'clearBets') {
+                const myBets = (rouletteGame.bets || []).filter(b => b.peer_id === myId);
+                const refund = myBets.reduce((s, b) => s + (b.amount || 0), 0);
+                if (refund > 0 && walletRef.current) {
+                    updateWallet(wallet.credit(walletRef.current, refund, 'Roulette bets cleared'));
+                }
+                socket.sendRoomMessage(rouletteGame.roomId, rl.serializeRouletteAction({
+                    type: 'rl_clearBets', peer_id: myId,
+                }));
+            }
+            return;
+        }
+
+        // Host processes locally
         let newGame = rouletteGame;
 
         switch (action.type) {
             case 'bet': {
                 const w = walletRef.current;
                 if (!w || !wallet.canAfford(w, action.amount)) { addMsg('★', `⚠ Insufficient chips.`, 'system'); return; }
-                // Upfront debit — prevents double-spending across concurrent games
                 updateWallet(wallet.debit(w, action.amount, 'Roulette bet'));
                 newGame = rl.placeBet(rouletteGame, myId, myNick, action.betType, action.betTarget, action.amount);
                 break;
             }
             case 'clearBets': {
-                // Refund all pending bets back to wallet
                 const myBets = (rouletteGame.bets || []).filter(b => b.peer_id === myId);
                 const refund = myBets.reduce((s, b) => s + (b.amount || 0), 0);
                 if (refund > 0 && walletRef.current) {
@@ -1685,8 +1758,30 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         const myId = myIdRef.current;
         const myNick = nickRef.current;
 
+        // Non-host: proxy bet/clearBets to host (host has the deck)
+        if (!amIHost(abHostRef.current)) {
+            if (action.type === 'bet') {
+                const w = walletRef.current;
+                if (!w || !wallet.canAfford(w, action.amount)) { addMsg('★', `⚠ Insufficient chips.`, 'system'); return; }
+                updateWallet(wallet.debit(w, action.amount, 'Andar Bahar bet'));
+                socket.sendRoomMessage(andarBaharGame.roomId, ab.serializeAndarBaharAction({
+                    type: 'ab_bet', peer_id: myId, nick: myNick, side: action.side, amount: action.amount,
+                }));
+            } else if (action.type === 'clearBets') {
+                const myBets = (andarBaharGame.bets || []).filter(b => b.peer_id === myId);
+                const refund = myBets.reduce((s, b) => s + (b.amount || 0), 0);
+                if (refund > 0 && walletRef.current) {
+                    updateWallet(wallet.credit(walletRef.current, refund, 'Andar Bahar bets cleared'));
+                }
+                socket.sendRoomMessage(andarBaharGame.roomId, ab.serializeAndarBaharAction({
+                    type: 'ab_clearBets', peer_id: myId,
+                }));
+            }
+            return;
+        }
+
+        // Host processes locally
         if (action.type === 'clearBets') {
-            // Refund all pending bets back to wallet
             const myBets = (andarBaharGame.bets || []).filter(b => b.peer_id === myId);
             const refund = myBets.reduce((s, b) => s + (b.amount || 0), 0);
             if (refund > 0 && walletRef.current) {
@@ -1698,11 +1793,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             return;
         }
 
-        if (action.type !== 'bet') return; // auto-cycle handles everything else
+        if (action.type !== 'bet') return;
 
         const w = walletRef.current;
         if (!w || !wallet.canAfford(w, action.amount)) { addMsg('★', `⚠ Insufficient chips.`, 'system'); return; }
-        // Upfront debit — prevents double-spending across concurrent games
         updateWallet(wallet.debit(w, action.amount, 'Andar Bahar bet'));
         const newGame = ab.placeBet(andarBaharGame, myId, myNick, action.side, action.amount);
         setAndarBaharGame(newGame);
