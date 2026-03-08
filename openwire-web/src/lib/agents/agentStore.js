@@ -49,7 +49,7 @@ function buildDefaults() {
         characters,
         modelFilters: { whitelist: [], blacklist: [] },
         guardrails: true,  // SFW guardrails on by default
-        _version: 11,
+        _version: 12,
     };
 }
 
@@ -58,7 +58,7 @@ function buildDefaults() {
 /** Load the complete agent store (groups, characters, modelFilters) */
 export function loadStore() {
     const stored = loadRaw();
-    if (stored && stored._version >= 11) return stored;
+    if (stored && stored._version >= 12) return stored;
     const defaults = buildDefaults();
     saveRaw(defaults);
     return defaults;
