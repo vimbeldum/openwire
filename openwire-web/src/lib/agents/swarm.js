@@ -999,11 +999,7 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
 
         const nick = match[1].trim();
 
-        // Don't tag other agents — only tag human users
-        // #7: Use cached agent names
-        const agentNames = this._getAgentNames();
-        if (agentNames.has(nick)) return null;
-
+        // Tag both humans and other agents to enable natural conversation flow
         return nick;
     }
 
