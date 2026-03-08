@@ -5,16 +5,29 @@ import * as bj from '../lib/blackjack';
 import * as rl from '../lib/roulette';
 import * as ab from '../lib/andarbahar';
 import * as wallet from '../lib/wallet';
-const GameBoard = lazy(() => import('./GameBoard'));
-const BlackjackBoard = lazy(() => import('./BlackjackBoard'));
-const RouletteBoard = lazy(() => import('./RouletteBoard'));
-const AndarBaharBoard = lazy(() => import('./AndarBaharBoard'));
-const AdminPortal = lazy(() => import('./AdminPortal'));
-const GifPicker = lazy(() => import('./GifPicker'));
-const HowToPlay = lazy(() => import('./HowToPlay'));
-const PostSessionSummary = lazy(() => import('./PostSessionSummary'));
-const AccountHistory = lazy(() => import('./AccountHistory'));
-const AgentControlPanel = lazy(() => import('./AgentControlPanel'));
+
+// Retry wrapper: on chunk-not-found after deploy, reload once to get fresh HTML
+function lazyRetry(fn) {
+    return lazy(() => fn().catch(() => {
+        const key = 'openwire_chunk_reload';
+        if (!sessionStorage.getItem(key)) {
+            sessionStorage.setItem(key, '1');
+            window.location.reload();
+        }
+        return fn(); // second attempt after reload flag set
+    }));
+}
+
+const GameBoard = lazyRetry(() => import('./GameBoard'));
+const BlackjackBoard = lazyRetry(() => import('./BlackjackBoard'));
+const RouletteBoard = lazyRetry(() => import('./RouletteBoard'));
+const AndarBaharBoard = lazyRetry(() => import('./AndarBaharBoard'));
+const AdminPortal = lazyRetry(() => import('./AdminPortal'));
+const GifPicker = lazyRetry(() => import('./GifPicker'));
+const HowToPlay = lazyRetry(() => import('./HowToPlay'));
+const PostSessionSummary = lazyRetry(() => import('./PostSessionSummary'));
+const AccountHistory = lazyRetry(() => import('./AccountHistory'));
+const AgentControlPanel = lazyRetry(() => import('./AgentControlPanel'));
 import LiveTicker from './chat/LiveTicker';
 import TypingBar from './chat/TypingBar';
 import * as ledger from '../lib/core/ledger.js';
@@ -311,7 +324,19 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         }
     }, []);
 
-    // ── Agent Swarm bootstrap ─────────────────────────────────
+    // ── Swarm host election: admin gets priority, otherwise oldest peer (lowest id) ──
+    const shouldRunSwarm = useCallback(() => {
+        if (isAdminRef.current) return true;
+        // Check if any admin is online (admins have priority)
+        // If no admin, the oldest peer (lowest alphabetical peer_id) hosts
+        const allIds = peersRef.current.map(p => p.peer_id).filter(Boolean);
+        if (!allIds.length || !myIdRef.current) return false;
+        const sorted = [...allIds].sort();
+        return sorted[0] === myIdRef.current;
+    }, []);
+
+    // ── Agent Swarm bootstrap (always load module, only start if elected host) ──
+    const swarmHostRef = useRef(false); // tracks whether this session is the active swarm host
     useEffect(() => {
         let cancelled = false;
         import('../lib/agents/swarm.js').then(({ AgentSwarm }) => {
@@ -358,16 +383,39 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             },
         });
         swarmRef.current = swarm;
-        // Auto-start the swarm so agents begin chatting immediately
-        swarm.start().catch(e => console.warn('[AgentSwarm] auto-start failed:', e));
+        // Only start if this session is the elected swarm host
+        if (shouldRunSwarm()) {
+            swarmHostRef.current = true;
+            swarm.start().catch(e => console.warn('[AgentSwarm] auto-start failed:', e));
+        }
         }); // end dynamic import
         return () => {
             cancelled = true;
             swarmRef.current?.stop();
             swarmRef.current = null;
+            swarmHostRef.current = false;
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // ── Re-evaluate swarm host on peer changes ──
+    useEffect(() => {
+        if (!swarmRef.current) return;
+        const isHost = shouldRunSwarm();
+        if (isHost && !swarmHostRef.current) {
+            // This session just became the elected host — start the swarm
+            swarmHostRef.current = true;
+            swarmRef.current.start().catch(e => console.warn('[AgentSwarm] host-takeover start failed:', e));
+            console.log('[SwarmElection] This session is now the swarm host');
+        } else if (!isHost && swarmHostRef.current) {
+            // Another session should host — stop our swarm
+            swarmHostRef.current = false;
+            swarmRef.current.stop();
+            setAgentRunning(false);
+            console.log('[SwarmElection] Swarm host moved to another session');
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [peers]);
 
     const addTicker = useCallback((text, gameType = 'casino') => {
         setTickerItems(prev => [...prev.slice(-29), { text, gameType, ts: Date.now() }]);
