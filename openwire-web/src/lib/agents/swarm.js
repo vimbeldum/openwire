@@ -38,8 +38,10 @@ const SUMMARY_MAX_CHARS = 2500;       // cap merged summary length
 const SUMMARY_STORAGE_KEY = 'openwire_context_summary';
 
 // Strip emoji from strings — used to clean nicks in context so LLM doesn't copy avatar emoji
-const EMOJI_RE = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}\u{2B50}\u{2764}\u{2753}\u{2049}\u{203C}\u{2139}\u{2328}\u{23CF}-\u{23FA}\u{25AA}-\u{25FE}\u{2934}-\u{2935}\u{3030}\u{303D}\u{3297}\u{3299}]/gu;
+const EMOJI_RE = /[\u{1F300}-\u{1F9FF}\u{1FA00}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}\u{2B50}\u{2764}\u{2753}\u{2049}\u{203C}\u{2139}\u{2328}\u{23CF}-\u{23FA}\u{25AA}-\u{25FE}\u{2934}-\u{2935}\u{3030}\u{303D}\u{3297}\u{3299}]/gu;
 function stripEmoji(str) { return str.replace(EMOJI_RE, '').trim(); }
+// Neutralize XML-like tags in user messages to prevent prompt injection
+function escapeXmlTags(str) { return str.replace(/</g, '(').replace(/>/g, ')'); }
 
 export class AgentSwarm {
     constructor({ onMessage, onError, onModelLoad, onLog, onTyping }) {
@@ -298,7 +300,9 @@ export class AgentSwarm {
             const cleanNick = stripEmoji(nick);
             isAgent = agentNames.has(cleanNick);
         }
-        this._context.push({ role: 'user', content: `${nick}: ${text}`, _isAgent: isAgent });
+        // Escape XML tags from user messages to prevent prompt injection via fake <identity> etc.
+        const safeText = isAgent ? text : escapeXmlTags(text);
+        this._context.push({ role: 'user', content: `${nick}: ${safeText}`, _isAgent: isAgent });
         if (this._context.length > CONTEXT_BUFFER_SIZE) this._context.shift();
         this._contextDirty = true;
 

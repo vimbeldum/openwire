@@ -69,7 +69,7 @@ export async function generateQwenMessage(modelId, systemPrompt, contextMessages
         model: modelId,
         messages,
         max_tokens: maxTokens || 200,
-        temperature: 0.92,
+        temperature: 0.78,
     };
 
     if (IS_DEBUG_QW) {

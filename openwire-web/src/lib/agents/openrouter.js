@@ -120,7 +120,7 @@ export async function generateMessage(modelId, systemPrompt, contextMessages, ma
         model: modelId,
         messages,
         max_tokens: maxTokens,
-        temperature: 0.92,
+        temperature: 0.78,
     };
 
     if (IS_DEBUG_OR) {

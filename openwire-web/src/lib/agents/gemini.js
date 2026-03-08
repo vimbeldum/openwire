@@ -76,9 +76,15 @@ export async function generateGeminiMessage(modelId, systemPrompt, contextMessag
         })),
     ];
 
+    // Gemini requires strict user/model alternation — merge consecutive same-role turns
     allMsgs.forEach(m => {
         const role = m.role === 'model' ? 'model' : 'user';
-        contents.push({ role, parts: [{ text: m.content }] });
+        const last = contents[contents.length - 1];
+        if (last && last.role === role) {
+            last.parts[0].text += '\n' + m.content;
+        } else {
+            contents.push({ role, parts: [{ text: m.content }] });
+        }
     });
 
     const payload = {
@@ -86,7 +92,7 @@ export async function generateGeminiMessage(modelId, systemPrompt, contextMessag
         contents,
         generationConfig: {
             maxOutputTokens: maxTokens || 200,
-            temperature: 0.92,
+            temperature: 0.78,
         },
     };
 
