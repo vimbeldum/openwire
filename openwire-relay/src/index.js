@@ -181,6 +181,9 @@ export class RelayRoom {
 
                 case "room_message": {
                     if (!peerInfo) return;
+                    // Verify sender is a member of the target room
+                    const msgRoom = this.rooms.get(msg.room_id);
+                    if (!msgRoom || !msgRoom.members.has(peerInfo.peer_id)) return;
                     this.broadcastToRoom(msg.room_id, {
                         type: "room_message",
                         room_id: msg.room_id,

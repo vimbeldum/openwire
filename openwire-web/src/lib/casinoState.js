@@ -9,7 +9,12 @@
 
 const STORAGE_KEY = 'openwire_casino_v1';
 
-function now() { return Date.now(); }
+let _lastTs = 0;
+function now() {
+    const t = Date.now();
+    _lastTs = t > _lastTs ? t : _lastTs + 1;
+    return _lastTs;
+}
 
 /* ── State shape ──────────────────────────────────────────── */
 

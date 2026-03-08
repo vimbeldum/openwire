@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 
 /* ── Outcome Bar ───────────────────────────────── */
 function OutcomeBar({ name, price, isLeading, isWinner, isResolved, dimmed }) {
@@ -340,7 +340,7 @@ function ResolvedBanner({ outcomes, result, payouts, myId }) {
 }
 
 /* ── Main Board ────────────────────────────────── */
-export default function PolymarketBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost }) {
+export default memo(function PolymarketBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost }) {
     if (!game) return null;
 
     const balance = wallet ? (wallet.baseBalance + wallet.adminBonus) : 0;
@@ -449,4 +449,4 @@ export default function PolymarketBoard({ game, myId, myNick, wallet, onAction, 
             </div>
         </div>
     );
-}
+});

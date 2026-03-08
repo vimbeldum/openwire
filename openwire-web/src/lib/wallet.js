@@ -102,6 +102,17 @@ export function saveWallet(wallet) {
     }
 }
 
+// Synchronous save for security-critical operations (debit)
+export function saveWalletSync(wallet) {
+    _pendingWallet = wallet;
+    const deviceId = wallet.deviceId || getDeviceId();
+    try {
+        localStorage.setItem(storageKey(deviceId), JSON.stringify(wallet));
+    } catch (e) {
+        console.warn('Failed to save wallet (sync)', e);
+    }
+}
+
 /* ── Balance helpers ──────────────────────────────────────── */
 export function getTotalBalance(wallet) {
     return (wallet.baseBalance || 0) + (wallet.adminBonus || 0);
@@ -134,7 +145,7 @@ export function debit(wallet, amount, reason = 'Bet') {
             { time: Date.now(), reason, amount: -amount, balance: Math.max(0, base) + Math.max(0, bonus) },
         ],
     };
-    saveWallet(updated);
+    saveWalletSync(updated);
     return updated;
 }
 

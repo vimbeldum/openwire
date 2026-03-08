@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import * as ab from '../lib/andarbahar';
 import * as bj from '../lib/blackjack';
 
@@ -115,7 +115,7 @@ function HistoryStrip({ history }) {
 const BET_AMOUNTS = [10, 25, 50, 100, 250, 500];
 
 /* ── Main Board ─────────────────────────────────── */
-export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost, onReady, onNewRound, readyCount, totalBettors, isReady }) {
+export default memo(function AndarBaharBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost, onReady, onNewRound, readyCount, totalBettors, isReady }) {
     const [selectedAmount, setSelectedAmount] = useState(50);
 
     if (!game) return null;
@@ -357,4 +357,4 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
             </div>
         </div>
     );
-}
+});

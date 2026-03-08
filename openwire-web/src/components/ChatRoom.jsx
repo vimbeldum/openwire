@@ -335,14 +335,45 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         setShowPostSummary(true);
     }, [activeGame]);
 
+    // ── Room switch cleanup: stop timers, reset game state ──
+    const cleanupGameState = useCallback(() => {
+        // Clear all game timers
+        if (rouletteTimerRef.current) { clearInterval(rouletteTimerRef.current); rouletteTimerRef.current = null; }
+        if (rouletteSpinTimeoutRef.current) { clearTimeout(rouletteSpinTimeoutRef.current); rouletteSpinTimeoutRef.current = null; }
+        if (rouletteResultTimeoutRef.current) { clearTimeout(rouletteResultTimeoutRef.current); rouletteResultTimeoutRef.current = null; }
+        if (abDealTimerRef.current) { clearInterval(abDealTimerRef.current); abDealTimerRef.current = null; }
+        if (abCycleTimerRef.current) { clearTimeout(abCycleTimerRef.current); abCycleTimerRef.current = null; }
+        abGenRef.current++;
+        if (bjDealerTimerRef.current) { clearTimeout(bjDealerTimerRef.current); bjDealerTimerRef.current = null; }
+        // Reset game states
+        setBlackjackGame(null);
+        setRouletteGame(null);
+        setAndarBaharGame(null);
+        setPolymarketGame(null);
+        setActiveGame(null);
+        // Reset host refs
+        bjHostRef.current = null;
+        rouletteHostRef.current = null;
+        abHostRef.current = null;
+        pmHostRef.current = null;
+        // Reset consent flags
+        hasJoinedBj.current = false;
+        hasJoinedRl.current = false;
+        hasJoinedAb.current = false;
+        hasJoinedPm.current = false;
+        // Clear ready peers
+        setReadyPeers({ roulette: new Set(), blackjack: new Set(), andarbahar: new Set() });
+    }, []);
+
     useEffect(() => {
         if (currentRoom) {
             localStorage.setItem('openwire_current_room', currentRoom);
         } else {
             localStorage.removeItem('openwire_current_room');
             localStorage.removeItem('openwire_current_room_name');
+            cleanupGameState();
         }
-    }, [currentRoom]);
+    }, [currentRoom, cleanupGameState]);
 
     // ── Wallet init ──────────────────────────────────────────
     useEffect(() => {
@@ -509,7 +540,17 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     }, [addReaction]);
 
     // ── Payout resolution (financial games) ─────────────────
+    const lastSettledRoundRef = useRef(new Set());
     const resolvePayoutEvent = useCallback((event, myId, walletObj) => {
+        // Idempotency: prevent double-processing the same round
+        const roundKey = `${event.gameType}-${event.roundId}`;
+        if (lastSettledRoundRef.current.has(roundKey)) return walletObj;
+        lastSettledRoundRef.current.add(roundKey);
+        // Cap the set to prevent unbounded growth
+        if (lastSettledRoundRef.current.size > 50) {
+            const first = lastSettledRoundRef.current.values().next().value;
+            lastSettledRoundRef.current.delete(first);
+        }
         const deviceId = wallet.getDeviceId();
         const { updatedWallet } = ledger.processEvent(walletObj, event, myId, deviceId);
         updateWallet(updatedWallet);
@@ -1131,6 +1172,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 const gameState = pm.deserializeGame(action.state);
                 if (gameState) {
                     if (!hasJoinedPm.current && pmHostRef.current !== myIdRef.current) break;
+                    // Verify sender is the host (prevent forged state injection)
+                    if (msg.from && pmHostRef.current && msg.from !== pmHostRef.current) break;
                     setPolymarketGame(prev => {
                         if (gameState.phase === 'resolved' && prev?.phase !== 'resolved' && !amIHost(pmHostRef.current)) {
                             const myNet = gameState.payouts?.[myId];
@@ -1305,17 +1348,26 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     const action = game.parseGameAction(msg.data);
                     if (action) handleGameAction(msg, action);
                 } else if (isBjMsg) {
+                    // Guard: only process BJ messages for the room we're playing in (or invites)
                     const action = bj.parseBlackjackAction(msg.data);
-                    if (action) handleBlackjackAction(msg, action);
+                    if (action && (action.type === 'bj_start' || !blackjackRef.current || blackjackRef.current.roomId === msg.room_id)) {
+                        handleBlackjackAction(msg, action);
+                    }
                 } else if (isRlMsg) {
                     const action = rl.parseRouletteAction(msg.data);
-                    if (action) handleRouletteAction(msg, action);
+                    if (action && (action.type === 'rl_start' || !rouletteRef.current || rouletteRef.current.roomId === msg.room_id)) {
+                        handleRouletteAction(msg, action);
+                    }
                 } else if (isAbMsg) {
                     const action = ab.parseAndarBaharAction(msg.data);
-                    if (action) handleAndarBaharAction(msg, action);
+                    if (action && (action.type === 'ab_start' || !andarBaharRef.current || andarBaharRef.current.roomId === msg.room_id)) {
+                        handleAndarBaharAction(msg, action);
+                    }
                 } else if (isPmMsg) {
                     const action = pm.parsePolymarketAction(msg.data);
-                    if (action) handlePolymarketAction(msg, action);
+                    if (action && (action.type === 'pm_start' || !polymarketRef.current || polymarketRef.current.roomId === msg.room_id)) {
+                        handlePolymarketAction(msg, action);
+                    }
                 } else if (isCurrentRoom) {
                     const gifMatch = msg.data.match(/^\[GIF\](.+)$/);
                     if (gifMatch) {
@@ -1363,7 +1415,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             case 'host_left': {
                 const myId = myIdRef.current;
                 addMsg('★', `👑 Host changed — new host elected`, 'system');
-                // Update host references
+                // Update host references for ALL game types
                 if (rouletteRef.current?.roomId === msg.room_id) {
                     rouletteHostRef.current = msg.new_host;
                     if (msg.new_host === myId) {
@@ -1371,13 +1423,26 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         startRouletteTimer();
                     }
                 }
+                if (blackjackRef.current?.roomId === msg.room_id) {
+                    bjHostRef.current = msg.new_host;
+                    if (msg.new_host === myId) {
+                        addMsg('★', '👑 You are now the Blackjack host', 'system');
+                        const curBj = blackjackRef.current;
+                        if (curBj && curBj.phase === 'betting') startBlackjackTimer(curBj);
+                    }
+                }
                 if (andarBaharRef.current?.roomId === msg.room_id) {
                     abHostRef.current = msg.new_host;
                     if (msg.new_host === myId) {
                         addMsg('★', '👑 You are now the Andar Bahar host', 'system');
-                        // Restart the full AB cycle from current state
                         const curAb = andarBaharRef.current;
                         if (curAb) startAbCycle(curAb);
+                    }
+                }
+                if (polymarketRef.current?.roomId === msg.room_id) {
+                    pmHostRef.current = msg.new_host;
+                    if (msg.new_host === myId) {
+                        addMsg('★', '👑 You are now the Predictions host', 'system');
                     }
                 }
                 break;
@@ -2364,6 +2429,24 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const balance = myWallet ? wallet.getTotalBalance(myWallet) : 0;
     const anyGameActive = !!(activeGame || blackjackGame || rouletteGame || andarBaharGame || polymarketGame);
 
+    // ── Stable callback props for memoized board components ──
+    const closeBj = useCallback(() => setBlackjackGame(null), []);
+    const closeRl = useCallback(() => setRouletteGame(null), []);
+    const closeAb = useCallback(() => setAndarBaharGame(null), []);
+    const closePm = useCallback(() => setPolymarketGame(null), []);
+    const closeTtt = useCallback(() => setActiveGame(null), []);
+    const helpBj = useCallback(() => openHelp('blackjack'), []);
+    const helpRl = useCallback(() => openHelp('roulette'), []);
+    const helpAb = useCallback(() => openHelp('andarbahar'), []);
+    const helpPm = useCallback(() => openHelp('polymarket'), []);
+    const helpTtt = useCallback(() => openHelp('tictactoe'), []);
+    const readyBj = useCallback(() => handleReadyUp('blackjack'), [handleReadyUp]);
+    const readyRl = useCallback(() => handleReadyUp('roulette'), [handleReadyUp]);
+    const readyAb = useCallback(() => handleReadyUp('andarbahar'), [handleReadyUp]);
+    const newRoundBj = useCallback(() => handleGameNewRound('blackjack'), [handleGameNewRound]);
+    const newRoundRl = useCallback(() => handleGameNewRound('roulette'), [handleGameNewRound]);
+    const newRoundAb = useCallback(() => handleGameNewRound('andarbahar'), [handleGameNewRound]);
+
     return (
         <div className="chat-layout">
             <header className="chat-header">
@@ -2713,10 +2796,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             {/* Game Overlays */}
             <Suspense fallback={null}>
             {activeGame && (
-                <GameBoard game={activeGame} myId={myIdRef.current} onMove={handleGameMove} onRematch={handleRematch} onClose={() => setActiveGame(null)} onHelp={() => openHelp('tictactoe')} />
+                <GameBoard game={activeGame} myId={myIdRef.current} onMove={handleGameMove} onRematch={handleRematch} onClose={closeTtt} onHelp={helpTtt} />
             )}
             {blackjackGame && (
-                <BlackjackBoard game={blackjackGame} myId={myIdRef.current} myNick={myNick} wallet={myWallet} onAction={handleBjAction} onClose={() => setBlackjackGame(null)} onHelp={() => openHelp('blackjack')} isHost={bjHostRef.current === myIdRef.current} onReady={() => handleReadyUp('blackjack')} onNewRound={() => handleGameNewRound('blackjack')} readyCount={readyPeers.blackjack.size} totalBettors={blackjackGame?.players?.filter(p => p.bet > 0).length || 0} isReady={readyPeers.blackjack.has(myIdRef.current)} />
+                <BlackjackBoard game={blackjackGame} myId={myIdRef.current} myNick={myNick} wallet={myWallet} onAction={handleBjAction} onClose={closeBj} onHelp={helpBj} isHost={bjHostRef.current === myIdRef.current} onReady={readyBj} onNewRound={newRoundBj} readyCount={readyPeers.blackjack.size} totalBettors={blackjackGame?.players?.filter(p => p.bet > 0).length || 0} isReady={readyPeers.blackjack.has(myIdRef.current)} />
             )}
             {rouletteGame && (
                 <RouletteBoard
@@ -2725,11 +2808,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     myNick={myNick}
                     wallet={myWallet}
                     onAction={handleRlAction}
-                    onClose={() => setRouletteGame(null)}
-                    onHelp={() => openHelp('roulette')}
+                    onClose={closeRl}
+                    onHelp={helpRl}
                     isHost={amIHost(rouletteHostRef.current)}
-                    onReady={() => handleReadyUp('roulette')}
-                    onNewRound={() => handleGameNewRound('roulette')}
+                    onReady={readyRl}
+                    onNewRound={newRoundRl}
                     readyCount={readyPeers.roulette.size}
                     totalBettors={[...new Set((rouletteGame?.bets || []).map(b => b.peer_id))].length}
                     isReady={readyPeers.roulette.has(myIdRef.current)}
@@ -2742,11 +2825,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     myNick={myNick}
                     wallet={myWallet}
                     onAction={handleAbAction}
-                    onClose={() => setAndarBaharGame(null)}
-                    onHelp={() => openHelp('andarbahar')}
+                    onClose={closeAb}
+                    onHelp={helpAb}
                     isHost={amIHost(abHostRef.current)}
-                    onReady={() => handleReadyUp('andarbahar')}
-                    onNewRound={() => handleGameNewRound('andarbahar')}
+                    onReady={readyAb}
+                    onNewRound={newRoundAb}
                     readyCount={readyPeers.andarbahar.size}
                     totalBettors={[...new Set((andarBaharGame?.bets || []).map(b => b.peer_id))].length}
                     isReady={readyPeers.andarbahar.has(myIdRef.current)}
@@ -2759,8 +2842,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     myNick={myNick}
                     wallet={myWallet}
                     onAction={handlePmAction}
-                    onClose={() => setPolymarketGame(null)}
-                    onHelp={() => openHelp('polymarket')}
+                    onClose={closePm}
+                    onHelp={helpPm}
                     isHost={amIHost(pmHostRef.current)}
                 />
             )}

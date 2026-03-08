@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, memo } from 'react';
 import * as bj from '../lib/blackjack';
 
 /* ── Reusable Premium Card ────────────────────────── */
@@ -199,7 +199,7 @@ function useDelayedResults(game) {
 }
 
 /* ── Main Board ───────────────────────────────────── */
-export default function BlackjackBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost, onReady, onNewRound, readyCount, totalBettors, isReady }) {
+export default memo(function BlackjackBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost, onReady, onNewRound, readyCount, totalBettors, isReady }) {
     const [selectedBet, setSelectedBet] = useState(50);
     const { revealedCards } = useDealAnimation(game);
     const showResults = useDelayedResults(game);
@@ -389,4 +389,4 @@ export default function BlackjackBoard({ game, myId, myNick, wallet, onAction, o
             </div>
         </div>
     );
-}
+});

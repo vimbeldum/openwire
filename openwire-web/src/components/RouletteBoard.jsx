@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, memo } from 'react';
 import * as rl from '../lib/roulette';
 
 /* ── Constants ──────────────────────────────────── */
@@ -194,7 +194,7 @@ function OutsideBtn({ label, type, target, myBets, onBet, disabled, className = 
 const BET_AMOUNTS = [5, 10, 25, 50, 100, 250];
 
 /* ── Main Board ─────────────────────────────────── */
-export default function RouletteBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost, onReady, onNewRound, readyCount, totalBettors, isReady }) {
+export default memo(function RouletteBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost, onReady, onNewRound, readyCount, totalBettors, isReady }) {
     const [betAmount, setBetAmount] = useState(25);
     const [spinning, setSpinning] = useState(false);
 
@@ -417,4 +417,4 @@ export default function RouletteBoard({ game, myId, myNick, wallet, onAction, on
             </div>
         </div>
     );
-}
+});
