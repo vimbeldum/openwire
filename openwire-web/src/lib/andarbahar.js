@@ -92,6 +92,7 @@ export function clearBets(game, peer_id) {
 // Host auto-deals trump at end of betting phase
 export function dealTrump(game) {
     if (game.phase !== 'betting') return game;
+    if (!game.deck || game.deck.length === 0) return game;
     const deck = [...game.deck];
     const trumpCard = deck.pop();
     return { ...game, deck, trumpCard, phase: 'dealing', dealCount: 0 };
@@ -291,8 +292,14 @@ export function serializeGame(game) {
 export function deserializeGame(data) {
     try {
         const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+        if (!parsed) return null;
         // Peers won't have the deck (host keeps it); ensure graceful handling
-        if (parsed && !parsed.deck) parsed.deck = null;
+        if (!parsed.deck) parsed.deck = [];
+        // Ensure arrays exist to prevent render crashes
+        if (!parsed.andar) parsed.andar = [];
+        if (!parsed.bahar) parsed.bahar = [];
+        if (!parsed.bets) parsed.bets = [];
+        if (!parsed.trumpHistory) parsed.trumpHistory = [];
         return parsed;
     } catch { return null; }
 }

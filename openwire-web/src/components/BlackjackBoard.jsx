@@ -223,9 +223,25 @@ export default function BlackjackBoard({ game, myId, myNick, wallet, onAction, o
                     )}
 
                     {game.phase === 'ended' && (
-                        <button className="bj-btn-primary deal" onClick={onNewRound}>
-                            Start Next Round
-                        </button>
+                        <>
+                            {/* Payout breakdown for all players */}
+                            {game.payouts && Object.keys(game.payouts).length > 0 && (
+                                <div className="bj-payouts-row">
+                                    {game.players.filter(p => p.bet > 0).map(p => {
+                                        const net = game.payouts?.[p.peer_id] ?? 0;
+                                        return (
+                                            <div key={p.peer_id} className={`bj-payout-chip ${net > 0 ? 'win' : net < 0 ? 'lose' : 'push'}`}>
+                                                <span>{p.nick}{p.peer_id === myId ? ' (You)' : ''}</span>
+                                                <span>{net > 0 ? `+${net}` : net === 0 ? '±0' : net}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                            <button className="bj-btn-primary deal" onClick={onNewRound}>
+                                Start Next Round
+                            </button>
+                        </>
                     )}
 
                     {!myPlayer && game.phase !== 'betting' && (

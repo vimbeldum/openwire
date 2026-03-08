@@ -121,7 +121,8 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
     if (!game) return null;
 
     const balance = wallet ? (wallet.baseBalance + wallet.adminBonus) : 0;
-    const myBets = game.bets?.filter(b => b.peer_id === myId) || [];
+    const bets = game.bets || [];
+    const myBets = bets.filter(b => b.peer_id === myId);
     const myAndarBet = myBets.find(b => b.side === 'andar');
     const myBaharBet = myBets.find(b => b.side === 'bahar');
     const totalMyBet = myBets.reduce((s, b) => s + b.amount, 0);
@@ -186,7 +187,7 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
                         )}
                         {game.phase === 'ended' && (
                             <div className={`ab-phase-badge result ${resultColor}`}>
-                                {game.result?.toUpperCase()} WINS!
+                                        {game.result === 'draw' ? 'DRAW' : `${game.result?.toUpperCase()} WINS!`}
                             </div>
                         )}
                         {myPayout !== undefined && game.phase === 'ended' && (
@@ -239,9 +240,9 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
                 </div>
 
                 {/* All bets */}
-                {game.bets?.length > 0 && (
+                {bets.length > 0 && (
                     <div className="ab-bets-bar">
-                        {game.bets.map((b, i) => (
+                        {bets.map((b, i) => (
                             <span key={i} className={`ab-bet-pill ${b.side}`}>
                                 {b.nick}: {b.amount}
                             </span>
@@ -253,7 +254,7 @@ export default function AndarBaharBoard({ game, myId, myNick, wallet, onAction, 
                 {game.phase === 'ended' && game.payouts && (
                     <div className="ab-payouts-row">
                         {Object.entries(game.payouts).map(([pid, net]) => {
-                            const bet = game.bets.find(b => b.peer_id === pid);
+                            const bet = bets.find(b => b.peer_id === pid);
                             return (
                                 <div key={pid} className={`ab-payout-chip ${net >= 0 ? 'win' : 'lose'}`}>
                                     <span>{bet?.nick || pid.slice(0, 6)}</span>

@@ -974,6 +974,28 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 });
                 break;
             }
+            case 'bj_player_action': {
+                // Non-host player sent an action — only the host processes it
+                if (!amIHost(bjHostRef.current)) break;
+                setBlackjackGame(prev => {
+                    if (!prev) return prev;
+                    let updated = prev;
+                    if (action.action === 'bet') {
+                        updated = bj.placeBet(prev, action.peer_id, action.amount);
+                    } else if (action.action === 'hit') {
+                        updated = bj.hit(prev, action.peer_id);
+                    } else if (action.action === 'stand') {
+                        updated = bj.stand(prev, action.peer_id);
+                    } else return prev;
+                    const prevPhase = prev.phase;
+                    setTimeout(() => {
+                        socket.sendRoomMessage(updated.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(updated) }));
+                        bjCheckDealerTransition(prevPhase, updated);
+                    }, 0);
+                    return updated;
+                });
+                break;
+            }
         }
     }, [addMsg, addActivityLog, updateWallet]);
 
@@ -1325,10 +1347,56 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         startBlackjackTimer(newGame);
     };
 
+    // Shared helper: after a BJ game update, check for dealer phase transition
+    const bjCheckDealerTransition = (prevPhase, newGame) => {
+        if (newGame.phase === 'dealer' && prevPhase !== 'dealer') {
+            setTimeout(() => {
+                const settled = bj.runDealerTurn(newGame);
+                const payoutEvent = new bj.BlackjackEngine(settled).calculateResults(settled);
+                settled.payouts = payoutEvent.totals || {};
+                setBlackjackGame(settled);
+                if (amIHost(bjHostRef.current) && settled.payouts) {
+                    updateBankLedger('blackjack', settled.payouts);
+                }
+                const hostMyId = myIdRef.current;
+                const hostMyNet = settled.payouts?.[hostMyId];
+                if (hostMyNet !== undefined && walletRef.current) {
+                    resolvePayoutEvent(payoutEvent, hostMyId, walletRef.current);
+                }
+                socket.sendRoomMessage(settled.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(settled) }));
+            }, 1000);
+        }
+    };
+
     const handleBjAction = (action) => {
         if (!blackjackGame) return;
         const myId = myIdRef.current;
         const myNick = nickRef.current;
+
+        // Non-host players: proxy bet/hit/stand to host (they don't have the deck)
+        if (!amIHost(bjHostRef.current)) {
+            if (action.type === 'join') {
+                socket.sendRoomMessage(blackjackGame.roomId, bj.serializeBlackjackAction({ type: 'bj_join', peer_id: myId, nick: myNick }));
+                return;
+            }
+            if (action.type === 'bet') {
+                const w = walletRef.current;
+                if (!w || !wallet.canAfford(w, action.amount)) return;
+                socket.sendRoomMessage(blackjackGame.roomId, bj.serializeBlackjackAction({
+                    type: 'bj_player_action', peer_id: myId, nick: myNick, action: 'bet', amount: action.amount,
+                }));
+                return;
+            }
+            if (action.type === 'hit' || action.type === 'stand') {
+                socket.sendRoomMessage(blackjackGame.roomId, bj.serializeBlackjackAction({
+                    type: 'bj_player_action', peer_id: myId, action: action.type,
+                }));
+                return;
+            }
+            return; // non-host ignores deal/dealerPlay/newRound
+        }
+
+        // Host processes locally (has full deck)
         let newGame = blackjackGame;
 
         switch (action.type) {
@@ -1337,7 +1405,6 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 socket.sendRoomMessage(blackjackGame.roomId, bj.serializeBlackjackAction({ type: 'bj_join', peer_id: myId, nick: myNick }));
                 break;
             case 'bet': {
-                // Validate affordability but do NOT debit — payout system handles net settlement
                 const w = walletRef.current;
                 if (!w || !wallet.canAfford(w, action.amount)) break;
                 newGame = bj.placeBet(blackjackGame, myId, action.amount);
@@ -1355,26 +1422,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
         setBlackjackGame(newGame);
         socket.sendRoomMessage(newGame.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(newGame) }));
-
-        if (newGame.phase === 'dealer' && blackjackGame.phase !== 'dealer') {
-            setTimeout(() => {
-                const settled = bj.runDealerTurn(newGame);
-                // Compute payouts for bank ledger and wallet settlement
-                const payoutEvent = new bj.BlackjackEngine(settled).calculateResults(settled);
-                settled.payouts = payoutEvent.totals || {};
-                setBlackjackGame(settled);
-                if (amIHost(bjHostRef.current) && settled.payouts) {
-                    updateBankLedger('blackjack', settled.payouts);
-                }
-                // Apply wallet changes for host
-                const hostMyId = myIdRef.current;
-                const hostMyNet = settled.payouts?.[hostMyId];
-                if (hostMyNet !== undefined && walletRef.current) {
-                    resolvePayoutEvent(payoutEvent, hostMyId, walletRef.current);
-                }
-                socket.sendRoomMessage(settled.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(settled) }));
-            }, 1000);
-        }
+        bjCheckDealerTransition(blackjackGame.phase, newGame);
     };
 
     // ── Roulette handlers ────────────────────────────────────
