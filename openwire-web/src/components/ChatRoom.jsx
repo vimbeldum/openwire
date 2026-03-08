@@ -309,11 +309,22 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         const swarm = new AgentSwarm({
             onMessage: (characterId, nick, avatar, text) => {
                 // Post agent messages to whichever room the user is currently viewing
-                addMsg(`${avatar} ${nick}`, text, 'peer', {
-                    roomId: currentRoomRef.current || null,
+                const displayNick = `${avatar} ${nick}`;
+                const roomId = currentRoomRef.current || null;
+                addMsg(displayNick, text, 'peer', {
+                    roomId,
                     isAgent: true,
                     characterId,
                 });
+                // Broadcast to other sessions via WebSocket relay
+                if (roomId) {
+                    socket.sendRoomMessage(roomId, JSON.stringify({
+                        type: 'agent_message',
+                        nick: displayNick,
+                        text,
+                        characterId,
+                    }));
+                }
                 // Feed back into context
                 swarm.addContext(nick, text);
             },
@@ -884,15 +895,29 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     setPeers(prev => prev.filter(p => p.peer_id !== msg.peer_id));
                     addMsg('★', `${msg.nick} left`, 'system');
                     break;
-                case 'message':
-                    addMsg(msg.nick, msg.data, 'peer');
-                    // Check if we were @mentioned in the general chat message
-                    if (msg.data && nickRef.current && msg.data.toLowerCase().includes(`@${nickRef.current.toLowerCase()}`)) {
-                        const toastId = Date.now() + Math.random();
-                        setMentionToasts(prev => [...prev, { id: toastId, from: msg.nick, text: msg.data }]);
-                        setTimeout(() => setMentionToasts(prev => prev.filter(t => t.id !== toastId)), 5000);
+                case 'message': {
+                    // Try parsing custom JSON actions (mention_notify, agent_message, etc.)
+                    let msgCustom = null;
+                    if (msg.data?.startsWith('{')) {
+                        try {
+                            const parsed = JSON.parse(msg.data);
+                            const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify'];
+                            if (CUSTOM.includes(parsed.type)) msgCustom = parsed;
+                        } catch { /* not JSON */ }
+                    }
+                    if (msgCustom) {
+                        handleCustomAction(msg, msgCustom);
+                    } else {
+                        addMsg(msg.nick, msg.data, 'peer');
+                        // Check if we were @mentioned in the general chat message
+                        if (msg.data && nickRef.current && msg.data.toLowerCase().includes(`@${nickRef.current.toLowerCase()}`)) {
+                            const toastId = Date.now() + Math.random();
+                            setMentionToasts(prev => [...prev, { id: toastId, from: msg.nick, text: msg.data }]);
+                            setTimeout(() => setMentionToasts(prev => prev.filter(t => t.id !== toastId)), 5000);
+                        }
                     }
                     break;
+                }
                 case 'room_created':
                     setRooms(prev => {
                         const updated = [...prev, { room_id: msg.room_id, name: msg.name, members: 1 }];
