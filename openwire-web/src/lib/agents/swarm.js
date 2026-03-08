@@ -29,6 +29,7 @@ const BASE_BACKOFF_MS = 2000;
 const PER_CHAR_COOLDOWN_MS = 10_000;  // 1 message per 10s per character
 const GLOBAL_COOLDOWN_MS = 5_000;     // 1 message per 5s across all AI
 const MENTION_COOLDOWN_MS = 8_000;    // suppress other characters for 8s after @mention
+const MAX_AGENT_CHAIN_DEPTH = 2;      // max agent→agent @mention chain depth (prevents loops)
 const MAX_QUEUE_SIZE = 32;            // #9: cap queue to prevent unbounded growth
 
 // Context compaction — auto-summarize via Gemini when context grows large
@@ -572,7 +573,7 @@ export class AgentSwarm {
      * Push a generation task onto the queue instead of calling API directly.
      * This ensures serial execution and rate-limit-aware retries.
      */
-    async _generate(characterId, { force = false } = {}) {
+    async _generate(characterId, { force = false, chainDepth = 0 } = {}) {
         // #8: Guard against post-stop queue insertion
         if (!this._running) return;
 
@@ -599,7 +600,7 @@ export class AgentSwarm {
             return;
         }
 
-        const task = { characterId, retries: 0, force };
+        const task = { characterId, retries: 0, force, chainDepth };
         if (force) {
             // Set mention cooldown — suppress other characters while this one responds
             this._mentionTarget = characterId;
@@ -647,7 +648,7 @@ export class AgentSwarm {
         }
 
         const task = this._messageQueue.shift();
-        const { characterId, retries, force } = task;
+        const { characterId, retries, force, chainDepth = 0 } = task;
         const c = this._characters[characterId];
 
         if (!c) {
@@ -910,6 +911,28 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
 
                 this._extractFact(c.name, text);
                 this._checkCrossOver(characterId);
+
+                // Agent-to-agent @mention chain: if this agent tagged another agent, trigger their response
+                if (chainDepth < MAX_AGENT_CHAIN_DEPTH) {
+                    const mentionMatches = text.match(/@([A-Za-z][A-Za-z\s]*)/g);
+                    if (mentionMatches) {
+                        const agentNames = this._getAgentNames();
+                        const triggered = new Set();
+                        for (const raw of mentionMatches) {
+                            const mentioned = raw.slice(1).trim(); // remove @
+                            // Find matching character by name (case-insensitive)
+                            const target = Object.values(this._characters).find(ch =>
+                                ch.name.toLowerCase() === mentioned.toLowerCase()
+                                || ch.name.split(' ')[0].toLowerCase() === mentioned.toLowerCase()
+                            );
+                            if (target && target.id !== characterId && this._isActive(target.id) && !triggered.has(target.id)) {
+                                triggered.add(target.id);
+                                this._log(`[AgentChain] ${c.name} tagged @${target.name} → triggering response (depth ${chainDepth + 1})`);
+                                this._generate(target.id, { force: true, chainDepth: chainDepth + 1 });
+                            }
+                        }
+                    }
+                }
             }
 
             // Success — release lock and process next
@@ -935,7 +958,7 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
                 }
 
                 // Put back at front of queue
-                this._messageQueue.unshift({ characterId, retries: nextRetries, force });
+                this._messageQueue.unshift({ characterId, retries: nextRetries, force, chainDepth });
                 const backoff = BASE_BACKOFF_MS * Math.pow(2, nextRetries);
                 const jitter = Math.random() * 1000;
                 const waitMs = backoff + jitter;
