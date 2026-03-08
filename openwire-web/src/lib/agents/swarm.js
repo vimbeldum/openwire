@@ -793,7 +793,7 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
                 const isDirectedAtSomeone = mentionedName && !isDirectedAtMe;
 
                 // Identity reminder — prevents character from talking about themselves in third person
-                const selfReminder = `REMEMBER: You ARE ${c.name}. Messages marked [THIS WAS SAID BY YOU - DO NOT DENY IT] are YOUR previous messages in this exact chat. Do NOT talk about yourself in 3rd person. Do NOT comment on "${c.name}" as if she/he is someone else. If someone quotes or mentions what you said earlier, DO NOT DENY IT. Own up to your previous statements and defend them vigorously. You are speaking AS ${c.name}.`;
+                const selfReminder = `REMEMBER: You ARE ${c.name}. Messages marked [THIS WAS SAID BY YOU - DO NOT DENY IT] are YOUR previous messages in this exact chat. Do NOT talk about yourself in 3rd person. Do NOT comment on "${c.name}" as if she/he is someone else. MEMORY RULE: If someone quotes or mentions what you said earlier, CHECK your messages in the Chat below. If you ACTUALLY said it, DO NOT DENY IT — own it and defend it vigorously! But if you NEVER said it in the Chat below, then AGGRESSIVELY DENY it and accuse them of lying! You are speaking AS ${c.name}.`;
 
                 const lenNote = 'Keep it 1-2 lines in Hinglish. No emoji, no asterisks. Plain text only.';
                 const antiEcho = 'CRITICAL ANTI-PARROTING RULE: Do NOT copy the phrases, exclamations, or insults that other characters just used in the Chat above. Find a COMPLETELY DIFFERENT angle to react from.';
