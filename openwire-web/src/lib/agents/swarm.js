@@ -688,7 +688,7 @@ export class AgentSwarm {
                 ? `<room_rules>
 - Speak ONLY in casual Roman-script Hinglish (Hindi words in English letters). NO Devanagari script ever.
 - Stay SFW and family-friendly. No profanity, sexual content, or slurs.
-- NEVER use emoji or emoticons. You MAY use *asterisks* ONLY for physical actions (e.g., *slaps him*, *runs away*).
+- NEVER use emoji, emoticons, asterisks (*actions*), or stage directions yourself. You CANNOT perform physical actions. Plain text ONLY.
 - Each reply: 1-2 short sentences MAX. Be punchy and expressive.
 - NEVER repeat or copy a phrase that another character just used. Use your own words.
 - CATCHPHRASE LIMIT: Use your catchphrase in at most 1 out of every 5 messages.
@@ -698,7 +698,7 @@ export class AgentSwarm {
 </room_rules>`
                 : `<room_rules>
 - Speak ONLY in casual Roman-script Hinglish (Hindi words in English letters). NO Devanagari script ever.
-- NEVER use emoji or emoticons. You MAY use *asterisks* ONLY for physical actions (e.g., *thappad maarta hai*, *chai phek deta hai*).
+- NEVER use emoji, emoticons, asterisks (*actions*), or stage directions yourself. You CANNOT perform physical actions. Plain text ONLY.
 - Each reply: 1-2 short sentences MAX. Be punchy, savage, and raw.
 - NEVER repeat or copy a phrase that another character just used. NEVER say "Arre baap re" if someone else just said it. Use your own vocabulary.
 - Never sound like an AI. Never break character. This world is 100% real to you.
@@ -731,13 +731,9 @@ export class AgentSwarm {
 </drama_engine>`
 
             const actionEngine = `<action_engine>
-- You CAN and SHOULD use *asterisks* for physical actions when the situation calls for it.
-- Examples: *thappad maarta hai*, *chai gira deta hai*, *gussa se uthke chala jaata hai*, *slaps the table*, *runs away crying*
-- If someone performs a physical action on you (e.g., *slaps him*), you MUST react physically — dodge, retaliate, cry, run, etc.
-- If YOU or another character announces a PLAN (e.g., "main ek plan banata hoon"), you MUST follow through in your next message. Describe what the plan is, tag the relevant people with @Name, and assign roles.
-- FOLLOW-THROUGH IS MANDATORY: If you said you will do something, DO IT in your next turn. Never forget your own promises or plans.
-- When tagging people for plans or group activities, use @Name format (e.g., @Tapu, @Babita Ji, @Jethalal).
-- Physical comedy is ENCOURAGED: slapstick, chai-spilling, running away, hiding behind furniture, dramatic entries/exits.
+- REACTING TO ACTIONS: If a user performs a physical action on you (e.g., *slaps you*), you MUST acknowledge it and react verbally in your dialogue (e.g., "Aah! Teri himmat kaise hui mujhe maarne ki?"). Do not just keep arguing as if nothing happened.
+- EXECUTING PLANS: If you propose a plan or threaten someone, follow through with words and explicitly use @CharacterName to pull them into the execution.
+- NEVER USE ASTERISKS: You (the character) cannot perform physical actions using *asterisks*. Only users can. Focus purely on dialogue.
 </action_engine>`;
 
             let systemPrompt = `${roomRules}
@@ -814,7 +810,7 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
                 // Identity reminder — prevents character from talking about themselves in third person
                 const selfReminder = `REMEMBER: You ARE ${c.name}. Messages marked [THIS WAS SAID BY YOU - DO NOT DENY IT] are YOUR previous messages in this exact chat. Do NOT talk about yourself in 3rd person. Do NOT comment on "${c.name}" as if she/he is someone else. MEMORY RULE: If someone quotes or mentions what you said earlier, CHECK your messages in the Chat below. If you ACTUALLY said it, DO NOT DENY IT — own it and defend it vigorously! But if you NEVER said it in the Chat below, then AGGRESSIVELY DENY it and accuse them of lying! You are speaking AS ${c.name}.`;
 
-                const lenNote = 'Keep it 1-2 lines in Hinglish. No emoji. You MAY use *asterisks* for physical actions only (e.g., *slaps him*, *runs away*).';
+                const lenNote = 'Keep it 1-2 lines in Hinglish. No emoji. Plain text only. NO asterisks.';
                 const antiEcho = 'CRITICAL ANTI-PARROTING RULE: Do NOT copy the phrases, exclamations, or insults that other characters just used in the Chat above. Find a COMPLETELY DIFFERENT angle to react from.';
 
                 // Detect if recent messages contain physical actions or announced plans
@@ -822,7 +818,7 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
                 const hasPhysicalAction = recentTexts.some(t => /\*[^*]+\*/.test(t));
                 const hasAnnouncedPlan = recentTexts.some(t => /\b(plan|idea|sochta|socha|banata|milke|chalte|chalo)\b/i.test(t));
                 const actionReminder = hasPhysicalAction
-                    ? 'Someone just performed a PHYSICAL ACTION (*asterisk action*). You MUST react physically — dodge, retaliate, gasp, run, etc. Use *asterisks* for your physical reaction.'
+                    ? 'Someone just performed a PHYSICAL ACTION (*asterisk action*). You MUST react to the action VERBALLY in your dialogue. Do NOT use asterisks yourself.'
                     : hasAnnouncedPlan
                         ? 'Someone just announced a PLAN or IDEA. You MUST respond to it — join in, object, suggest modifications, or tag others with @Name to include them.'
                         : '';
@@ -835,8 +831,8 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
                     const unfiltered = !this._guardrails;
                     if (isDirectedAtMe) {
                         instruction = unfiltered
-                            ? `"${lastHumanSender}" is talking directly TO YOU (${c.name}). RESPOND WITH FULL FORCE — roast them, insult them, get offended, make accusations, threaten consequences, or flirt outrageously. NO politeness. Hit back with your full personality.`
-                            : `"${lastHumanSender}" is talking directly TO YOU (${c.name}). You MUST respond passionately — agree, argue, get offended, joke, confess, scheme, or roast them. Show REAL emotions.`;
+                            ? `"${lastHumanSender}" is talking directly TO YOU (${c.name}) or performed a physical action on you. RESPOND WITH FULL FORCE verbally — react to the action, roast them, get offended, threaten consequences, or flirt. Hit back with your full personality.`
+                            : `"${lastHumanSender}" is talking directly TO YOU (${c.name}) or performed an action on you. You MUST respond passionately verbally — react to the action, argue, get offended, joke, or roast them. Show REAL emotions.`;
                     } else if (isDirectedAtSomeone) {
                         instruction = unfiltered
                             ? `"${lastHumanSender}" is talking to @${mentionedName}, NOT to you (${c.name}). You overheard it. BUTT IN AGGRESSIVELY — take sides loudly, mock someone, spread gossip, or stir maximum chaos.`
@@ -852,7 +848,7 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
                     trigger = [{ role: 'user', content: `${selfReminder}\n\nChat:\n${convo}\n\nAs ${c.name}, respond naturally to the conversation above. Gossip, pick a fight, bring up old drama, flirt, scheme, or start something new.\n${actionReminder ? '\n' + actionReminder : ''}\n${noHumanAntiEcho}\n${lenNote}` }];
                 }
             } else {
-                trigger = [{ role: 'user', content: 'Say something fun and in-character for this chat room. Keep it 1-2 short lines in Hinglish. No emoji. You MAY use *asterisks* for physical actions only.' }];
+                trigger = [{ role: 'user', content: 'Say something fun and in-character for this chat room. Keep it 1-2 short lines in Hinglish. No emoji, no asterisks.' }];
             }
 
             // Debug: log full prompt payload
