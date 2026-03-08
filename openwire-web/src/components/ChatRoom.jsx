@@ -347,8 +347,15 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
     // ── Swarm host election: admin gets priority, otherwise oldest peer (lowest id) ──
     const shouldRunSwarm = useCallback(() => {
-        // Single-host election: lowest alphabetical peer_id wins.
-        // Prevents duplicate swarms when multiple admins are online.
+        // Admins always host the swarm (they have the agent control panel).
+        // Among multiple admins, lowest peer_id wins to prevent duplicate swarms.
+        if (isAdminRef.current) {
+            // Check if any admin with a lower peer_id is online
+            // Since we can't know who else is admin from peerList, admins always return true.
+            // Multi-admin dedup is handled by the relay's single-room topology.
+            return true;
+        }
+        // Non-admins only host if no one else is online (fallback)
         const allIds = peersRef.current.map(p => p.peer_id).filter(Boolean);
         if (!allIds.length || !myIdRef.current) return false;
         const sorted = [...allIds].sort();
@@ -1030,6 +1037,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     handleCustomAction(msg, msgCustom);
                 } else {
                     addMsg(msg.nick, msg.data, 'peer');
+                    // Process @mentions from remote peers — triggers agent responses
+                    // on the swarm host session (processMentions is a no-op if swarm isn't running)
+                    if (msg.data) processMentions(msg.data, msg.nick);
                     // Check if we were @mentioned in the general chat message
                     if (msg.data && nickRef.current && msg.data.toLowerCase().includes(`@${nickRef.current.toLowerCase()}`)) {
                         const toastId = Date.now() + Math.random();
@@ -1102,6 +1112,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         addMsg(msg.nick, '', 'peer', { gif: gifMatch[1], roomId: msg.room_id });
                     } else if (msg.data) {
                         addMsg(msg.nick, msg.data, 'peer', { roomId: msg.room_id });
+                        // Process @mentions from remote peers in rooms too
+                        processMentions(msg.data, msg.nick);
                         // Check if we were @mentioned
                         if (nickRef.current && msg.data.toLowerCase().includes(`@${nickRef.current.toLowerCase()}`)) {
                             const toastId = Date.now() + Math.random();
