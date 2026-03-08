@@ -48,7 +48,7 @@ function buildDefaults() {
         groups,
         characters,
         modelFilters: { whitelist: [], blacklist: [] },
-        _version: 6,
+        _version: 7,
     };
 }
 
