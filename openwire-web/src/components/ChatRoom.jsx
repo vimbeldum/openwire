@@ -427,7 +427,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         };
         swarmRef.current = swarm;
         // Only start if this session is the elected swarm host
-        if (shouldRunSwarm()) {
+        const hostCheck = shouldRunSwarm();
+        console.log('[SwarmElection] Bootstrap check:', { hostCheck, isAdmin: isAdminRef.current, myId: myIdRef.current, peers: peersRef.current?.length });
+        if (hostCheck) {
             swarmHostRef.current = true;
             swarm.start().catch(e => console.warn('[AgentSwarm] auto-start failed:', e));
         }
