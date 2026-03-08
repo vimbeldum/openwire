@@ -1682,11 +1682,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                             <span className="header-chips">💰 {balance.toLocaleString()}</span>
                         </>
                     )}
+                    {isAdminRef.current && (
                     <button
                         className={`btn-agent-panel ${agentRunning ? 'active' : ''}`}
                         onClick={() => setShowAgentPanel(v => !v)}
                         title="Pop-Culture Agent Swarm"
                     >🤖</button>
+                    )}
                     <div className="mute-agents-wrapper" ref={muteMenuRef}>
                         <button
                             className={`btn-mute-agents ${allAgentsMuted ? 'muted' : ''}`}
@@ -2046,7 +2048,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 />
             )}
 
-            {showAgentPanel && (
+            {showAgentPanel && isAdminRef.current && (
                 <AgentControlPanel
                     swarm={swarmRef.current}
                     onClose={() => setShowAgentPanel(false)}
