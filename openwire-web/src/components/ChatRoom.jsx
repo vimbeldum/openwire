@@ -1432,8 +1432,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 const sw = swarmRef.current;
                 if (!sw) { console.warn(`[@Mention] No swarm instance for @${name}`); return; }
                 if (!sw.running) { console.warn(`[@Mention] Swarm not running for @${name}`); return; }
-                // Feed the message into swarm context and trigger immediate response
-                sw.addContext(senderNick, text);
+                // Context already fed by addMsg — just trigger the response
                 const c = CHARACTERS[agentId];
                 if (!c) { console.warn(`[@Mention] Character not found: ${agentId}`); return; }
                 if (!sw._isActive(agentId)) {

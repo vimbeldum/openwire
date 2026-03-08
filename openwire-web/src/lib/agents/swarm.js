@@ -26,6 +26,7 @@ const MAX_RETRIES = 3;
 const BASE_BACKOFF_MS = 2000;
 const PER_CHAR_COOLDOWN_MS = 10_000;  // 1 message per 10s per character
 const GLOBAL_COOLDOWN_MS = 5_000;     // 1 message per 5s across all AI
+const MENTION_COOLDOWN_MS = 8_000;    // suppress other characters for 8s after @mention
 
 export class AgentSwarm {
     constructor({ onMessage, onError, onModelLoad, onLog, onTyping }) {
@@ -69,6 +70,10 @@ export class AgentSwarm {
         this._lastMsgGlobal = 0;    // timestamp of last AI message
         this._perCharCooldown = PER_CHAR_COOLDOWN_MS;
         this._globalCooldown = GLOBAL_COOLDOWN_MS;
+
+        // Mention ownership — suppresses other characters during directed @mentions
+        this._mentionTarget = null;       // characterId of the @mentioned character
+        this._mentionActiveUntil = 0;     // timestamp when cooldown expires
 
         // Dynamic config — loaded from agentStore
         this._characters = {};  // dict { id: charObj }
@@ -368,12 +373,17 @@ export class AgentSwarm {
             if (!this._running) return;
 
             if (this._isActive(characterId)) {
-                const roll = Math.random() * 10;
-                if (roll < c.frequencyWeight) {
-                    this._log(`[Timer] ${c.name} fired -> rolled ${roll.toFixed(1)} (needed < ${c.frequencyWeight}) -> Generating...`);
-                    await this._generate(characterId);
+                // Structural gate: suppress during directed @mention cooldown
+                if (this._mentionActiveUntil > Date.now() && this._mentionTarget !== characterId) {
+                    this._log(`[Timer] ${c.name} suppressed — @mention cooldown active for ${this._characters[this._mentionTarget]?.name}`);
                 } else {
-                    this._log(`[Timer] ${c.name} fired -> rolled ${roll.toFixed(1)} (needed < ${c.frequencyWeight}) -> Skipped`);
+                    const roll = Math.random() * 10;
+                    if (roll < c.frequencyWeight) {
+                        this._log(`[Timer] ${c.name} fired -> rolled ${roll.toFixed(1)} (needed < ${c.frequencyWeight}) -> Generating...`);
+                        await this._generate(characterId);
+                    } else {
+                        this._log(`[Timer] ${c.name} fired -> rolled ${roll.toFixed(1)} (needed < ${c.frequencyWeight}) -> Skipped`);
+                    }
                 }
             }
 
@@ -413,6 +423,11 @@ export class AgentSwarm {
 
         const task = { characterId, retries: 0, force };
         if (force) {
+            // Set mention cooldown — suppress other characters while this one responds
+            this._mentionTarget = characterId;
+            this._mentionActiveUntil = Date.now() + MENTION_COOLDOWN_MS;
+            this._log(`[Mention] Cooldown active for ${c.name} (${MENTION_COOLDOWN_MS / 1000}s)`);
+
             // @mentions jump to front of queue (after any other force tasks, preserving FIFO among mentions)
             const lastForceIdx = this._messageQueue.reduce((idx, t, i) => t.force ? i : idx, -1);
             this._messageQueue.splice(lastForceIdx + 1, 0, task);
@@ -645,6 +660,11 @@ ${c.systemPrompt}${moodBlock}${factsBlock}`;
 
     _checkCrossOver(speakerId) {
         if (!this._running) return;
+        // Suppress cross-over during @mention cooldown — let the conversation stay focused
+        if (this._mentionActiveUntil > Date.now()) {
+            this._log(`[CrossOver] Suppressed — @mention cooldown active`);
+            return;
+        }
 
         Object.values(this._characters).forEach(c => {
             if (c.id === speakerId) return;
