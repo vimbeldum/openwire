@@ -16,6 +16,7 @@ import { fetchGeminiModels, generateGeminiMessage } from './gemini.js';
 import { loadStore, getCharactersDict, getGroupsDict } from './agentStore.js';
 
 const CONTEXT_BUFFER_SIZE = 5000;
+const TURN2_ANCHOR = { role: 'assistant', content: 'Samjha! Main Hinglish mein aur exactly 1-2 lines mein interact karunga, Roman script only, aur apni comedy engine ke rules break nahi karunga.', _isAgent: true };
 const FALLBACK_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
 const DEFAULT_ALL_MODEL = 'openrouter/auto';
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-lite';
@@ -48,7 +49,7 @@ export class AgentSwarm {
         this._provider = 'openrouter';
         this._geminiModels = [];
 
-        this._context = [];
+        this._context = [TURN2_ANCHOR];
         this._assignedModels = {};
         this._moods = {};
         this._sessionFacts = [];
@@ -277,7 +278,7 @@ export class AgentSwarm {
     flushContext() {
         const ctxLen = this._context.length;
         const factsLen = this._sessionFacts.length;
-        this._context = [];
+        this._context = [TURN2_ANCHOR];
         this._sessionFacts = [];
         this._log(`[Flush] Cleared ${ctxLen} context messages and ${factsLen} session facts`);
     }
@@ -469,7 +470,12 @@ export class AgentSwarm {
 - If a user sets a time limit, reach a conclusion before it expires.
 </room_rules>
 
-${c.systemPrompt}${moodBlock}${factsBlock}`;
+${c.systemPrompt}${moodBlock}${factsBlock}
+
+<rules>
+LENGTH: Maximum 1 or 2 short sentences. No rambling.
+SCRIPT: YOU MUST ONLY USE THE ROMAN SCRIPT (ABC...). DEVANAGARI SCRIPT IS STRICTLY FORBIDDEN.
+</rules>`;
 
         // Build context — Gemini has 1M token window, OpenRouter free models are smaller
         const contextSize = this._provider === 'gemini' ? 5000 : 30;
