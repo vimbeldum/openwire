@@ -345,6 +345,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         if (abCycleTimerRef.current) { clearTimeout(abCycleTimerRef.current); abCycleTimerRef.current = null; }
         abGenRef.current++;
         if (bjDealerTimerRef.current) { clearTimeout(bjDealerTimerRef.current); bjDealerTimerRef.current = null; }
+        if (snapshotTimerRef.current) { clearInterval(snapshotTimerRef.current); snapshotTimerRef.current = null; }
         // Reset game states
         setBlackjackGame(null);
         setRouletteGame(null);
@@ -795,8 +796,42 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
             abGenRef.current++;
             if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
+            if (snapshotTimerRef.current) clearInterval(snapshotTimerRef.current);
         };
     }, []);
+
+    // ── Host state snapshot (periodic backup for host migration) ──
+    const snapshotTimerRef = useRef(null);
+
+    useEffect(() => {
+        // Every 5 seconds, if we're host of any game, send a snapshot to the relay
+        snapshotTimerRef.current = setInterval(() => {
+            const roomId = currentRoomRef.current;
+            if (!roomId) return;
+
+            const snapshots = {};
+            if (rouletteRef.current && amIHost(rouletteHostRef.current)) {
+                snapshots.roulette = rl.serializeGame(rouletteRef.current);
+            }
+            if (blackjackRef.current && amIHost(bjHostRef.current)) {
+                snapshots.blackjack = bj.serializeGame(blackjackRef.current);
+            }
+            if (andarBaharRef.current && amIHost(abHostRef.current)) {
+                snapshots.andarbahar = ab.serializeGame(andarBaharRef.current);
+            }
+            if (polymarketRef.current && amIHost(pmHostRef.current)) {
+                snapshots.polymarket = pm.serializeGame(polymarketRef.current);
+            }
+
+            if (Object.keys(snapshots).length > 0) {
+                socket.sendStateSnapshot(roomId, snapshots);
+            }
+        }, 5000);
+
+        return () => {
+            if (snapshotTimerRef.current) clearInterval(snapshotTimerRef.current);
+        };
+    }, [amIHost]);
 
     // ── Custom P2P action handler ─────────────────────────────
     const handleCustomAction = useCallback((msg, action) => {
@@ -1465,35 +1500,112 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             // ── Host migration ───────────────────────────────────
             case 'host_left': {
                 const myId = myIdRef.current;
-                addMsg('★', `👑 Host changed — new host elected`, 'system');
-                // Update host references for ALL game types
+                addMsg('★', `Host changed — new host elected`, 'system');
+
+                // Restore game state from relay snapshot if available
+                let snapshots = {};
+                if (msg.gameSnapshots) {
+                    try {
+                        snapshots = typeof msg.gameSnapshots === 'string'
+                            ? JSON.parse(msg.gameSnapshots)
+                            : msg.gameSnapshots;
+                    } catch {
+                        addMsg('★', 'Game state could not be restored from previous host.', 'system');
+                    }
+                }
+
+                // Roulette
                 if (rouletteRef.current?.roomId === msg.room_id) {
                     rouletteHostRef.current = msg.new_host;
                     if (msg.new_host === myId) {
-                        addMsg('★', '👑 You are now the Roulette host', 'system');
+                        addMsg('★', 'You are now the Roulette host', 'system');
+                        // Restore from snapshot if available
+                        if (snapshots.roulette) {
+                            const restored = rl.deserializeGame(snapshots.roulette);
+                            if (restored) {
+                                // Phase-aware recovery: stuck in spinning → reset to betting
+                                if (restored.phase === 'spinning') {
+                                    const reset = rl.newRound(restored);
+                                    setRouletteGame(reset);
+                                    socket.sendRoomMessage(msg.room_id, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(reset) }));
+                                } else {
+                                    setRouletteGame(restored);
+                                }
+                            }
+                        } else {
+                            // Fallback: use local state if no snapshot
+                            const curRl = rouletteRef.current;
+                            if (curRl && curRl.phase !== 'betting') {
+                                const reset = rl.newRound(curRl);
+                                setRouletteGame(reset);
+                                socket.sendRoomMessage(msg.room_id, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(reset) }));
+                            }
+                        }
                         startRouletteTimer();
                     }
                 }
+
+                // Blackjack
                 if (blackjackRef.current?.roomId === msg.room_id) {
                     bjHostRef.current = msg.new_host;
                     if (msg.new_host === myId) {
-                        addMsg('★', '👑 You are now the Blackjack host', 'system');
-                        const curBj = blackjackRef.current;
-                        if (curBj && curBj.phase === 'betting') startBlackjackTimer(curBj);
+                        addMsg('★', 'You are now the Blackjack host', 'system');
+                        if (snapshots.blackjack) {
+                            const restored = bj.deserializeGame(snapshots.blackjack);
+                            if (restored) {
+                                // Phase-aware: if stuck in 'playing' or 'dealer', reset to new round
+                                if (restored.phase === 'playing' || restored.phase === 'dealer') {
+                                    const reset = bj.newRound(restored);
+                                    setBlackjackGame(reset);
+                                    socket.sendRoomMessage(msg.room_id, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(reset) }));
+                                    startBlackjackTimer(reset);
+                                } else {
+                                    setBlackjackGame(restored);
+                                    if (restored.phase === 'betting') startBlackjackTimer(restored);
+                                }
+                            }
+                        } else {
+                            const curBj = blackjackRef.current;
+                            if (curBj && curBj.phase === 'betting') startBlackjackTimer(curBj);
+                        }
                     }
                 }
+
+                // Andar Bahar
                 if (andarBaharRef.current?.roomId === msg.room_id) {
                     abHostRef.current = msg.new_host;
                     if (msg.new_host === myId) {
-                        addMsg('★', '👑 You are now the Andar Bahar host', 'system');
-                        const curAb = andarBaharRef.current;
-                        if (curAb) startAbCycle(curAb);
+                        addMsg('★', 'You are now the Andar Bahar host', 'system');
+                        if (snapshots.andarbahar) {
+                            const restored = ab.deserializeGame(snapshots.andarbahar);
+                            if (restored) {
+                                // Phase-aware: stuck in 'dealing' → create new round (deck is lost anyway)
+                                if (restored.phase === 'dealing') {
+                                    const reset = ab.newRound(restored);
+                                    setAndarBaharGame(reset);
+                                    socket.sendRoomMessage(msg.room_id, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(reset) }));
+                                    startAbCycle(reset);
+                                } else {
+                                    setAndarBaharGame(restored);
+                                    startAbCycle(restored);
+                                }
+                            }
+                        } else {
+                            const curAb = andarBaharRef.current;
+                            if (curAb) startAbCycle(curAb);
+                        }
                     }
                 }
+
+                // Polymarket
                 if (polymarketRef.current?.roomId === msg.room_id) {
                     pmHostRef.current = msg.new_host;
                     if (msg.new_host === myId) {
-                        addMsg('★', '👑 You are now the Predictions host', 'system');
+                        addMsg('★', 'You are now the Predictions host', 'system');
+                        if (snapshots.polymarket) {
+                            const restored = pm.deserializeGame(snapshots.polymarket);
+                            if (restored) setPolymarketGame(restored);
+                        }
                     }
                 }
                 break;
@@ -1521,6 +1633,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 break;
             }
 
+            case 'rate_limited':
+                // Server told us we're sending too fast — silently throttle
+                break;
+
             case 'disconnected':
                 setConnected(false);
                 addMsg('★', '⚠ Disconnected — reconnecting...', 'system');
@@ -1530,7 +1646,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
-        socket.connect(nickRef.current, (msg) => onWsEventRef.current?.(msg), { isAdmin: isAdminRef.current });
+        const adminSecret = isAdminRef.current ? (localStorage.getItem('openwire_admin_secret') || '') : '';
+        socket.connect(nickRef.current, (msg) => onWsEventRef.current?.(msg), { isAdmin: isAdminRef.current, adminSecret });
         return () => socket.disconnect();
     }, []);
 

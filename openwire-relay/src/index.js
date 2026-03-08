@@ -2,24 +2,48 @@
    OpenWire Relay — Cloudflare Worker + Durable Object
    WebSocket relay for auto peer discovery & message relay
    + Admin: IP-level persistent banning, kick, host_left
+   + Rate limiting, connection limits, message size limits
    ═══════════════════════════════════════════════════════════ */
+
+// Admin secret: use Cloudflare Worker env binding (env.ADMIN_SECRET) in production
+const FALLBACK_ADMIN_SECRET = 'openwire-admin-2024';
 
 export default {
     async fetch(request, env) {
         const id = env.RELAY.idFromName("global");
         const relay = env.RELAY.get(id);
-        return relay.fetch(request);
+        // Pass env to DO so it can access ADMIN_SECRET
+        return relay.fetch(request, { env });
     },
 };
 
 export class RelayRoom {
-    constructor(state) {
+    constructor(state, env) {
         this.state = state;
+        this.env = env;
         // ws → { peer_id, nick, ip, rooms: Set<string>, balance: 0 }
         this.peers = new Map();
-        // room_id → { name, members: Set<string>, hostPeerId: string }
+        // room_id → { name, members: Set<string>, hostPeerId: string, memberWs: Set<WebSocket>, lastStateSnapshot: null }
         this.rooms = new Map();
         this.bannedIps = null; // loaded lazily from KV
+        this.bannedIpSet = null; // Set mirror for O(1) lookups
+        this.ipConnectionCount = new Map(); // ip → count for O(1) connection limiting
+    }
+
+    // Admin secret accessor — prefers env binding, falls back to constant
+    getAdminSecret() {
+        return this.env?.ADMIN_SECRET || FALLBACK_ADMIN_SECRET;
+    }
+
+    // Constant-time string comparison to prevent timing attacks
+    timingSafeEqual(a, b) {
+        if (typeof a !== 'string' || typeof b !== 'string') return false;
+        if (a.length !== b.length) return false;
+        let result = 0;
+        for (let i = 0; i < a.length; i++) {
+            result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+        }
+        return result === 0;
     }
 
     // Load banned IPs from persistent Durable Object storage
@@ -27,12 +51,14 @@ export class RelayRoom {
         if (this.bannedIps === null) {
             const stored = await this.state.storage.get('banned_ips');
             this.bannedIps = stored ? JSON.parse(stored) : [];
+            this.bannedIpSet = new Set(this.bannedIps);
         }
         return this.bannedIps;
     }
 
     async saveBannedIps() {
         await this.state.storage.put('banned_ips', JSON.stringify(this.bannedIps));
+        this.bannedIpSet = new Set(this.bannedIps);
     }
 
     async fetch(request) {
@@ -57,12 +83,23 @@ export class RelayRoom {
         // Check IP ban BEFORE accepting connection
         const clientIp = request.headers.get('CF-Connecting-IP') ?? 'unknown';
         const banned = await this.loadBannedIps();
-        if (banned.includes(clientIp)) {
+        if (this.bannedIpSet ? this.bannedIpSet.has(clientIp) : banned.includes(clientIp)) {
             const pair = new WebSocketPair();
             const [client, server] = Object.values(pair);
             server.accept();
             server.send(JSON.stringify({ type: 'banned', message: 'You are banned from this server.' }));
             server.close(1008, 'Banned');
+            return new Response(null, { status: 101, webSocket: client, headers: corsHeaders() });
+        }
+
+        // Per-IP connection limit (max 5) — Sybil resistance (O(1) lookup)
+        const connectionsFromIp = this.ipConnectionCount.get(clientIp) || 0;
+        if (connectionsFromIp >= 5) {
+            const pair = new WebSocketPair();
+            const [client, server] = Object.values(pair);
+            server.accept();
+            server.send(JSON.stringify({ type: 'error', message: 'Too many connections from this IP.' }));
+            server.close(1008, 'Connection limit');
             return new Response(null, { status: 101, webSocket: client, headers: corsHeaders() });
         }
 
@@ -82,19 +119,43 @@ export class RelayRoom {
         let peerInfo = null;
 
         ws.addEventListener("message", async (event) => {
+            // Message size limit: 50KB max
+            if (typeof event.data === 'string' && event.data.length > 51200) return;
+
             let msg;
             try { msg = JSON.parse(event.data); } catch { return; }
 
+            // Rate limiting (skip for join since peerInfo is null at that point)
+            if (peerInfo) {
+                const now = Date.now();
+                if (!peerInfo._rateTokens) { peerInfo._rateTokens = 30; peerInfo._rateLastRefill = now; }
+                const elapsed = now - peerInfo._rateLastRefill;
+                if (elapsed >= 1000) {
+                    peerInfo._rateTokens = Math.min(40, peerInfo._rateTokens + 30 * (elapsed / 1000)); // 30/s refill, 40 burst cap
+                    peerInfo._rateLastRefill = now;
+                }
+                if (peerInfo._rateTokens <= 0) {
+                    this.send(ws, { type: 'rate_limited' });
+                    return; // drop message
+                }
+                peerInfo._rateTokens--;
+            }
+
             switch (msg.type) {
                 case "join": {
-                    const peer_id = msg.peer_id || crypto.randomUUID().slice(0, 16);
+                    const peer_id = crypto.randomUUID().slice(0, 16); // ALWAYS server-generated
                     let nick = (msg.nick || "Anonymous").slice(0, 24);
                     const takenNicks = new Set([...this.peers.values()].map(p => p.nick));
                     let base = nick, counter = 2;
                     while (takenNicks.has(nick)) nick = `${base}${counter++}`;
 
-                    peerInfo = { peer_id, nick, ip: clientIp, rooms: new Set(), balance: 0, is_admin: !!msg.is_admin };
+                    // Admin auth: constant-time comparison prevents timing attacks
+                    const is_admin = typeof msg.admin_secret === 'string' && this.timingSafeEqual(msg.admin_secret, this.getAdminSecret());
+
+                    peerInfo = { peer_id, nick, ip: clientIp, rooms: new Set(), balance: 0, is_admin };
                     this.peers.set(ws, peerInfo);
+                    // Track IP connection count
+                    this.ipConnectionCount.set(clientIp, (this.ipConnectionCount.get(clientIp) || 0) + 1);
 
                     this.send(ws, {
                         type: "welcome",
@@ -121,7 +182,8 @@ export class RelayRoom {
 
                 case "balance_update": {
                     if (!peerInfo) return;
-                    peerInfo.balance = msg.balance || 0;
+                    if (typeof msg.balance !== 'number' || !isFinite(msg.balance) || msg.balance < 0) return;
+                    peerInfo.balance = msg.balance;
                     // Broadcast lightweight diff instead of full peerList (O(N) not O(N²))
                     this.broadcast({ type: "peer_balance_update", peer_id: peerInfo.peer_id, balance: peerInfo.balance });
                     break;
@@ -135,6 +197,8 @@ export class RelayRoom {
                         name,
                         members: new Set([peerInfo.peer_id]),
                         hostPeerId: peerInfo.peer_id,
+                        memberWs: new Set([ws]),
+                        lastStateSnapshot: null,
                     });
                     peerInfo.rooms.add(room_id);
                     this.send(ws, { type: "room_created", room_id, name });
@@ -149,6 +213,7 @@ export class RelayRoom {
                     // Cancel pending deletion if someone rejoins
                     if (room._deleteTimer) { clearTimeout(room._deleteTimer); room._deleteTimer = null; }
                     room.members.add(peerInfo.peer_id);
+                    room.memberWs.add(ws);
                     peerInfo.rooms.add(msg.room_id);
                     this.broadcastToRoom(msg.room_id, {
                         type: "room_peer_joined",
@@ -196,7 +261,7 @@ export class RelayRoom {
 
                 case "room_leave": {
                     if (!peerInfo) return;
-                    this.leaveRoom(peerInfo, msg.room_id);
+                    this.leaveRoom(peerInfo, msg.room_id, false, ws);
                     break;
                 }
 
@@ -205,14 +270,34 @@ export class RelayRoom {
                     break;
                 }
 
+                case "room_state_snapshot": {
+                    if (!peerInfo) return;
+                    const snapRoom = this.rooms.get(msg.room_id);
+                    if (!snapRoom) return;
+                    // Only the host can update the snapshot
+                    if (snapRoom.hostPeerId !== peerInfo.peer_id) return;
+                    // Size limit: max 100KB for snapshots
+                    if (typeof msg.state !== 'string' || msg.state.length > 102400) return;
+                    snapRoom.lastStateSnapshot = msg.state; // Store latest game state
+                    break;
+                }
+
                 // ── ADMIN MESSAGES ─────────────────────────────────────
 
                 case "admin_kick": {
-                    if (!peerInfo) return;
+                    if (!peerInfo || !peerInfo.is_admin) return;
                     const targetId = msg.peer_id;
                     for (const [clientWs, info] of this.peers) {
                         if (info.peer_id === targetId) {
                             this.send(clientWs, { type: 'kicked', message: 'You were kicked by an admin.' });
+                            // Clean up room membership before removing peer
+                            for (const rid of info.rooms) {
+                                this.leaveRoom(info, rid, true, clientWs);
+                            }
+                            // Decrement IP count
+                            const cnt = this.ipConnectionCount.get(info.ip) || 1;
+                            if (cnt <= 1) this.ipConnectionCount.delete(info.ip);
+                            else this.ipConnectionCount.set(info.ip, cnt - 1);
                             try { clientWs.close(1008, 'Kicked'); } catch { }
                             this.peers.delete(clientWs);
                             break;
@@ -223,7 +308,7 @@ export class RelayRoom {
                 }
 
                 case "admin_ban_ip": {
-                    if (!peerInfo) return;
+                    if (!peerInfo || !peerInfo.is_admin) return;
                     const targetId = msg.peer_id;
                     let targetIp = null;
 
@@ -231,6 +316,13 @@ export class RelayRoom {
                         if (info.peer_id === targetId) {
                             targetIp = info.ip;
                             this.send(clientWs, { type: 'banned', message: 'You have been banned.' });
+                            // Clean up room membership before removing peer
+                            for (const rid of info.rooms) {
+                                this.leaveRoom(info, rid, true, clientWs);
+                            }
+                            const cnt = this.ipConnectionCount.get(info.ip) || 1;
+                            if (cnt <= 1) this.ipConnectionCount.delete(info.ip);
+                            else this.ipConnectionCount.set(info.ip, cnt - 1);
                             try { clientWs.close(1008, 'Banned'); } catch { }
                             this.peers.delete(clientWs);
                             break;
@@ -249,7 +341,7 @@ export class RelayRoom {
                 }
 
                 case "admin_unban_ip": {
-                    if (!peerInfo) return;
+                    if (!peerInfo || !peerInfo.is_admin) return;
                     this.bannedIps = (this.bannedIps || []).filter(ip => ip !== msg.ip);
                     await this.saveBannedIps();
                     this.send(ws, { type: 'banned_ips', ips: this.bannedIps });
@@ -257,7 +349,8 @@ export class RelayRoom {
                 }
 
                 case "admin_adjust_balance": {
-                    if (!peerInfo) return;
+                    if (!peerInfo || !peerInfo.is_admin) return;
+                    if (typeof msg.delta !== 'number' || !isFinite(msg.delta)) return;
                     // Relay the adjustment to the target peer
                     for (const [clientWs, info] of this.peers) {
                         if (info.peer_id === msg.peer_id) {
@@ -274,7 +367,7 @@ export class RelayRoom {
                 }
 
                 case "admin_get_bans": {
-                    if (!peerInfo) return;
+                    if (!peerInfo || !peerInfo.is_admin) return;
                     await this.loadBannedIps();
                     this.send(ws, { type: 'banned_ips', ips: this.bannedIps });
                     break;
@@ -299,16 +392,32 @@ export class RelayRoom {
                             old_host: peerInfo.peer_id,
                             new_host: newHostId,
                             room_id,
+                            gameSnapshots: room.lastStateSnapshot || null,
                         });
                     }
                 }
-                this.leaveRoom(peerInfo, room_id, true);
+                this.leaveRoom(peerInfo, room_id, true, ws);
             }
+            // Decrement IP connection count
+            const ipCnt = this.ipConnectionCount.get(peerInfo.ip) || 1;
+            if (ipCnt <= 1) this.ipConnectionCount.delete(peerInfo.ip);
+            else this.ipConnectionCount.set(peerInfo.ip, ipCnt - 1);
             this.peers.delete(ws);
             this.broadcast({ type: "peer_left", peer_id: peerInfo.peer_id, nick: peerInfo.nick });
         });
 
-        ws.addEventListener("error", () => { this.peers.delete(ws); });
+        // Error handler: run same cleanup as close
+        ws.addEventListener("error", () => {
+            if (!peerInfo) { this.peers.delete(ws); return; }
+            for (const room_id of peerInfo.rooms) {
+                this.leaveRoom(peerInfo, room_id, true, ws);
+            }
+            const ipCnt = this.ipConnectionCount.get(peerInfo.ip) || 1;
+            if (ipCnt <= 1) this.ipConnectionCount.delete(peerInfo.ip);
+            else this.ipConnectionCount.set(peerInfo.ip, ipCnt - 1);
+            this.peers.delete(ws);
+            this.broadcast({ type: "peer_left", peer_id: peerInfo.peer_id, nick: peerInfo.nick });
+        });
     }
 
     // ── Helpers ──────────────────────────────────────────────
@@ -328,10 +437,10 @@ export class RelayRoom {
 
     broadcastToRoom(room_id, obj, exclude) {
         const room = this.rooms.get(room_id);
-        if (!room) return;
+        if (!room || !room.memberWs) return;
         const data = JSON.stringify(obj);
-        for (const [clientWs, info] of this.peers) {
-            if (clientWs !== exclude && room.members.has(info.peer_id)) {
+        for (const clientWs of room.memberWs) {
+            if (clientWs !== exclude) {
                 try { clientWs.send(data); } catch { }
             }
         }
@@ -345,9 +454,7 @@ export class RelayRoom {
         return [...this.peers.values()].map(p => ({
             peer_id: p.peer_id,
             nick: p.nick,
-            ip: p.ip,
             balance: p.balance || 0,
-            is_admin: p.is_admin || false,
         }));
     }
 
@@ -360,13 +467,15 @@ export class RelayRoom {
         }));
     }
 
-    leaveRoom(peerInfo, room_id, silent = false) {
+    leaveRoom(peerInfo, room_id, silent = false, ws = null) {
         const room = this.rooms.get(room_id);
         if (!room) return;
         room.members.delete(peerInfo.peer_id);
+        if (ws && room.memberWs) room.memberWs.delete(ws);
         peerInfo.rooms.delete(room_id);
 
         if (room.members.size === 0) {
+            room.lastStateSnapshot = null; // Free snapshot memory
             // Keep empty rooms alive for 60s so refreshing users can rejoin
             if (!room._deleteTimer) {
                 room._deleteTimer = setTimeout(() => {
