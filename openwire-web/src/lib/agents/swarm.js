@@ -15,7 +15,7 @@ import { fetchFreeModels, generateMessage } from './openrouter.js';
 import { fetchGeminiModels, generateGeminiMessage } from './gemini.js';
 import { loadStore, getCharactersDict, getGroupsDict } from './agentStore.js';
 
-const CONTEXT_BUFFER_SIZE = 5000;
+const CONTEXT_BUFFER_SIZE = 1000;
 const TURN2_ANCHOR = { role: 'assistant', content: 'Samjha! Main Hinglish mein aur exactly 1-2 lines mein interact karunga, Roman script only, aur apni comedy engine ke rules break nahi karunga.', _isAgent: true };
 const FALLBACK_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
 const DEFAULT_ALL_MODEL = 'openrouter/auto';
@@ -500,7 +500,7 @@ export class AgentSwarm {
 ${c.systemPrompt}${moodBlock}${factsBlock}`;
 
         // Build context — Gemini has 1M token window, OpenRouter free models are smaller
-        const contextSize = this._provider === 'gemini' ? 5000 : 30;
+        const contextSize = this._provider === 'gemini' ? 100 : 30; // send last 100 msgs to API, not the full buffer
         const recent = this._context.slice(-contextSize);
         let trigger;
         if (recent.length) {
