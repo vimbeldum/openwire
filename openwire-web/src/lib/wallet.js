@@ -81,12 +81,24 @@ export function loadWallet(nick) {
     return wallet;
 }
 
+// Debounced save — writes at most once per second to avoid blocking main thread
+let _walletSaveTimer = null;
+let _pendingWallet = null;
+
 export function saveWallet(wallet) {
-    const deviceId = wallet.deviceId || getDeviceId();
-    try {
-        localStorage.setItem(storageKey(deviceId), JSON.stringify(wallet));
-    } catch (e) {
-        console.warn('Failed to save wallet', e);
+    _pendingWallet = wallet;
+    if (!_walletSaveTimer) {
+        _walletSaveTimer = setTimeout(() => {
+            _walletSaveTimer = null;
+            if (_pendingWallet) {
+                const deviceId = _pendingWallet.deviceId || getDeviceId();
+                try {
+                    localStorage.setItem(storageKey(deviceId), JSON.stringify(_pendingWallet));
+                } catch (e) {
+                    console.warn('Failed to save wallet', e);
+                }
+            }
+        }, 1000);
     }
 }
 

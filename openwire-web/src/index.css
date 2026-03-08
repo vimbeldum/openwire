@@ -608,8 +608,7 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 100;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  /* backdrop-filter removed — at 85%+ opacity blur is imperceptible, saves GPU compositing */
   animation: overlayFade 0.2s ease;
   overflow: hidden; /* Presentation domain: no element may breach 100vh/100vw */
 }
@@ -3300,7 +3299,10 @@ body {
   border-radius: 50%;
   position: relative;
   z-index: 1;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+  /* filter: drop-shadow removed — forces SVG re-rasterization during 9s spin animation */
+  /* will-change: transform moved to .is-spinning — avoids permanent GPU layer allocation */
+}
+.is-spinning .rl-wheel-svg {
   will-change: transform;
 }
 

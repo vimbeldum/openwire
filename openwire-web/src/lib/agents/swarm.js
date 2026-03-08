@@ -27,6 +27,7 @@ const BASE_BACKOFF_MS = 2000;
 const PER_CHAR_COOLDOWN_MS = 10_000;  // 1 message per 10s per character
 const GLOBAL_COOLDOWN_MS = 5_000;     // 1 message per 5s across all AI
 const MENTION_COOLDOWN_MS = 8_000;    // suppress other characters for 8s after @mention
+const MAX_QUEUE_SIZE = 32;            // #9: cap queue to prevent unbounded growth
 
 export class AgentSwarm {
     constructor({ onMessage, onError, onModelLoad, onLog, onTyping }) {
@@ -78,7 +79,17 @@ export class AgentSwarm {
         // Mention ownership — suppresses other characters during directed @mentions
         this._mentionTarget = null;       // characterId of the @mentioned character
         this._mentionActiveUntil = 0;     // timestamp when cooldown expires
-        this._lastCrossOverAt = 0;          // global crossover cooldown tracker
+        this._lastCrossOverAt = 0;        // global crossover cooldown tracker
+
+        // #1/#2: Track stagger timers so they can be cleared on stop/reload
+        this._staggerTimers = [];
+        // #3: Track crossover timers for cleanup
+        this._crossoverTimers = [];
+        // #4: Track mood revert timers for cleanup
+        this._moodTimers = [];
+
+        // #7: Cached agent names set (invalidated on config change)
+        this._agentNamesCache = null;
 
         // Dynamic config — loaded from agentStore
         this._characters = {};  // dict { id: charObj }
@@ -97,6 +108,9 @@ export class AgentSwarm {
         this._groups = getGroupsDict(store);
         this._modelFilters = store.modelFilters || { whitelist: [], blacklist: [] };
 
+        // #7: Invalidate agent names cache on config change
+        this._agentNamesCache = null;
+
         // Seed enabled state
         Object.keys(this._characters).forEach(id => {
             if (this._charEnabled[id] === undefined) {
@@ -107,6 +121,26 @@ export class AgentSwarm {
         Object.keys(this._groups).forEach(id => {
             if (this._groupEnabled[id] === undefined) this._groupEnabled[id] = true;
         });
+
+        // #6: Prune stale entries for removed characters
+        const validIds = new Set(Object.keys(this._characters));
+        for (const id of Object.keys(this._lastMsgByChar)) {
+            if (!validIds.has(id)) delete this._lastMsgByChar[id];
+        }
+        for (const id of Object.keys(this._moods)) {
+            if (!validIds.has(id)) delete this._moods[id];
+        }
+        for (const id of Object.keys(this._assignedModels)) {
+            if (!validIds.has(id)) delete this._assignedModels[id];
+        }
+    }
+
+    // #7: Cached agent name lookup — avoids Set allocation on every addContext call
+    _getAgentNames() {
+        if (!this._agentNamesCache) {
+            this._agentNamesCache = new Set(Object.values(this._characters).map(c => c.name));
+        }
+        return this._agentNamesCache;
     }
 
     /** Hot-reload config from agentStore without stopping the swarm */
@@ -117,6 +151,10 @@ export class AgentSwarm {
         Object.values(this._timers).forEach(t => clearTimeout(t));
         this._timers = {};
 
+        // #1: Clear stagger timers from previous loadConfig/start
+        this._staggerTimers.forEach(t => clearTimeout(t));
+        this._staggerTimers = [];
+
         this._loadFromStore();
         this._log('[Config] Hot-reloaded from agentStore');
 
@@ -124,7 +162,8 @@ export class AgentSwarm {
         if (wasRunning) {
             Object.keys(this._characters).forEach((id, idx) => {
                 if (!this._timers[id]) {
-                    setTimeout(() => this._scheduleNext(id), idx * 3_000);
+                    const t = setTimeout(() => this._scheduleNext(id), idx * 3_000);
+                    this._staggerTimers.push(t);
                 }
             });
         }
@@ -154,8 +193,11 @@ export class AgentSwarm {
 
         this._throttleTimer = setInterval(() => { this._messagesThisMinute = 0; }, 60_000);
 
+        // #2: Track stagger timers so stop() can clear them
+        this._staggerTimers = [];
         Object.keys(this._characters).forEach((id, idx) => {
-            setTimeout(() => this._scheduleNext(id), idx * 7_000);
+            const t = setTimeout(() => this._scheduleNext(id), idx * 7_000);
+            this._staggerTimers.push(t);
         });
 
         this._log('[Swarm] All timers scheduled');
@@ -165,10 +207,28 @@ export class AgentSwarm {
         this._running = false;
         Object.values(this._timers).forEach(t => clearTimeout(t));
         this._timers = {};
+        // Clear typing indicators for all queued characters before draining
+        this._messageQueue.forEach(t => {
+            const c = this._characters[t.characterId];
+            if (c) this._onTyping(t.characterId, c.name, c.avatar, false);
+        });
         this._messageQueue = [];
         this._isProcessingQueue = false;
         if (this._throttleTimer) { clearInterval(this._throttleTimer); this._throttleTimer = null; }
         if (this._factTimer) { clearInterval(this._factTimer); this._factTimer = null; }
+
+        // #1/#2: Clear stagger timers
+        this._staggerTimers.forEach(t => clearTimeout(t));
+        this._staggerTimers = [];
+
+        // #3: Clear crossover timers
+        this._crossoverTimers.forEach(t => clearTimeout(t));
+        this._crossoverTimers = [];
+
+        // #4: Clear mood revert timers
+        this._moodTimers.forEach(t => clearTimeout(t));
+        this._moodTimers = [];
+
         this._log('[Swarm] Stopped');
     }
 
@@ -189,9 +249,10 @@ export class AgentSwarm {
 
     addContext(nick, text, forceIsAgent = false) {
         if (!text || typeof text !== 'string') return;
-        const agentNames = new Set(Object.values(this._characters).map(c => c.name));
+        // #7: Use cached agent names set
+        const agentNames = this._getAgentNames();
         // Check exact match AND substring match to handle "😅 Jethalal" format from P2P broadcasts
-        const isAgent = forceIsAgent || agentNames.has(nick) || Array.from(agentNames).some(name => nick.includes(name));
+        const isAgent = forceIsAgent || agentNames.has(nick) || [...agentNames].some(name => nick.includes(name));
         this._context.push({ role: 'user', content: `${nick}: ${text}`, _isAgent: isAgent });
         if (this._context.length > CONTEXT_BUFFER_SIZE) this._context.shift();
         this._contextDirty = true;
@@ -212,7 +273,7 @@ export class AgentSwarm {
         if (hasMention) {
             this._log(`[Reactivity] Skipped — message contains @mention, deferring to mention handler`);
         } else {
-            // Collect all matching characters, then pick max 2-3 to avoid dog-piling
+            // Collect all matching characters, then pick max 2 to avoid dog-piling
             const lower = text.toLowerCase();
             const matched = Object.values(this._characters).filter(c => {
                 if (!this._isActive(c.id)) return false;
@@ -220,7 +281,7 @@ export class AgentSwarm {
                 return c.reactive_tags.some(tag => lower.includes(tag.toLowerCase()));
             });
 
-            // Shuffle and pick at most 2 to respond (reduced from 3)
+            // Shuffle and pick at most 2 to respond
             const MAX_REACTIVE = 2;
             const shuffled = matched.sort(() => Math.random() - 0.5);
             const selected = shuffled.slice(0, MAX_REACTIVE);
@@ -415,6 +476,9 @@ export class AgentSwarm {
      * This ensures serial execution and rate-limit-aware retries.
      */
     async _generate(characterId, { force = false } = {}) {
+        // #8: Guard against post-stop queue insertion
+        if (!this._running) return;
+
         if (!force && this._messagesThisMinute >= this._maxMsgPerMin) {
             this._log(`[Throttle] ${this._characters[characterId]?.name} blocked — ${this._messagesThisMinute}/${this._maxMsgPerMin} msg/min`);
             return;
@@ -450,6 +514,11 @@ export class AgentSwarm {
             this._messageQueue.splice(lastForceIdx + 1, 0, task);
             this._log(`[Queue] ${c.name} PRIORITY added at position ${lastForceIdx + 2} (queue: ${this._messageQueue.length})`);
         } else {
+            // #9: Cap queue size to prevent unbounded growth under burst load
+            if (this._messageQueue.length >= MAX_QUEUE_SIZE) {
+                this._log(`[Queue] ${c.name} dropped — queue full (${this._messageQueue.length}/${MAX_QUEUE_SIZE})`);
+                return;
+            }
             this._messageQueue.push(task);
             this._log(`[Queue] ${c.name} added (queue: ${this._messageQueue.length})`);
         }
@@ -476,6 +545,8 @@ export class AgentSwarm {
             const waitMs = this._globalCooldown - sinceLastGlobal;
             this._log(`[Cooldown] Global 5s cooldown — waiting ${(waitMs / 1000).toFixed(1)}s`);
             await new Promise(r => setTimeout(r, waitMs));
+            // #5: Check running state after async wait
+            if (!this._running) { this._isProcessingQueue = false; return; }
         }
 
         const task = this._messageQueue.shift();
@@ -497,6 +568,9 @@ export class AgentSwarm {
             this._processQueue();
             return;
         }
+
+        // Wrap entire prompt-build + generation in try to prevent queue deadlock (#9 from audit)
+        try {
 
         const modelId = this.getAssignedModel(characterId);
 
@@ -586,7 +660,6 @@ ${c.systemPrompt}${moodBlock}${factsBlock}`;
         // Ensure typing indicator is on
         this._onTyping(characterId, c.name, c.avatar, true);
 
-        try {
             const useGemini = this._provider === 'gemini';
             const gen = useGemini ? generateGeminiMessage : generateMessage;
             let text = await gen(modelId, systemPrompt, trigger, 120);
@@ -655,6 +728,8 @@ ${c.systemPrompt}${moodBlock}${factsBlock}`;
 
                 // Keep typing indicator on during backoff
                 await new Promise(r => setTimeout(r, waitMs));
+                // #5: Check running state after async wait
+                if (!this._running) { this._isProcessingQueue = false; return; }
 
                 this._isProcessingQueue = false;
                 this._processQueue();
@@ -686,7 +761,8 @@ ${c.systemPrompt}${moodBlock}${factsBlock}`;
         const nick = match[1].trim();
 
         // Don't tag other agents — only tag human users
-        const agentNames = new Set(Object.values(this._characters).map(c => c.name));
+        // #7: Use cached agent names
+        const agentNames = this._getAgentNames();
         if (agentNames.has(nick)) return null;
 
         return nick;
@@ -725,11 +801,12 @@ ${c.systemPrompt}${moodBlock}${factsBlock}`;
         if (roll < CROSSOVER_PROBABILITY) {
             this._lastCrossOverAt = now;
             this._log(`[CrossOver] ${pick.name} triggered by ${this._characters[speakerId]?.name} (rolled ${roll.toFixed(2)} < ${CROSSOVER_PROBABILITY})`);
-            setTimeout(() => {
-                // Do NOT call _scheduleNext here — let the background loop handle it.
-                // Calling _scheduleNext creates double timers and exponential growth.
+            // #3: Track crossover timer for cleanup on stop()
+            const crossTimer = setTimeout(() => {
+                if (!this._running) return;
                 this._generate(pick.id);
             }, 2000 + Math.random() * 3000);
+            this._crossoverTimers.push(crossTimer);
         } else {
             this._log(`[CrossOver] All candidates skipped (rolled ${roll.toFixed(2)} >= ${CROSSOVER_PROBABILITY})`);
         }
@@ -762,12 +839,14 @@ ${c.systemPrompt}${moodBlock}${factsBlock}`;
         this._moods[characterId] = mood;
         this._log(`[Mood] ${this._characters[characterId]?.name}: ${prevMood} -> ${mood}`);
 
-        setTimeout(() => {
+        // #4: Track mood revert timer for cleanup on stop()
+        const moodTimer = setTimeout(() => {
             if (this._moods[characterId] === mood) {
                 this._moods[characterId] = 'normal';
                 this._log(`[Mood] ${this._characters[characterId]?.name}: ${mood} -> normal (auto-revert)`);
             }
         }, 120_000 + Math.random() * 180_000);
+        this._moodTimers.push(moodTimer);
     }
 
     // ── Ephemeral Session Memory ─────────────────────────────

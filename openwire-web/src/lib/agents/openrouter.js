@@ -87,8 +87,10 @@ function extractParamCount(model) {
 /**
  * Generate a character message via the OpenRouter proxy.
  */
+const IS_DEBUG_OR = typeof localStorage !== 'undefined' && localStorage.getItem('openwire_debug') === 'true';
+const FETCH_TIMEOUT_MS = 30_000;
+
 export async function generateMessage(modelId, systemPrompt, contextMessages, maxTokens = 120) {
-    const isDebug = typeof localStorage !== 'undefined' && localStorage.getItem('openwire_debug') === 'true';
     const messages = [
         { role: 'system', content: systemPrompt },
         ...contextMessages,
@@ -101,20 +103,29 @@ export async function generateMessage(modelId, systemPrompt, contextMessages, ma
         temperature: 0.92,
     };
 
-    if (isDebug) {
+    if (IS_DEBUG_OR) {
         console.log('[OpenRouter] Request:', { model: modelId, contextCount: contextMessages.length, maxTokens });
     }
 
-    const resp = await fetch(PROXY, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    });
+    // AbortController with 30s timeout — prevents hung fetch from locking the queue
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    let resp;
+    try {
+        resp = await fetch(PROXY, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+        });
+    } finally {
+        clearTimeout(timeout);
+    }
 
     if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         const msg = err?.error?.message || `HTTP ${resp.status}`;
-        if (isDebug) console.error('[OpenRouter] Error:', resp.status, err);
+        if (IS_DEBUG_OR) console.error('[OpenRouter] Error:', resp.status, err);
         const error = new Error(msg);
         error.status = resp.status;
         throw error;
@@ -122,7 +133,7 @@ export async function generateMessage(modelId, systemPrompt, contextMessages, ma
 
     const data = await resp.json();
     const text = data.choices?.[0]?.message?.content?.trim();
-    if (isDebug) {
+    if (IS_DEBUG_OR) {
         console.log('[OpenRouter] Response:', { model: data.model, text: text || '(empty)', id: data.id });
         if (!text) console.warn('[OpenRouter] Empty response! choices:', JSON.stringify(data.choices), 'finish_reason:', data.choices?.[0]?.finish_reason);
     }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import * as rl from '../lib/roulette';
 
 /* ── Constants ──────────────────────────────────── */
@@ -48,7 +48,8 @@ function RouletteWheel({ spinning, result }) {
     const cx = 50, cy = 50;
     const angle = 360 / n;
 
-    const sectors = WHEEL_ORDER.map((num, i) => {
+    // Memoize sectors — 37 SVG elements with trig calculations, static data that never changes
+    const sectors = useMemo(() => WHEEL_ORDER.map((num, i) => {
         const startAngle = i * angle - 90;
         const endAngle = (i + 1) * angle - 90;
         const toRad = (d) => (d * Math.PI) / 180;
@@ -86,7 +87,7 @@ function RouletteWheel({ spinning, result }) {
                 </text>
             </g>
         );
-    });
+    }), []); // Empty deps — wheel sectors are static
 
     return (
         <div className={`rl-wheel-container ${spinning ? 'is-spinning' : ''}`} style={{

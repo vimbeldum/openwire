@@ -47,8 +47,10 @@ export function formatGeminiLabel(model) {
  * Generate a character message via Gemini.
  * Converts OpenAI-style messages to Gemini format.
  */
+const IS_DEBUG_GM = typeof localStorage !== 'undefined' && localStorage.getItem('openwire_debug') === 'true';
+const FETCH_TIMEOUT_MS = 30_000;
+
 export async function generateGeminiMessage(modelId, systemPrompt, contextMessages, maxTokens = 120) {
-    const isDebug = typeof localStorage !== 'undefined' && localStorage.getItem('openwire_debug') === 'true';
 
     // Build Gemini contents from OpenAI-style messages
     const contents = [];
@@ -80,15 +82,24 @@ export async function generateGeminiMessage(modelId, systemPrompt, contextMessag
         },
     };
 
-    if (isDebug) {
+    if (IS_DEBUG_GM) {
         console.log('[Gemini] Request:', { model: modelId, contextCount: contextMessages.length, maxTokens });
     }
 
-    const resp = await fetch(PROXY, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    });
+    // AbortController with 30s timeout — prevents hung fetch from locking the queue
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    let resp;
+    try {
+        resp = await fetch(PROXY, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+        });
+    } finally {
+        clearTimeout(timeout);
+    }
 
     if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
@@ -101,7 +112,7 @@ export async function generateGeminiMessage(modelId, systemPrompt, contextMessag
 
     const data = await resp.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    if (isDebug) {
+    if (IS_DEBUG_GM) {
         console.log('[Gemini] Response:', { model: modelId, text: text || '(empty)' });
         if (!text) console.warn('[Gemini] Empty response! Full data:', data);
     }

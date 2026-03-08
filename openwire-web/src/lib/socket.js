@@ -8,6 +8,10 @@ let ws = null;
 let listeners = [];
 let reconnectTimer = null;
 let pingTimer = null;
+let reconnectAttempt = 0;
+const MAX_RECONNECT_ATTEMPTS = 10;
+const BASE_RECONNECT_MS = 1000;
+const MAX_RECONNECT_MS = 30000;
 
 export function connect(nick, onEvent) {
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
@@ -22,6 +26,7 @@ export function connect(nick, onEvent) {
     ws = new WebSocket(RELAY_URL);
 
     ws.onopen = () => {
+        reconnectAttempt = 0; // Reset on successful connection
         ws.send(JSON.stringify({ type: 'join', nick, peer_id: generateId() }));
         if (pingTimer) clearInterval(pingTimer);
         const PING_BASE = 14000;
@@ -45,7 +50,18 @@ export function connect(nick, onEvent) {
         if (pingTimer) clearInterval(pingTimer);
         listeners.forEach((fn) => fn({ type: 'disconnected' }));
         ws = null;
-        reconnectTimer = setTimeout(() => connect(nick, onEvent), 3000);
+        // Exponential backoff with jitter — prevents reconnect storm at scale
+        if (reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
+            listeners.forEach((fn) => fn({ type: 'reconnect_failed' }));
+            return;
+        }
+        clearTimeout(reconnectTimer);
+        const delay = Math.min(
+            BASE_RECONNECT_MS * Math.pow(2, reconnectAttempt) + Math.random() * 1000,
+            MAX_RECONNECT_MS
+        );
+        reconnectAttempt++;
+        reconnectTimer = setTimeout(() => connect(nick, onEvent), delay);
     };
 
     ws.onerror = () => { };

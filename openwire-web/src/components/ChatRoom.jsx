@@ -60,8 +60,8 @@ function saveMessages(messages) {
 }
 
 export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin }) {
-    // Dynamic agent characters from store (for @mention matching)
-    const CHARACTERS = getCharactersDict(loadStore());
+    // Dynamic agent characters from store (for @mention matching) — memoized to avoid rebuild every render
+    const CHARACTERS = useMemo(() => getCharactersDict(loadStore()), []);
 
     const [messages, setMessages] = useState(() => loadMessages());
     const [input, setInput] = useState('');
@@ -368,7 +368,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             },
             onModelLoad: () => setAgentRunning(true),
             onLog: (line) => {
-                swarmLogsRef.current = [...swarmLogsRef.current.slice(-200), line];
+                // Mutate in place to avoid spread-copy GC pressure on every log line
+                const logs = swarmLogsRef.current;
+                if (logs.length >= 200) logs.shift();
+                logs.push(line);
                 if (debugModeRef.current) console.log('[AgentSwarm]', line);
             },
             onTyping: (characterId, nick, avatar, isTyping) => {
@@ -1149,8 +1152,16 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         }
     }, [messages, showGameChat]);
 
+    // Debounced auto-scroll — only if user is near bottom, uses rAF to avoid layout thrash
     useEffect(() => {
-        messagesEnd.current?.scrollIntoView({ behavior: 'smooth' });
+        const container = messagesEnd.current?.parentElement;
+        if (!container) return;
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+        if (!isNearBottom) return;
+        const raf = requestAnimationFrame(() => {
+            messagesEnd.current?.scrollIntoView({ behavior: 'smooth' });
+        });
+        return () => cancelAnimationFrame(raf);
     }, [messages]);
 
     // ── Invite handlers ──────────────────────────────────────
