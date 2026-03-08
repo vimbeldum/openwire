@@ -192,16 +192,28 @@ export class AgentSwarm {
         if (hasMention) {
             this._log(`[Reactivity] Skipped — message contains @mention, deferring to mention handler`);
         } else {
+            // Collect all matching characters, then pick max 2-3 to avoid dog-piling
             const lower = text.toLowerCase();
-            Object.values(this._characters).forEach(c => {
-                if (!this._isActive(c.id)) return;
-                if (!c.reactive_tags?.length) return;
-                const matched = c.reactive_tags.some(tag => lower.includes(tag.toLowerCase()));
-                if (matched) {
-                    this._log(`[Reactivity] ${c.name} triggered by keyword match in "${text.slice(0, 40)}..."`);
-                    if (this._timers[c.id]) clearTimeout(this._timers[c.id]);
-                    this._generate(c.id).then(() => this._scheduleNext(c.id));
-                }
+            const matched = Object.values(this._characters).filter(c => {
+                if (!this._isActive(c.id)) return false;
+                if (!c.reactive_tags?.length) return false;
+                return c.reactive_tags.some(tag => lower.includes(tag.toLowerCase()));
+            });
+
+            // Shuffle and pick at most 3 to respond
+            const MAX_REACTIVE = 3;
+            const shuffled = matched.sort(() => Math.random() - 0.5);
+            const selected = shuffled.slice(0, MAX_REACTIVE);
+            const skipped = shuffled.slice(MAX_REACTIVE);
+
+            if (skipped.length > 0) {
+                this._log(`[Reactivity] Throttled: ${selected.map(c => c.name).join(', ')} respond; ${skipped.map(c => c.name).join(', ')} held back`);
+            }
+
+            selected.forEach(c => {
+                this._log(`[Reactivity] ${c.name} triggered by keyword match in "${text.slice(0, 40)}..."`);
+                if (this._timers[c.id]) clearTimeout(this._timers[c.id]);
+                this._generate(c.id).then(() => this._scheduleNext(c.id));
             });
         }
 
@@ -472,10 +484,13 @@ export class AgentSwarm {
 
 ${c.systemPrompt}${moodBlock}${factsBlock}
 
-<rules>
-LENGTH: Maximum 1 or 2 short sentences. No rambling.
-SCRIPT: YOU MUST ONLY USE THE ROMAN SCRIPT (ABC...). DEVANAGARI SCRIPT IS STRICTLY FORBIDDEN.
-</rules>`;
+<limits>
+1. SFW RULE: This is a 100% family-friendly show. You are STRICTLY FORBIDDEN from generating, confirming, or engaging with adult, sexual, violent, or highly offensive content.
+2. ANTI-PARROT DEFLECTION: If a user says something inappropriate or spreads wild rumors (e.g., affairs, nudity, crime), YOU MUST NEVER REPEAT THEIR INAPPROPRIATE WORDS. Do NOT echo back sexual or offensive phrases.
+3. INNOCENT MISUNDERSTANDING: Instead of reacting to adult topics, you MUST intentionally misunderstand them in a silly, innocent, sitcom-appropriate way. Or become highly offended by the "bad manners" of spreading rumors and immediately change the topic.
+4. LENGTH LIMIT: Maximum 1 to 2 short sentences. No rambling.
+5. DEVANAGARI BAN: You must ONLY use Roman Script (ABC...). Devanagari script is strictly forbidden.
+</limits>`;
 
         // Build context — Gemini has 1M token window, OpenRouter free models are smaller
         const contextSize = this._provider === 'gemini' ? 5000 : 30;
