@@ -2071,7 +2071,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         <button onClick={() => setShowGameChat(false)}>✕</button>
                     </div>
                     <div className="floating-chat-messages">
-                        {messages.filter(m => !isAgentMuted(m)).slice(-50).map((m) => (
+                        {messages.filter(m => m.roomId === (currentRoom || null) && !isAgentMuted(m)).slice(-50).map((m) => (
                             <div key={m.id} className={`msg ${m.type}`}>
                                 <span className="msg-time">[{m.time}]</span>
                                 {m.sender && <span className={`msg-sender ${m.type}`}>{m.sender}:</span>}
