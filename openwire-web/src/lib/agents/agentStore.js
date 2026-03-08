@@ -48,7 +48,7 @@ function buildDefaults() {
         groups,
         characters,
         modelFilters: { whitelist: [], blacklist: [] },
-        _version: 4,
+        _version: 5,
     };
 }
 
@@ -57,7 +57,7 @@ function buildDefaults() {
 /** Load the complete agent store (groups, characters, modelFilters) */
 export function loadStore() {
     const stored = loadRaw();
-    if (stored && stored._version >= 4) return stored;
+    if (stored && stored._version >= 5) return stored;
     const defaults = buildDefaults();
     saveRaw(defaults);
     return defaults;
