@@ -227,8 +227,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             reactions: {},
             ...extra,
         }]);
-        // Feed real chat messages into swarm context (not system/game messages)
-        if ((type === 'self' || type === 'peer') && content && !extra?.isAgent) {
+        // Feed real chat messages into swarm context (only general chat, not rooms or game messages)
+        if ((type === 'self' || type === 'peer') && content && !extra?.isAgent && !extra?.roomId) {
             swarmRef.current?.addContext(sender, content);
         }
     }, []);
@@ -308,23 +308,21 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         if (cancelled) return;
         const swarm = new AgentSwarm({
             onMessage: (characterId, nick, avatar, text) => {
-                // Post agent messages to whichever room the user is currently viewing
+                // Agent messages only appear in the general chat, never in rooms
+                if (currentRoomRef.current) return;
                 const displayNick = `${avatar} ${nick}`;
-                const roomId = currentRoomRef.current || null;
                 addMsg(displayNick, text, 'peer', {
-                    roomId,
+                    roomId: null,
                     isAgent: true,
                     characterId,
                 });
-                // Broadcast to other sessions via WebSocket relay
-                if (roomId) {
-                    socket.sendRoomMessage(roomId, JSON.stringify({
-                        type: 'agent_message',
-                        nick: displayNick,
-                        text,
-                        characterId,
-                    }));
-                }
+                // Broadcast to other sessions via general chat relay
+                socket.sendChat(JSON.stringify({
+                    type: 'agent_message',
+                    nick: displayNick,
+                    text,
+                    characterId,
+                }));
                 // Feed back into context
                 swarm.addContext(nick, text);
             },
@@ -1421,9 +1419,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         mentions.forEach(raw => {
             const name = raw.slice(1).toLowerCase();
 
-            // Check if it's an AI agent mention
+            // Check if it's an AI agent mention (only in general chat, not rooms)
             const agentId = agentNameMap[name];
-            if (agentId) {
+            if (agentId && !currentRoomRef.current) {
                 const sw = swarmRef.current;
                 if (!sw) { console.warn(`[@Mention] No swarm instance for @${name}`); return; }
                 if (!sw.running) { console.warn(`[@Mention] Swarm not running for @${name}`); return; }
