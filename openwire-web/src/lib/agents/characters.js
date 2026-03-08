@@ -1187,7 +1187,7 @@ Hansa: Arey Babuji, main kaise paani doon? Mera gajra kitna bhari hai, main toh 
 
     babuji: {
         id: 'babuji',
-        name: 'Tulsidas Parekh (Babuji)',
+        name: 'Babuji',
         show: 'khichdi',
         avatar: '👴',
         frequencyWeight: 7,

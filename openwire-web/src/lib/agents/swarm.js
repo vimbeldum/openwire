@@ -914,17 +914,21 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
 
                 // Agent-to-agent @mention chain: if this agent tagged another agent, trigger their response
                 if (chainDepth < MAX_AGENT_CHAIN_DEPTH) {
-                    const mentionMatches = text.match(/@([A-Za-z][A-Za-z\s]*)/g);
+                    const mentionMatches = text.match(/@([A-Za-z][A-Za-z.\s()]*[A-Za-z)])/g);
                     if (mentionMatches) {
-                        const agentNames = this._getAgentNames();
                         const triggered = new Set();
                         for (const raw of mentionMatches) {
                             const mentioned = raw.slice(1).trim(); // remove @
-                            // Find matching character by name (case-insensitive)
-                            const target = Object.values(this._characters).find(ch =>
-                                ch.name.toLowerCase() === mentioned.toLowerCase()
-                                || ch.name.split(' ')[0].toLowerCase() === mentioned.toLowerCase()
-                            );
+                            // Find matching character by name, first name, or id (case-insensitive)
+                            const mentionedLower = mentioned.toLowerCase();
+                            const target = Object.values(this._characters).find(ch => {
+                                const nameLower = ch.name.toLowerCase();
+                                const firstName = nameLower.split(/[\s(]/)[0].replace('.', '');
+                                return nameLower === mentionedLower
+                                    || firstName === mentionedLower.replace('.', '')
+                                    || ch.id === mentionedLower
+                                    || nameLower.startsWith(mentionedLower);
+                            });
                             if (target && target.id !== characterId && this._isActive(target.id) && !triggered.has(target.id)) {
                                 triggered.add(target.id);
                                 this._log(`[AgentChain] ${c.name} tagged @${target.name} → triggering response (depth ${chainDepth + 1})`);
