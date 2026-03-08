@@ -23,13 +23,14 @@ export function connect(nick, onEvent) {
 
     ws.onopen = () => {
         ws.send(JSON.stringify({ type: 'join', nick, peer_id: generateId() }));
-        // Start keep-alive pings (every 15s to beat Cloudflare idle timeout)
         if (pingTimer) clearInterval(pingTimer);
+        const PING_BASE = 14000;
+        const PING_JITTER = 2000;
         pingTimer = setInterval(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'ping' }));
             }
-        }, 15000);
+        }, PING_BASE + Math.random() * PING_JITTER);
     };
 
     ws.onmessage = (e) => {

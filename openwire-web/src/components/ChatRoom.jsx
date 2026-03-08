@@ -1,25 +1,27 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import * as socket from '../lib/socket';
 import * as game from '../lib/game';
 import * as bj from '../lib/blackjack';
 import * as rl from '../lib/roulette';
 import * as ab from '../lib/andarbahar';
 import * as wallet from '../lib/wallet';
-import GameBoard from './GameBoard';
-import BlackjackBoard from './BlackjackBoard';
-import RouletteBoard from './RouletteBoard';
-import AndarBaharBoard from './AndarBaharBoard';
-import AdminPortal from './AdminPortal';
-import GifPicker from './GifPicker';
-import HowToPlay from './HowToPlay';
-import PostSessionSummary from './PostSessionSummary';
-import AccountHistory from './AccountHistory';
-import AgentControlPanel from './AgentControlPanel';
+const GameBoard = lazy(() => import('./GameBoard'));
+const BlackjackBoard = lazy(() => import('./BlackjackBoard'));
+const RouletteBoard = lazy(() => import('./RouletteBoard'));
+const AndarBaharBoard = lazy(() => import('./AndarBaharBoard'));
+const AdminPortal = lazy(() => import('./AdminPortal'));
+const GifPicker = lazy(() => import('./GifPicker'));
+const HowToPlay = lazy(() => import('./HowToPlay'));
+const PostSessionSummary = lazy(() => import('./PostSessionSummary'));
+const AccountHistory = lazy(() => import('./AccountHistory'));
+const AgentControlPanel = lazy(() => import('./AgentControlPanel'));
 import LiveTicker from './chat/LiveTicker';
 import TypingBar from './chat/TypingBar';
 import * as ledger from '../lib/core/ledger.js';
 import { getRoomAlias } from '../lib/core/identity.js';
 import { loadStore, getCharactersDict } from '../lib/agents/agentStore.js';
+
+const MENTION_REGEX = /(@\w+)/g;
 
 function timeStr() {
     const d = new Date();
@@ -84,7 +86,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const [agentRunning, setAgentRunning] = useState(false);
     const [mentionToasts, setMentionToasts] = useState([]);
     const [agentTyping, setAgentTyping] = useState({});   // { characterId: { nick, avatar, ts } }
-    const [swarmLogs, setSwarmLogs] = useState([]);
+    const swarmLogsRef = useRef([]);
     const swarmRef = useRef(null);
 
     // Per-user muted agents (localStorage-backed)
@@ -128,6 +130,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         if (!msg.isAgent || !msg.characterId) return false;
         return !!mutedAgents[msg.characterId];
     }, [mutedAgents]);
+
+    const filteredMessages = useMemo(() =>
+        messages.filter(m => m.roomId === (currentRoom || null) && !isAgentMuted(m)),
+        [messages, currentRoom, mutedAgents]
+    );
 
     // Bank Ledger (House P&L Tracker)
     const [bankLedger, setBankLedger] = useState(() => {
@@ -202,7 +209,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     useEffect(() => { currentRoomRef.current = currentRoom; }, [currentRoom]);
     useEffect(() => { walletRef.current = myWallet; }, [myWallet]);
 
-    useEffect(() => { saveMessages(messages); }, [messages]);
+    useEffect(() => {
+        const timer = setTimeout(() => saveMessages(messages), 2000);
+        return () => clearTimeout(timer);
+    }, [messages]);
 
     // ── Typing peer cleanup (stale after 3s) ─────────────────
     useEffect(() => {
@@ -332,7 +342,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             },
             onModelLoad: () => setAgentRunning(true),
             onLog: (line) => {
-                setSwarmLogs(prev => [...prev.slice(-200), line]);
+                swarmLogsRef.current = [...swarmLogsRef.current.slice(-200), line];
                 if (debugModeRef.current) console.log('[AgentSwarm]', line);
             },
             onTyping: (characterId, nick, avatar, isTyping) => {
@@ -1284,7 +1294,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     // ── Render message content with @mention highlights ──────
     const renderContent = useCallback((text) => {
         if (!text || typeof text !== 'string') return text;
-        const parts = text.split(/(@\w+)/g);
+        const parts = text.split(MENTION_REGEX);
         if (parts.length === 1) return text;
         return parts.map((part, i) => {
             if (part.startsWith('@')) {
@@ -1309,14 +1319,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     }, []);
 
     // Build cached list of all mentionable names (agents + online peers), sorted alphabetically
-    const allMentionables = useCallback(() => {
-        const names = new Map(); // lowercase → display name
-        // Add agent characters
+    const allMentionables = useMemo(() => {
+        const names = new Map();
         Object.values(CHARACTERS).forEach(c => {
             names.set(c.name.toLowerCase(), { display: c.name, avatar: c.avatar, type: 'agent' });
         });
-        // Add online peers (excluding self)
-        peersRef.current.forEach(p => {
+        peers.forEach(p => {
             if (p.nick && p.nick !== nickRef.current) {
                 const key = p.nick.toLowerCase();
                 if (!names.has(key)) names.set(key, { display: p.nick, avatar: '👤', type: 'peer' });
@@ -1325,15 +1333,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         return [...names.entries()]
             .sort((a, b) => a[0].localeCompare(b[0]))
             .map(([key, val]) => ({ key, ...val }));
-    }, [CHARACTERS]);
+    }, [CHARACTERS, peers]);
 
     // Update suggestions when query changes
     useEffect(() => {
         if (mentionQuery === null) { setMentionSuggestions([]); return; }
-        const all = allMentionables();
-        if (!mentionQuery) { setMentionSuggestions(all); setMentionIndex(0); return; }
+        if (!mentionQuery) { setMentionSuggestions(allMentionables); setMentionIndex(0); return; }
         const q = mentionQuery.toLowerCase();
-        const filtered = all.filter(m => m.key.startsWith(q));
+        const filtered = allMentionables.filter(m => m.key.startsWith(q));
         setMentionSuggestions(filtered);
         setMentionIndex(0);
     }, [mentionQuery, allMentionables]);
@@ -1746,8 +1753,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             <LiveTicker items={tickerItems} />
 
             <div className="messages-area">
-                {messages
-                    .filter(m => m.roomId === (currentRoom || null) && !isAgentMuted(m))
+                {filteredMessages
                     .map((m) => (
                     <div key={m.id} className={`msg ${m.type}${m.type === 'whisper' ? ' whisper' : ''}`}>
                         {m.type === 'game_invite' && !m.inviteUsed ? (
@@ -1858,7 +1864,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         onPaste={handlePaste}
                         autoFocus
                     />
-                    {showGifPicker && <GifPicker onSelect={handleGifSelect} onClose={() => setShowGifPicker(false)} />}
+                    {showGifPicker && <Suspense fallback={null}><GifPicker onSelect={handleGifSelect} onClose={() => setShowGifPicker(false)} /></Suspense>}
                 </div>
                 <button type="button" className="gif-btn" onClick={() => setShowGifPicker(!showGifPicker)}>GIF</button>
                 <button type="submit">Send</button>
@@ -1989,6 +1995,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             </div>
 
             {/* Game Overlays */}
+            <Suspense fallback={null}>
             {activeGame && (
                 <GameBoard game={activeGame} myId={myIdRef.current} onMove={handleGameMove} onRematch={handleRematch} onClose={() => setActiveGame(null)} onHelp={() => openHelp('tictactoe')} />
             )}
@@ -2020,12 +2027,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 />
             )}
 
-            {/* How to Play Overlay — stacked above game, internal scroll only */}
             {showHelp && (
                 <HowToPlay activeGame={helpGame} onClose={() => setShowHelp(false)} />
             )}
 
-            {/* Post-Session Summary — shown after every completed round */}
             {showPostSummary && lastPayoutEvent && (
                 <PostSessionSummary
                     event={lastPayoutEvent}
@@ -2034,7 +2039,6 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 />
             )}
 
-            {/* Account History — full ledger view */}
             {showAccountHistory && (
                 <AccountHistory
                     deviceId={wallet.getDeviceId()}
@@ -2043,13 +2047,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 />
             )}
 
-            {/* Pop-Culture Agent Swarm Control Panel */}
             {showAgentPanel && (
                 <AgentControlPanel
                     swarm={swarmRef.current}
                     onClose={() => setShowAgentPanel(false)}
                 />
             )}
+            </Suspense>
 
             {/* Floating chat toggle — visible only when a game overlay is open */}
             {anyGameActive && (
@@ -2071,7 +2075,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                         <button onClick={() => setShowGameChat(false)}>✕</button>
                     </div>
                     <div className="floating-chat-messages">
-                        {messages.filter(m => m.roomId === (currentRoom || null) && !isAgentMuted(m)).slice(-50).map((m) => (
+                        {filteredMessages.slice(-50).map((m) => (
                             <div key={m.id} className={`msg ${m.type}`}>
                                 <span className="msg-time">[{m.time}]</span>
                                 {m.sender && <span className={`msg-sender ${m.type}`}>{m.sender}:</span>}
@@ -2111,21 +2115,21 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             )}
 
             {/* Admin Portal */}
-            {showAdmin && initialIsAdmin && (
+            {showAdmin && initialIsAdmin && (<Suspense fallback={null}>
                 <AdminPortal
                     peers={peers}
                     activityLog={activityLog}
                     bannedIps={bannedIps}
                     bankLedger={bankLedger}
                     swarm={swarmRef.current}
-                    swarmLogs={swarmLogs}
+                    swarmLogs={swarmLogsRef.current}
                     onKick={handleAdminKick}
                     onBanIp={handleAdminBanIp}
                     onUnbanIp={handleAdminUnbanIp}
                     onAdjustBalance={handleAdminAdjustBalance}
                     onClose={() => setShowAdmin(false)}
                 />
-            )}
+            </Suspense>)}
         </div>
     );
 }
