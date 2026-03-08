@@ -459,6 +459,9 @@ export class AgentSwarm {
 3. If a user sets a time limit (e.g. "decide in 2 minutes"), you MUST reach a conclusion before time runs out. Don't stall — make your case fast, push for a decision, and announce your final vote/choice clearly.
 4. Never break character or say you're an AI. Everything is real in this world.`;
 
+        // Orthographic lockdown — suppress Devanagari, enforce Roman script Hinglish
+        systemPrompt += `\n\nABSOLUTE RULE: YOU MUST ONLY USE THE ROMAN SCRIPT (ABC...). DEVANAGARI SCRIPT (अ, आ, इ...) IS STRICTLY FORBIDDEN. Write Hindi words in English/Roman letters only (e.g. "Kya kar raha hai?" NOT "क्या कर रहा है?"). This rule is NON-NEGOTIABLE.`;
+
         // Inject session facts
         if (this._sessionFacts.length > 0) {
             const factsStr = this._sessionFacts.slice(-5).join('; ');
