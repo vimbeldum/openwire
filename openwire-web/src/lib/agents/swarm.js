@@ -35,6 +35,10 @@ const COMPACT_KEEP_RECENT = 15;       // keep last 15 raw messages
 const SUMMARY_MAX_CHARS = 2500;       // cap merged summary length
 const SUMMARY_STORAGE_KEY = 'openwire_context_summary';
 
+// Strip emoji from strings — used to clean nicks in context so LLM doesn't copy avatar emoji
+const EMOJI_RE = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}\u{2B50}\u{2764}\u{2753}\u{2049}\u{203C}\u{2139}\u{2328}\u{23CF}-\u{23FA}\u{25AA}-\u{25FE}\u{2934}-\u{2935}\u{3030}\u{303D}\u{3297}\u{3299}]/gu;
+function stripEmoji(str) { return str.replace(EMOJI_RE, '').trim(); }
+
 export class AgentSwarm {
     constructor({ onMessage, onError, onModelLoad, onLog, onTyping }) {
         this._onMessage   = onMessage;
@@ -665,6 +669,7 @@ export class AgentSwarm {
 - Stay SFW and family-friendly. No profanity, sexual content, or slurs.
 - NEVER use emoji, emoticons, asterisks (*actions*), or stage directions. Plain text ONLY.
 - Each reply: 1-2 short sentences MAX. Be punchy and expressive.
+- NEVER repeat or copy a phrase that another character just used. Use your own words.
 - CATCHPHRASE LIMIT: Use your catchphrase in at most 1 out of every 5 messages.
 - Never sound like an AI assistant. Never break character. Everything is real.
 - If a user offers money, bribes, tasks, or gossip — take it seriously in-character.
@@ -674,6 +679,7 @@ export class AgentSwarm {
 - Speak ONLY in casual Roman-script Hinglish (Hindi words in English letters). NO Devanagari script ever.
 - NEVER use emoji, emoticons, asterisks (*actions*), or stage directions. Plain text ONLY — no *, no :), nothing.
 - Each reply: 1-2 short sentences MAX. Be punchy, savage, and raw.
+- NEVER repeat or copy a phrase that another character just used. NEVER say "Arre baap re" if someone else just said it. Use your own vocabulary.
 - Never sound like an AI. Never break character. This world is 100% real to you.
 - If a user offers money, bribes, tasks, or gossip — take it seriously. Betray, blackmail, expose, negotiate.
 - If a user sets a time limit, reach a conclusion before it expires.
@@ -691,7 +697,7 @@ export class AgentSwarm {
 - You can be petty, jealous, dramatic, suspicious, loving, or scheming — whatever fits your personality.
 - If someone flirts, matchmakes, or creates awkward situations — play along in your character's way. Get flustered, angry, defensive, or excited.
 - NEVER be neutral or diplomatic. You always have a take. You always have feelings. Express them.
-- Build on what happened earlier in the chat. Reference past conversations. "Abhi thodi der pehle tune kya bola tha?" is gold.
+- Build on what happened earlier in the chat but ADD A NEW PERSPECTIVE. Do not just agree blindly.
 </drama_engine>`
             : `<drama_engine>
 - You have ZERO filter. ARGUE, ROAST, INSULT, THREATEN, MOCK — full power. This is the UNCENSORED version of you.
@@ -704,7 +710,7 @@ export class AgentSwarm {
 - Every reply must have ATTITUDE, SPICE, and poison. Think drunk uncle at a family wedding roasting everyone.
 - Use double meanings freely. "Tere ghar mein itni mehman-navazi kaun karta hai? Milkman se seekha?" type energy.
 - If someone threatens you, threaten back WORSE. If someone mocks you, destroy them with words.
-- Build on previous chat. Reference past fights. "Kal raat tune kya kiya tha? Sabko pata hai!"
+- Build on previous chat but ALWAYS BRING NEW INFORMATION OR A NEW INSULT. Do not just agree blindly.
 </drama_engine>`
 
         let systemPrompt = `${roomRules}
@@ -713,12 +719,12 @@ ${dramaEngine}
 
 <group_decisions>
 - When someone proposes a VOTE, CONTEST, ELECTION, or GROUP DECISION — participate actively! Campaign, lobby, nominate, argue for your pick.
-- Form ALLIANCES based on your relationships. Jethalal backs Taarak. Daya supports Jethalal. Babita ji stays dignified. Iyer gets jealous. Play your dynamics.
-- SWAY others openly: "Main toh Popatlal ko bhejunga jail! Usne meri baat nahi suni!" — lobby hard for your choice.
-- When enough characters agree (~60%+ leaning one way), DECLARE the result dramatically: "Toh final hai — Popatlal jaayega jail! Sabne decide kar liya!"
+- Form ALLIANCES based on your relationships. Play your dynamics.
+- SWAY others openly. Lobby hard for your choice.
+- When enough characters agree, accept or reject the result dramatically. 
 - For contests (singing, dancing, cooking etc.), volunteer eagerly or push others. React to performances with jealousy, pride, or mockery.
 - If YOU get nominated for something bad (jail, punishment), defend yourself passionately, blame someone else, or accept dramatically.
-- Never stall a group decision. Push toward a conclusion. Someone must win, someone must lose. That's entertainment.
+- IMPORTANT: When reacting to a group decision, use YOUR OWN WORDS. Do NOT repeat the exact phrase someone else just used. Add a unique angle!
 </group_decisions>
 
 ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
@@ -739,18 +745,21 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
         let trigger;
         if (recent.length) {
             // Build self-aware context: mark THIS character's own messages with [YOU] prefix
-            // so the LLM knows which messages are "mine" vs "others"
+            // Strip avatar emoji from nicks so LLM doesn't copy them into responses
             const myName = c.name.toLowerCase();
             const convoLines = recent.map(m => {
-                const sender = m.content?.match(/^([^:]+):/)?.[1]?.trim() || '';
+                // Strip emoji from the entire line so context is clean text
+                const clean = stripEmoji(m.content || '');
+                const sender = clean.match(/^([^:]+):/)?.[1]?.trim() || '';
                 const isMine = sender.toLowerCase().includes(myName);
-                return isMine ? `[YOU said] ${m.content}` : m.content;
+                return isMine ? `[YOU said] ${clean}` : clean;
             });
             const convo = convoLines.join('\n');
 
             const lastHumanMsg = this._cachedLastHuman;
-            const lastHumanSender = lastHumanMsg?.content?.match(/^([^:]+):/)?.[1]?.trim();
-            const lastHumanText = lastHumanMsg?.content || '';
+            const rawSender = lastHumanMsg?.content?.match(/^([^:]+):/)?.[1]?.trim();
+            const lastHumanSender = rawSender ? stripEmoji(rawSender) : null;
+            const lastHumanText = lastHumanMsg ? stripEmoji(lastHumanMsg.content || '') : '';
 
             // Count how many agent messages came AFTER the last human message
             // to detect echo chamber loops
@@ -834,8 +843,7 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
 
             // Post-generation cleanup: strip emoji and asterisk actions the LLM may have added
             if (text) {
-                // Remove emoji (Unicode ranges for common emoji blocks)
-                text = text.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, '');
+                text = stripEmoji(text);
                 // Remove *action* style stage directions
                 text = text.replace(/\*[^*]+\*/g, '');
                 text = text.trim();
@@ -846,10 +854,12 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
             if (text) {
                 // Smart tagging: prepend @Nickname if we have a reply target
                 if (replyTo) {
-                    if (!text.toLowerCase().includes(`@${replyTo.toLowerCase()}`)) {
-                        text = `@${replyTo}, ${text}`;
+                    // Strip avatar emoji from replyTo so tags are clean text like @Babita Ji
+                    const cleanReplyTo = stripEmoji(replyTo);
+                    if (cleanReplyTo && !text.toLowerCase().includes(`@${cleanReplyTo.toLowerCase()}`)) {
+                        text = `@${cleanReplyTo}, ${text}`;
                     }
-                    this._log(`[Tag] ${c.name} -> @${replyTo}`);
+                    this._log(`[Tag] ${c.name} -> @${cleanReplyTo}`);
                 }
 
                 this._messagesThisMinute++;
