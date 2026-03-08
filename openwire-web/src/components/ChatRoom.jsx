@@ -4,6 +4,7 @@ import * as game from '../lib/game';
 import * as bj from '../lib/blackjack';
 import * as rl from '../lib/roulette';
 import * as ab from '../lib/andarbahar';
+import * as pm from '../lib/polymarket';
 import * as wallet from '../lib/wallet';
 
 // Retry wrapper: on chunk-not-found after deploy, reload once to get fresh HTML
@@ -22,6 +23,7 @@ const GameBoard = lazyRetry(() => import('./GameBoard'));
 const BlackjackBoard = lazyRetry(() => import('./BlackjackBoard'));
 const RouletteBoard = lazyRetry(() => import('./RouletteBoard'));
 const AndarBaharBoard = lazyRetry(() => import('./AndarBaharBoard'));
+const PolymarketBoard = lazyRetry(() => import('./PolymarketBoard'));
 const AdminPortal = lazyRetry(() => import('./AdminPortal'));
 const GifPicker = lazyRetry(() => import('./GifPicker'));
 const HowToPlay = lazyRetry(() => import('./HowToPlay'));
@@ -76,6 +78,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const [blackjackGame, setBlackjackGame] = useState(null);
     const [rouletteGame, setRouletteGame] = useState(null);
     const [andarBaharGame, setAndarBaharGame] = useState(null);
+    const [polymarketGame, setPolymarketGame] = useState(null);
 
     // How to Play
     const [showHelp, setShowHelp] = useState(false);
@@ -206,6 +209,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const blackjackRef = useRef(null);
     const rouletteRef = useRef(null);
     const andarBaharRef = useRef(null);
+    const polymarketRef = useRef(null);
     const roomsRef = useRef([]);
     const peersRef = useRef([]);
     const currentRoomRef = useRef(null);
@@ -218,6 +222,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const bjHostRef = useRef(null);        // peer_id of blackjack host
     const rouletteHostRef = useRef(null);   // peer_id of roulette host
     const abHostRef = useRef(null);         // peer_id of andar bahar host
+    const pmHostRef = useRef(null);         // peer_id of polymarket host
     const rouletteTimerRef = useRef(null);
     const rouletteSpinTimeoutRef = useRef(null);
     const rouletteResultTimeoutRef = useRef(null);
@@ -227,11 +232,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const hasJoinedBj = useRef(false);
     const hasJoinedRl = useRef(false);
     const hasJoinedAb = useRef(false);
+    const hasJoinedPm = useRef(false);
 
     useEffect(() => { activeGameRef.current = activeGame; }, [activeGame]);
     useEffect(() => { blackjackRef.current = blackjackGame; }, [blackjackGame]);
     useEffect(() => { rouletteRef.current = rouletteGame; }, [rouletteGame]);
     useEffect(() => { andarBaharRef.current = andarBaharGame; }, [andarBaharGame]);
+    useEffect(() => { polymarketRef.current = polymarketGame; }, [polymarketGame]);
     useEffect(() => { roomsRef.current = rooms; }, [rooms]);
     useEffect(() => { peersRef.current = peers; }, [peers]);
     useEffect(() => { currentRoomRef.current = currentRoom; }, [currentRoom]);
@@ -548,6 +555,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 hasJoinedAb.current = true;
                 abHostRef.current = inviteData.host;
                 addMsg('★', '🃏 Joined Andar Bahar table!', 'system');
+                break;
+            case 'polymarket':
+                hasJoinedPm.current = true;
+                pmHostRef.current = inviteData.host;
+                addMsg('★', '📊 Joined Predictions market!', 'system');
                 break;
             case 'tictactoe': {
                 const newTTT = game.createGame(
@@ -1092,6 +1104,68 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         }
     }, [updateWallet]);
 
+    // ── Polymarket message handler ────────────────────────────
+    const handlePolymarketAction = useCallback((msg, action) => {
+        const myId = myIdRef.current;
+        switch (action.type) {
+            case 'pm_start': {
+                if (action.host === myId) return;
+                addMsg('📊', `${action.host_nick} started Predictions!`, 'game_invite', {
+                    gameType: 'polymarket',
+                    inviteData: { room_id: action.room_id, host: action.host, host_nick: action.host_nick },
+                    roomId: msg.room_id,
+                });
+                break;
+            }
+            case 'pm_state': {
+                const gameState = pm.deserializeGame(action.state);
+                if (gameState) {
+                    if (!hasJoinedPm.current && pmHostRef.current !== myIdRef.current) break;
+                    setPolymarketGame(prev => {
+                        if (gameState.phase === 'resolved' && prev?.phase !== 'resolved' && !amIHost(pmHostRef.current)) {
+                            const myNet = gameState.payouts?.[myId];
+                            if (myNet !== undefined && walletRef.current) {
+                                const event = new pm.PolymarketEngine(gameState).calculateResults(gameState);
+                                setTimeout(() => resolvePayoutEvent(event, myId, walletRef.current), 0);
+                            }
+                        }
+                        return gameState;
+                    });
+                }
+                break;
+            }
+            case 'pm_buy': {
+                // Host processes buy request from non-host peer
+                if (!amIHost(pmHostRef.current)) break;
+                setPolymarketGame(prev => {
+                    if (!prev || prev.phase !== 'open') return prev;
+                    const result = pm.buyShares(prev, action.peer_id, action.nick, action.outcomeIdx, action.shares);
+                    if (!result) return prev;
+                    const updated = result.game;
+                    setTimeout(() => {
+                        socket.sendRoomMessage(updated.roomId, pm.serializePolymarketAction({ type: 'pm_state', state: pm.serializeGame(updated) }));
+                    }, 0);
+                    return updated;
+                });
+                break;
+            }
+            case 'pm_sell': {
+                if (!amIHost(pmHostRef.current)) break;
+                setPolymarketGame(prev => {
+                    if (!prev || prev.phase !== 'open') return prev;
+                    const result = pm.sellShares(prev, action.peer_id, action.nick, action.outcomeIdx, action.shares);
+                    if (!result) return prev;
+                    const updated = result.game;
+                    setTimeout(() => {
+                        socket.sendRoomMessage(updated.roomId, pm.serializePolymarketAction({ type: 'pm_state', state: pm.serializeGame(updated) }));
+                    }, 0);
+                    return updated;
+                });
+                break;
+            }
+        }
+    }, [amIHost, addMsg]);
+
     // ── WebSocket event handler (ref-stable to avoid reconnect cascades) ──
     onWsEventRef.current = (msg) => {
         switch (msg.type) {
@@ -1202,11 +1276,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 const isBjMsg = bj.isBlackjackMessage(msg.data);
                 const isRlMsg = rl.isRouletteMessage(msg.data);
                 const isAbMsg = ab.isAndarBaharMessage(msg.data);
+                const isPmMsg = pm.isPolymarketMessage(msg.data);
                 const isGameMsg = game.isGameMessage(msg.data);
 
                 // Try custom JSON action first (typing, react, tip, whisper, ticker, screenshot)
                 let customAction = null;
-                if (!isBjMsg && !isRlMsg && !isAbMsg && !isGameMsg && msg.data?.startsWith('{')) {
+                if (!isBjMsg && !isRlMsg && !isAbMsg && !isPmMsg && !isGameMsg && msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
                         const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round'];
@@ -1228,6 +1303,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 } else if (isAbMsg) {
                     const action = ab.parseAndarBaharAction(msg.data);
                     if (action) handleAndarBaharAction(msg, action);
+                } else if (isPmMsg) {
+                    const action = pm.parsePolymarketAction(msg.data);
+                    if (action) handlePolymarketAction(msg, action);
                 } else if (isCurrentRoom) {
                     const gifMatch = msg.data.match(/^\[GIF\](.+)$/);
                     if (gifMatch) {
@@ -1516,6 +1594,100 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         const newGame = ab.placeBet(andarBaharGame, myId, myNick, action.side, action.amount);
         setAndarBaharGame(newGame);
         socket.sendRoomMessage(newGame.roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(newGame) }));
+    };
+
+    // ── Polymarket handlers ───────────────────────────────────
+    const startPolymarket = (roomId) => {
+        const myId = myIdRef.current;
+        const myNick = nickRef.current;
+        const newGame = pm.createPolymarket(roomId);
+        setPolymarketGame(newGame);
+        pmHostRef.current = myId;
+        hasJoinedPm.current = true;
+        addMsg('📊', `Predictions market started! Use the panel to create a question.`, 'system');
+        socket.sendRoomMessage(roomId, pm.serializePolymarketAction({ type: 'pm_start', room_id: roomId, host: myId, host_nick: myNick }));
+        socket.sendRoomMessage(roomId, pm.serializePolymarketAction({ type: 'pm_state', state: pm.serializeGame(newGame) }));
+    };
+
+    const handlePmAction = (action) => {
+        if (!polymarketGame) return;
+        const myId = myIdRef.current;
+        const myNick = nickRef.current;
+        const roomId = polymarketGame.roomId;
+
+        switch (action.type) {
+            case 'create': {
+                if (!amIHost(pmHostRef.current)) return;
+                const newGame = pm.createMarket(polymarketGame, action.question, action.outcomes);
+                setPolymarketGame(newGame);
+                socket.sendRoomMessage(roomId, pm.serializePolymarketAction({ type: 'pm_state', state: pm.serializeGame(newGame) }));
+                addMsg('📊', `Market created: "${action.question}"`, 'system');
+                break;
+            }
+            case 'buy': {
+                const w = walletRef.current;
+                const costEstimate = action.shares; // rough upper bound
+                if (!w || !wallet.canAfford(w, costEstimate)) { addMsg('★', `⚠ Insufficient chips.`, 'system'); return; }
+                if (amIHost(pmHostRef.current)) {
+                    const result = pm.buyShares(polymarketGame, myId, myNick, action.outcomeIdx, action.shares);
+                    if (result.cost > 0) {
+                        updateWallet(wallet.debit(walletRef.current, result.cost, 'Prediction share buy'));
+                        setPolymarketGame(result.game);
+                        socket.sendRoomMessage(roomId, pm.serializePolymarketAction({ type: 'pm_state', state: pm.serializeGame(result.game) }));
+                    }
+                } else {
+                    // Non-host: send buy request to host, debit will happen on state sync
+                    socket.sendRoomMessage(roomId, pm.serializePolymarketAction({
+                        type: 'pm_buy', peer_id: myId, nick: myNick,
+                        outcomeIdx: action.outcomeIdx, shares: action.shares,
+                    }));
+                }
+                break;
+            }
+            case 'sell': {
+                if (amIHost(pmHostRef.current)) {
+                    const result = pm.sellShares(polymarketGame, myId, myNick, action.outcomeIdx, action.shares);
+                    if (result.revenue > 0) {
+                        updateWallet(wallet.credit(walletRef.current, result.revenue, 'Prediction share sell'));
+                        setPolymarketGame(result.game);
+                        socket.sendRoomMessage(roomId, pm.serializePolymarketAction({ type: 'pm_state', state: pm.serializeGame(result.game) }));
+                    }
+                } else {
+                    socket.sendRoomMessage(roomId, pm.serializePolymarketAction({
+                        type: 'pm_sell', peer_id: myId, nick: myNick,
+                        outcomeIdx: action.outcomeIdx, shares: action.shares,
+                    }));
+                }
+                break;
+            }
+            case 'lock': {
+                if (!amIHost(pmHostRef.current)) return;
+                const locked = pm.lockMarket(polymarketGame);
+                setPolymarketGame(locked);
+                socket.sendRoomMessage(roomId, pm.serializePolymarketAction({ type: 'pm_state', state: pm.serializeGame(locked) }));
+                addMsg('📊', `Market locked — no more trading.`, 'system');
+                break;
+            }
+            case 'resolve': {
+                if (!amIHost(pmHostRef.current)) return;
+                const resolved = pm.resolveMarket(polymarketGame, action.winnerIdx);
+                setPolymarketGame(resolved);
+                socket.sendRoomMessage(roomId, pm.serializePolymarketAction({ type: 'pm_state', state: pm.serializeGame(resolved) }));
+                // Process payouts for host
+                const engine = new pm.PolymarketEngine(resolved);
+                const event = engine.calculateResults(resolved);
+                resolvePayoutEvent(event, myId, walletRef.current);
+                addMsg('📊', `Market resolved: ${resolved.outcomes[action.winnerIdx]} wins!`, 'system');
+                break;
+            }
+            case 'newMarket': {
+                if (!amIHost(pmHostRef.current)) return;
+                const fresh = pm.newMarket(polymarketGame);
+                setPolymarketGame(fresh);
+                socket.sendRoomMessage(roomId, pm.serializePolymarketAction({ type: 'pm_state', state: pm.serializeGame(fresh) }));
+                break;
+            }
+        }
     };
 
     // ── Ready Up handler ────────────────────────────────────
@@ -1956,6 +2128,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 '/blackjack  — start blackjack game',
                 '/roulette  — start roulette (auto-spin every 2 min)',
                 '/andarbahar  — start Andar Bahar',
+                '/predictions  — start prediction market',
                 '/balance  — show your chip balance',
                 '/tip <nick> <amount>  — send chips to a peer',
                 '/clear  — clear current chat history',
@@ -2081,6 +2254,16 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             return;
         }
 
+        if (text === '/predictions' || text.startsWith('/predictions ')) {
+            let roomId = text.slice(13).trim();
+            if (!roomId && activeRoom) roomId = activeRoom;
+            if (!roomId && currentRooms.length > 0) roomId = currentRooms[0].room_id;
+            if (!roomId) { addMsg('★', '⚠ Create a room first.', 'system'); return; }
+            if (polymarketRef.current) { addMsg('★', '⚠ Predictions market already running.', 'system'); return; }
+            startPolymarket(roomId);
+            return;
+        }
+
         // Whisper mode — send ephemeral P2P message
         if (whisperTarget && activeRoom) {
             socket.sendRoomMessage(activeRoom, JSON.stringify({
@@ -2131,7 +2314,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const myNick = nickRef.current;
     const currentRoomName = currentRoom ? rooms.find(r => r.room_id === currentRoom)?.name || 'Unknown Room' : null;
     const balance = myWallet ? wallet.getTotalBalance(myWallet) : 0;
-    const anyGameActive = !!(activeGame || blackjackGame || rouletteGame || andarBaharGame);
+    const anyGameActive = !!(activeGame || blackjackGame || rouletteGame || andarBaharGame || polymarketGame);
 
     return (
         <div className="chat-layout">
@@ -2453,6 +2636,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                             }}>🃏 Andar Bahar</button>
 
                             <button className="sidebar-btn" onClick={() => {
+                                const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
+                                if (!roomId) { addMsg('★', '⚠ Select or create a room first', 'system'); return; }
+                                if (polymarketRef.current) { setPolymarketGame(polymarketRef.current); return; }
+                                startPolymarket(roomId);
+                            }}>📊 Predictions</button>
+
+                            <button className="sidebar-btn" onClick={() => {
                                 const nick = prompt('Invite nick:');
                                 const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
                                 if (nick && roomId) {
@@ -2512,6 +2702,18 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                     readyCount={readyPeers.andarbahar.size}
                     totalBettors={[...new Set((andarBaharGame?.bets || []).map(b => b.peer_id))].length}
                     isReady={readyPeers.andarbahar.has(myIdRef.current)}
+                />
+            )}
+            {polymarketGame && (
+                <PolymarketBoard
+                    game={polymarketGame}
+                    myId={myIdRef.current}
+                    myNick={myNick}
+                    wallet={myWallet}
+                    onAction={handlePmAction}
+                    onClose={() => setPolymarketGame(null)}
+                    onHelp={() => openHelp('polymarket')}
+                    isHost={amIHost(pmHostRef.current)}
                 />
             )}
 

@@ -6332,3 +6332,406 @@ body {
   text-align: center;
   margin-top: 6px;
 }
+
+/* ═══ Polymarket / Predictions ═══════════════════════════════ */
+
+.pm-table {
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(59, 130, 246, 0.12) 0%, transparent 60%),
+    linear-gradient(180deg, #0d0f1a 0%, #1a1a2e 100%);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  width: min(98vw, 820px);
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-elevated), inset 0 0 80px rgba(59, 130, 246, 0.05);
+}
+
+.pm-market-question {
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 0.75rem 1rem;
+  color: #e0e0e0;
+  line-height: 1.3;
+}
+
+.pm-outcomes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0 1rem;
+}
+
+.pm-outcome-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pm-outcome-label {
+  min-width: 60px;
+  font-size: 0.85rem;
+  color: #ccc;
+}
+
+.pm-outcome-bar {
+  flex: 1;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+
+.pm-outcome-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.4s ease;
+}
+.pm-outcome-fill.yes { background: linear-gradient(90deg, #22c55e, #16a34a); }
+.pm-outcome-fill.no { background: linear-gradient(90deg, #ef4444, #dc2626); }
+.pm-outcome-fill.other { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+
+.pm-outcome-price {
+  min-width: 40px;
+  text-align: right;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #fff;
+}
+
+.pm-outcome-row.winner .pm-outcome-bar {
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
+}
+.pm-outcome-row.loser { opacity: 0.4; }
+
+/* ── Trade Panel ─────────────────────────────────── */
+.pm-trade-panel {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  margin: 0.75rem 1rem;
+  padding: 0.75rem;
+}
+
+.pm-trade-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 0.5rem;
+}
+.pm-trade-tab {
+  flex: 1;
+  padding: 0.4rem;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: #aaa;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.pm-trade-tab:first-child { border-radius: 6px 0 0 6px; }
+.pm-trade-tab:last-child { border-radius: 0 6px 6px 0; }
+.pm-trade-tab.active { background: #22c55e; color: #fff; }
+.pm-trade-tab.sell.active { background: #ef4444; }
+
+/* ── Outcome Selector ────────────────────────────── */
+.pm-outcome-btns {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.pm-outcome-btn {
+  flex: 1;
+  padding: 0.4rem;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  background: transparent;
+  color: #ccc;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.pm-outcome-btn.selected {
+  border-color: #22c55e;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+}
+
+/* ── Share Controls ──────────────────────────────── */
+.pm-share-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.pm-share-label {
+  font-size: 0.8rem;
+  color: #888;
+  min-width: 50px;
+}
+.pm-share-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pm-share-count {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+  min-width: 30px;
+  text-align: center;
+}
+.pm-share-presets {
+  display: flex;
+  gap: 0.3rem;
+  margin-left: auto;
+}
+.pm-preset-btn {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: #aaa;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.pm-preset-btn:hover { background: rgba(255, 255, 255, 0.1); }
+
+/* ── Cost & Confirm ──────────────────────────────── */
+.pm-cost-estimate {
+  text-align: center;
+  padding: 0.4rem;
+  font-size: 0.85rem;
+  color: #888;
+}
+.pm-cost-estimate strong { color: #fff; font-size: 1rem; }
+
+.pm-confirm-btn {
+  width: 100%;
+  padding: 0.6rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.pm-confirm-btn.buy { background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; }
+.pm-confirm-btn.sell { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; }
+.pm-confirm-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Position Display ────────────────────────────── */
+.pm-position {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  margin: 0.5rem 1rem;
+  padding: 0.5rem 0.75rem;
+}
+.pm-position-title {
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.3rem;
+}
+.pm-position-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: #ccc;
+  padding: 0.15rem 0;
+}
+.pm-position-value { font-weight: 600; color: #fff; }
+
+/* ── Trade Feed ──────────────────────────────────── */
+.pm-trade-feed {
+  padding: 0 1rem;
+  max-height: 80px;
+  overflow: hidden;
+}
+.pm-trade-feed-title {
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.3rem;
+}
+.pm-trade-item {
+  font-size: 0.8rem;
+  color: #999;
+  padding: 0.1rem 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pm-trade-item .buy { color: #22c55e; }
+.pm-trade-item .sell { color: #ef4444; }
+
+/* ── Host Controls ───────────────────────────────── */
+.pm-controls {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  justify-content: center;
+}
+.pm-control-btn {
+  padding: 0.5rem 1.2rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.pm-control-btn.lock { background: #f59e0b; color: #000; }
+.pm-control-btn.resolve { background: #22c55e; color: #fff; }
+.pm-control-btn.new-market { background: #3b82f6; color: #fff; }
+
+/* ── Resolution Banner ───────────────────────────── */
+.pm-resolved-banner {
+  text-align: center;
+  padding: 0.75rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.pm-resolved-banner.win { color: #22c55e; }
+.pm-resolved-banner.lose { color: #ef4444; }
+.pm-resolved-banner.neutral { color: #888; }
+
+/* ── Payouts ─────────────────────────────────────── */
+.pm-payouts-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+  padding: 0.3rem 1rem;
+}
+.pm-payout-chip {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.pm-payout-chip.win { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+.pm-payout-chip.lose { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.pm-payout-chip.push { background: rgba(255, 255, 255, 0.1); color: #888; }
+
+/* ── Create Market Form ──────────────────────────── */
+.pm-create-form {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.pm-create-label {
+  font-size: 0.8rem;
+  color: #888;
+  margin-bottom: 0.2rem;
+}
+.pm-create-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+}
+.pm-create-input:focus { outline: none; border-color: #3b82f6; }
+
+.pm-outcomes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.pm-outcome-input-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.pm-add-outcome-btn {
+  padding: 0.3rem 0.8rem;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: transparent;
+  color: #888;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.pm-remove-outcome-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: #888;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pm-create-btn {
+  padding: 0.6rem;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.pm-create-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Resolve & Phase ─────────────────────────────── */
+.pm-resolve-select {
+  padding: 0.4rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.pm-phase-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.pm-phase-badge.open { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+.pm-phase-badge.locked { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+.pm-phase-badge.resolved { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+
+.pm-volume {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #666;
+  padding: 0.3rem;
+}
+
+.pm-participants {
+  padding: 0 1rem;
+  font-size: 0.75rem;
+  color: #666;
+}
