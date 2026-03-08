@@ -496,8 +496,25 @@ ${c.systemPrompt}${moodBlock}${factsBlock}`;
             const lastHumanSender = lastHumanMsg?.content?.match(/^([^:]+):/)?.[1]?.trim();
             const lastHumanText = lastHumanMsg?.content || '';
 
+            // Detect if the message is directed at a specific character via @mention
+            const mentionMatch = lastHumanText.match(/@(\w+)/);
+            const mentionedName = mentionMatch ? mentionMatch[1].toLowerCase() : null;
+            const isDirectedAtMe = mentionedName && (
+                c.name.toLowerCase().includes(mentionedName) ||
+                c.id.toLowerCase() === mentionedName
+            );
+            const isDirectedAtSomeone = mentionedName && !isDirectedAtMe;
+
             if (lastHumanSender) {
-                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\n>>> THE MOST IMPORTANT MESSAGE TO RESPOND TO:\n"${lastHumanText}"\n\nYou MUST respond to what "${lastHumanSender}" said above. React to THEIR words — agree, disagree, joke, answer their question, or roast them. Do NOT ignore the human user. Do NOT start your own random topic. Keep it 1-2 short lines in Hinglish.` }];
+                let instruction;
+                if (isDirectedAtMe) {
+                    instruction = `"${lastHumanSender}" is talking directly TO YOU. You MUST respond to their message. React to THEIR words — agree, disagree, joke, answer their question, or roast them.`;
+                } else if (isDirectedAtSomeone) {
+                    instruction = `"${lastHumanSender}" is talking to @${mentionedName}, NOT to you. Do NOT respond as if they asked you. You may react as a bystander with a brief comment or stay silent. Do NOT answer their question — it was not for you.`;
+                } else {
+                    instruction = `"${lastHumanSender}" said something to the group. React to THEIR words — agree, disagree, joke, answer their question, or roast them. Do NOT ignore the human user.`;
+                }
+                trigger = [{ role: 'user', content: `Chat:\n${convo}\n\n>>> THE MOST IMPORTANT MESSAGE TO RESPOND TO:\n"${lastHumanText}"\n\n${instruction} Do NOT start your own random topic. Keep it 1-2 short lines in Hinglish.` }];
             } else {
                 trigger = [{ role: 'user', content: `Chat:\n${convo}\n\nRespond naturally to the conversation above. You can react to what was said OR bring up something new in character. Keep it 1-2 short lines in Hinglish.` }];
             }
