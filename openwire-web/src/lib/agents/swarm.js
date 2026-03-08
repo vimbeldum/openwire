@@ -78,6 +78,7 @@ export class AgentSwarm {
         // Mention ownership — suppresses other characters during directed @mentions
         this._mentionTarget = null;       // characterId of the @mentioned character
         this._mentionActiveUntil = 0;     // timestamp when cooldown expires
+        this._lastCrossOverAt = 0;          // global crossover cooldown tracker
 
         // Dynamic config — loaded from agentStore
         this._characters = {};  // dict { id: charObj }
@@ -196,6 +197,14 @@ export class AgentSwarm {
 
         if (!this._running) return;
 
+        // ── CRITICAL: Only scan reactive triggers for HUMAN messages ──
+        // Agent messages must NOT trigger other agents via keywords —
+        // otherwise agents endlessly trigger each other (exponential loop)
+        if (isAgent) {
+            this._log(`[Reactivity] Skipped — agent message from ${nick}, no reactive scan`);
+            return;
+        }
+
         // If the message contains @mentions, skip reactive triggers — let the
         // @mention handler in ChatRoom handle priority queuing instead
         const hasMention = /@\w+/.test(text);
@@ -210,8 +219,8 @@ export class AgentSwarm {
                 return c.reactive_tags.some(tag => lower.includes(tag.toLowerCase()));
             });
 
-            // Shuffle and pick at most 3 to respond
-            const MAX_REACTIVE = 3;
+            // Shuffle and pick at most 2 to respond (reduced from 3)
+            const MAX_REACTIVE = 2;
             const shuffled = matched.sort(() => Math.random() - 0.5);
             const selected = shuffled.slice(0, MAX_REACTIVE);
             const skipped = shuffled.slice(MAX_REACTIVE);
@@ -223,7 +232,8 @@ export class AgentSwarm {
             selected.forEach(c => {
                 this._log(`[Reactivity] ${c.name} triggered by keyword match in "${text.slice(0, 40)}..."`);
                 if (this._timers[c.id]) clearTimeout(this._timers[c.id]);
-                this._generate(c.id).then(() => this._scheduleNext(c.id));
+                // Do NOT call _scheduleNext — let the background loop handle rescheduling
+                this._generate(c.id);
             });
         }
 
@@ -478,6 +488,16 @@ export class AgentSwarm {
             return;
         }
 
+        // Per-character cooldown guard — prevent bypassing via crossover/reactivity
+        const sinceLastChar = Date.now() - (this._lastMsgByChar[characterId] || 0);
+        if (!force && sinceLastChar < this._perCharCooldown) {
+            this._log(`[Cooldown] ${c.name} blocked — ${(sinceLastChar / 1000).toFixed(1)}s < ${(this._perCharCooldown / 1000)}s per-char cooldown`);
+            this._onTyping(characterId, c.name, c.avatar, false);
+            this._isProcessingQueue = false;
+            this._processQueue();
+            return;
+        }
+
         const modelId = this.getAssignedModel(characterId);
 
         // ── Build system prompt: Global Room Rules → Character Card → Dynamic State ──
@@ -682,22 +702,37 @@ ${c.systemPrompt}${moodBlock}${factsBlock}`;
             return;
         }
 
-        Object.values(this._characters).forEach(c => {
-            if (c.id === speakerId) return;
-            if (!this._isActive(c.id)) return;
-            if (!c.agent_triggers?.includes(speakerId)) return;
+        // ── Global crossover cooldown: max 1 crossover chain every 15s ──
+        const now = Date.now();
+        if (this._lastCrossOverAt && (now - this._lastCrossOverAt) < 15_000) {
+            this._log(`[CrossOver] Suppressed — global cooldown (${((now - this._lastCrossOverAt) / 1000).toFixed(1)}s < 15s)`);
+            return;
+        }
 
-            const roll = Math.random();
-            if (roll < CROSSOVER_PROBABILITY) {
-                this._log(`[CrossOver] ${c.name} triggered by ${this._characters[speakerId]?.name} (rolled ${roll.toFixed(2)} < ${CROSSOVER_PROBABILITY})`);
-                setTimeout(() => {
-                    if (this._timers[c.id]) clearTimeout(this._timers[c.id]);
-                    this._generate(c.id).then(() => this._scheduleNext(c.id));
-                }, 1000 + Math.random() * 2000);
-            } else {
-                this._log(`[CrossOver] ${c.name} skipped (rolled ${roll.toFixed(2)} >= ${CROSSOVER_PROBABILITY})`);
-            }
+        // Only allow ONE crossover per trigger event (not all matching agents)
+        const candidates = Object.values(this._characters).filter(c => {
+            if (c.id === speakerId) return false;
+            if (!this._isActive(c.id)) return false;
+            if (!c.agent_triggers?.includes(speakerId)) return false;
+            return true;
         });
+
+        if (candidates.length === 0) return;
+
+        // Pick exactly one candidate probabilistically
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        const roll = Math.random();
+        if (roll < CROSSOVER_PROBABILITY) {
+            this._lastCrossOverAt = now;
+            this._log(`[CrossOver] ${pick.name} triggered by ${this._characters[speakerId]?.name} (rolled ${roll.toFixed(2)} < ${CROSSOVER_PROBABILITY})`);
+            setTimeout(() => {
+                // Do NOT call _scheduleNext here — let the background loop handle it.
+                // Calling _scheduleNext creates double timers and exponential growth.
+                this._generate(pick.id);
+            }, 2000 + Math.random() * 3000);
+        } else {
+            this._log(`[CrossOver] All candidates skipped (rolled ${roll.toFixed(2)} >= ${CROSSOVER_PROBABILITY})`);
+        }
     }
 
     // ── Dynamic Mood Shifts ──────────────────────────────────
