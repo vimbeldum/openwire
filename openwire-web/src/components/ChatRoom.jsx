@@ -215,6 +215,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const onWsEventRef = useRef(null);
 
     // Host tracking per game type per room
+    const bjHostRef = useRef(null);        // peer_id of blackjack host
     const rouletteHostRef = useRef(null);   // peer_id of roulette host
     const abHostRef = useRef(null);         // peer_id of andar bahar host
     const rouletteTimerRef = useRef(null);
@@ -569,6 +570,177 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         setMessages(prev => prev.map(m => m.id === msgId ? { ...m, inviteUsed: true } : m));
     }, []);
 
+    // ── P2P host election ────────────────────────────────────
+    const amIHost = useCallback((hostPeerId) => {
+        return myIdRef.current && myIdRef.current === hostPeerId;
+    }, []);
+
+    const electNewHostFromPeers = useCallback((peerIds) => {
+        // Deterministic: return the lowest peer_id alphabetically
+        const sorted = [...peerIds].filter(Boolean).sort();
+        return sorted[0] || null;
+    }, []);
+
+    // ── Roulette auto-spin ───────────────────────────────────
+    const startRouletteTimer = useCallback(() => {
+        if (rouletteTimerRef.current) clearInterval(rouletteTimerRef.current);
+        clearTimeout(rouletteSpinTimeoutRef.current);
+        clearTimeout(rouletteResultTimeoutRef.current);
+
+        rouletteTimerRef.current = setInterval(() => {
+            const currentGame = rouletteRef.current;
+            const hostId = rouletteHostRef.current;
+            if (!currentGame || !amIHost(hostId)) return;
+            if (currentGame.phase !== 'betting') return;
+
+            // Start 10s spinning phase
+            const spun = rl.spin(currentGame);
+            setRouletteGame(spun);
+
+            const roomId = currentGame.roomId;
+            socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(spun) }));
+            addActivityLog(`Roulette wheel spinning...`);
+
+            // After SPIN_PHASE_MS (10s), show results
+            rouletteSpinTimeoutRef.current = setTimeout(() => {
+                const resultsGame = rl.finishSpin(rouletteRef.current || spun);
+                setRouletteGame(resultsGame);
+
+                // Apply winnings via Global Ledger Service
+                const myId = myIdRef.current;
+                const myNet = resultsGame.payouts?.[myId];
+
+                // Track house P&L
+                if (amIHost(rouletteHostRef.current) && resultsGame.payouts) {
+                    updateBankLedger('roulette', resultsGame.payouts);
+                }
+
+                if (myNet !== undefined && walletRef.current) {
+                    const event = new rl.RouletteEngine(resultsGame).calculateResults(resultsGame);
+                    resolvePayoutEvent(event, myId, walletRef.current);
+                }
+
+                if (amIHost(rouletteHostRef.current)) {
+                    socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(resultsGame) }));
+                    addActivityLog(`Roulette spin: result ${spun.result} (${rl.getColor(spun.result)})`);
+                }
+
+                // After RESULTS_DISPLAY_MS (10s), start new betting round
+                rouletteResultTimeoutRef.current = setTimeout(() => {
+                    const reset = rl.newRound(rouletteRef.current || resultsGame);
+                    setRouletteGame(reset);
+                    if (amIHost(rouletteHostRef.current)) {
+                        socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(reset) }));
+                    }
+                }, rl.RESULTS_DISPLAY_MS);
+
+            }, rl.SPIN_PHASE_MS);
+
+        }, rl.SPIN_INTERVAL_MS);
+    }, [addActivityLog, amIHost, updateWallet]);
+
+    // ── Blackjack Auto-deal timer ──────────────────────────
+    const bjDealerTimerRef = useRef(null);
+
+    const startBlackjackTimer = useCallback((gameVal) => {
+        if (!gameVal || gameVal.phase !== 'betting') return;
+        if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
+
+        const msLeft = Math.max(0, gameVal.nextDealAt - Date.now());
+
+        bjDealerTimerRef.current = setTimeout(() => {
+            const currentGame = blackjackRef.current;
+            const hostId = bjHostRef.current;
+            if (!currentGame || !amIHost(hostId) || currentGame.phase !== 'betting') return;
+
+            // Auto-deal
+            const dealtGame = bj.dealInitialCards(currentGame);
+            setBlackjackGame(dealtGame);
+            socket.sendRoomMessage(currentGame.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(dealtGame) }));
+        }, msLeft);
+    }, [amIHost]);
+
+    // ── Andar Bahar auto-cycle (host-driven) ─────────────────
+    const abCycleTimerRef = useRef(null);
+    const abGenRef = useRef(0);
+
+    const startAbCycle = useCallback((initialGame) => {
+        // Clear any existing timers
+        if (abDealTimerRef.current) clearInterval(abDealTimerRef.current);
+        if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
+        abGenRef.current++;
+        const gen = abGenRef.current;
+
+        const roomId = initialGame.roomId;
+        const bettingMs = ab.BETTING_DURATION_MS;
+
+        // Phase 1: Betting window → after BETTING_DURATION_MS, deal trump
+        abCycleTimerRef.current = setTimeout(() => {
+            if (gen !== abGenRef.current) return;
+            if (!amIHost(abHostRef.current)) return;
+            const current = andarBaharRef.current;
+            if (!current || current.phase !== 'betting') return;
+
+            const withTrump = ab.dealTrump(current);
+            setAndarBaharGame(withTrump);
+            socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(withTrump) }));
+            addActivityLog(`Andar Bahar: trump card ${withTrump.trumpCard?.value}${withTrump.trumpCard?.suit}`);
+
+            // Phase 2: Deal cards 1-by-1
+            abDealTimerRef.current = setInterval(() => {
+                if (gen !== abGenRef.current) { clearInterval(abDealTimerRef.current); return; }
+                const cur = andarBaharRef.current;
+                if (!cur || !amIHost(abHostRef.current)) { clearInterval(abDealTimerRef.current); return; }
+                if (cur.phase !== 'dealing') { clearInterval(abDealTimerRef.current); return; }
+
+                const next = ab.dealNext(cur);
+                setAndarBaharGame(next);
+                socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(next) }));
+
+                if (next.phase === 'ended') {
+                    clearInterval(abDealTimerRef.current);
+
+                    if (amIHost(abHostRef.current) && next.payouts) {
+                        updateBankLedger('andarbahar', next.payouts);
+                    }
+
+                    // Apply wallet changes for host via Global Ledger Service
+                    const myId = myIdRef.current;
+                    const myNet = next.payouts?.[myId];
+                    if (myNet !== undefined && walletRef.current) {
+                        const event = new ab.AndarBaharEngine(next).calculateResults(next);
+                        resolvePayoutEvent(event, myId, walletRef.current);
+                    }
+                    addActivityLog(`Andar Bahar: ${next.result?.toUpperCase()} wins! Trump: ${next.trumpCard?.value}${next.trumpCard?.suit}`);
+
+                    // Phase 3: Show results for RESULTS_DISPLAY_MS, then new round
+                    abCycleTimerRef.current = setTimeout(() => {
+                        if (gen !== abGenRef.current) return;
+                        if (!amIHost(abHostRef.current)) return;
+                        const reset = ab.newRound(andarBaharRef.current || next);
+                        setAndarBaharGame(reset);
+                        socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(reset) }));
+                        // Restart cycle
+                        startAbCycle(reset);
+                    }, ab.RESULTS_DISPLAY_MS);
+                }
+            }, ab.DEAL_INTERVAL_MS);
+
+        }, bettingMs);
+    }, [addActivityLog, amIHost, updateWallet]);
+
+    useEffect(() => {
+        return () => {
+            if (rouletteTimerRef.current) clearInterval(rouletteTimerRef.current);
+            clearTimeout(rouletteSpinTimeoutRef.current);
+            clearTimeout(rouletteResultTimeoutRef.current);
+            if (abDealTimerRef.current) clearInterval(abDealTimerRef.current);
+            if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
+            abGenRef.current++;
+            if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
+        };
+    }, []);
+
     // ── Custom P2P action handler ─────────────────────────────
     const handleCustomAction = useCallback((msg, action) => {
         const myId = myIdRef.current;
@@ -694,177 +866,6 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         }
     }, [addMsg, addReaction, addTicker, updateWallet, amIHost, clearReadyPeers, startBlackjackTimer]);
 
-    // ── P2P host election ────────────────────────────────────
-    const amIHost = useCallback((hostPeerId) => {
-        return myIdRef.current && myIdRef.current === hostPeerId;
-    }, []);
-
-    const electNewHostFromPeers = useCallback((peerIds) => {
-        // Deterministic: return the lowest peer_id alphabetically
-        const sorted = [...peerIds].filter(Boolean).sort();
-        return sorted[0] || null;
-    }, []);
-
-    // ── Roulette auto-spin ───────────────────────────────────
-    const startRouletteTimer = useCallback(() => {
-        if (rouletteTimerRef.current) clearInterval(rouletteTimerRef.current);
-        clearTimeout(rouletteSpinTimeoutRef.current);
-        clearTimeout(rouletteResultTimeoutRef.current);
-
-        rouletteTimerRef.current = setInterval(() => {
-            const currentGame = rouletteRef.current;
-            const hostId = rouletteHostRef.current;
-            if (!currentGame || !amIHost(hostId)) return;
-            if (currentGame.phase !== 'betting') return;
-
-            // Start 10s spinning phase
-            const spun = rl.spin(currentGame);
-            setRouletteGame(spun);
-
-            const roomId = currentGame.roomId;
-            socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(spun) }));
-            addActivityLog(`Roulette wheel spinning...`);
-
-            // After SPIN_PHASE_MS (10s), show results
-            rouletteSpinTimeoutRef.current = setTimeout(() => {
-                const resultsGame = rl.finishSpin(rouletteRef.current || spun);
-                setRouletteGame(resultsGame);
-
-                // Apply winnings via Global Ledger Service
-                const myId = myIdRef.current;
-                const myNet = resultsGame.payouts?.[myId];
-
-                // Track house P&L
-                if (amIHost(rouletteHostRef.current) && resultsGame.payouts) {
-                    updateBankLedger('roulette', resultsGame.payouts);
-                }
-
-                if (myNet !== undefined && walletRef.current) {
-                    const event = new rl.RouletteEngine(resultsGame).calculateResults(resultsGame);
-                    resolvePayoutEvent(event, myId, walletRef.current);
-                }
-
-                if (amIHost(rouletteHostRef.current)) {
-                    socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(resultsGame) }));
-                    addActivityLog(`Roulette spin: result ${spun.result} (${rl.getColor(spun.result)})`);
-                }
-
-                // After RESULTS_DISPLAY_MS (10s), start new betting round
-                rouletteResultTimeoutRef.current = setTimeout(() => {
-                    const reset = rl.newRound(rouletteRef.current || resultsGame);
-                    setRouletteGame(reset);
-                    if (amIHost(rouletteHostRef.current)) {
-                        socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(reset) }));
-                    }
-                }, rl.RESULTS_DISPLAY_MS);
-
-            }, rl.SPIN_PHASE_MS);
-
-        }, rl.SPIN_INTERVAL_MS);
-    }, [addActivityLog, amIHost, updateWallet]);
-
-    // ── Blackjack Auto-deal timer ──────────────────────────
-    const bjDealerTimerRef = useRef(null);
-
-    const startBlackjackTimer = useCallback((gameVal) => {
-        if (!gameVal || gameVal.phase !== 'betting') return;
-        if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
-
-        const msLeft = Math.max(0, gameVal.nextDealAt - Date.now());
-
-        bjDealerTimerRef.current = setTimeout(() => {
-            const currentGame = blackjackRef.current;
-            const hostId = bjHostRef.current;
-            if (!currentGame || !amIHost(hostId) || currentGame.phase !== 'betting') return;
-
-            // Auto-deal
-            const dealtGame = bj.dealInitialCards(currentGame);
-            setBlackjackGame(dealtGame);
-            socket.sendRoomMessage(currentGame.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(dealtGame) }));
-        }, msLeft);
-    }, [amIHost]);
-
-    useEffect(() => {
-        return () => {
-            if (rouletteTimerRef.current) clearInterval(rouletteTimerRef.current);
-            clearTimeout(rouletteSpinTimeoutRef.current);
-            clearTimeout(rouletteResultTimeoutRef.current);
-            if (abDealTimerRef.current) clearInterval(abDealTimerRef.current);
-            if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
-            abGenRef.current++;
-            if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
-        };
-    }, []);
-
-    // ── Andar Bahar auto-cycle (host-driven) ─────────────────
-    const abCycleTimerRef = useRef(null);
-    const abGenRef = useRef(0);
-
-    const startAbCycle = useCallback((initialGame) => {
-        // Clear any existing timers
-        if (abDealTimerRef.current) clearInterval(abDealTimerRef.current);
-        if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
-        abGenRef.current++;
-        const gen = abGenRef.current;
-
-        const roomId = initialGame.roomId;
-        const bettingMs = ab.BETTING_DURATION_MS;
-
-        // Phase 1: Betting window → after BETTING_DURATION_MS, deal trump
-        abCycleTimerRef.current = setTimeout(() => {
-            if (gen !== abGenRef.current) return;
-            if (!amIHost(abHostRef.current)) return;
-            const current = andarBaharRef.current;
-            if (!current || current.phase !== 'betting') return;
-
-            const withTrump = ab.dealTrump(current);
-            setAndarBaharGame(withTrump);
-            socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(withTrump) }));
-            addActivityLog(`Andar Bahar: trump card ${withTrump.trumpCard?.value}${withTrump.trumpCard?.suit}`);
-
-            // Phase 2: Deal cards 1-by-1
-            abDealTimerRef.current = setInterval(() => {
-                if (gen !== abGenRef.current) { clearInterval(abDealTimerRef.current); return; }
-                const cur = andarBaharRef.current;
-                if (!cur || !amIHost(abHostRef.current)) { clearInterval(abDealTimerRef.current); return; }
-                if (cur.phase !== 'dealing') { clearInterval(abDealTimerRef.current); return; }
-
-                const next = ab.dealNext(cur);
-                setAndarBaharGame(next);
-                socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(next) }));
-
-                if (next.phase === 'ended') {
-                    clearInterval(abDealTimerRef.current);
-
-                    if (amIHost(abHostRef.current) && next.payouts) {
-                        updateBankLedger('andarbahar', next.payouts);
-                    }
-
-                    // Apply wallet changes for host via Global Ledger Service
-                    const myId = myIdRef.current;
-                    const myNet = next.payouts?.[myId];
-                    if (myNet !== undefined && walletRef.current) {
-                        const event = new ab.AndarBaharEngine(next).calculateResults(next);
-                        resolvePayoutEvent(event, myId, walletRef.current);
-                    }
-                    addActivityLog(`Andar Bahar: ${next.result?.toUpperCase()} wins! Trump: ${next.trumpCard?.value}${next.trumpCard?.suit}`);
-
-                    // Phase 3: Show results for RESULTS_DISPLAY_MS, then new round
-                    abCycleTimerRef.current = setTimeout(() => {
-                        if (gen !== abGenRef.current) return;
-                        if (!amIHost(abHostRef.current)) return;
-                        const reset = ab.newRound(andarBaharRef.current || next);
-                        setAndarBaharGame(reset);
-                        socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(reset) }));
-                        // Restart cycle
-                        startAbCycle(reset);
-                    }, ab.RESULTS_DISPLAY_MS);
-                }
-            }, ab.DEAL_INTERVAL_MS);
-
-        }, bettingMs);
-    }, [addActivityLog, amIHost, updateWallet]);
-
     // ── Tic-Tac-Toe handler ──────────────────────────────────
     const handleGameAction = useCallback((msg, action) => {
         const myId = myIdRef.current;
@@ -912,6 +913,27 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
             }
         }
     }, [addMsg]);
+
+    // Shared helper: after a BJ game update, check for dealer phase transition
+    const bjCheckDealerTransition = (prevPhase, newGame) => {
+        if (newGame.phase === 'dealer' && prevPhase !== 'dealer') {
+            setTimeout(() => {
+                const settled = bj.runDealerTurn(newGame);
+                const payoutEvent = new bj.BlackjackEngine(settled).calculateResults(settled);
+                settled.payouts = payoutEvent.totals || {};
+                setBlackjackGame(settled);
+                if (amIHost(bjHostRef.current) && settled.payouts) {
+                    updateBankLedger('blackjack', settled.payouts);
+                }
+                const hostMyId = myIdRef.current;
+                const hostMyNet = settled.payouts?.[hostMyId];
+                if (hostMyNet !== undefined && walletRef.current) {
+                    resolvePayoutEvent(payoutEvent, hostMyId, walletRef.current);
+                }
+                socket.sendRoomMessage(settled.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(settled) }));
+            }, 1000);
+        }
+    };
 
     // ── Blackjack handler ────────────────────────────────────
     const handleBlackjackAction = useCallback((msg, action) => {
@@ -1331,7 +1353,6 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
     const declineInvite = (invite) => setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
 
     // ── Blackjack handlers ───────────────────────────────────
-    const bjHostRef = useRef(null);
 
     const startBlackjack = (roomId) => {
         const myId = myIdRef.current;
@@ -1345,27 +1366,6 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
         socket.sendRoomMessage(roomId, bj.serializeBlackjackAction({ type: 'bj_start', room_id: roomId, host: myId, host_nick: myNick }));
         socket.sendRoomMessage(roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(newGame) }));
         startBlackjackTimer(newGame);
-    };
-
-    // Shared helper: after a BJ game update, check for dealer phase transition
-    const bjCheckDealerTransition = (prevPhase, newGame) => {
-        if (newGame.phase === 'dealer' && prevPhase !== 'dealer') {
-            setTimeout(() => {
-                const settled = bj.runDealerTurn(newGame);
-                const payoutEvent = new bj.BlackjackEngine(settled).calculateResults(settled);
-                settled.payouts = payoutEvent.totals || {};
-                setBlackjackGame(settled);
-                if (amIHost(bjHostRef.current) && settled.payouts) {
-                    updateBankLedger('blackjack', settled.payouts);
-                }
-                const hostMyId = myIdRef.current;
-                const hostMyNet = settled.payouts?.[hostMyId];
-                if (hostMyNet !== undefined && walletRef.current) {
-                    resolvePayoutEvent(payoutEvent, hostMyId, walletRef.current);
-                }
-                socket.sendRoomMessage(settled.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(settled) }));
-            }, 1000);
-        }
     };
 
     const handleBjAction = (action) => {
