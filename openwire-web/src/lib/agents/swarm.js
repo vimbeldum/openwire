@@ -26,9 +26,9 @@ const DEFAULT_MSG_PER_MIN = 60;
 const CROSSOVER_PROBABILITY = 0.7;
 const MAX_RETRIES = 3;
 const BASE_BACKOFF_MS = 2000;
-const PER_CHAR_COOLDOWN_MS = 10_000;  // 1 message per 10s per character
-const GLOBAL_COOLDOWN_MS = 5_000;     // 1 message per 5s across all AI
-const MENTION_COOLDOWN_MS = 8_000;    // suppress other characters for 8s after @mention
+const PER_CHAR_COOLDOWN_MS = 15_000;  // 1 message per 15s per character
+const GLOBAL_COOLDOWN_MS = 10_000;    // 1 message per 10s across all AI
+const MENTION_COOLDOWN_MS = 12_000;   // suppress other characters for 12s after @mention
 const MAX_AGENT_CHAIN_DEPTH = 2;      // max agent→agent @mention chain depth (prevents loops)
 const MAX_QUEUE_SIZE = 32;            // #9: cap queue to prevent unbounded growth
 
@@ -1019,8 +1019,8 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
 
         // ── Global crossover cooldown: max 1 crossover chain every 15s ──
         const now = Date.now();
-        if (this._lastCrossOverAt && (now - this._lastCrossOverAt) < 15_000) {
-            this._log(`[CrossOver] Suppressed — global cooldown (${((now - this._lastCrossOverAt) / 1000).toFixed(1)}s < 15s)`);
+        if (this._lastCrossOverAt && (now - this._lastCrossOverAt) < 20_000) {
+            this._log(`[CrossOver] Suppressed — global cooldown (${((now - this._lastCrossOverAt) / 1000).toFixed(1)}s < 20s)`);
             return;
         }
 
