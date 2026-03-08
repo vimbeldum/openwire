@@ -3,6 +3,7 @@ import { getTotalHousePnl } from '../lib/casinoState.js';
 import { loadStore, getCharactersDict, getGroupsDict, getGroupCharacters } from '../lib/agents/agentStore.js';
 import { formatModelLabel } from '../lib/agents/openrouter.js';
 import { formatGeminiLabel } from '../lib/agents/gemini.js';
+import { formatQwenLabel } from '../lib/agents/qwen.js';
 
 const TABS = ['Players', 'Ban List', 'Activity Log', 'Stats', 'Agents'];
 const CHATTER_LABELS = { 0.25: 'Quiet', 0.5: 'Calm', 1: 'Normal', 1.5: 'Active', 2: 'Chaotic' };
@@ -44,6 +45,8 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
     const [provider, setProvider] = useState(swarm?.provider ?? 'openrouter');
     const [geminiModels, setGeminiModels] = useState(swarm?.geminiModels ?? []);
     const [geminiLoading, setGeminiLoading] = useState(false);
+    const [qwenModels, setQwenModels] = useState(swarm?.qwenModels ?? []);
+    const [qwenLoading, setQwenLoading] = useState(false);
     const [charMoods, setCharMoods] = useState(() => {
         const init = {};
         Object.keys(CHARACTERS).forEach(id => { init[id] = swarm?.getMood(id) ?? 'normal'; });
@@ -443,6 +446,26 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                     >
                                         {geminiLoading ? 'Loading...' : 'Gemini'}
                                     </button>
+                                    <button
+                                        className={`admin-btn ${provider === 'qwen' ? 'adjust' : ''}`}
+                                        disabled={qwenLoading}
+                                        onClick={async () => {
+                                            setProvider('qwen');
+                                            setQwenLoading(true);
+                                            try {
+                                                await swarm?.setProvider('qwen');
+                                                setQwenModels(swarm?.qwenModels ?? []);
+                                                const model = swarm?.defaultModel ?? '';
+                                                setDefaultModel(model);
+                                                setOverrides({});
+                                                Object.keys(CHARACTERS).forEach(id => swarm?.setModelOverride(id, null));
+                                                onProviderChange?.('qwen', model);
+                                            } catch (_) {}
+                                            setQwenLoading(false);
+                                        }}
+                                    >
+                                        {qwenLoading ? 'Loading...' : 'Qwen'}
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -461,13 +484,19 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                         setOverrides({});
                                         Object.keys(CHARACTERS).forEach(id => swarm?.setModelOverride(id, null));
                                     }}
-                                    disabled={provider === 'openrouter' ? swarmModels.length === 0 : geminiModels.length === 0}
+                                    disabled={(provider === 'openrouter' ? swarmModels : provider === 'qwen' ? qwenModels : geminiModels).length === 0}
                                     style={{ width: '100%' }}
                                 >
-                                    {provider === 'openrouter'
+                                    {(provider === 'openrouter'
                                         ? swarmModels.map(m => (
                                             <option key={m.id} value={m.id}>
                                                 {formatModelLabel(m)}
+                                            </option>
+                                        ))
+                                        : provider === 'qwen'
+                                        ? qwenModels.map(m => (
+                                            <option key={m.id} value={m.id}>
+                                                {formatQwenLabel(m)}
                                             </option>
                                         ))
                                         : geminiModels.map(m => (
@@ -475,7 +504,7 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                                 {formatGeminiLabel(m)}
                                             </option>
                                         ))
-                                    }
+                                    )}
                                 </select>
                             </div>
                         </div>
@@ -550,14 +579,14 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                                                     swarm?.setModelOverride(c.id, val);
                                                                     setOverrides(prev => ({ ...prev, [c.id]: val }));
                                                                 }}
-                                                                disabled={provider === 'openrouter' ? swarmModels.length === 0 : geminiModels.length === 0}
+                                                                disabled={(provider === 'openrouter' ? swarmModels : provider === 'qwen' ? qwenModels : geminiModels).length === 0}
                                                             >
                                                                 <option value="">
                                                                     {`— Use Default —`}
                                                                 </option>
-                                                                {(provider === 'openrouter' ? swarmModels : geminiModels).map(m => (
+                                                                {(provider === 'openrouter' ? swarmModels : provider === 'qwen' ? qwenModels : geminiModels).map(m => (
                                                                     <option key={m.id} value={m.id}>
-                                                                        {provider === 'openrouter' ? formatModelLabel(m) : formatGeminiLabel(m)}
+                                                                        {provider === 'openrouter' ? formatModelLabel(m) : provider === 'qwen' ? formatQwenLabel(m) : formatGeminiLabel(m)}
                                                                     </option>
                                                                 ))}
                                                             </select>

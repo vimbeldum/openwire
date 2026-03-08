@@ -13,6 +13,7 @@
 
 import { fetchFreeModels, generateMessage } from './openrouter.js';
 import { fetchGeminiModels, generateGeminiMessage } from './gemini.js';
+import { fetchQwenModels, generateQwenMessage } from './qwen.js';
 import { loadStore, getCharactersDict, getGroupsDict } from './agentStore.js';
 
 const CONTEXT_BUFFER_SIZE = 1000;
@@ -20,6 +21,7 @@ const TURN2_ANCHOR = { role: 'assistant', content: 'Samjha! Main Hinglish mein a
 const FALLBACK_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
 const DEFAULT_ALL_MODEL = 'openrouter/auto';
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-lite';
+const DEFAULT_QWEN_MODEL = 'qwen3.5-flash';
 const DEFAULT_MSG_PER_MIN = 60;
 const CROSSOVER_PROBABILITY = 0.7;
 const MAX_RETRIES = 3;
@@ -57,9 +59,10 @@ export class AgentSwarm {
         this._charEnabled    = {};
         this._groupEnabled   = {};
 
-        // Provider: 'openrouter' or 'gemini'
+        // Provider: 'openrouter', 'gemini', or 'qwen'
         this._provider = 'openrouter';
         this._geminiModels = [];
+        this._qwenModels = [];
 
         this._context = [TURN2_ANCHOR];
         this._contextDirty = true;     // dirty flag for context cache
@@ -421,6 +424,7 @@ export class AgentSwarm {
     get queueLength()   { return this._messageQueue.length; }
     get provider()      { return this._provider; }
     get geminiModels()  { return this._geminiModels; }
+    get qwenModels()    { return this._qwenModels; }
 
     get contextSummary() { return this._contextSummary.join('\n'); }
 
@@ -467,10 +471,23 @@ export class AgentSwarm {
                     this._onError(`Gemini model fetch failed: ${e.message}`);
                 }
             }
-            // Auto-select gemini-2.5-flash as default
             const flash = this._geminiModels.find(m => m.id.includes('gemini-2.5-flash-lite'))
                 || this._geminiModels.find(m => m.id.includes('gemini-2.5-flash'));
             this._defaultModel = flash?.id || this._geminiModels[0]?.id || DEFAULT_GEMINI_MODEL;
+            this._log(`[Config] Default model -> ${this._defaultModel}`);
+        } else if (provider === 'qwen') {
+            if (this._qwenModels.length === 0) {
+                try {
+                    this._qwenModels = await fetchQwenModels();
+                    this._log(`[Qwen] Fetched ${this._qwenModels.length} models`);
+                } catch (e) {
+                    this._log(`[Qwen] Model fetch failed: ${e.message}`);
+                    this._onError(`Qwen model fetch failed: ${e.message}`);
+                }
+            }
+            const flash = this._qwenModels.find(m => m.id.includes('qwen3.5-flash'))
+                || this._qwenModels.find(m => m.id.includes('qwen-flash'));
+            this._defaultModel = flash?.id || this._qwenModels[0]?.id || DEFAULT_QWEN_MODEL;
             this._log(`[Config] Default model -> ${this._defaultModel}`);
         } else {
             this._defaultModel = DEFAULT_ALL_MODEL;
@@ -726,7 +743,7 @@ ${dramaEngine}
 ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
 
         // Build context — memoized with dirty flag to avoid redundant serialization
-        const contextSize = this._provider === 'gemini' ? 100 : 30;
+        const contextSize = (this._provider === 'gemini' || this._provider === 'qwen') ? 100 : 30;
         if (this._contextDirty) {
             this._cachedRecent = this._context.slice(-contextSize);
             this._cachedConvo = this._cachedRecent.map(m => m.content).join('\n');
@@ -822,13 +839,16 @@ ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}`;
         // Ensure typing indicator is on
         this._onTyping(characterId, c.name, c.avatar, true);
 
-            const useGemini = this._provider === 'gemini';
-            const gen = useGemini ? generateGeminiMessage : generateMessage;
+            const gen = this._provider === 'gemini' ? generateGeminiMessage
+                : this._provider === 'qwen' ? generateQwenMessage
+                : generateMessage;
             let text = await gen(modelId, systemPrompt, trigger, 120);
 
             // If primary model returns empty, retry with a fallback
             if (!text) {
-                const pool = useGemini ? this._geminiModels : this._freeModels;
+                const pool = this._provider === 'gemini' ? this._geminiModels
+                    : this._provider === 'qwen' ? this._qwenModels
+                    : this._freeModels;
                 const fallbackModel = pool.find(m => m.id !== modelId)?.id;
                 if (fallbackModel) {
                     this._log(`[Generate] ${c.name} got empty from ${modelId}, retrying with ${fallbackModel}`);
