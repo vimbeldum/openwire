@@ -48,6 +48,7 @@ function buildDefaults() {
         groups,
         characters,
         modelFilters: { whitelist: [], blacklist: [] },
+        guardrails: true,  // SFW guardrails on by default
         _version: 7,
     };
 }

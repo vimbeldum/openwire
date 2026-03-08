@@ -43,6 +43,7 @@ export default function AgentControlPanel({ swarm, onClose }) {
     const [assigned, setAssigned]   = useState({});
     const [loading, setLoading]     = useState(false);
     const [error, setError]         = useState(null);
+    const [guardrails, setGuardrails] = useState(store.guardrails !== false);
 
     // ── Model Tester state ────────────────────────────────────
     const [allModels, setAllModels]     = useState([]);
@@ -102,6 +103,12 @@ export default function AgentControlPanel({ swarm, onClose }) {
                 setLoading(false);
             }
         }
+    };
+
+    const handleToggleGuardrails = (val) => {
+        const next = { ...store, guardrails: val };
+        persistAndReload(next);
+        setGuardrails(val);
     };
 
     const handleToggleGroup = (gid, val) => {
@@ -265,6 +272,28 @@ export default function AgentControlPanel({ swarm, onClose }) {
                                 Start the swarm to activate agents.
                             </div>
                         )}
+
+                        {/* Guardrails toggle */}
+                        <div className="acp-guardrails-row">
+                            <div className="acp-guardrails-info">
+                                <span className="acp-guardrails-label">
+                                    {guardrails ? 'SFW Mode' : 'Unfiltered Mode'}
+                                </span>
+                                <span className="acp-guardrails-desc">
+                                    {guardrails
+                                        ? 'Family-friendly, no profanity, polite drama'
+                                        : 'Raw, unfiltered, savage roasts & crude humor'}
+                                </span>
+                            </div>
+                            <label className="acp-show-toggle" title="Toggle guardrails">
+                                <input type="checkbox"
+                                    checked={guardrails}
+                                    onChange={e => handleToggleGuardrails(e.target.checked)}
+                                />
+                                <span className="acp-toggle-track" />
+                            </label>
+                        </div>
+
                         {currentGroups.map(group => {
                             const chars = getGroupCharacters(store, group.id);
                             const allOn = chars.every(c => charEnabled[c.id]);

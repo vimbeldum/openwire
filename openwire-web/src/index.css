@@ -5791,6 +5791,29 @@ body {
   font-style: italic;
   flex-shrink: 0;
 }
+.acp-guardrails-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1.25rem;
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(255,255,255,0.02);
+  flex-shrink: 0;
+}
+.acp-guardrails-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.acp-guardrails-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.acp-guardrails-desc {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
 
 /* Scrollable body */
 .acp-body {
