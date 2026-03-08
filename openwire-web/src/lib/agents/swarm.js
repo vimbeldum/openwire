@@ -51,6 +51,10 @@ export class AgentSwarm {
         this._geminiModels = [];
 
         this._context = [TURN2_ANCHOR];
+        this._contextDirty = true;     // dirty flag for context cache
+        this._cachedConvo = '';         // memoized context string
+        this._cachedLastHuman = null;   // memoized last human message
+        this._cachedRecent = [];        // memoized recent slice
         this._assignedModels = {};
         this._moods = {};
         this._sessionFacts = [];
@@ -188,6 +192,7 @@ export class AgentSwarm {
         const isAgent = agentNames.has(nick);
         this._context.push({ role: 'user', content: `${nick}: ${text}`, _isAgent: isAgent });
         if (this._context.length > CONTEXT_BUFFER_SIZE) this._context.shift();
+        this._contextDirty = true;
 
         if (!this._running) return;
 
@@ -296,6 +301,7 @@ export class AgentSwarm {
         const ctxLen = this._context.length;
         const factsLen = this._sessionFacts.length;
         this._context = [TURN2_ANCHOR];
+        this._contextDirty = true;
         this._sessionFacts = [];
         this._log(`[Flush] Cleared ${ctxLen} context messages and ${factsLen} session facts`);
     }
@@ -499,15 +505,24 @@ export class AgentSwarm {
 
 ${c.systemPrompt}${moodBlock}${factsBlock}`;
 
-        // Build context — Gemini has 1M token window, OpenRouter free models are smaller
-        const contextSize = this._provider === 'gemini' ? 100 : 30; // send last 100 msgs to API, not the full buffer
-        const recent = this._context.slice(-contextSize);
+        // Build context — memoized with dirty flag to avoid redundant serialization
+        const contextSize = this._provider === 'gemini' ? 100 : 30;
+        if (this._contextDirty) {
+            this._cachedRecent = this._context.slice(-contextSize);
+            this._cachedConvo = this._cachedRecent.map(m => m.content).join('\n');
+            // Reverse scan without allocating a new array
+            this._cachedLastHuman = null;
+            for (let i = this._cachedRecent.length - 1; i >= 0; i--) {
+                if (!this._cachedRecent[i]._isAgent) { this._cachedLastHuman = this._cachedRecent[i]; break; }
+            }
+            this._contextDirty = false;
+        }
+        const recent = this._cachedRecent;
         let trigger;
         if (recent.length) {
-            const convo = recent.map(m => m.content).join('\n');
+            const convo = this._cachedConvo;
 
-            // Find the most recent human message (not from an AI agent)
-            const lastHumanMsg = [...recent].reverse().find(m => !m._isAgent);
+            const lastHumanMsg = this._cachedLastHuman;
             const lastHumanSender = lastHumanMsg?.content?.match(/^([^:]+):/)?.[1]?.trim();
             const lastHumanText = lastHumanMsg?.content || '';
 
