@@ -485,10 +485,12 @@ impl UiApp {
             // Regular chat message
             self.state
                 .add_chat_message(&self.state.nick.clone(), &input);
+            let nick = self.state.nick.clone();
             let _ = self
                 .command_sender
                 .send(NetworkCommand::Broadcast {
                     data: input.into_bytes(),
+                    nick,
                 })
                 .await;
             false

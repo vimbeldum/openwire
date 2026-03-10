@@ -109,8 +109,9 @@ pub struct GifResult {
 /// Commands to control the network layer
 #[derive(Debug)]
 pub enum NetworkCommand {
-    /// Broadcast a signed message to the general topic
-    Broadcast { data: Vec<u8> },
+    /// Broadcast a signed message to the general topic.
+    /// `nick` is the sender's display name — used for relay/web-bridge loopback.
+    Broadcast { data: Vec<u8>, nick: String },
     /// Send an encrypted message to a specific peer
     SendToPeer { peer_id: String, data: Vec<u8> },
     /// Send a file to all peers
@@ -818,7 +819,17 @@ pub async fn run_network(mut network: Network) -> Result<()> {
             // Handle commands from the UI/controller
             Some(cmd) = network.command_receiver.recv() => {
                 match cmd {
-                    NetworkCommand::Broadcast { data } => {
+                    NetworkCommand::Broadcast { data, nick } => {
+                        // Loopback to relay bridge + web bridge clients so they can
+                        // forward the local user's message.  We only send on the
+                        // broadcast channel — TUI already shows the message immediately.
+                        let loopback = NetworkEvent::MessageReceived {
+                            from: network.local_peer_id,
+                            topic: "openwire-general".to_string(),
+                            data: format!("{}: {}", nick, String::from_utf8_lossy(&data)).into_bytes(),
+                        };
+                        let _ = network.event_broadcast.send(loopback);
+
                         if let Err(e) = network.publish_signed(data).await {
                             tracing::error!("Failed to broadcast: {}", e);
                             send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error(format!("Broadcast failed: {}", e))).await;

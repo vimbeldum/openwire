@@ -251,12 +251,21 @@ async fn handle_relay_message(
         RelayIn::Welcome { peer_id, peers, .. } => {
             tracing::info!("Relay bridge: welcomed as peer_id={}", peer_id);
             for peer in peers {
-                if let (Some(pid), Some(nick_val)) =
-                    (peer.get("peer_id"), peer.get("nick"))
-                {
-                    let pid_str = pid.as_str().unwrap_or("");
-                    let nick_str = nick_val.as_str().unwrap_or(pid_str);
-                    tracing::debug!("Relay bridge: existing peer {} ({})", pid_str, nick_str);
+                if let Some(pid) = peer.get("peer_id").and_then(|v| v.as_str()) {
+                    let nick_str = peer.get("nick").and_then(|v| v.as_str()).unwrap_or(pid);
+                    tracing::debug!("Relay bridge: existing peer {} ({})", pid, nick_str);
+                    let from_peer = peer_id_from_str(pid);
+                    let disc = NetworkEvent::PeerDiscovered(from_peer);
+                    let _ = event_broadcast.send(disc.clone());
+                    let _ = event_tx.send(disc).await;
+                    let msg = format!("[relay] {} is online", nick_str);
+                    let chat = NetworkEvent::MessageReceived {
+                        from: from_peer,
+                        topic: "openwire-general".to_string(),
+                        data: msg.into_bytes(),
+                    };
+                    let _ = event_broadcast.send(chat.clone());
+                    let _ = event_tx.send(chat).await;
                 }
             }
         }
@@ -285,28 +294,29 @@ async fn handle_relay_message(
 
         RelayIn::PeerJoined { peer_id, nick } => {
             tracing::info!("Relay bridge: peer joined {} ({})", peer_id, nick);
-            // Emit a system-style message so the TUI can show it.
-            let msg = format!("[relay] {} joined", nick);
             let from_peer = peer_id_from_str(&peer_id);
-            let event = NetworkEvent::MessageReceived {
+            // PeerDiscovered → TUI shows "Peer joined" and increments peer count
+            let disc = NetworkEvent::PeerDiscovered(from_peer);
+            let _ = event_broadcast.send(disc.clone());
+            let _ = event_tx.send(disc).await;
+            // Also show a named join message in the chat
+            let msg = format!("[relay] {} joined", nick);
+            let chat = NetworkEvent::MessageReceived {
                 from: from_peer,
                 topic: "openwire-general".to_string(),
                 data: msg.into_bytes(),
             };
-            let _ = event_broadcast.send(event.clone());
-            let _ = event_tx.send(event).await;
+            let _ = event_broadcast.send(chat.clone());
+            let _ = event_tx.send(chat).await;
         }
 
         RelayIn::PeerLeft { peer_id } => {
             tracing::info!("Relay bridge: peer left {}", peer_id);
             let from_peer = peer_id_from_str(&peer_id);
-            let event = NetworkEvent::MessageReceived {
-                from: from_peer,
-                topic: "openwire-general".to_string(),
-                data: b"[relay] peer disconnected".to_vec(),
-            };
-            let _ = event_broadcast.send(event.clone());
-            let _ = event_tx.send(event).await;
+            // PeerDisconnected → TUI removes from peer list and decrements count
+            let disc = NetworkEvent::PeerDisconnected(from_peer);
+            let _ = event_broadcast.send(disc.clone());
+            let _ = event_tx.send(disc).await;
         }
 
         RelayIn::Pong => {

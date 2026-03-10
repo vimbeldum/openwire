@@ -491,24 +491,23 @@ async fn handle_client_message(
         }
 
         ClientMsg::Message { data } => {
+            let nick = state
+                .connected_peers
+                .read()
+                .await
+                .get(peer_id)
+                .cloned()
+                .unwrap_or_else(|| peer_id[..8.min(peer_id.len())].to_string());
             // Forward to gossipsub for any P2P peers on the network
             let _ = state
                 .network_tx
                 .send(NetworkCommand::Broadcast {
                     data: data.clone().into_bytes(),
+                    nick: nick.clone(),
                 })
                 .await;
-            // Echo to ALL web clients on this bridge + TUI, regardless of
-            // gossipsub success (no P2P peers needed for local delivery).
-            let nick = {
-                state
-                    .connected_peers
-                    .read()
-                    .await
-                    .get(peer_id)
-                    .cloned()
-                    .unwrap_or_else(|| peer_id[..8.min(peer_id.len())].to_string())
-            };
+            // Echo to ALL web clients on this bridge + TUI regardless of
+            // gossipsub success (no P2P peers required for local delivery).
             let display = format!("[web:{}] {}", nick, data);
             let event = NetworkEvent::MessageReceived {
                 from: peer_libp2p,
