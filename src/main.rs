@@ -58,8 +58,14 @@ struct Args {
     #[arg(short, long, default_value = "warn")]
     log_level: String,
 
-    /// Cloud relay URL to bridge into (enables relay bridge when set).
-    /// Example: wss://openwire-relay.openwire.workers.dev
+    /// Connect to the cloud relay so openwire-web users on Vercel can
+    /// see and message you. The relay URL is hardcoded; use --relay-url
+    /// only if you self-host the relay.
+    #[arg(long)]
+    relay: bool,
+
+    /// Override the relay WebSocket URL (implies --relay).
+    /// Default: wss://openwire-relay.openwire.workers.dev
     #[arg(long)]
     relay_url: Option<String>,
 }
@@ -132,8 +138,12 @@ async fn main() -> Result<()> {
         });
     }
 
-    // Start relay bridge if --relay-url is set
-    if let Some(relay_url) = args.relay_url {
+    // Start relay bridge if --relay or --relay-url is provided
+    if args.relay || args.relay_url.is_some() {
+        let relay_url = args
+            .relay_url
+            .clone()
+            .unwrap_or_else(|| "wss://openwire-relay.openwire.workers.dev".to_string());
         let relay_command_tx = handle.command_sender.clone();
         let relay_event_broadcast = handle.event_broadcast.clone();
         let relay_event_tx = handle.event_tx.clone();
@@ -169,12 +179,14 @@ async fn main() -> Result<()> {
     // Run the TUI on the main thread (blocking — crossterm needs it)
     let nick = args.nick.clone();
     let web_port = args.web.then_some(args.web_port);
+    let relay_active = args.relay || args.relay_url.is_some();
     let mut ui = ui::UiApp::new(
         nick,
         local_peer_id,
         handle.command_sender,
         handle.event_receiver,
         web_port,
+        relay_active,
     )?;
 
     // Run UI — blocks until user quits

@@ -80,7 +80,7 @@ pub struct UiState {
 }
 
 impl UiState {
-    pub fn new(nick: String, local_peer_id: String, web_port: Option<u16>) -> Self {
+    pub fn new(nick: String, local_peer_id: String, web_port: Option<u16>, relay: bool) -> Self {
         let mut state = Self {
             input: String::new(),
             cursor_pos: 0,
@@ -107,6 +107,11 @@ impl UiState {
             state.add_system_message(&format!(
                 "🌐 Web bridge active → open http://localhost:{port} in a browser, or point the openwire-web app at ws://localhost:{port}/ws"
             ));
+        }
+        if relay {
+            state.add_system_message(
+                "☁ Relay bridge active → you are visible to openwire-web users on Vercel",
+            );
         }
         state
     }
@@ -173,6 +178,7 @@ impl UiApp {
         command_sender: mpsc::Sender<NetworkCommand>,
         event_receiver: mpsc::Receiver<NetworkEvent>,
         web_port: Option<u16>,
+        relay: bool,
     ) -> Result<Self> {
         enable_raw_mode()?;
         let mut stdout = io::stdout();
@@ -182,7 +188,7 @@ impl UiApp {
 
         Ok(Self {
             terminal,
-            state: UiState::new(nick, local_peer_id, web_port),
+            state: UiState::new(nick, local_peer_id, web_port, relay),
             command_sender,
             event_receiver,
         })
