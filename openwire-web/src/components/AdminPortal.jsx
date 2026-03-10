@@ -51,6 +51,8 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
     const [haimakerModels, setHaimakerModels] = useState(swarm?.haimakerModels ?? []);
     const [haimakerLoading, setHaimakerLoading] = useState(false);
     const [mentionOnlyMode, setMentionOnlyMode] = useState(swarm?.mentionOnlyMode ?? false);
+    const [statsDebug, setStatsDebug] = useState(swarm?.statsDebug ?? false);
+    const [aiStats, setAiStats] = useState(null);
     const [charMoods, setCharMoods] = useState(() => {
         const init = {};
         Object.keys(CHARACTERS).forEach(id => { init[id] = swarm?.getMood(id) ?? 'normal'; });
@@ -75,6 +77,15 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
             logEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
     }, [swarmLogs, showLog]);
+
+    // Poll AI stats when debug is enabled
+    useEffect(() => {
+        if (!statsDebug || !swarm) { setAiStats(null); return; }
+        const tick = () => setAiStats({ ...swarm.stats, queueLength: swarm.queueLength, queue: swarm.queueContents || [] });
+        tick();
+        const id = setInterval(tick, 2000);
+        return () => clearInterval(id);
+    }, [statsDebug, swarm]);
 
     const totalChips = peers.reduce((s, p) => s + (p.balance || 0), 0);
     const richest = peers.reduce((best, p) => (!best || (p.balance || 0) > (best.balance || 0)) ? p : best, null);
@@ -413,6 +424,115 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                 Mention-only mode (AI speaks only when @tagged, active 4 min)
                             </label>
                         </div>
+
+                        {/* AI Stats debug toggle */}
+                        <div className="admin-agents-controls" style={{ marginTop: 0 }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={statsDebug}
+                                    onChange={e => {
+                                        const on = e.target.checked;
+                                        setStatsDebug(on);
+                                        swarm?.setStatsDebug(on);
+                                    }}
+                                />
+                                AI Stats (debug — tracks generation timing, queue, TPS)
+                            </label>
+                        </div>
+
+                        {/* AI Stats panel (only when debug enabled) */}
+                        {statsDebug && aiStats && (() => {
+                            const avgMs = aiStats.totalGenerations > 0
+                                ? Math.round(aiStats.totalTimeMs / aiStats.totalGenerations) : 0;
+                            const avgTps = aiStats.totalGenerations > 0 && aiStats.totalTimeMs > 0
+                                ? +(aiStats.totalTokensEstimated / (aiStats.totalTimeMs / 1000)).toFixed(1) : 0;
+                            const recent = aiStats.generations || [];
+                            const last5 = recent.slice(-5).reverse();
+                            const byChar = Object.values(aiStats.byCharacter || {})
+                                .sort((a, b) => b.count - a.count).slice(0, 10);
+                            const queueNames = (aiStats.queue || []).map(id => CHARACTERS[id]?.name || id);
+                            return (
+                                <div style={{ background: 'var(--bg-secondary, #1a1a2e)', border: '1px solid var(--border, #333)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
+                                    <div style={{ fontSize: '0.9em', fontWeight: 600, marginBottom: 8, color: 'var(--text, #ccc)' }}>AI Generation Stats</div>
+                                    <div className="admin-stats-grid">
+                                        <div className="admin-stat-card">
+                                            <div className="admin-stat-label">Total Generations</div>
+                                            <div className="admin-stat-value">{aiStats.totalGenerations}</div>
+                                        </div>
+                                        <div className="admin-stat-card">
+                                            <div className="admin-stat-label">Avg Time</div>
+                                            <div className="admin-stat-value">{avgMs > 1000 ? `${(avgMs/1000).toFixed(1)}s` : `${avgMs}ms`}</div>
+                                        </div>
+                                        <div className="admin-stat-card">
+                                            <div className="admin-stat-label">Avg TPS</div>
+                                            <div className="admin-stat-value">{avgTps}</div>
+                                        </div>
+                                        <div className="admin-stat-card">
+                                            <div className="admin-stat-label">Queue</div>
+                                            <div className="admin-stat-value">{aiStats.queueLength || 0}</div>
+                                        </div>
+                                        <div className="admin-stat-card">
+                                            <div className="admin-stat-label">Est. Tokens</div>
+                                            <div className="admin-stat-value">{aiStats.totalTokensEstimated}</div>
+                                        </div>
+                                        <div className="admin-stat-card">
+                                            <div className="admin-stat-label">429s / Errors</div>
+                                            <div className="admin-stat-value" style={{ color: (aiStats.rateLimitHits + aiStats.errors) > 0 ? '#f44336' : '#4caf50' }}>
+                                                {aiStats.rateLimitHits} / {aiStats.errors}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Queue contents */}
+                                    {queueNames.length > 0 && (
+                                        <div style={{ marginTop: 8, fontSize: '0.8em', color: 'var(--text-muted)' }}>
+                                            <strong>Queue:</strong> {queueNames.join(' → ')}
+                                        </div>
+                                    )}
+
+                                    {/* Recent generations */}
+                                    {last5.length > 0 && (
+                                        <div style={{ marginTop: 8 }}>
+                                            <div style={{ fontSize: '0.8em', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>Recent Generations</div>
+                                            <table className="admin-table" style={{ fontSize: '0.75em' }}>
+                                                <thead><tr><th>Character</th><th>Time</th><th>Tokens</th><th>TPS</th><th>Model</th></tr></thead>
+                                                <tbody>
+                                                    {last5.map((g, i) => (
+                                                        <tr key={i} style={{ opacity: g.success ? 1 : 0.4 }}>
+                                                            <td>{g.character}</td>
+                                                            <td>{g.timeMs > 1000 ? `${(g.timeMs/1000).toFixed(1)}s` : `${g.timeMs}ms`}</td>
+                                                            <td>{g.outputTokens}</td>
+                                                            <td>{g.tps}</td>
+                                                            <td style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.model?.split('/').pop()}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+
+                                    {/* Per-character breakdown */}
+                                    {byChar.length > 0 && (
+                                        <div style={{ marginTop: 8 }}>
+                                            <div style={{ fontSize: '0.8em', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>Per Character</div>
+                                            <table className="admin-table" style={{ fontSize: '0.75em' }}>
+                                                <thead><tr><th>Character</th><th>Count</th><th>Avg Time</th></tr></thead>
+                                                <tbody>
+                                                    {byChar.map((cs, i) => (
+                                                        <tr key={i}>
+                                                            <td>{cs.name}</td>
+                                                            <td>{cs.count}</td>
+                                                            <td>{cs.avgTimeMs > 1000 ? `${(cs.avgTimeMs/1000).toFixed(1)}s` : `${cs.avgTimeMs}ms`}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
 
                         {/* Flush AI context */}
                         <div className="admin-agents-controls" style={{ marginTop: 0 }}>

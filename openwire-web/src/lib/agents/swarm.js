@@ -133,6 +133,19 @@ export class AgentSwarm {
         this._onTaskUpdate = null;   // callback for UI task progress
         this._loadTasks();
 
+        // AI generation statistics (counters always tracked; detailed history only when debug enabled)
+        this._stats = {
+            totalGenerations: 0,
+            totalTokensEstimated: 0,  // rough estimate based on output length
+            totalTimeMs: 0,
+            generations: [],          // last N generation records (debug only)
+            byCharacter: {},          // characterId → { count, totalTimeMs, avgTimeMs }
+            errors: 0,
+            rateLimitHits: 0,
+        };
+        this._statsDebug = false;     // toggled via setStatsDebug()
+        this._statsMaxHistory = 50;
+
         // Dynamic config — loaded from agentStore
         this._characters = {};  // dict { id: charObj }
         this._groups = {};      // dict { id: groupObj }
@@ -481,12 +494,25 @@ export class AgentSwarm {
     get guardrails() { return this._guardrails; }
     set defaultModel(v) { this._defaultModel = v; this._log(`[Config] Default model -> ${v}`); }
     get queueLength() { return this._messageQueue.length; }
+    get queueContents() { return this._messageQueue.map(t => t.characterId); }
     get provider() { return this._provider; }
     get geminiModels() { return this._geminiModels; }
     get qwenModels() { return this._qwenModels; }
     get haimakerModels() { return this._haimakerModels; }
 
     get contextSummary() { return this._contextSummary.join('\n'); }
+    get stats() { return this._stats; }
+    get statsDebug() { return this._statsDebug; }
+    get mentionOnlyMode() { return this._mentionOnlyMode; }
+
+    setStatsDebug(on) {
+        this._statsDebug = !!on;
+        if (!on) {
+            this._stats.generations = [];  // free memory when debug turned off
+            this._stats.byCharacter = {};
+        }
+        this._log(`[Stats] Debug ${on ? 'enabled' : 'disabled'}`);
+    }
 
     /** Load a summary received from a peer (P2P sync) */
     loadSummary(summary) {
@@ -989,6 +1015,7 @@ CRITICAL — DISTINGUISH HUMANS FROM CHARACTERS:
                     : this._provider === 'haimaker' ? generateHaimakerMessage
                         : generateMessage;
             const maxTok = this._provider === 'haimaker' ? 4096 : 120;
+            const genStartMs = performance.now();
             let text = await gen(modelId, systemPrompt, trigger, maxTok);
 
             // If primary model returns empty, retry with a fallback
@@ -1002,6 +1029,39 @@ CRITICAL — DISTINGUISH HUMANS FROM CHARACTERS:
                     this._log(`[Generate] ${c.name} got empty from ${modelId}, retrying with ${fallbackModel}`);
                     text = await gen(fallbackModel, systemPrompt, trigger, maxTok);
                 }
+            }
+            const genTimeMs = performance.now() - genStartMs;
+
+            // Record generation statistics (counters always; detailed history only when debug on)
+            const outputTokens = text ? Math.ceil(text.length / 4) : 0; // rough ~4 chars/token
+            this._stats.totalGenerations++;
+            this._stats.totalTimeMs += genTimeMs;
+            this._stats.totalTokensEstimated += outputTokens;
+
+            if (this._statsDebug) {
+                this._stats.generations.push({
+                    character: c.name,
+                    characterId,
+                    model: modelId,
+                    provider: this._provider,
+                    timeMs: Math.round(genTimeMs),
+                    outputTokens,
+                    outputLen: text?.length || 0,
+                    tps: (outputTokens > 0 && genTimeMs > 0) ? +(outputTokens / (genTimeMs / 1000)).toFixed(1) : 0,
+                    timestamp: Date.now(),
+                    success: !!text,
+                });
+                if (this._stats.generations.length > this._statsMaxHistory) {
+                    this._stats.generations.shift();
+                }
+                // Per-character stats
+                if (!this._stats.byCharacter[characterId]) {
+                    this._stats.byCharacter[characterId] = { name: c.name, count: 0, totalTimeMs: 0 };
+                }
+                const cs = this._stats.byCharacter[characterId];
+                cs.count++;
+                cs.totalTimeMs += genTimeMs;
+                cs.avgTimeMs = Math.round(cs.totalTimeMs / cs.count);
             }
 
             this._onTyping(characterId, c.name, c.avatar, false);
@@ -1069,6 +1129,7 @@ CRITICAL — DISTINGUISH HUMANS FROM CHARACTERS:
                 || e.message?.toLowerCase().includes('too many requests');
 
             if (is429) {
+                this._stats.rateLimitHits++;
                 const nextRetries = retries + 1;
 
                 if (nextRetries > MAX_RETRIES) {
@@ -1098,6 +1159,7 @@ CRITICAL — DISTINGUISH HUMANS FROM CHARACTERS:
 
             } else {
                 // Non-429 error — drop the task and move on
+                this._stats.errors++;
                 this._onTyping(characterId, c.name, c.avatar, false);
                 this._onError(`[${c.name}] ${e.message}`);
                 this._log(`[Error] ${c.name}: ${e.message}`);
