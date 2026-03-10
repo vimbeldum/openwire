@@ -910,9 +910,14 @@ impl Blackjack {
         if player.doubled_down { return Err("Already doubled down"); }
         if player.hand.len() != 2 { return Err("Can only double on initial two cards"); }
         player.doubled_down = true;
+        player.bet *= 2; // Double the bet for payout calculation
         if let Some(card) = self.deck.pop() {
             player.hand.push(card);
         }
+        // Auto-stand after double down (standard Blackjack rule)
+        player.status = PlayerStatus::Stand;
+        // Advance to next player
+        self.advance_to_next_player();
         Ok(())
     }
 

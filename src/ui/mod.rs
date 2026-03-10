@@ -504,6 +504,12 @@ impl UiApp {
                 self.handle_blackjack_command(&cmd).await;
             }
             game_ui::ActiveGameView::Roulette => {
+                // Only allow bets during betting phase
+                if self.state.roulette_game.as_ref().map(|g| &g.phase) != Some(&RoulettePhase::Betting) {
+                    self.state.add_system_message("Can only place bets during the betting phase.");
+                    self.state.game_overlay.bet_input.clear();
+                    return;
+                }
                 let bet_type = match self.state.game_overlay.bet_type_key {
                     'r' => "red",
                     'k' => "black",
@@ -520,7 +526,7 @@ impl UiApp {
                     'b' => "bahar",
                     _ => "andar",
                 };
-                let cmd = format!("/ab bet {} {}", side, amount_str);
+                let cmd = format!("/ab {} {}", side, amount_str);
                 self.handle_andarbahar_command(&cmd).await;
             }
             _ => {}
@@ -1917,9 +1923,19 @@ impl UiApp {
     fn handle_incoming_blackjack_action(&mut self, _room_id: &str, action: BlackjackAction) {
         match action {
             BlackjackAction::State { state_json } => {
-                if let Ok(game) = serde_json::from_str::<Blackjack>(&state_json) {
+                if let Ok(mut game) = serde_json::from_str::<Blackjack>(&state_json) {
                     // Only update if we are a participant (already have a local game)
                     if self.state.blackjack_game.is_some() {
+                        // Preserve local player's bet amount to prevent peer manipulation
+                        if let Some(ref local_game) = self.state.blackjack_game {
+                            if let Some(local_player) = local_game.players.iter()
+                                .find(|p| p.peer_id == self.state.local_peer_id) {
+                                if let Some(remote_player) = game.players.iter_mut()
+                                    .find(|p| p.peer_id == self.state.local_peer_id) {
+                                    remote_player.bet = local_player.bet;
+                                }
+                            }
+                        }
                         self.state.blackjack_game = Some(game);
                         self.render_blackjack();
                     }
@@ -2151,14 +2167,27 @@ impl UiApp {
                     .add_system_message(&format!("Roulette result: {} ({})", n, color));
             }
 
+            // Calculate total stake so we can return it on any win
+            let my_total_stake: u32 = self.state.roulette_game.as_ref()
+                .map(|g| g.bets.iter()
+                    .filter(|b| b.peer_id == self.state.local_peer_id)
+                    .map(|b| b.amount)
+                    .sum::<u32>())
+                .unwrap_or(0);
+
             let mut total_net: i64 = 0;
             for (peer, net) in &payouts {
                 if peer == &self.state.local_peer_id {
                     total_net = *net;
+                    // net is profit/loss. Stake was already debited.
+                    // Return: stake + net (if positive, player profits; if negative, partial/total loss)
+                    let total_return = my_total_stake as i64 + *net;
+                    if total_return > 0 {
+                        self.state.wallet.credit(total_return as u32);
+                    }
                     if *net > 0 {
-                        self.state.wallet.credit(*net as u32);
                         self.state.add_system_message(&format!(
-                            "You won {}! Balance: {}",
+                            "You won ${}! Balance: {}",
                             net, self.state.wallet.balance
                         ));
                         let ticker = format!(
@@ -2173,9 +2202,14 @@ impl UiApp {
                                 nick,
                             })
                             .await;
+                    } else if *net == 0 {
+                        self.state.add_system_message(&format!(
+                            "Push — stake returned. Balance: {}",
+                            self.state.wallet.balance
+                        ));
                     } else {
                         self.state.add_system_message(&format!(
-                            "You lost {}. Balance: {}",
+                            "You lost ${}. Balance: {}",
                             net.abs(),
                             self.state.wallet.balance
                         ));
@@ -2184,7 +2218,10 @@ impl UiApp {
             }
             self.state.casino_state.record_payout("roulette", total_net);
 
-            // Don't call new_round() here — let the overlay display the result.
+            // Transition to Ended so overlay shows result; user presses Space for new round.
+            if let Some(ref mut game) = self.state.roulette_game {
+                game.end_round();
+            }
             // User presses Space again to start a new round (handled in overlay action).
 
             let action = RouletteAction::Spin;
@@ -2205,7 +2242,16 @@ impl UiApp {
     fn handle_incoming_roulette_action(&mut self, _room_id: &str, action: RouletteAction) {
         match action {
             RouletteAction::State { state_json } => {
-                if let Ok(game) = serde_json::from_str::<RouletteEngine>(&state_json) {
+                if let Ok(mut game) = serde_json::from_str::<RouletteEngine>(&state_json) {
+                    // Preserve local player's bets to prevent peer manipulation
+                    if let Some(ref local_game) = self.state.roulette_game {
+                        let my_bets: Vec<_> = local_game.bets.iter()
+                            .filter(|b| b.peer_id == self.state.local_peer_id)
+                            .cloned()
+                            .collect();
+                        game.bets.retain(|b| b.peer_id != self.state.local_peer_id);
+                        game.bets.extend(my_bets);
+                    }
                     self.state.roulette_game = Some(game);
                 }
             }
@@ -2334,19 +2380,30 @@ impl UiApp {
                 .map(|g| g.calculate_payouts())
                 .unwrap_or_default();
 
+            // Calculate total stake for proper return
+            let my_ab_stake: u32 = self.state.andarbahar_game.as_ref()
+                .map(|g| g.bets.iter()
+                    .filter(|b| b.peer_id == self.state.local_peer_id)
+                    .map(|b| b.amount)
+                    .sum::<u32>())
+                .unwrap_or(0);
+
             let mut total_net: i64 = 0;
             for (peer, net) in &payouts {
                 if peer == &self.state.local_peer_id {
                     total_net = *net;
+                    let total_return = my_ab_stake as i64 + *net;
+                    if total_return > 0 {
+                        self.state.wallet.credit(total_return as u32);
+                    }
                     if *net > 0 {
-                        self.state.wallet.credit(*net as u32);
                         self.state.add_system_message(&format!(
-                            "Andar Bahar: you won {}! Balance: {}",
+                            "Andar Bahar: you won ${}! Balance: {}",
                             net, self.state.wallet.balance
                         ));
                     } else {
                         self.state.add_system_message(&format!(
-                            "Andar Bahar: you lost {}. Balance: {}",
+                            "Andar Bahar: you lost ${}. Balance: {}",
                             net.abs(),
                             self.state.wallet.balance
                         ));
@@ -2357,19 +2414,8 @@ impl UiApp {
                 .casino_state
                 .record_payout("andarbahar", total_net);
 
-            let lines: Vec<String> = self
-                .state
-                .andarbahar_game
-                .as_ref()
-                .map(|g| g.render_status())
-                .unwrap_or_default();
-            for l in lines {
-                self.state.add_system_message(&l);
-            }
-
-            if let Some(ref mut game) = self.state.andarbahar_game {
-                game.new_round();
-            }
+            // Don't call new_round() — let overlay display the result.
+            // User presses Space/D for new round.
 
             let action = AndarBaharAction::Deal;
             let _ = self
@@ -2432,7 +2478,16 @@ impl UiApp {
     fn handle_incoming_andarbahar_action(&mut self, _room_id: &str, action: AndarBaharAction) {
         match action {
             AndarBaharAction::State { state_json } => {
-                if let Ok(game) = serde_json::from_str::<AndarBaharEngine>(&state_json) {
+                if let Ok(mut game) = serde_json::from_str::<AndarBaharEngine>(&state_json) {
+                    // Preserve local player's bets to prevent peer manipulation
+                    if let Some(ref local_game) = self.state.andarbahar_game {
+                        let my_bets: Vec<_> = local_game.bets.iter()
+                            .filter(|b| b.peer_id == self.state.local_peer_id)
+                            .cloned()
+                            .collect();
+                        game.bets.retain(|b| b.peer_id != self.state.local_peer_id);
+                        game.bets.extend(my_bets);
+                    }
                     self.state.andarbahar_game = Some(game);
                 }
             }

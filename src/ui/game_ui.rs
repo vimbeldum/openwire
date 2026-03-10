@@ -349,6 +349,19 @@ fn render_action_bar(f: &mut Frame, area: Rect, ov: &mut GameOverlay) {
     let blk = Block::default().borders(Borders::TOP).border_style(Style::default().fg(Color::Yellow));
     let inner = blk.inner(area);
     f.render_widget(blk, area);
+    let btn_y = if ov.entering_bet && inner.height > 1 {
+        // Show bet input on first line, buttons on second
+        let bet_text = if ov.bet_input.is_empty() { "_" } else { &ov.bet_input };
+        let input_line = Line::from(vec![
+            sb("  Bet: $", Color::Green),
+            sb(bet_text, Color::Yellow),
+            s("▌", Color::DarkGray),
+        ]);
+        f.render_widget(Paragraph::new(input_line), Rect::new(inner.x, inner.y, inner.width, 1));
+        inner.y + 1
+    } else {
+        inner.y
+    };
     let mut spans: Vec<Span<'static>> = vec![Span::raw("  ")];
     let mut xo = inner.x + 2;
     for entry in ov.button_areas.iter_mut() {
@@ -358,7 +371,7 @@ fn render_action_bar(f: &mut Frame, area: Rect, ov: &mut GameOverlay) {
             else if key == '0' { label.clone() }
             else { format!("[{}]{}", key.to_uppercase(), label) };
         let w = disp.len() as u16;
-        entry.1 = Rect::new(xo, inner.y, w, 1);
+        entry.1 = Rect::new(xo, btn_y, w, 1);
         xo += w + 2;
         if key != '\n' && key != '\x1b' && key != '0' {
             let ks = if key == ' ' { "[Space]".into() } else { format!("[{}]", key.to_uppercase()) };
@@ -367,7 +380,7 @@ fn render_action_bar(f: &mut Frame, area: Rect, ov: &mut GameOverlay) {
         } else { spans.push(s(&disp, Color::DarkGray)); }
         spans.push(Span::raw("  "));
     }
-    f.render_widget(Paragraph::new(Line::from(spans)), inner);
+    f.render_widget(Paragraph::new(Line::from(spans)), Rect::new(inner.x, btn_y, inner.width, 1));
 }
 
 // ─── Key event handler ──────────────────────────────────────────────────────
