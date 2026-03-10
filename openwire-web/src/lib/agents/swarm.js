@@ -33,6 +33,7 @@ const GLOBAL_COOLDOWN_MS = 10_000;    // 1 message per 10s across all AI
 const MENTION_COOLDOWN_MS = 12_000;   // suppress other characters for 12s after @mention
 const MAX_AGENT_CHAIN_DEPTH = 2;      // max agent→agent @mention chain depth (prevents loops)
 const MAX_QUEUE_SIZE = 32;            // #9: cap queue to prevent unbounded growth
+const SLOW_PROVIDER_QUEUE_CAP = 4;   // tighter cap for slow providers (thinking models)
 
 // Context compaction — auto-summarize via Gemini when context grows large
 const COMPACT_THRESHOLD = 50;         // trigger compaction when context reaches this size
@@ -654,6 +655,8 @@ export class AgentSwarm {
                 // Structural gate: suppress during directed @mention cooldown
                 else if (this._mentionActiveUntil > Date.now() && !this._mentionTargets.has(characterId)) {
                     this._log(`[Timer] ${c.name} suppressed — @mention cooldown active`);
+                } else if (this._provider === 'haimaker' && this._messageQueue.length >= SLOW_PROVIDER_QUEUE_CAP) {
+                    this._log(`[Timer] ${c.name} skipped — queue full for slow provider (${this._messageQueue.length}/${SLOW_PROVIDER_QUEUE_CAP})`);
                 } else {
                     const roll = Math.random() * 10;
                     if (roll < c.frequencyWeight) {
@@ -721,13 +724,14 @@ export class AgentSwarm {
             this._messageQueue.splice(lastForceIdx + 1, 0, task);
             this._log(`[Queue] ${c.name} PRIORITY added at position ${lastForceIdx + 2} (queue: ${this._messageQueue.length})`);
         } else {
-            // #9: Cap queue size to prevent unbounded growth under burst load
-            if (this._messageQueue.length >= MAX_QUEUE_SIZE) {
-                this._log(`[Queue] ${c.name} dropped — queue full (${this._messageQueue.length}/${MAX_QUEUE_SIZE})`);
+            // #9: Cap queue size — tighter cap for slow providers like Haimaker (thinking models)
+            const cap = this._provider === 'haimaker' ? SLOW_PROVIDER_QUEUE_CAP : MAX_QUEUE_SIZE;
+            if (this._messageQueue.length >= cap) {
+                this._log(`[Queue] ${c.name} dropped — queue full (${this._messageQueue.length}/${cap})`);
                 return;
             }
             this._messageQueue.push(task);
-            this._log(`[Queue] ${c.name} added (queue: ${this._messageQueue.length})`);
+            this._log(`[Queue] ${c.name} added (queue: ${this._messageQueue.length}/${cap})`);
         }
 
         // Show typing indicator while in queue
