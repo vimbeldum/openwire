@@ -7,6 +7,9 @@
 
 const PROXY = '/api/openrouter';
 
+// Thinking models don't benefit from prompt repetition
+const THINKING_MODEL_RE = /think|reasoning|deepseek-r1|qwq/i;
+
 /**
  * Fetch all models available on OpenRouter, then filter to free-only.
  * Applies whitelist/blacklist from modelFilters if provided.
@@ -111,8 +114,14 @@ const IS_DEBUG_OR = typeof localStorage !== 'undefined' && localStorage.getItem(
 const FETCH_TIMEOUT_MS = 30_000;
 
 export async function generateMessage(modelId, systemPrompt, contextMessages, maxTokens = 120) {
+    // Triple prompt repetition for non-thinking models (research shows 3x improves accuracy)
+    const isThinking = THINKING_MODEL_RE.test(modelId);
+    const systemContent = isThinking
+        ? systemPrompt
+        : systemPrompt + '\n\n[REINFORCEMENT]\n' + systemPrompt + '\n\n[REINFORCEMENT]\n' + systemPrompt;
+
     const messages = [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: systemContent },
         ...contextMessages,
     ];
 

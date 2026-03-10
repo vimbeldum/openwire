@@ -6,6 +6,9 @@
 
 const PROXY = '/api/gemini';
 
+// Thinking models don't benefit from prompt repetition
+const THINKING_MODEL_RE = /think|reasoning|deepseek-r1|qwq/i;
+
 /**
  * Fetch all Gemini models that support generateContent.
  * Returns sorted array of model objects.
@@ -67,13 +70,23 @@ export async function generateGeminiMessage(modelId, systemPrompt, contextMessag
 
     // System instruction goes as the first user turn
     // Then alternate user/model for context
+    const instruction = systemPrompt + '\n\nReminder: Roman-script Hinglish only. No Devanagari. 1-2 short sentences max. No emoji. You MAY use *asterisks* ONLY for physical actions (e.g., *slaps him*, *runs away*). Always finish your sentence completely — never stop mid-word or mid-sentence.';
+
+    // Triple prompt repetition for non-thinking models (research shows 3x improves accuracy)
+    const isThinking = THINKING_MODEL_RE.test(modelId);
+    const systemContent = isThinking
+        ? instruction
+        : instruction + '\n\n---\n\n' + instruction + '\n\n---\n\n' + instruction;
+
+    const contextMapped = contextMessages.map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        content: m.content,
+    }));
+
     const allMsgs = [
-        { role: 'user', content: systemPrompt + '\n\nReminder: Roman-script Hinglish only. No Devanagari. 1-2 short sentences max. No emoji. You MAY use *asterisks* ONLY for physical actions (e.g., *slaps him*, *runs away*). Always finish your sentence completely — never stop mid-word or mid-sentence.' },
+        { role: 'user', content: systemContent },
         { role: 'model', content: 'Samjha! Hinglish mein, 1-2 lines, Roman script only, no emoji, *actions* allowed.' },
-        ...contextMessages.map(m => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            content: m.content,
-        })),
+        ...contextMapped,
     ];
 
     // Gemini requires strict user/model alternation — merge consecutive same-role turns

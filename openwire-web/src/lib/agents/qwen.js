@@ -6,6 +6,9 @@
 
 const PROXY = '/api/qwen';
 
+// Thinking models don't benefit from prompt repetition
+const THINKING_MODEL_RE = /think|reasoning|deepseek-r1|qwq/i;
+
 /**
  * Fetch available Qwen models (curated list from proxy).
  * Returns sorted array of model objects.
@@ -54,11 +57,16 @@ const FETCH_TIMEOUT_MS = 30_000;
 export async function generateQwenMessage(modelId, systemPrompt, contextMessages, maxTokens = 120) {
 
     // Build OpenAI-style messages array
+    const instruction = systemPrompt + '\n\nReminder: Roman-script Hinglish only. No Devanagari. 1-2 short sentences max. No emoji. You MAY use *asterisks* ONLY for physical actions (e.g., *slaps him*, *runs away*). Always finish your sentence completely — never stop mid-word or mid-sentence.';
+
+    // Triple prompt repetition for non-thinking models (research shows 3x improves accuracy)
+    const isThinking = THINKING_MODEL_RE.test(modelId);
+    const systemContent = isThinking
+        ? instruction
+        : instruction + '\n\n[REINFORCEMENT]\n' + instruction + '\n\n[REINFORCEMENT]\n' + instruction;
+
     const messages = [
-        {
-            role: 'system',
-            content: systemPrompt + '\n\nReminder: Roman-script Hinglish only. No Devanagari. 1-2 short sentences max. No emoji. You MAY use *asterisks* ONLY for physical actions (e.g., *slaps him*, *runs away*). Always finish your sentence completely — never stop mid-word or mid-sentence.',
-        },
+        { role: 'system', content: systemContent },
         ...contextMessages.map(m => ({
             role: m.role === 'model' ? 'assistant' : m.role,
             content: m.content,
