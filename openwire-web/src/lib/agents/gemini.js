@@ -85,7 +85,6 @@ export async function generateGeminiMessage(modelId, systemPrompt, contextMessag
 
     const allMsgs = [
         { role: 'user', content: systemContent },
-        { role: 'model', content: 'Samjha! Hinglish mein, 1-2 lines, Roman script only, no emoji, *actions* allowed.' },
         ...contextMapped,
     ];
 
