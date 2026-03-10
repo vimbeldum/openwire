@@ -80,7 +80,7 @@ pub struct UiState {
 }
 
 impl UiState {
-    pub fn new(nick: String, local_peer_id: String) -> Self {
+    pub fn new(nick: String, local_peer_id: String, web_port: Option<u16>) -> Self {
         let mut state = Self {
             input: String::new(),
             cursor_pos: 0,
@@ -103,6 +103,11 @@ impl UiState {
         state.add_system_message("Welcome to OpenWire! End-to-end encrypted P2P messenger.");
         state.add_system_message("Peers on the same LAN are discovered automatically via mDNS.");
         state.add_system_message("Type a message and press Enter to chat. /help for commands.");
+        if let Some(port) = web_port {
+            state.add_system_message(&format!(
+                "🌐 Web bridge active → open http://localhost:{port} in a browser, or point the openwire-web app at ws://localhost:{port}/ws"
+            ));
+        }
         state
     }
 
@@ -167,6 +172,7 @@ impl UiApp {
         local_peer_id: String,
         command_sender: mpsc::Sender<NetworkCommand>,
         event_receiver: mpsc::Receiver<NetworkEvent>,
+        web_port: Option<u16>,
     ) -> Result<Self> {
         enable_raw_mode()?;
         let mut stdout = io::stdout();
@@ -176,7 +182,7 @@ impl UiApp {
 
         Ok(Self {
             terminal,
-            state: UiState::new(nick, local_peer_id),
+            state: UiState::new(nick, local_peer_id, web_port),
             command_sender,
             event_receiver,
         })

@@ -160,8 +160,43 @@ pub async fn start_web_server(
 
 // ── REST handlers ────────────────────────────────────────────────────────────
 
-async fn index_handler() -> &'static str {
-    "OpenWire P2P Encrypted Messenger — Web Interface"
+async fn index_handler() -> axum::response::Html<&'static str> {
+    axum::response::Html(r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenWire — Web Bridge</title>
+<style>
+  body{font-family:monospace;background:#0d1117;color:#e6edf3;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;gap:1rem}
+  h1{color:#58a6ff;margin:0}
+  .badge{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:1.2rem 2rem;max-width:480px;width:90%;text-align:center}
+  code{background:#21262d;padding:.2em .5em;border-radius:4px;color:#79c0ff;word-break:break-all}
+  .label{color:#8b949e;font-size:.85rem;margin-top:1rem}
+  a{color:#58a6ff}
+  .ok{color:#3fb950}
+</style>
+</head>
+<body>
+<h1>⚡ OpenWire</h1>
+<div class="badge">
+  <div class="ok">✔ Web bridge is running</div>
+  <div class="label">WebSocket endpoint</div>
+  <code id="ws"></code>
+  <div class="label">REST API</div>
+  <code id="api"></code>
+  <div class="label" style="margin-top:1.5rem">
+    Point the <a href="https://github.com/vimbeldum/openwire" target="_blank">openwire-web</a> app<br>
+    at the WebSocket URL above, or use the Landing page&nbsp;<b>CLI&nbsp;Node</b> option.
+  </div>
+</div>
+<script>
+  const h = window.location.host;
+  document.getElementById('ws').textContent  = 'ws://'  + h + '/ws';
+  document.getElementById('api').textContent = 'http://' + h + '/api/status';
+</script>
+</body>
+</html>"#)
 }
 
 async fn health_handler() -> Json<HealthResponse> {

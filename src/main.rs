@@ -122,11 +122,13 @@ async fn main() -> Result<()> {
 
     // Run the TUI on the main thread (blocking — crossterm needs it)
     let nick = args.nick.clone();
+    let web_port = args.web.then_some(args.web_port);
     let mut ui = ui::UiApp::new(
         nick,
         local_peer_id,
         handle.command_sender,
         handle.event_receiver,
+        web_port,
     )?;
 
     // Run UI — blocks until user quits
