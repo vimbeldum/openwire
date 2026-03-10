@@ -241,6 +241,99 @@ body {
   transform: translateY(0);
 }
 
+/* ── Landing: Connect-via mode selector ────────── */
+.landing-connect-via {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+
+.landing-connect-via-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.landing-connect-via-options {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.landing-radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.landing-radio-option input[type="radio"] {
+  accent-color: var(--accent);
+  width: auto;
+  cursor: pointer;
+}
+
+.landing-cli-url-input {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.landing-cli-url-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.landing-cli-url-input::placeholder {
+  color: var(--text-dim);
+}
+
+/* ── App: Connection mode badge in global header ─ */
+.connection-mode-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 220px;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+}
+
+.connection-mode-relay {
+  background: rgba(102, 161, 238, 0.12);
+  border-color: rgba(102, 161, 238, 0.25);
+  color: var(--accent);
+}
+
+.connection-mode-cli {
+  background: rgba(22, 199, 46, 0.12);
+  border-color: rgba(22, 199, 46, 0.25);
+  color: var(--green);
+}
+
+.connection-mode-lock {
+  margin-right: 0.3em;
+}
+
 /* ── Bento Box Layout ─────────────────────────── */
 .chat-layout {
   display: grid;

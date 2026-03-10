@@ -1,8 +1,15 @@
 /* ═══════════════════════════════════════════════════════════
    OpenWire Web — WebSocket client for the relay server
+   or a local CLI node bridge
    ═══════════════════════════════════════════════════════════ */
 
 const RELAY_URL = import.meta.env.VITE_RELAY_URL || 'ws://localhost:8787';
+const DEFAULT_CLI_BRIDGE_URL = import.meta.env.VITE_CLI_BRIDGE_URL || 'ws://localhost:18080';
+
+// 'relay' | 'cli-node'
+let _connectionMode = 'relay';
+// When in cli-node mode, store the host portion for display (e.g. "192.168.1.5:18080")
+let _cliNodeHost = null;
 
 let ws = null;
 let listeners = [];
@@ -48,21 +55,46 @@ function drainQueue() {
     }
 }
 
-export function connect(nick, onEvent, { isAdmin = false, adminSecret = '' } = {}) {
-    if (pingTimer) clearInterval(pingTimer);
-    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.CLOSING)) return;
+/**
+ * Returns the current connection mode.
+ * @returns {'relay' | 'cli-node'}
+ */
+export function getConnectionMode() {
+    return _connectionMode;
+}
 
-    // Only keep the most recent listener to prevent duplicates on reconnect
+/**
+ * Returns the CLI node host string (e.g. "192.168.1.5:18080") when in cli-node mode,
+ * or null when in relay mode.
+ * @returns {string | null}
+ */
+export function getCliNodeHost() {
+    return _cliNodeHost;
+}
+
+/**
+ * Internal helper that opens a WebSocket to the given url and wires up
+ * the standard event handlers. Used by both connect() and connectToCliNode().
+ *
+ * @param {string} url  Full WebSocket URL
+ * @param {string} nick
+ * @param {Function} onEvent
+ * @param {{ isAdmin?: boolean, adminSecret?: string }} opts
+ * @param {Function} reconnectFn  Called after backoff to reconnect
+ */
+function _openWebSocket(url, nick, onEvent, { isAdmin = false, adminSecret = '' } = {}, reconnectFn) {
+    if (pingTimer) clearInterval(pingTimer);
+
     listeners = [onEvent];
 
-    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && !RELAY_URL.startsWith('wss://')) {
-        console.warn('[OpenWire] Security warning: WebSocket relay is using an unencrypted connection (ws://) on an https:// page. Set VITE_RELAY_URL to a wss:// endpoint.');
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && !url.startsWith('wss://')) {
+        console.warn('[OpenWire] Security warning: WebSocket is using an unencrypted connection (ws://) on an https:// page.');
     }
 
-    ws = new WebSocket(RELAY_URL);
+    ws = new WebSocket(url);
 
     ws.onopen = () => {
-        reconnectAttempt = 0; // Reset on successful connection
+        reconnectAttempt = 0;
         const joinMsg = { type: 'join', nick };
         if (adminSecret) joinMsg.admin_secret = adminSecret;
         ws.send(JSON.stringify(joinMsg));
@@ -79,7 +111,7 @@ export function connect(nick, onEvent, { isAdmin = false, adminSecret = '' } = {
     ws.onmessage = (e) => {
         try {
             const msg = JSON.parse(e.data);
-            if (msg.type === 'pong') return; // ignore keep-alive acks
+            if (msg.type === 'pong') return;
             if (msg.type === 'rate_limited') {
                 console.warn('[OpenWire] Rate limited by server');
                 return;
@@ -94,7 +126,6 @@ export function connect(nick, onEvent, { isAdmin = false, adminSecret = '' } = {
         _messageQueue = [];
         listeners.forEach((fn) => fn({ type: 'disconnected' }));
         ws = null;
-        // Exponential backoff with jitter — prevents reconnect storm at scale
         if (reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
             listeners.forEach((fn) => fn({ type: 'reconnect_failed' }));
             return;
@@ -105,10 +136,94 @@ export function connect(nick, onEvent, { isAdmin = false, adminSecret = '' } = {
             MAX_RECONNECT_MS
         );
         reconnectAttempt++;
-        reconnectTimer = setTimeout(() => connect(nick, onEvent, { isAdmin, adminSecret }), delay);
+        reconnectTimer = setTimeout(reconnectFn, delay);
     };
 
     ws.onerror = () => { };
+}
+
+export function connect(nick, onEvent, { isAdmin = false, adminSecret = '' } = {}) {
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.CLOSING)) return;
+
+    _connectionMode = 'relay';
+    _cliNodeHost = null;
+
+    _openWebSocket(
+        RELAY_URL,
+        nick,
+        onEvent,
+        { isAdmin, adminSecret },
+        () => connect(nick, onEvent, { isAdmin, adminSecret })
+    );
+}
+
+/**
+ * Connect directly to a CLI node's WebSocket bridge.
+ * Falls back to the main relay if the CLI node connection fails.
+ *
+ * @param {string} cliUrl   Full WebSocket URL, e.g. "ws://192.168.1.5:18080/ws"
+ *                          If no path is given, "/ws" is appended automatically.
+ * @param {string} nick
+ * @param {Function} onEvent
+ * @param {{ isAdmin?: boolean, adminSecret?: string }} opts
+ */
+export function connectToCliNode(cliUrl, nick, onEvent, { isAdmin = false, adminSecret = '' } = {}) {
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.CLOSING)) return;
+
+    // Validate and normalise the URL
+    let normalised = cliUrl.trim();
+    if (!normalised) normalised = DEFAULT_CLI_BRIDGE_URL;
+    // Ensure a path component exists
+    try {
+        const u = new URL(normalised);
+        if (!u.pathname || u.pathname === '/') u.pathname = '/ws';
+        normalised = u.toString();
+        _cliNodeHost = u.host; // e.g. "192.168.1.5:18080"
+    } catch {
+        console.error('[OpenWire] Invalid CLI node URL:', normalised, '— falling back to relay');
+        _connectionMode = 'relay';
+        _cliNodeHost = null;
+        connect(nick, onEvent, { isAdmin, adminSecret });
+        return;
+    }
+
+    _connectionMode = 'cli-node';
+
+    // Notify caller that we are attempting CLI-node connection
+    onEvent({ type: 'cli_node_connecting', url: normalised });
+
+    // Attempt CLI node connection; on repeated failure, fall back to relay
+    let _cliAttempts = 0;
+    const MAX_CLI_ATTEMPTS = 3;
+
+    function attemptCli() {
+        _openWebSocket(
+            normalised,
+            nick,
+            onEvent,
+            { isAdmin, adminSecret },
+            () => {
+                _cliAttempts++;
+                if (_cliAttempts >= MAX_CLI_ATTEMPTS) {
+                    console.warn('[OpenWire] CLI node unreachable after', MAX_CLI_ATTEMPTS, 'attempts — falling back to relay');
+                    onEvent({ type: 'cli_node_fallback', url: normalised });
+                    _connectionMode = 'relay';
+                    _cliNodeHost = null;
+                    reconnectAttempt = 0;
+                    connect(nick, onEvent, { isAdmin, adminSecret });
+                } else {
+                    const delay = Math.min(
+                        BASE_RECONNECT_MS * Math.pow(2, reconnectAttempt) + Math.random() * 1000,
+                        MAX_RECONNECT_MS
+                    );
+                    reconnectAttempt++;
+                    reconnectTimer = setTimeout(attemptCli, delay);
+                }
+            }
+        );
+    }
+
+    attemptCli();
 }
 
 export function disconnect() {
