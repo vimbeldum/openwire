@@ -1049,28 +1049,28 @@ impl RouletteBetType {
                 }
             }
             RouletteBetType::Odd => {
-                if result > 0 && result % 2 != 0 {
+                if result > 0 && !result.is_multiple_of(2) {
                     2
                 } else {
                     0
                 }
             }
             RouletteBetType::Even => {
-                if result > 0 && result % 2 == 0 {
+                if result > 0 && result.is_multiple_of(2) {
                     2
                 } else {
                     0
                 }
             }
             RouletteBetType::Low => {
-                if result >= 1 && result <= 18 {
+                if (1..=18).contains(&result) {
                     2
                 } else {
                     0
                 }
             }
             RouletteBetType::High => {
-                if result >= 19 && result <= 36 {
+                if (19..=36).contains(&result) {
                     2
                 } else {
                     0
@@ -1095,7 +1095,7 @@ impl RouletteBetType {
                 let hits = match c {
                     1 => result % 3 == 1,
                     2 => result % 3 == 2,
-                    3 => result % 3 == 0,
+                    3 => result.is_multiple_of(3),
                     _ => false,
                 };
                 if hits { 3 } else { 0 }
@@ -1396,7 +1396,7 @@ impl AndarBaharEngine {
 
         // Bahar receives the first card (deal_count starts at 0)
         let total_dealt = self.andar.len() + self.bahar.len();
-        let side = if total_dealt % 2 == 0 {
+        let side = if total_dealt.is_multiple_of(2) {
             AndarBaharSide::Bahar
         } else {
             AndarBaharSide::Andar
@@ -1728,10 +1728,10 @@ impl Wallet {
 
     pub fn load() -> Self {
         let path = Self::wallet_path();
-        if let Ok(data) = std::fs::read_to_string(&path) {
-            if let Ok(w) = serde_json::from_str::<Wallet>(&data) {
-                return w;
-            }
+        if let Ok(data) = std::fs::read_to_string(&path)
+            && let Ok(w) = serde_json::from_str::<Wallet>(&data)
+        {
+            return w;
         }
         // First run: grant starting chips
         let w = Wallet {

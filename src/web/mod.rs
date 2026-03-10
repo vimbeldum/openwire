@@ -221,10 +221,10 @@ async fn handle_ws_connection(socket: WebSocket, state: WebState) {
         loop {
             match event_rx.recv().await {
                 Ok(event) => {
-                    if let Some(msg) = network_event_to_json(event, &state_a).await {
-                        if ws_tx_a.send(msg).await.is_err() {
-                            break; // client disconnected
-                        }
+                    if let Some(msg) = network_event_to_json(event, &state_a).await
+                        && ws_tx_a.send(msg).await.is_err()
+                    {
+                        break; // client disconnected
                     }
                 }
                 Err(broadcast::error::RecvError::Lagged(n)) => {
