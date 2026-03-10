@@ -1,14 +1,14 @@
 /* ================================================================
    OpenWire — Vercel Serverless: Haimaker Proxy
    Keeps MINMAX_API_KEY server-side. Frontend calls /api/haimaker.
-   GET  → list available models (curated)
+   GET  → fetch available models from Haimaker /v1/models
    POST → forward chat completion request via OpenAI-compatible API
    ================================================================ */
 
 const BASE = 'https://api.haimaker.ai/v1';
 
-// Models we expose in the dropdown (curated for chat/generation use)
-const CURATED_MODELS = [
+// Fallback if /v1/models fetch fails
+const FALLBACK_MODELS = [
     { id: 'minimax/minimax-m2.5', name: 'MiniMax M2.5', context_length: 131072 },
 ];
 
@@ -24,7 +24,25 @@ export default async function handler(req, res) {
 
     try {
         if (req.method === 'GET') {
-            return res.status(200).json({ models: CURATED_MODELS });
+            // Try fetching models dynamically from Haimaker
+            try {
+                const upstream = await fetch(`${BASE}/models`, {
+                    headers: { 'Authorization': `Bearer ${key}` },
+                });
+                if (upstream.ok) {
+                    const data = await upstream.json();
+                    // OpenAI-compatible: { data: [{ id, ... }] }
+                    const models = (data.data || []).map(m => ({
+                        id: m.id,
+                        name: m.name || m.id,
+                        context_length: m.context_length || 0,
+                    }));
+                    if (models.length > 0) {
+                        return res.status(200).json({ models });
+                    }
+                }
+            } catch (_) { /* fall through to fallback */ }
+            return res.status(200).json({ models: FALLBACK_MODELS });
         }
 
         if (req.method === 'POST') {
