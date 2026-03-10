@@ -4,6 +4,7 @@ import { loadStore, getCharactersDict, getGroupsDict, getGroupCharacters } from 
 import { formatModelLabel } from '../lib/agents/openrouter.js';
 import { formatGeminiLabel } from '../lib/agents/gemini.js';
 import { formatQwenLabel } from '../lib/agents/qwen.js';
+import { formatHaimakerLabel } from '../lib/agents/haimaker.js';
 
 const TABS = ['Players', 'Ban List', 'Activity Log', 'Stats', 'Agents'];
 const CHATTER_LABELS = { 0.25: 'Quiet', 0.5: 'Calm', 1: 'Normal', 1.5: 'Active', 2: 'Chaotic' };
@@ -47,6 +48,8 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
     const [geminiLoading, setGeminiLoading] = useState(false);
     const [qwenModels, setQwenModels] = useState(swarm?.qwenModels ?? []);
     const [qwenLoading, setQwenLoading] = useState(false);
+    const [haimakerModels, setHaimakerModels] = useState(swarm?.haimakerModels ?? []);
+    const [haimakerLoading, setHaimakerLoading] = useState(false);
     const [charMoods, setCharMoods] = useState(() => {
         const init = {};
         Object.keys(CHARACTERS).forEach(id => { init[id] = swarm?.getMood(id) ?? 'normal'; });
@@ -466,6 +469,26 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                     >
                                         {qwenLoading ? 'Loading...' : 'Qwen'}
                                     </button>
+                                    <button
+                                        className={`admin-btn ${provider === 'haimaker' ? 'adjust' : ''}`}
+                                        disabled={haimakerLoading}
+                                        onClick={async () => {
+                                            setProvider('haimaker');
+                                            setHaimakerLoading(true);
+                                            try {
+                                                await swarm?.setProvider('haimaker');
+                                                setHaimakerModels(swarm?.haimakerModels ?? []);
+                                                const model = swarm?.defaultModel ?? '';
+                                                setDefaultModel(model);
+                                                setOverrides({});
+                                                Object.keys(CHARACTERS).forEach(id => swarm?.setModelOverride(id, null));
+                                                onProviderChange?.('haimaker', model);
+                                            } catch (_) {}
+                                            setHaimakerLoading(false);
+                                        }}
+                                    >
+                                        {haimakerLoading ? 'Loading...' : 'Haimaker'}
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -484,7 +507,7 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                         setOverrides({});
                                         Object.keys(CHARACTERS).forEach(id => swarm?.setModelOverride(id, null));
                                     }}
-                                    disabled={(provider === 'openrouter' ? swarmModels : provider === 'qwen' ? qwenModels : geminiModels).length === 0}
+                                    disabled={(provider === 'openrouter' ? swarmModels : provider === 'qwen' ? qwenModels : provider === 'haimaker' ? haimakerModels : geminiModels).length === 0}
                                     style={{ width: '100%' }}
                                 >
                                     {(provider === 'openrouter'
@@ -497,6 +520,12 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                         ? qwenModels.map(m => (
                                             <option key={m.id} value={m.id}>
                                                 {formatQwenLabel(m)}
+                                            </option>
+                                        ))
+                                        : provider === 'haimaker'
+                                        ? haimakerModels.map(m => (
+                                            <option key={m.id} value={m.id}>
+                                                {formatHaimakerLabel(m)}
                                             </option>
                                         ))
                                         : geminiModels.map(m => (
@@ -579,14 +608,14 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                                                     swarm?.setModelOverride(c.id, val);
                                                                     setOverrides(prev => ({ ...prev, [c.id]: val }));
                                                                 }}
-                                                                disabled={(provider === 'openrouter' ? swarmModels : provider === 'qwen' ? qwenModels : geminiModels).length === 0}
+                                                                disabled={(provider === 'openrouter' ? swarmModels : provider === 'qwen' ? qwenModels : provider === 'haimaker' ? haimakerModels : geminiModels).length === 0}
                                                             >
                                                                 <option value="">
                                                                     {`— Use Default —`}
                                                                 </option>
-                                                                {(provider === 'openrouter' ? swarmModels : provider === 'qwen' ? qwenModels : geminiModels).map(m => (
+                                                                {(provider === 'openrouter' ? swarmModels : provider === 'qwen' ? qwenModels : provider === 'haimaker' ? haimakerModels : geminiModels).map(m => (
                                                                     <option key={m.id} value={m.id}>
-                                                                        {provider === 'openrouter' ? formatModelLabel(m) : provider === 'qwen' ? formatQwenLabel(m) : formatGeminiLabel(m)}
+                                                                        {provider === 'openrouter' ? formatModelLabel(m) : provider === 'qwen' ? formatQwenLabel(m) : provider === 'haimaker' ? formatHaimakerLabel(m) : formatGeminiLabel(m)}
                                                                     </option>
                                                                 ))}
                                                             </select>

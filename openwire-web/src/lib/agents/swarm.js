@@ -14,6 +14,7 @@
 import { fetchFreeModels, generateMessage } from './openrouter.js';
 import { fetchGeminiModels, generateGeminiMessage } from './gemini.js';
 import { fetchQwenModels, generateQwenMessage } from './qwen.js';
+import { fetchHaimakerModels, generateHaimakerMessage } from './haimaker.js';
 import { loadStore, getCharactersDict, getGroupsDict } from './agentStore.js';
 
 const CONTEXT_BUFFER_SIZE = 1000;
@@ -22,6 +23,7 @@ const FALLBACK_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
 const DEFAULT_ALL_MODEL = 'openrouter/auto';
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-lite';
 const DEFAULT_QWEN_MODEL = 'qwen3.5-flash';
+const DEFAULT_HAIMAKER_MODEL = 'minimax/minimax-m2.5';
 const DEFAULT_MSG_PER_MIN = 60;
 const CROSSOVER_PROBABILITY = 0.7;
 const MAX_RETRIES = 3;
@@ -62,10 +64,11 @@ export class AgentSwarm {
         this._charEnabled = {};
         this._groupEnabled = {};
 
-        // Provider: 'openrouter', 'gemini', or 'qwen'
+        // Provider: 'openrouter', 'gemini', 'qwen', or 'haimaker'
         this._provider = 'openrouter';
         this._geminiModels = [];
         this._qwenModels = [];
+        this._haimakerModels = [];
 
         this._context = [TURN2_ANCHOR];
         this._contextDirty = true;     // dirty flag for context cache
@@ -446,6 +449,7 @@ export class AgentSwarm {
     get provider() { return this._provider; }
     get geminiModels() { return this._geminiModels; }
     get qwenModels() { return this._qwenModels; }
+    get haimakerModels() { return this._haimakerModels; }
 
     get contextSummary() { return this._contextSummary.join('\n'); }
 
@@ -509,6 +513,19 @@ export class AgentSwarm {
             const flash = this._qwenModels.find(m => m.id.includes('qwen3.5-flash'))
                 || this._qwenModels.find(m => m.id.includes('qwen-flash'));
             this._defaultModel = flash?.id || this._qwenModels[0]?.id || DEFAULT_QWEN_MODEL;
+            this._log(`[Config] Default model -> ${this._defaultModel}`);
+        } else if (provider === 'haimaker') {
+            if (this._haimakerModels.length === 0) {
+                try {
+                    this._haimakerModels = await fetchHaimakerModels();
+                    this._log(`[Haimaker] Fetched ${this._haimakerModels.length} models`);
+                } catch (e) {
+                    this._log(`[Haimaker] Model fetch failed: ${e.message}`);
+                    this._onError(`Haimaker model fetch failed: ${e.message}`);
+                }
+            }
+            const minimax = this._haimakerModels.find(m => m.id.includes('minimax-m2.5'));
+            this._defaultModel = minimax?.id || this._haimakerModels[0]?.id || DEFAULT_HAIMAKER_MODEL;
             this._log(`[Config] Default model -> ${this._defaultModel}`);
         } else {
             this._defaultModel = DEFAULT_ALL_MODEL;
@@ -817,7 +834,7 @@ CRITICAL — DISTINGUISH HUMANS FROM CHARACTERS:
 </human_interaction_rules>`;
 
             // Build context — memoized with dirty flag to avoid redundant serialization
-            const contextSize = (this._provider === 'gemini' || this._provider === 'qwen') ? 100 : 30;
+            const contextSize = (this._provider === 'gemini' || this._provider === 'qwen' || this._provider === 'haimaker') ? 100 : 30;
             if (this._contextDirty) {
                 this._cachedRecent = this._context.slice(-contextSize);
                 this._cachedConvo = this._cachedRecent.map(m => m.content).join('\n');
@@ -923,14 +940,16 @@ CRITICAL — DISTINGUISH HUMANS FROM CHARACTERS:
 
             const gen = this._provider === 'gemini' ? generateGeminiMessage
                 : this._provider === 'qwen' ? generateQwenMessage
-                    : generateMessage;
+                    : this._provider === 'haimaker' ? generateHaimakerMessage
+                        : generateMessage;
             let text = await gen(modelId, systemPrompt, trigger, 120);
 
             // If primary model returns empty, retry with a fallback
             if (!text) {
                 const pool = this._provider === 'gemini' ? this._geminiModels
                     : this._provider === 'qwen' ? this._qwenModels
-                        : this._freeModels;
+                        : this._provider === 'haimaker' ? this._haimakerModels
+                            : this._freeModels;
                 const fallbackModel = pool.find(m => m.id !== modelId)?.id;
                 if (fallbackModel) {
                     this._log(`[Generate] ${c.name} got empty from ${modelId}, retrying with ${fallbackModel}`);
