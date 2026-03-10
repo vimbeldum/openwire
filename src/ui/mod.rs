@@ -4,8 +4,10 @@
 //! with a 3-pane layout: messages, peers, and input.
 
 use anyhow::Result;
+pub mod game_ui;
+
 use crossterm::{
-    event::{self, Event, KeyCode, KeyModifiers},
+    event::{self, EnableMouseCapture, DisableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
@@ -25,7 +27,7 @@ use tokio::sync::mpsc;
 
 use crate::game::{
     AndarBaharAction, AndarBaharBet, AndarBaharCountRange, AndarBaharEngine, AndarBaharSide,
-    Blackjack, BlackjackAction, CasinoState, GameAction, RouletteAction, RouletteBet,
+    Blackjack, BlackjackAction, BlackjackPhase, CasinoState, GameAction, RouletteAction, RouletteBet,
     RouletteBetType, RouletteEngine, SlotsEngine, TicTacToe, TransactionLedger, Wallet,
 };
 use crate::network::{NetworkCommand, NetworkEvent};
@@ -81,6 +83,8 @@ pub struct UiState {
     pub typing_peers: std::collections::HashMap<String, std::time::Instant>,
     /// Path to persist chat history
     pub message_history_path: std::path::PathBuf,
+    /// Game overlay state (visual game UI on top of chat)
+    pub game_overlay: game_ui::GameOverlay,
 }
 
 impl UiState {
@@ -108,6 +112,7 @@ impl UiState {
                 .unwrap_or_else(|| std::path::PathBuf::from("."))
                 .join(".openwire")
                 .join("chat_history.json"),
+            game_overlay: game_ui::GameOverlay::new(),
         };
         state.add_system_message("Welcome to OpenWire! End-to-end encrypted P2P messenger.");
         state.add_system_message("Peers on the same LAN are discovered automatically via mDNS.");
@@ -217,7 +222,7 @@ impl UiApp {
     ) -> Result<Self> {
         enable_raw_mode()?;
         let mut stdout = io::stdout();
-        execute!(stdout, EnterAlternateScreen)?;
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend)?;
 
@@ -241,107 +246,245 @@ impl UiApp {
                 self.handle_network_event(event);
             }
 
-            // Poll for keyboard events with a small timeout
-            if event::poll(std::time::Duration::from_millis(50))?
-                && let Event::Key(key) = event::read()?
-            {
-                match (key.code, key.modifiers) {
-                    (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
+            // Poll for input events with a small timeout
+            if event::poll(std::time::Duration::from_millis(50))? {
+                let ev = event::read()?;
+
+                // ── Mouse events (game overlay buttons) ─────────────────
+                if let Event::Mouse(mouse) = &ev {
+                    if self.state.game_overlay.visible {
+                        if let Some(action_key) = game_ui::handle_game_mouse(*mouse, &self.state.game_overlay) {
+                            self.handle_overlay_action_key(action_key).await;
+                        }
+                    }
+                    continue; // don't fall through to key handling
+                }
+
+                // ── Key events ──────────────────────────────────────────
+                if let Event::Key(key) = ev {
+                    // Ctrl+C always quits
+                    if key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::CONTROL {
                         let _ = self.command_sender.send(NetworkCommand::Shutdown).await;
                         break;
                     }
-                    (KeyCode::Esc, _) => {
-                        let _ = self.command_sender.send(NetworkCommand::Shutdown).await;
+
+                    // If game overlay is visible, route keys there first
+                    if self.state.game_overlay.visible {
+                        let result = game_ui::handle_game_key(key, &mut self.state.game_overlay);
+                        match result {
+                            game_ui::GameKeyResult::ExitOverlay => {
+                                self.state.game_overlay.visible = false;
+                            }
+                            game_ui::GameKeyResult::Consumed => {
+                                // Dispatch the game action based on key
+                                if let KeyCode::Char(c) = key.code {
+                                    self.handle_overlay_action_key(c).await;
+                                } else if key.code == KeyCode::Enter && !self.state.game_overlay.bet_input.is_empty() {
+                                    self.handle_overlay_bet_confirm().await;
+                                }
+                            }
+                            game_ui::GameKeyResult::BroadcastAction(_data) => {}
+                            game_ui::GameKeyResult::Ignored => {
+                                // Fall through to normal key handling below
+                                self.handle_normal_key(key).await;
+                            }
+                        }
+                        continue;
+                    }
+
+                    // Normal (non-overlay) key handling
+                    if self.handle_normal_key(key).await {
                         break;
                     }
-                    (KeyCode::Enter, _) => {
-                        if self.handle_submit().await {
-                            break;
-                        }
-                    }
-                    (KeyCode::Char(c), _) => {
-                        self.state.input.insert(self.state.cursor_pos, c);
-                        self.state.cursor_pos += 1;
-                        // Throttled typing indicator broadcast
-                        let now = std::time::Instant::now();
-                        if now.duration_since(self.last_typing_broadcast)
-                            > std::time::Duration::from_secs(2)
-                        {
-                            self.last_typing_broadcast = now;
-                            let typing_msg = format!("TYPING:{}", self.state.nick);
-                            let nick = self.state.nick.clone();
-                            let _ = self
-                                .command_sender
-                                .send(NetworkCommand::Broadcast {
-                                    data: typing_msg.into_bytes(),
-                                    nick,
-                                })
-                                .await;
-                        }
-                    }
-                    (KeyCode::Backspace, _) => {
-                        if self.state.cursor_pos > 0 {
-                            self.state.cursor_pos -= 1;
-                            self.state.input.remove(self.state.cursor_pos);
-                        }
-                    }
-                    (KeyCode::Delete, _) => {
-                        if self.state.cursor_pos < self.state.input.len() {
-                            self.state.input.remove(self.state.cursor_pos);
-                        }
-                    }
-                    (KeyCode::Left, _) => {
-                        if self.state.cursor_pos > 0 {
-                            self.state.cursor_pos -= 1;
-                        }
-                    }
-                    (KeyCode::Right, _) => {
-                        if self.state.cursor_pos < self.state.input.len() {
-                            self.state.cursor_pos += 1;
-                        }
-                    }
-                    (KeyCode::Home, _) => {
-                        self.state.cursor_pos = 0;
-                    }
-                    (KeyCode::End, _) => {
-                        self.state.cursor_pos = self.state.input.len();
-                    }
-                    (KeyCode::Up, _) => {
-                        // Scroll up (towards older messages)
-                        self.state.auto_scroll = false;
-                        let max_scroll = self.state.messages.len().saturating_sub(1);
-                        if self.state.scroll_offset < max_scroll {
-                            self.state.scroll_offset += 1;
-                        }
-                    }
-                    (KeyCode::Down, _) => {
-                        // Scroll down (towards newer messages)
-                        if self.state.scroll_offset > 0 {
-                            self.state.scroll_offset -= 1;
-                        }
-                        if self.state.scroll_offset == 0 {
-                            self.state.auto_scroll = true;
-                        }
-                    }
-                    (KeyCode::PageUp, _) => {
-                        // Scroll up by 10 messages
-                        self.state.auto_scroll = false;
-                        let max_scroll = self.state.messages.len().saturating_sub(1);
-                        self.state.scroll_offset = (self.state.scroll_offset + 10).min(max_scroll);
-                    }
-                    (KeyCode::PageDown, _) => {
-                        // Scroll down by 10 messages
-                        self.state.scroll_offset = self.state.scroll_offset.saturating_sub(10);
-                        if self.state.scroll_offset == 0 {
-                            self.state.auto_scroll = true;
-                        }
-                    }
-                    _ => {}
                 }
             }
         }
 
         Ok(())
+    }
+
+    /// Handle a normal (non-overlay) key event. Returns true if should quit.
+    async fn handle_normal_key(&mut self, key: crossterm::event::KeyEvent) -> bool {
+        match (key.code, key.modifiers) {
+            (KeyCode::Esc, _) => {
+                let _ = self.command_sender.send(NetworkCommand::Shutdown).await;
+                return true;
+            }
+            (KeyCode::Enter, _) => {
+                return self.handle_submit().await;
+            }
+            (KeyCode::Char(c), _) => {
+                self.state.input.insert(self.state.cursor_pos, c);
+                self.state.cursor_pos += 1;
+                // Throttled typing indicator broadcast
+                let now = std::time::Instant::now();
+                if now.duration_since(self.last_typing_broadcast)
+                    > std::time::Duration::from_secs(2)
+                {
+                    self.last_typing_broadcast = now;
+                    let typing_msg = format!("TYPING:{}", self.state.nick);
+                    let nick = self.state.nick.clone();
+                    let _ = self
+                        .command_sender
+                        .send(NetworkCommand::Broadcast {
+                            data: typing_msg.into_bytes(),
+                            nick,
+                        })
+                        .await;
+                }
+            }
+            (KeyCode::Backspace, _) => {
+                if self.state.cursor_pos > 0 {
+                    self.state.cursor_pos -= 1;
+                    self.state.input.remove(self.state.cursor_pos);
+                }
+            }
+            (KeyCode::Delete, _) => {
+                if self.state.cursor_pos < self.state.input.len() {
+                    self.state.input.remove(self.state.cursor_pos);
+                }
+            }
+            (KeyCode::Left, _) => {
+                if self.state.cursor_pos > 0 {
+                    self.state.cursor_pos -= 1;
+                }
+            }
+            (KeyCode::Right, _) => {
+                if self.state.cursor_pos < self.state.input.len() {
+                    self.state.cursor_pos += 1;
+                }
+            }
+            (KeyCode::Home, _) => {
+                self.state.cursor_pos = 0;
+            }
+            (KeyCode::End, _) => {
+                self.state.cursor_pos = self.state.input.len();
+            }
+            (KeyCode::Up, _) => {
+                self.state.auto_scroll = false;
+                let max_scroll = self.state.messages.len().saturating_sub(1);
+                if self.state.scroll_offset < max_scroll {
+                    self.state.scroll_offset += 1;
+                }
+            }
+            (KeyCode::Down, _) => {
+                if self.state.scroll_offset > 0 {
+                    self.state.scroll_offset -= 1;
+                }
+                if self.state.scroll_offset == 0 {
+                    self.state.auto_scroll = true;
+                }
+            }
+            (KeyCode::PageUp, _) => {
+                self.state.auto_scroll = false;
+                let max_scroll = self.state.messages.len().saturating_sub(1);
+                self.state.scroll_offset = (self.state.scroll_offset + 10).min(max_scroll);
+            }
+            (KeyCode::PageDown, _) => {
+                self.state.scroll_offset = self.state.scroll_offset.saturating_sub(10);
+                if self.state.scroll_offset == 0 {
+                    self.state.auto_scroll = true;
+                }
+            }
+            _ => {}
+        }
+        false
+    }
+
+    /// Handle an overlay action key (from keyboard shortcut or mouse click)
+    async fn handle_overlay_action_key(&mut self, c: char) {
+        match &self.state.game_overlay.view {
+            game_ui::ActiveGameView::Blackjack => match c {
+                'h' => self.handle_blackjack_command("/bj hit").await,
+                's' => self.handle_blackjack_command("/bj stand").await,
+                'd' if !self.state.game_overlay.entering_bet => {
+                    if self.state.blackjack_game.as_ref().map(|g| &g.phase) == Some(&BlackjackPhase::Betting) {
+                        self.handle_blackjack_command("/bj deal").await;
+                    } else {
+                        self.handle_blackjack_command("/bj double").await;
+                    }
+                }
+                'p' => self.handle_blackjack_command("/bj split").await,
+                'i' => self.handle_blackjack_command("/bj insurance").await,
+                'n' => self.handle_blackjack_command("/bj newround").await,
+                'b' => { /* entering_bet mode activated by handle_game_key */ }
+                _ => {}
+            },
+            game_ui::ActiveGameView::Roulette => match c {
+                ' ' => self.handle_roulette_command("/roulette spin").await,
+                _ => { /* bet entry handled separately */ }
+            },
+            game_ui::ActiveGameView::Slots => match c {
+                ' ' => self.handle_slots_command("/slots spin 10").await,
+                '1' => self.handle_slots_command("/slots spin 10").await,
+                '2' => self.handle_slots_command("/slots spin 25").await,
+                '3' => self.handle_slots_command("/slots spin 50").await,
+                '4' => self.handle_slots_command("/slots spin 100").await,
+                '5' => self.handle_slots_command("/slots spin 500").await,
+                _ => {}
+            },
+            game_ui::ActiveGameView::TicTacToe => match c {
+                '1'..='9' => {
+                    let pos = c.to_string();
+                    self.handle_game_move(&pos).await;
+                }
+                'r' => {
+                    // Rematch
+                    if let Some(ref game) = self.state.active_game {
+                        let room_id = game.room_id.clone();
+                        let mut new_game = game.clone();
+                        new_game.new_round();
+                        self.state.active_game = Some(new_game);
+                        // Broadcast challenge for rematch
+                        let action = GameAction::Challenge {
+                            challenger: self.state.local_peer_id.clone(),
+                            challenger_nick: self.state.nick.clone(),
+                            room_id,
+                        };
+                        let _ = self
+                            .command_sender
+                            .send(NetworkCommand::SendRoomMessage {
+                                room_id: self.state.active_game.as_ref().unwrap().room_id.clone(),
+                                data: action.to_bytes(),
+                            })
+                            .await;
+                    }
+                }
+                _ => {}
+            },
+            game_ui::ActiveGameView::AndarBahar => match c {
+                'd' => self.handle_andarbahar_command("/ab deal").await,
+                _ => { /* bet entry handled separately */ }
+            },
+            game_ui::ActiveGameView::None => {}
+        }
+    }
+
+    /// Handle bet confirmation after entering digits in the overlay
+    async fn handle_overlay_bet_confirm(&mut self) {
+        let amount_str = self.state.game_overlay.bet_input.clone();
+        if amount_str.is_empty() {
+            return;
+        }
+        match &self.state.game_overlay.view {
+            game_ui::ActiveGameView::Blackjack => {
+                let cmd = format!("/bj bet {}", amount_str);
+                self.handle_blackjack_command(&cmd).await;
+            }
+            game_ui::ActiveGameView::Roulette => {
+                // For roulette, bet type was stored when user pressed r/k/o/e/#
+                // Default to red if unclear
+                let cmd = format!("/roulette bet red {}", amount_str);
+                self.handle_roulette_command(&cmd).await;
+            }
+            game_ui::ActiveGameView::AndarBahar => {
+                // Default to andar
+                let cmd = format!("/ab bet andar {}", amount_str);
+                self.handle_andarbahar_command(&cmd).await;
+            }
+            _ => {}
+        }
+        self.state.game_overlay.bet_input.clear();
     }
 
     /// Handle submit (Enter key). Returns true if should quit.
@@ -841,8 +984,9 @@ impl UiApp {
         // Start new game
         if cmd.is_empty() || cmd.trim() == "" {
             if self.state.blackjack_game.is_some() {
-                self.state
-                    .add_system_message("Blackjack game already in progress.");
+                // Show overlay for existing game
+                self.state.game_overlay.view = game_ui::ActiveGameView::Blackjack;
+                self.state.game_overlay.visible = true;
                 return;
             }
             // Use first joined room, or "local" for solo play
@@ -856,6 +1000,8 @@ impl UiApp {
             game.add_player(self.state.local_peer_id.clone(), self.state.nick.clone());
 
             self.state.blackjack_game = Some(game);
+            self.state.game_overlay.view = game_ui::ActiveGameView::Blackjack;
+            self.state.game_overlay.visible = true;
             self.state
                 .add_system_message("🃏 Blackjack started! /bj bet <amount> to place your bet.");
 
@@ -1074,6 +1220,8 @@ impl UiApp {
                 self.state
                     .add_system_message("You are O — use /move <1-9> when it's your turn");
                 self.state.active_game = Some(game);
+                self.state.game_overlay.view = game_ui::ActiveGameView::TicTacToe;
+                self.state.game_overlay.visible = true;
 
                 // Send accept
                 let accept = GameAction::Accept {
@@ -1104,6 +1252,8 @@ impl UiApp {
                         action_room,
                     );
                     self.state.active_game = Some(game);
+                    self.state.game_overlay.view = game_ui::ActiveGameView::TicTacToe;
+                    self.state.game_overlay.visible = true;
                 }
 
                 self.state
@@ -1373,6 +1523,9 @@ impl UiApp {
 
     /// Render the current state
     fn render(&mut self) -> Result<()> {
+        // Temporarily take the overlay out to avoid borrow conflicts in the draw closure
+        let mut overlay = std::mem::replace(&mut self.state.game_overlay, game_ui::GameOverlay::new());
+
         let nick = self.state.nick.clone();
         let peer_id_short = if self.state.local_peer_id.len() > 8 {
             format!("{}…", &self.state.local_peer_id[..8])
@@ -1580,7 +1733,11 @@ impl UiApp {
 
             let rooms = List::new(room_items).block(rooms_block);
             f.render_widget(rooms, right_chunks[1]);
+
+            // ── Game overlay (renders on top of everything) ─────────
+            game_ui::render_game_overlay(f, size, &self.state, &mut overlay);
         })?;
+        self.state.game_overlay = overlay;
         Ok(())
     }
 
@@ -1689,19 +1846,14 @@ impl UiApp {
                 .map(|(id, _)| id.clone())
                 .unwrap_or_else(|| "local".to_string());
             self.state.roulette_game = Some(RouletteEngine::new(room_id));
+            self.state.game_overlay.view = game_ui::ActiveGameView::Roulette;
+            self.state.game_overlay.visible = true;
         }
 
         if cmd.is_empty() {
-            // Show status
-            let lines: Vec<String> = self
-                .state
-                .roulette_game
-                .as_ref()
-                .map(|g| g.render_status())
-                .unwrap_or_default();
-            for l in lines {
-                self.state.add_system_message(&l);
-            }
+            // Show visual overlay instead of text dump
+            self.state.game_overlay.view = game_ui::ActiveGameView::Roulette;
+            self.state.game_overlay.visible = true;
             return;
         }
 
@@ -1905,18 +2057,14 @@ impl UiApp {
                 .map(|(id, _)| id.clone())
                 .unwrap_or_else(|| "local".to_string());
             self.state.andarbahar_game = Some(AndarBaharEngine::new(room_id));
+            self.state.game_overlay.view = game_ui::ActiveGameView::AndarBahar;
+            self.state.game_overlay.visible = true;
         }
 
         if cmd.is_empty() {
-            let lines: Vec<String> = self
-                .state
-                .andarbahar_game
-                .as_ref()
-                .map(|g| g.render_status())
-                .unwrap_or_default();
-            for l in lines {
-                self.state.add_system_message(&l);
-            }
+            // Show visual overlay
+            self.state.game_overlay.view = game_ui::ActiveGameView::AndarBahar;
+            self.state.game_overlay.visible = true;
             return;
         }
 
@@ -2135,6 +2283,8 @@ impl UiApp {
                 .map(|(id, _)| id.clone())
                 .unwrap_or_else(|| "local".to_string());
             self.state.slots_engine = Some(SlotsEngine::new(room_id));
+            self.state.game_overlay.view = game_ui::ActiveGameView::Slots;
+            self.state.game_overlay.visible = true;
         }
 
         if let Some(amount_str) = cmd.strip_prefix("spin ") {
@@ -2346,7 +2496,7 @@ impl Drop for UiApp {
     fn drop(&mut self) {
         self.state.save_message_history();
         let _ = disable_raw_mode();
-        let _ = execute!(self.terminal.backend_mut(), LeaveAlternateScreen);
+        let _ = execute!(self.terminal.backend_mut(), DisableMouseCapture, LeaveAlternateScreen);
         let _ = self.terminal.show_cursor();
     }
 }
