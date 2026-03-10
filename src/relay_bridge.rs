@@ -267,7 +267,7 @@ async fn handle_relay_message(
                     let disc = NetworkEvent::PeerDiscovered(from_peer);
                     let _ = event_broadcast.send(disc.clone());
                     let _ = event_tx.send(disc).await;
-                    let msg = format!("[relay] {} is online", nick_str);
+                    let msg = format!("[relay:{}] is online", nick_str);
                     let chat = NetworkEvent::MessageReceived {
                         from: from_peer,
                         topic: "openwire-general".to_string(),
@@ -309,7 +309,7 @@ async fn handle_relay_message(
             let _ = event_broadcast.send(disc.clone());
             let _ = event_tx.send(disc).await;
             // Also show a named join message in the chat
-            let msg = format!("[relay] {} joined", nick);
+            let msg = format!("[relay:{}] joined", nick);
             let chat = NetworkEvent::MessageReceived {
                 from: from_peer,
                 topic: "openwire-general".to_string(),

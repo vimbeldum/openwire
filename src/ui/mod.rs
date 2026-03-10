@@ -1635,41 +1635,56 @@ impl UiApp {
                 }
 
                 // Extract relay nick from [relay:Nick] prefix for display
-                let (sender, inner_content) = if content.starts_with("[relay:") {
+                let (relay_nick, inner_content) = if content.starts_with("[relay:") {
                     if let Some(bracket_end) = content.find("] ") {
                         let nick = &content[7..bracket_end]; // skip "[relay:"
                         let rest = &content[bracket_end + 2..];
-                        (nick.to_string(), rest.to_string())
+                        (Some(nick.to_string()), rest.to_string())
                     } else {
-                        (short.clone(), content.clone())
+                        (None, content.clone())
                     }
                 } else {
-                    (short.clone(), content.clone())
+                    (None, content.clone())
                 };
 
                 // Handle incoming whisper
-                let display_content = if inner_content.starts_with("[whisper from ") || content.starts_with("[whisper from ") {
-                    format!("[PM] {}", content)
-                } else {
-                    // Try to parse JSON agent/custom messages from web clients
-                    match Self::try_parse_web_json(&content) {
-                        Some(Some(display)) => display,
-                        Some(None) => return, // Internal protocol message — suppress entirely
-                        None => {
-                            // Check for @mention of our nick
-                            let mention_marker = if inner_content
-                                .to_lowercase()
-                                .contains(&format!("@{}", self.state.nick.to_lowercase()))
-                            {
-                                "[@] "
-                            } else {
-                                ""
-                            };
-                            format!("{}{}", mention_marker, inner_content)
+                if inner_content.starts_with("[whisper from ") || content.starts_with("[whisper from ") {
+                    let sender = relay_nick.as_deref().unwrap_or(&short);
+                    self.state.add_chat_message(sender, &format!("[PM] {}", content));
+                    return;
+                }
+
+                // Try to parse JSON agent/custom messages from web clients
+                match Self::try_parse_web_json(&content) {
+                    Some(Some(display)) => {
+                        // For AI messages like "[AI:😅 Jethalal] text", extract the AI nick as sender
+                        if display.starts_with("[AI:") {
+                            if let Some(bracket_end) = display.find("] ") {
+                                let ai_nick = &display[4..bracket_end];
+                                let ai_text = &display[bracket_end + 2..];
+                                self.state.add_chat_message(ai_nick, ai_text);
+                                return;
+                            }
                         }
+                        // For [@mention] or [ticker] etc, use relay nick or peer ID
+                        let sender = relay_nick.as_deref().unwrap_or(&short);
+                        self.state.add_chat_message(sender, &display);
                     }
-                };
-                self.state.add_chat_message(&sender, &display_content);
+                    Some(None) => return, // Internal protocol message — suppress entirely
+                    None => {
+                        // Check for @mention of our nick
+                        let mention_marker = if inner_content
+                            .to_lowercase()
+                            .contains(&format!("@{}", self.state.nick.to_lowercase()))
+                        {
+                            "[@] "
+                        } else {
+                            ""
+                        };
+                        let sender = relay_nick.as_deref().unwrap_or(&short);
+                        self.state.add_chat_message(sender, &format!("{}{}", mention_marker, inner_content));
+                    }
+                }
             }
             NetworkEvent::FileReceived { from, filename, .. } => {
                 let short = Self::short_id(&from.to_string(), 8);
