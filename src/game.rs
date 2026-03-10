@@ -5,7 +5,9 @@
 
 #![allow(dead_code)]
 
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Tic-Tac-Toe cell state
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -968,5 +970,876 @@ impl Blackjack {
 
         lines.push("══════════════════════════════════════════".to_string());
         lines
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ROULETTE ENGINE
+// Wire prefix: RL:
+// European roulette 0-36, single zero.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Red numbers in European roulette
+pub const ROULETTE_RED: &[u8] = &[
+    1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36,
+];
+
+pub fn roulette_is_red(n: u8) -> bool {
+    ROULETTE_RED.contains(&n)
+}
+
+pub fn roulette_is_black(n: u8) -> bool {
+    n > 0 && !roulette_is_red(n)
+}
+
+/// Roulette game phase
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum RoulettePhase {
+    Betting,
+    Spinning,
+    Ended,
+}
+
+/// A single roulette bet — player + bet type + wager
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RouletteBet {
+    pub peer_id: String,
+    pub nick: String,
+    pub bet_type: RouletteBetType,
+    pub amount: u32,
+}
+
+/// All supported roulette bet types
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum RouletteBetType {
+    Straight(u8), // single number 0-36, pays 35:1
+    Red,
+    Black,
+    Odd,
+    Even,
+    Low,        // 1-18
+    High,       // 19-36
+    Dozen(u8),  // 1-3
+    Column(u8), // 1-3
+}
+
+impl RouletteBetType {
+    /// Returns the payout multiplier (total returned including stake) or 0 for a loss.
+    pub fn payout_multiplier(&self, result: u8) -> u32 {
+        match self {
+            RouletteBetType::Straight(n) => {
+                if *n == result {
+                    36
+                } else {
+                    0
+                }
+            }
+            RouletteBetType::Red => {
+                if roulette_is_red(result) {
+                    2
+                } else {
+                    0
+                }
+            }
+            RouletteBetType::Black => {
+                if roulette_is_black(result) {
+                    2
+                } else {
+                    0
+                }
+            }
+            RouletteBetType::Odd => {
+                if result > 0 && result % 2 != 0 {
+                    2
+                } else {
+                    0
+                }
+            }
+            RouletteBetType::Even => {
+                if result > 0 && result % 2 == 0 {
+                    2
+                } else {
+                    0
+                }
+            }
+            RouletteBetType::Low => {
+                if result >= 1 && result <= 18 {
+                    2
+                } else {
+                    0
+                }
+            }
+            RouletteBetType::High => {
+                if result >= 19 && result <= 36 {
+                    2
+                } else {
+                    0
+                }
+            }
+            RouletteBetType::Dozen(d) => {
+                if result == 0 {
+                    return 0;
+                }
+                let hits = match d {
+                    1 => (1..=12).contains(&result),
+                    2 => (13..=24).contains(&result),
+                    3 => (25..=36).contains(&result),
+                    _ => false,
+                };
+                if hits { 3 } else { 0 }
+            }
+            RouletteBetType::Column(c) => {
+                if result == 0 {
+                    return 0;
+                }
+                let hits = match c {
+                    1 => result % 3 == 1,
+                    2 => result % 3 == 2,
+                    3 => result % 3 == 0,
+                    _ => false,
+                };
+                if hits { 3 } else { 0 }
+            }
+        }
+    }
+}
+
+/// Roulette network action (prefix RL:)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RouletteAction {
+    Bet { bet: RouletteBet },
+    Spin,
+    State { state_json: String },
+}
+
+impl RouletteAction {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut data = b"RL:".to_vec();
+        data.extend_from_slice(&serde_json::to_vec(self).unwrap_or_default());
+        data
+    }
+
+    pub fn from_bytes(data: &[u8]) -> Option<Self> {
+        let s = std::str::from_utf8(data).ok()?;
+        let json = s.strip_prefix("RL:")?;
+        serde_json::from_str(json).ok()
+    }
+
+    pub fn is_roulette_message(data: &[u8]) -> bool {
+        data.starts_with(b"RL:")
+    }
+}
+
+/// Roulette game state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RouletteEngine {
+    pub room_id: String,
+    pub phase: RoulettePhase,
+    pub bets: Vec<RouletteBet>,
+    pub result: Option<u8>,
+    pub timestamp: u64,
+}
+
+impl RouletteEngine {
+    pub fn new(room_id: String) -> Self {
+        Self {
+            room_id,
+            phase: RoulettePhase::Betting,
+            bets: Vec::new(),
+            result: None,
+            timestamp: Self::now_secs(),
+        }
+    }
+
+    fn now_secs() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+    }
+
+    /// Place or replace a bet for a player+type combination
+    pub fn place_bet(&mut self, bet: RouletteBet) {
+        // Remove existing bet of the same type from the same player
+        self.bets
+            .retain(|b| !(b.peer_id == bet.peer_id && b.bet_type == bet.bet_type));
+        if self.bets.len() < 200 {
+            self.bets.push(bet);
+        }
+    }
+
+    /// Spin: generate a result 0-36 and compute net payouts per player
+    pub fn spin(&mut self) -> HashMap<String, i64> {
+        let result = rand::rng().random::<u8>() % 37;
+        self.result = Some(result);
+        self.phase = RoulettePhase::Spinning;
+        self.timestamp = Self::now_secs();
+        self.calculate_payouts(result)
+    }
+
+    /// Calculate net payouts for a given result
+    pub fn calculate_payouts(&self, result: u8) -> HashMap<String, i64> {
+        let mut payouts: HashMap<String, i64> = HashMap::new();
+        for bet in &self.bets {
+            let multiplier = bet.bet_type.payout_multiplier(result);
+            let net = if multiplier > 0 {
+                (bet.amount as i64) * (multiplier as i64 - 1)
+            } else {
+                -(bet.amount as i64)
+            };
+            *payouts.entry(bet.peer_id.clone()).or_insert(0) += net;
+        }
+        payouts
+    }
+
+    pub fn end_round(&mut self) {
+        self.phase = RoulettePhase::Ended;
+    }
+
+    pub fn new_round(&mut self) {
+        self.bets.clear();
+        self.result = None;
+        self.phase = RoulettePhase::Betting;
+        self.timestamp = Self::now_secs();
+    }
+
+    /// Render a summary of the current state
+    pub fn render_status(&self) -> Vec<String> {
+        let mut lines = vec!["══════════════ ROULETTE ══════════════".to_string()];
+        match &self.phase {
+            RoulettePhase::Betting => {
+                lines.push(format!(
+                    "Phase: BETTING  |  Bets placed: {}",
+                    self.bets.len()
+                ));
+                lines.push("  /roulette bet <type> <amount>".to_string());
+                lines.push("  Types: red, black, odd, even, low, high".to_string());
+                lines.push("         straight <0-36>, dozen <1-3>, column <1-3>".to_string());
+                lines.push("  /roulette spin  — spin the wheel".to_string());
+            }
+            RoulettePhase::Spinning => {
+                if let Some(n) = self.result {
+                    let color = if n == 0 {
+                        "green"
+                    } else if roulette_is_red(n) {
+                        "red"
+                    } else {
+                        "black"
+                    };
+                    lines.push(format!("RESULT: {} ({})", n, color));
+                }
+            }
+            RoulettePhase::Ended => {
+                if let Some(n) = self.result {
+                    let color = if n == 0 {
+                        "green"
+                    } else if roulette_is_red(n) {
+                        "red"
+                    } else {
+                        "black"
+                    };
+                    lines.push(format!("ENDED — result was: {} ({})", n, color));
+                }
+                lines.push("  /roulette spin  — new round".to_string());
+            }
+        }
+        lines.push("══════════════════════════════════════".to_string());
+        lines
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ANDAR BAHAR ENGINE
+// Wire prefix: AB:
+// Classic Indian card game.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Andar Bahar phase
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum AndarBaharPhase {
+    Betting,
+    Dealing,
+    Ended,
+}
+
+/// Which side won
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum AndarBaharSide {
+    Andar,
+    Bahar,
+}
+
+impl std::fmt::Display for AndarBaharSide {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AndarBaharSide::Andar => write!(f, "Andar"),
+            AndarBaharSide::Bahar => write!(f, "Bahar"),
+        }
+    }
+}
+
+/// A single Andar Bahar bet
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AndarBaharBet {
+    pub peer_id: String,
+    pub nick: String,
+    pub side: AndarBaharSide,
+    pub amount: u32,
+}
+
+/// Andar Bahar network action
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AndarBaharAction {
+    Bet { bet: AndarBaharBet },
+    Deal,
+    State { state_json: String },
+}
+
+impl AndarBaharAction {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut data = b"AB:".to_vec();
+        data.extend_from_slice(&serde_json::to_vec(self).unwrap_or_default());
+        data
+    }
+
+    pub fn from_bytes(data: &[u8]) -> Option<Self> {
+        let s = std::str::from_utf8(data).ok()?;
+        let json = s.strip_prefix("AB:")?;
+        serde_json::from_str(json).ok()
+    }
+
+    pub fn is_andarbahar_message(data: &[u8]) -> bool {
+        data.starts_with(b"AB:")
+    }
+}
+
+/// Andar Bahar game state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AndarBaharEngine {
+    pub room_id: String,
+    pub phase: AndarBaharPhase,
+    pub joker: Option<Card>,
+    pub andar: Vec<Card>,
+    pub bahar: Vec<Card>,
+    pub bets: Vec<AndarBaharBet>,
+    pub result: Option<AndarBaharSide>,
+    pub deck: Vec<Card>,
+    /// Which side received the first dealt card (Bahar by tradition)
+    pub trump_first: Option<AndarBaharSide>,
+}
+
+impl AndarBaharEngine {
+    pub fn new(room_id: String) -> Self {
+        Self {
+            room_id,
+            phase: AndarBaharPhase::Betting,
+            joker: None,
+            andar: Vec::new(),
+            bahar: Vec::new(),
+            bets: Vec::new(),
+            result: None,
+            deck: Self::make_deck(),
+            trump_first: None,
+        }
+    }
+
+    fn make_deck() -> Vec<Card> {
+        let mut deck = Vec::new();
+        for &suit in SUITS {
+            for &value in VALUES {
+                deck.push(Card::new(suit, value));
+            }
+        }
+        use rand::seq::SliceRandom;
+        deck.shuffle(&mut rand::rng());
+        deck
+    }
+
+    /// Place or replace a side bet for a player
+    pub fn place_bet(&mut self, bet: AndarBaharBet) {
+        self.bets
+            .retain(|b| !(b.peer_id == bet.peer_id && b.side == bet.side));
+        if self.bets.len() < 200 {
+            self.bets.push(bet);
+        }
+    }
+
+    /// Deal the joker (trump) card — transitions to Dealing phase
+    pub fn deal_joker(&mut self) {
+        if self.phase != AndarBaharPhase::Betting {
+            return;
+        }
+        if let Some(card) = self.deck.pop() {
+            self.joker = Some(card);
+            self.phase = AndarBaharPhase::Dealing;
+        }
+    }
+
+    /// Deal one card, alternating Bahar then Andar.
+    /// Returns true if the game ended.
+    pub fn deal_next(&mut self) -> bool {
+        if self.phase != AndarBaharPhase::Dealing {
+            return false;
+        }
+        let joker_value = match &self.joker {
+            Some(j) => j.value.clone(),
+            None => return false,
+        };
+
+        let card = match self.deck.pop() {
+            Some(c) => c,
+            None => {
+                self.phase = AndarBaharPhase::Ended;
+                return true;
+            }
+        };
+
+        // Bahar receives the first card (deal_count starts at 0)
+        let total_dealt = self.andar.len() + self.bahar.len();
+        let side = if total_dealt % 2 == 0 {
+            AndarBaharSide::Bahar
+        } else {
+            AndarBaharSide::Andar
+        };
+
+        // Record which side got the first card
+        if self.trump_first.is_none() {
+            self.trump_first = Some(side.clone());
+        }
+
+        let is_match = card.value == joker_value;
+        match &side {
+            AndarBaharSide::Andar => self.andar.push(card),
+            AndarBaharSide::Bahar => self.bahar.push(card),
+        }
+
+        if is_match {
+            self.result = Some(side);
+            self.phase = AndarBaharPhase::Ended;
+            return true;
+        }
+
+        false
+    }
+
+    /// Deal all remaining cards until a match is found
+    pub fn deal_all(&mut self) {
+        self.deal_joker();
+        while self.phase == AndarBaharPhase::Dealing {
+            if self.deal_next() {
+                break;
+            }
+        }
+    }
+
+    /// Calculate net payouts for all bets
+    pub fn calculate_payouts(&self) -> HashMap<String, i64> {
+        let mut payouts: HashMap<String, i64> = HashMap::new();
+        let winning_side = match &self.result {
+            Some(s) => s,
+            None => return payouts,
+        };
+        let trump_first_is_bahar = matches!(&self.trump_first, Some(AndarBaharSide::Bahar));
+
+        for bet in &self.bets {
+            let net: i64 = if bet.side == *winning_side {
+                // Andar pays 0.9:1 when trump appeared first on Bahar side (standard rule)
+                let multiplier =
+                    if matches!(winning_side, AndarBaharSide::Andar) && trump_first_is_bahar {
+                        0.9_f64
+                    } else {
+                        1.0_f64
+                    };
+                (bet.amount as f64 * multiplier) as i64
+            } else {
+                -(bet.amount as i64)
+            };
+            *payouts.entry(bet.peer_id.clone()).or_insert(0) += net;
+        }
+        payouts
+    }
+
+    pub fn new_round(&mut self) {
+        // Reuse deck if enough cards remain
+        if self.deck.len() < 10 {
+            self.deck = Self::make_deck();
+        }
+        self.joker = None;
+        self.andar.clear();
+        self.bahar.clear();
+        self.bets.clear();
+        self.result = None;
+        self.trump_first = None;
+        self.phase = AndarBaharPhase::Betting;
+    }
+
+    pub fn render_status(&self) -> Vec<String> {
+        let mut lines = vec!["══════════════ ANDAR BAHAR ═══════════════".to_string()];
+        if let Some(j) = &self.joker {
+            lines.push(format!("Joker: {}", j.symbol()));
+        }
+        lines.push(format!(
+            "Andar: {}  |  Bahar: {}",
+            self.andar
+                .iter()
+                .map(|c| c.symbol())
+                .collect::<Vec<_>>()
+                .join(" "),
+            self.bahar
+                .iter()
+                .map(|c| c.symbol())
+                .collect::<Vec<_>>()
+                .join(" "),
+        ));
+        match &self.phase {
+            AndarBaharPhase::Betting => {
+                lines.push(format!("Phase: BETTING  |  Bets: {}", self.bets.len()));
+                lines.push("  /ab andar <amount>  — bet on Andar".to_string());
+                lines.push("  /ab bahar <amount>  — bet on Bahar".to_string());
+                lines.push("  /ab deal            — deal cards (host)".to_string());
+            }
+            AndarBaharPhase::Dealing => {
+                lines.push(format!(
+                    "Phase: DEALING  |  Cards dealt: {}",
+                    self.andar.len() + self.bahar.len()
+                ));
+            }
+            AndarBaharPhase::Ended => {
+                if let Some(winner) = &self.result {
+                    lines.push(format!("RESULT: {} wins!", winner));
+                }
+                lines.push(format!(
+                    "Total cards dealt: {}",
+                    self.andar.len() + self.bahar.len()
+                ));
+                lines.push("  /ab deal  — new round".to_string());
+            }
+        }
+        lines.push("══════════════════════════════════════════".to_string());
+        lines
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SLOTS ENGINE
+// Wire prefix: SL:
+// 3-reel weighted slot machine.
+// Weights: Cherry 30, Lemon 25, Orange 20, Plum 12, Bell 8, Bar 3, Seven 1.5, Diamond 0.5
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Slot machine symbols
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum SlotSymbol {
+    Cherry,
+    Lemon,
+    Orange,
+    Plum,
+    Bell,
+    Bar,
+    Seven,
+    Diamond,
+}
+
+impl SlotSymbol {
+    pub fn display(&self) -> &'static str {
+        match self {
+            SlotSymbol::Cherry => "Cherry",
+            SlotSymbol::Lemon => "Lemon",
+            SlotSymbol::Orange => "Orange",
+            SlotSymbol::Plum => "Plum",
+            SlotSymbol::Bell => "Bell",
+            SlotSymbol::Bar => "Bar",
+            SlotSymbol::Seven => "Seven",
+            SlotSymbol::Diamond => "Diamond",
+        }
+    }
+
+    pub fn icon(&self) -> &'static str {
+        match self {
+            SlotSymbol::Cherry => "[CHR]",
+            SlotSymbol::Lemon => "[LEM]",
+            SlotSymbol::Orange => "[ORG]",
+            SlotSymbol::Plum => "[PLM]",
+            SlotSymbol::Bell => "[BEL]",
+            SlotSymbol::Bar => "[BAR]",
+            SlotSymbol::Seven => "[ 7 ]",
+            SlotSymbol::Diamond => "[DIA]",
+        }
+    }
+
+    /// Weighted random spin. Weights sum to 1000 to allow half-percent precision.
+    pub fn spin() -> Self {
+        // Weights × 10 for integer precision: 300, 250, 200, 120, 80, 30, 15, 5 → total 1000
+        let r = rand::rng().random::<u32>() % 1000;
+        if r < 300 {
+            SlotSymbol::Cherry
+        } else if r < 550 {
+            SlotSymbol::Lemon
+        } else if r < 750 {
+            SlotSymbol::Orange
+        } else if r < 870 {
+            SlotSymbol::Plum
+        } else if r < 950 {
+            SlotSymbol::Bell
+        } else if r < 980 {
+            SlotSymbol::Bar
+        } else if r < 995 {
+            SlotSymbol::Seven
+        } else {
+            SlotSymbol::Diamond
+        }
+    }
+
+    /// Payout multiplier for three matching reels (total return including stake).
+    pub fn triple_multiplier(&self) -> u32 {
+        match self {
+            SlotSymbol::Cherry => 2,
+            SlotSymbol::Lemon => 3,
+            SlotSymbol::Orange => 4,
+            SlotSymbol::Plum => 5,
+            SlotSymbol::Bell => 10,
+            SlotSymbol::Bar => 20,
+            SlotSymbol::Seven => 50,
+            SlotSymbol::Diamond => 100,
+        }
+    }
+}
+
+/// Slots network action
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SlotsAction {
+    Spin {
+        peer_id: String,
+        nick: String,
+        amount: u32,
+    },
+    Result {
+        reels: [SlotSymbol; 3],
+        payout: i64,
+    },
+}
+
+impl SlotsAction {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut data = b"SL:".to_vec();
+        data.extend_from_slice(&serde_json::to_vec(self).unwrap_or_default());
+        data
+    }
+
+    pub fn from_bytes(data: &[u8]) -> Option<Self> {
+        let s = std::str::from_utf8(data).ok()?;
+        let json = s.strip_prefix("SL:")?;
+        serde_json::from_str(json).ok()
+    }
+
+    pub fn is_slots_message(data: &[u8]) -> bool {
+        data.starts_with(b"SL:")
+    }
+}
+
+/// Slots game state (per-player, single-player machine)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlotsEngine {
+    pub room_id: String,
+    pub reels: [SlotSymbol; 3],
+    pub last_bet: u32,
+    pub last_payout: i64,
+}
+
+impl SlotsEngine {
+    pub fn new(room_id: String) -> Self {
+        Self {
+            room_id,
+            reels: [SlotSymbol::Cherry, SlotSymbol::Cherry, SlotSymbol::Cherry],
+            last_bet: 0,
+            last_payout: 0,
+        }
+    }
+
+    /// Spin the reels with a given bet and return the net payout.
+    pub fn spin(&mut self, bet: u32) -> i64 {
+        self.last_bet = bet;
+        self.reels = [SlotSymbol::spin(), SlotSymbol::spin(), SlotSymbol::spin()];
+        let payout = Self::calculate_payout(&self.reels, bet);
+        self.last_payout = payout;
+        payout
+    }
+
+    /// Calculate net payout for a reel combination.
+    /// Returns positive for wins, negative for losses.
+    pub fn calculate_payout(reels: &[SlotSymbol; 3], bet: u32) -> i64 {
+        if reels[0] == reels[1] && reels[1] == reels[2] {
+            // Triple match
+            let multiplier = reels[0].triple_multiplier();
+            (bet as i64) * (multiplier as i64 - 1)
+        } else if reels[0] == SlotSymbol::Cherry && reels[1] == SlotSymbol::Cherry {
+            // Two cherries (any third symbol) — 2x stake back (net +1x)
+            bet as i64
+        } else {
+            -(bet as i64)
+        }
+    }
+
+    pub fn render_result(&self) -> Vec<String> {
+        let reels_str = format!(
+            "{} {} {}",
+            self.reels[0].icon(),
+            self.reels[1].icon(),
+            self.reels[2].icon()
+        );
+        let outcome = if self.last_payout > 0 {
+            format!("WIN! +{}", self.last_payout)
+        } else if self.last_payout == 0 {
+            "PUSH".to_string()
+        } else {
+            format!("LOSE  {}", self.last_payout)
+        };
+        vec![
+            "══════════ SLOTS ══════════".to_string(),
+            format!("  {}", reels_str),
+            format!("  Bet: {}  |  {}", self.last_bet, outcome),
+            "  /slots spin <amount>".to_string(),
+            "══════════════════════════".to_string(),
+        ]
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VIRTUAL WALLET
+// Persists to ~/.openwire/wallet.json
+// Daily refresh of 1000 chips at UTC midnight.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Chip wallet for casino games
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Wallet {
+    pub balance: u32,
+    /// Unix day (seconds / 86400) of last refresh
+    pub daily_refresh: u64,
+}
+
+impl Wallet {
+    pub const DAILY_CHIPS: u32 = 1000;
+
+    fn wallet_path() -> std::path::PathBuf {
+        let home = dirs_next::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+        home.join(".openwire").join("wallet.json")
+    }
+
+    pub fn load() -> Self {
+        let path = Self::wallet_path();
+        if let Ok(data) = std::fs::read_to_string(&path) {
+            if let Ok(w) = serde_json::from_str::<Wallet>(&data) {
+                return w;
+            }
+        }
+        // First run: grant starting chips
+        let w = Wallet {
+            balance: Self::DAILY_CHIPS,
+            daily_refresh: Self::today_day(),
+        };
+        w.save();
+        w
+    }
+
+    pub fn save(&self) {
+        let path = Self::wallet_path();
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(json) = serde_json::to_string_pretty(self) {
+            let _ = std::fs::write(&path, json);
+        }
+    }
+
+    fn today_day() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            / 86400
+    }
+
+    pub fn refresh_if_needed(&mut self) {
+        let today = Self::today_day();
+        if today > self.daily_refresh {
+            self.balance += Self::DAILY_CHIPS;
+            self.daily_refresh = today;
+            self.save();
+        }
+    }
+
+    pub fn debit(&mut self, amount: u32) -> Result<(), &'static str> {
+        if amount == 0 {
+            return Err("Bet must be greater than zero");
+        }
+        if self.balance < amount {
+            return Err("Insufficient chips");
+        }
+        self.balance -= amount;
+        self.save();
+        Ok(())
+    }
+
+    pub fn credit(&mut self, amount: u32) {
+        self.balance = self.balance.saturating_add(amount);
+        self.save();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CASINO STATE — LWW CRDT
+// Wire prefix: CS:
+// Tracks house P&L per game type.
+// Merge rule: higher timestamp wins per key.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// House P&L tracker using LWW (last-write-wins) CRDT semantics
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CasinoState {
+    /// game_type -> net P&L (positive = house profit)
+    pub house_pnl: HashMap<String, i64>,
+    pub last_updated: u64,
+}
+
+impl CasinoState {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a payout event. Positive net = player won (house lost).
+    pub fn record_payout(&mut self, game_type: &str, player_net: i64) {
+        *self.house_pnl.entry(game_type.to_string()).or_insert(0) -= player_net;
+        self.last_updated = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+    }
+
+    /// Serialize for wire transmission
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut data = b"CS:".to_vec();
+        data.extend_from_slice(&serde_json::to_vec(self).unwrap_or_default());
+        data
+    }
+
+    pub fn from_bytes(data: &[u8]) -> Option<Self> {
+        let s = std::str::from_utf8(data).ok()?;
+        let json = s.strip_prefix("CS:")?;
+        serde_json::from_str(json).ok()
+    }
+
+    pub fn is_casino_state_message(data: &[u8]) -> bool {
+        data.starts_with(b"CS:")
+    }
+
+    /// LWW merge: for each key, keep whichever state has the higher timestamp.
+    pub fn merge(&mut self, other: &CasinoState) {
+        if other.last_updated > self.last_updated {
+            for (game, pnl) in &other.house_pnl {
+                self.house_pnl.insert(game.clone(), *pnl);
+            }
+            self.last_updated = other.last_updated;
+        }
     }
 }

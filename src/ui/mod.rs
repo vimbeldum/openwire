@@ -23,7 +23,11 @@ use ratatui::{
 use std::io;
 use tokio::sync::mpsc;
 
-use crate::game::{Blackjack, BlackjackAction, GameAction, TicTacToe};
+use crate::game::{
+    AndarBaharAction, AndarBaharBet, AndarBaharEngine, AndarBaharSide, Blackjack, BlackjackAction,
+    CasinoState, GameAction, RouletteAction, RouletteBet, RouletteBetType, RouletteEngine,
+    SlotsEngine, TicTacToe, Wallet,
+};
 use crate::network::{NetworkCommand, NetworkEvent};
 
 /// A chat message for display
@@ -63,6 +67,16 @@ pub struct UiState {
     pub active_game: Option<TicTacToe>,
     /// Active blackjack game
     pub blackjack_game: Option<Blackjack>,
+    /// Active roulette game
+    pub roulette_game: Option<RouletteEngine>,
+    /// Active Andar Bahar game
+    pub andarbahar_game: Option<AndarBaharEngine>,
+    /// Active slots engine
+    pub slots_engine: Option<SlotsEngine>,
+    /// Player chip wallet
+    pub wallet: Wallet,
+    /// Casino house P&L tracker
+    pub casino_state: CasinoState,
 }
 
 impl UiState {
@@ -80,6 +94,11 @@ impl UiState {
             auto_scroll: true,
             active_game: None,
             blackjack_game: None,
+            roulette_game: None,
+            andarbahar_game: None,
+            slots_engine: None,
+            wallet: Wallet::load(),
+            casino_state: CasinoState::new(),
         };
         state.add_system_message("Welcome to OpenWire! End-to-end encrypted P2P messenger.");
         state.add_system_message("Peers on the same LAN are discovered automatically via mDNS.");
@@ -357,6 +376,30 @@ impl UiApp {
             self.state
                 .add_system_message("  /bj newround                - Start new round");
             self.state.add_system_message("");
+            self.state.add_system_message("ROULETTE:");
+            self.state
+                .add_system_message("  /roulette                   - Show roulette table");
+            self.state
+                .add_system_message("  /roulette bet <type> <amt>  - Place bet");
+            self.state
+                .add_system_message("  /roulette spin              - Spin the wheel");
+            self.state.add_system_message("");
+            self.state.add_system_message("ANDAR BAHAR:");
+            self.state
+                .add_system_message("  /ab andar <amount>          - Bet on Andar");
+            self.state
+                .add_system_message("  /ab bahar <amount>          - Bet on Bahar");
+            self.state
+                .add_system_message("  /ab deal                    - Deal cards");
+            self.state.add_system_message("");
+            self.state.add_system_message("SLOTS:");
+            self.state
+                .add_system_message("  /slots spin <amount>        - Spin the reels");
+            self.state.add_system_message("");
+            self.state.add_system_message("WALLET:");
+            self.state
+                .add_system_message("  /wallet  or  /chips         - Show chip balance");
+            self.state.add_system_message("");
             self.state.add_system_message("MESSAGE SCROLLING:");
             self.state
                 .add_system_message("  Up / Down        - Scroll one line");
@@ -413,6 +456,18 @@ impl UiApp {
             false
         } else if input == "/blackjack" || input.starts_with("/bj ") {
             self.handle_blackjack_command(input.trim()).await;
+            false
+        } else if input == "/roulette" || input.starts_with("/roulette ") {
+            self.handle_roulette_command(input.trim()).await;
+            false
+        } else if input == "/ab" || input.starts_with("/ab ") {
+            self.handle_andarbahar_command(input.trim()).await;
+            false
+        } else if input == "/slots" || input.starts_with("/slots ") {
+            self.handle_slots_command(input.trim()).await;
+            false
+        } else if input == "/wallet" || input == "/chips" {
+            self.handle_wallet_command().await;
             false
         } else {
             // Regular chat message
@@ -1069,6 +1124,18 @@ impl UiApp {
                     if let Some(action) = GameAction::from_bytes(&content) {
                         self.handle_incoming_game_action(&room_id, &sender_nick, action);
                     }
+                } else if BlackjackAction::is_blackjack_message(&content) {
+                    if let Some(action) = BlackjackAction::from_bytes(&content) {
+                        self.handle_incoming_blackjack_action(&room_id, action);
+                    }
+                } else if RouletteAction::is_roulette_message(&content) {
+                    if let Some(action) = RouletteAction::from_bytes(&content) {
+                        self.handle_incoming_roulette_action(&room_id, action);
+                    }
+                } else if AndarBaharAction::is_andarbahar_message(&content) {
+                    if let Some(action) = AndarBaharAction::from_bytes(&content) {
+                        self.handle_incoming_andarbahar_action(&room_id, action);
+                    }
                 } else {
                     let content_str = String::from_utf8_lossy(&content).to_string();
                     self.state
@@ -1342,6 +1409,555 @@ impl UiApp {
             f.render_widget(rooms, right_chunks[1]);
         })?;
         Ok(())
+    }
+
+    // ─── Blackjack incoming (Bug 1 fix) ──────────────────────────────────────
+
+    fn handle_incoming_blackjack_action(&mut self, _room_id: &str, action: BlackjackAction) {
+        match action {
+            BlackjackAction::State { state_json } => {
+                if let Ok(game) = serde_json::from_str::<Blackjack>(&state_json) {
+                    // Only update if we are a participant (already have a local game)
+                    if self.state.blackjack_game.is_some() {
+                        self.state.blackjack_game = Some(game);
+                        self.render_blackjack();
+                    }
+                }
+            }
+            BlackjackAction::Start {
+                room_id,
+                host,
+                host_nick,
+            } => {
+                if self.state.blackjack_game.is_none() {
+                    let mut game = Blackjack::new(room_id);
+                    game.add_player(host, host_nick);
+                    game.add_player(self.state.local_peer_id.clone(), self.state.nick.clone());
+                    self.state.blackjack_game = Some(game);
+                    self.state
+                        .add_system_message("Blackjack game started by host! /bj bet <amount>");
+                }
+            }
+            BlackjackAction::Join { peer_id, nick } => {
+                if let Some(ref mut game) = self.state.blackjack_game {
+                    game.add_player(peer_id, nick);
+                }
+            }
+            BlackjackAction::Bet { peer_id, amount } => {
+                if let Some(ref mut game) = self.state.blackjack_game {
+                    game.place_bet(&peer_id, amount);
+                }
+            }
+            BlackjackAction::Hit { peer_id } => {
+                if let Some(ref mut game) = self.state.blackjack_game {
+                    game.hit(&peer_id);
+                    self.render_blackjack();
+                }
+            }
+            BlackjackAction::Stand { peer_id } => {
+                if let Some(ref mut game) = self.state.blackjack_game {
+                    game.stand(&peer_id);
+                    self.render_blackjack();
+                }
+            }
+            BlackjackAction::Deal => {
+                if let Some(ref mut game) = self.state.blackjack_game {
+                    game.deal_initial_cards();
+                    self.render_blackjack();
+                }
+            }
+            BlackjackAction::DealerPlay => {
+                if let Some(ref mut game) = self.state.blackjack_game {
+                    game.run_dealer_turn();
+                    self.render_blackjack();
+                }
+            }
+            BlackjackAction::NewRound => {
+                if let Some(ref mut game) = self.state.blackjack_game {
+                    game.new_round();
+                }
+                self.state
+                    .add_system_message("New blackjack round! /bj bet <amount>");
+            }
+        }
+    }
+
+    // ─── Roulette command handler ─────────────────────────────────────────────
+
+    async fn handle_roulette_command(&mut self, cmd: &str) {
+        let cmd = cmd.strip_prefix("/roulette").unwrap_or(cmd).trim();
+
+        // Ensure a game exists
+        if self.state.roulette_game.is_none() {
+            if self.state.rooms.is_empty() {
+                self.state
+                    .add_system_message("Join a room first: /room create <name>");
+                return;
+            }
+            let room_id = self.state.rooms[0].0.clone();
+            self.state.roulette_game = Some(RouletteEngine::new(room_id));
+        }
+
+        if cmd.is_empty() {
+            // Show status
+            let lines: Vec<String> = self
+                .state
+                .roulette_game
+                .as_ref()
+                .map(|g| g.render_status())
+                .unwrap_or_default();
+            for l in lines {
+                self.state.add_system_message(&l);
+            }
+            return;
+        }
+
+        if let Some(rest) = cmd.strip_prefix("bet ") {
+            // /roulette bet <type> <amount>
+            let parts: Vec<&str> = rest.trim().splitn(3, ' ').collect();
+            if parts.len() < 2 {
+                self.state
+                    .add_system_message("Usage: /roulette bet <type> <amount>");
+                self.state.add_system_message(
+                    "Types: red, black, odd, even, low, high, straight <n>, dozen <1-3>, column <1-3>",
+                );
+                return;
+            }
+
+            let amount: u32 = match parts.last().unwrap().parse() {
+                Ok(a) if a > 0 => a,
+                _ => {
+                    self.state
+                        .add_system_message("Bet amount must be a positive integer.");
+                    return;
+                }
+            };
+
+            let bet_type = match parts[0] {
+                "red" => Some(RouletteBetType::Red),
+                "black" => Some(RouletteBetType::Black),
+                "odd" => Some(RouletteBetType::Odd),
+                "even" => Some(RouletteBetType::Even),
+                "low" => Some(RouletteBetType::Low),
+                "high" => Some(RouletteBetType::High),
+                "straight" if parts.len() >= 2 => parts[1]
+                    .parse::<u8>()
+                    .ok()
+                    .filter(|&n| n <= 36)
+                    .map(RouletteBetType::Straight),
+                "dozen" if parts.len() >= 2 => parts[1]
+                    .parse::<u8>()
+                    .ok()
+                    .filter(|&d| (1..=3).contains(&d))
+                    .map(RouletteBetType::Dozen),
+                "column" if parts.len() >= 2 => parts[1]
+                    .parse::<u8>()
+                    .ok()
+                    .filter(|&c| (1..=3).contains(&c))
+                    .map(RouletteBetType::Column),
+                _ => None,
+            };
+
+            let bet_type = match bet_type {
+                Some(t) => t,
+                None => {
+                    self.state
+                        .add_system_message("Unknown bet type. See /help for options.");
+                    return;
+                }
+            };
+
+            // Debit wallet
+            let mut wallet = self.state.wallet.clone();
+            wallet.refresh_if_needed();
+            if let Err(e) = wallet.debit(amount) {
+                self.state.add_system_message(&format!("Wallet: {}", e));
+                return;
+            }
+            self.state.wallet = wallet;
+
+            let bet = RouletteBet {
+                peer_id: self.state.local_peer_id.clone(),
+                nick: self.state.nick.clone(),
+                bet_type,
+                amount,
+            };
+            let room_id = if let Some(ref mut game) = self.state.roulette_game {
+                game.place_bet(bet.clone());
+                Some(game.room_id.clone())
+            } else {
+                None
+            };
+            if let Some(rid) = room_id {
+                self.state.add_system_message(&format!(
+                    "Bet placed: {} chips. Balance: {}",
+                    amount, self.state.wallet.balance
+                ));
+                let action = RouletteAction::Bet { bet };
+                let _ = self
+                    .command_sender
+                    .send(NetworkCommand::SendRoomMessage {
+                        room_id: rid,
+                        data: action.to_bytes(),
+                    })
+                    .await;
+            }
+        } else if cmd == "spin" {
+            let (payouts, room_id) = {
+                let game = match self.state.roulette_game.as_mut() {
+                    Some(g) => g,
+                    None => return,
+                };
+                let p = game.spin();
+                let rid = game.room_id.clone();
+                (p, rid)
+            };
+
+            let result = self.state.roulette_game.as_ref().and_then(|g| g.result);
+            if let Some(n) = result {
+                let color = if n == 0 {
+                    "green"
+                } else if crate::game::roulette_is_red(n) {
+                    "red"
+                } else {
+                    "black"
+                };
+                self.state
+                    .add_system_message(&format!("Roulette result: {} ({})", n, color));
+            }
+
+            let mut total_net: i64 = 0;
+            for (peer, net) in &payouts {
+                if peer == &self.state.local_peer_id {
+                    total_net = *net;
+                    if *net > 0 {
+                        self.state.wallet.credit(*net as u32);
+                        self.state.add_system_message(&format!(
+                            "You won {}! Balance: {}",
+                            net, self.state.wallet.balance
+                        ));
+                    } else {
+                        self.state.add_system_message(&format!(
+                            "You lost {}. Balance: {}",
+                            net.abs(),
+                            self.state.wallet.balance
+                        ));
+                    }
+                }
+            }
+            self.state.casino_state.record_payout("roulette", total_net);
+
+            if let Some(ref mut game) = self.state.roulette_game {
+                game.new_round();
+            }
+
+            let action = RouletteAction::Spin;
+            let _ = self
+                .command_sender
+                .send(NetworkCommand::SendRoomMessage {
+                    room_id,
+                    data: action.to_bytes(),
+                })
+                .await;
+        } else {
+            self.state.add_system_message(
+                "Roulette: /roulette  /roulette bet <type> <amount>  /roulette spin",
+            );
+        }
+    }
+
+    fn handle_incoming_roulette_action(&mut self, _room_id: &str, action: RouletteAction) {
+        match action {
+            RouletteAction::State { state_json } => {
+                if let Ok(game) = serde_json::from_str::<RouletteEngine>(&state_json) {
+                    self.state.roulette_game = Some(game);
+                }
+            }
+            RouletteAction::Bet { bet } => {
+                if let Some(ref mut game) = self.state.roulette_game {
+                    game.place_bet(bet);
+                }
+            }
+            RouletteAction::Spin => {
+                // Remote spin result handled via State sync; just notify
+                self.state
+                    .add_system_message("Roulette: wheel spun by host.");
+            }
+        }
+    }
+
+    // ─── Andar Bahar command handler ──────────────────────────────────────────
+
+    async fn handle_andarbahar_command(&mut self, cmd: &str) {
+        let cmd = cmd.strip_prefix("/ab").unwrap_or(cmd).trim();
+
+        // Ensure a game exists
+        if self.state.andarbahar_game.is_none() {
+            if self.state.rooms.is_empty() {
+                self.state
+                    .add_system_message("Join a room first: /room create <name>");
+                return;
+            }
+            let room_id = self.state.rooms[0].0.clone();
+            self.state.andarbahar_game = Some(AndarBaharEngine::new(room_id));
+        }
+
+        if cmd.is_empty() {
+            let lines: Vec<String> = self
+                .state
+                .andarbahar_game
+                .as_ref()
+                .map(|g| g.render_status())
+                .unwrap_or_default();
+            for l in lines {
+                self.state.add_system_message(&l);
+            }
+            return;
+        }
+
+        let place_bet = |state: &mut crate::ui::UiState,
+                         side: AndarBaharSide,
+                         amount_str: &str|
+         -> Option<(AndarBaharBet, String)> {
+            let amount: u32 = match amount_str.parse() {
+                Ok(a) if a > 0 => a,
+                _ => {
+                    state.add_system_message("Bet amount must be a positive integer.");
+                    return None;
+                }
+            };
+            let mut wallet = state.wallet.clone();
+            wallet.refresh_if_needed();
+            if let Err(e) = wallet.debit(amount) {
+                state.add_system_message(&format!("Wallet: {}", e));
+                return None;
+            }
+            state.wallet = wallet;
+            let bet = AndarBaharBet {
+                peer_id: state.local_peer_id.clone(),
+                nick: state.nick.clone(),
+                side,
+                amount,
+            };
+            let room_id = state
+                .andarbahar_game
+                .as_ref()
+                .map(|g| g.room_id.clone())
+                .unwrap_or_default();
+            state.add_system_message(&format!(
+                "Bet placed: {} chips. Balance: {}",
+                amount, state.wallet.balance
+            ));
+            Some((bet, room_id))
+        };
+
+        if let Some(amount_str) = cmd.strip_prefix("andar ") {
+            if let Some((bet, room_id)) =
+                place_bet(&mut self.state, AndarBaharSide::Andar, amount_str.trim())
+            {
+                if let Some(ref mut game) = self.state.andarbahar_game {
+                    game.place_bet(bet.clone());
+                }
+                let action = AndarBaharAction::Bet { bet };
+                let _ = self
+                    .command_sender
+                    .send(NetworkCommand::SendRoomMessage {
+                        room_id,
+                        data: action.to_bytes(),
+                    })
+                    .await;
+            }
+        } else if let Some(amount_str) = cmd.strip_prefix("bahar ") {
+            if let Some((bet, room_id)) =
+                place_bet(&mut self.state, AndarBaharSide::Bahar, amount_str.trim())
+            {
+                if let Some(ref mut game) = self.state.andarbahar_game {
+                    game.place_bet(bet.clone());
+                }
+                let action = AndarBaharAction::Bet { bet };
+                let _ = self
+                    .command_sender
+                    .send(NetworkCommand::SendRoomMessage {
+                        room_id,
+                        data: action.to_bytes(),
+                    })
+                    .await;
+            }
+        } else if cmd == "deal" {
+            let room_id = {
+                let game = match self.state.andarbahar_game.as_mut() {
+                    Some(g) => g,
+                    None => return,
+                };
+                game.deal_all();
+                game.room_id.clone()
+            };
+
+            // Credit/debit wallet from payouts
+            let payouts = self
+                .state
+                .andarbahar_game
+                .as_ref()
+                .map(|g| g.calculate_payouts())
+                .unwrap_or_default();
+
+            let mut total_net: i64 = 0;
+            for (peer, net) in &payouts {
+                if peer == &self.state.local_peer_id {
+                    total_net = *net;
+                    if *net > 0 {
+                        self.state.wallet.credit(*net as u32);
+                        self.state.add_system_message(&format!(
+                            "Andar Bahar: you won {}! Balance: {}",
+                            net, self.state.wallet.balance
+                        ));
+                    } else {
+                        self.state.add_system_message(&format!(
+                            "Andar Bahar: you lost {}. Balance: {}",
+                            net.abs(),
+                            self.state.wallet.balance
+                        ));
+                    }
+                }
+            }
+            self.state
+                .casino_state
+                .record_payout("andarbahar", total_net);
+
+            let lines: Vec<String> = self
+                .state
+                .andarbahar_game
+                .as_ref()
+                .map(|g| g.render_status())
+                .unwrap_or_default();
+            for l in lines {
+                self.state.add_system_message(&l);
+            }
+
+            if let Some(ref mut game) = self.state.andarbahar_game {
+                game.new_round();
+            }
+
+            let action = AndarBaharAction::Deal;
+            let _ = self
+                .command_sender
+                .send(NetworkCommand::SendRoomMessage {
+                    room_id,
+                    data: action.to_bytes(),
+                })
+                .await;
+        } else {
+            self.state
+                .add_system_message("Usage: /ab andar <amount> | /ab bahar <amount> | /ab deal");
+        }
+    }
+
+    fn handle_incoming_andarbahar_action(&mut self, _room_id: &str, action: AndarBaharAction) {
+        match action {
+            AndarBaharAction::State { state_json } => {
+                if let Ok(game) = serde_json::from_str::<AndarBaharEngine>(&state_json) {
+                    self.state.andarbahar_game = Some(game);
+                }
+            }
+            AndarBaharAction::Bet { bet } => {
+                if let Some(ref mut game) = self.state.andarbahar_game {
+                    game.place_bet(bet);
+                }
+            }
+            AndarBaharAction::Deal => {
+                self.state
+                    .add_system_message("Andar Bahar: host is dealing...");
+            }
+        }
+    }
+
+    // ─── Slots command handler ────────────────────────────────────────────────
+
+    async fn handle_slots_command(&mut self, cmd: &str) {
+        let cmd = cmd.strip_prefix("/slots").unwrap_or(cmd).trim();
+
+        // Ensure engine exists
+        if self.state.slots_engine.is_none() {
+            let room_id = self
+                .state
+                .rooms
+                .first()
+                .map(|(id, _)| id.clone())
+                .unwrap_or_else(|| "local".to_string());
+            self.state.slots_engine = Some(SlotsEngine::new(room_id));
+        }
+
+        if let Some(amount_str) = cmd.strip_prefix("spin ") {
+            let amount: u32 = match amount_str.trim().parse() {
+                Ok(a) if a > 0 => a,
+                _ => {
+                    self.state.add_system_message("Usage: /slots spin <amount>");
+                    return;
+                }
+            };
+
+            // Debit wallet
+            let mut wallet = self.state.wallet.clone();
+            wallet.refresh_if_needed();
+            if let Err(e) = wallet.debit(amount) {
+                self.state.add_system_message(&format!("Wallet: {}", e));
+                return;
+            }
+            self.state.wallet = wallet;
+
+            let payout = {
+                let engine = self.state.slots_engine.as_mut().unwrap();
+                engine.spin(amount)
+            };
+
+            if payout > 0 {
+                self.state.wallet.credit(amount + payout as u32);
+                self.state.casino_state.record_payout("slots", payout);
+            } else {
+                self.state.casino_state.record_payout("slots", payout);
+            }
+
+            let lines: Vec<String> = self
+                .state
+                .slots_engine
+                .as_ref()
+                .map(|e| e.render_result())
+                .unwrap_or_default();
+            for l in lines {
+                self.state.add_system_message(&l);
+            }
+            self.state
+                .add_system_message(&format!("Balance: {} chips", self.state.wallet.balance));
+        } else {
+            self.state.add_system_message("Usage: /slots spin <amount>");
+        }
+    }
+
+    // ─── Wallet command handler ───────────────────────────────────────────────
+
+    async fn handle_wallet_command(&mut self) {
+        let mut wallet = self.state.wallet.clone();
+        wallet.refresh_if_needed();
+        self.state.wallet = wallet;
+        self.state.add_system_message(&format!(
+            "Chip balance: {}  (daily refresh: +{} chips at UTC midnight)",
+            self.state.wallet.balance,
+            crate::game::Wallet::DAILY_CHIPS
+        ));
+        // Show house P&L
+        if !self.state.casino_state.house_pnl.is_empty() {
+            self.state.add_system_message("House P&L this session:");
+            let pnl: Vec<String> = self
+                .state
+                .casino_state
+                .house_pnl
+                .iter()
+                .map(|(game, net)| format!("  {}: {}", game, net))
+                .collect();
+            for l in pnl {
+                self.state.add_system_message(&l);
+            }
+        }
     }
 }
 
