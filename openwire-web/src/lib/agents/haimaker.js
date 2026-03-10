@@ -6,8 +6,10 @@
 
 const PROXY = '/api/haimaker';
 
-// Thinking models don't benefit from prompt repetition
-const THINKING_MODEL_RE = /think|reasoning|deepseek-r1|qwq/i;
+// Haimaker models (e.g. minimax) are thinking models — skip prompt repetition
+// and strip <think> tags from output
+const THINKING_MODEL_RE = /think|reasoning|deepseek-r1|qwq|minimax/i;
+const THINK_TAG_RE = /<think>[\s\S]*?<\/think>\s*/g;
 
 /**
  * Fetch available Haimaker models (curated list from proxy).
@@ -54,9 +56,10 @@ export function formatHaimakerLabel(model) {
 const IS_DEBUG_HM = typeof localStorage !== 'undefined' && localStorage.getItem('openwire_debug') === 'true';
 const FETCH_TIMEOUT_MS = 30_000;
 
-export async function generateHaimakerMessage(modelId, systemPrompt, contextMessages, maxTokens = 120) {
+export async function generateHaimakerMessage(modelId, systemPrompt, contextMessages, maxTokens = 4096) {
 
-    // Build OpenAI-style messages array
+    // Build OpenAI-style messages array — higher token budget because thinking models
+    // use internal reasoning tokens before producing the visible reply
     const instruction = systemPrompt + '\n\nReminder: Roman-script Hinglish only. No Devanagari. 1-2 short sentences max. No emoji. You MAY use *asterisks* ONLY for physical actions (e.g., *slaps him*, *runs away*). Always finish your sentence completely — never stop mid-word or mid-sentence.';
 
     // Triple prompt repetition for non-thinking models (research shows 3x improves accuracy)
@@ -76,7 +79,7 @@ export async function generateHaimakerMessage(modelId, systemPrompt, contextMess
     const payload = {
         model: modelId,
         messages,
-        max_tokens: maxTokens || 200,
+        max_tokens: maxTokens || 4096,
         temperature: 0.78,
     };
 
@@ -108,10 +111,16 @@ export async function generateHaimakerMessage(modelId, systemPrompt, contextMess
     }
 
     const data = await resp.json();
-    const text = data.choices?.[0]?.message?.content?.trim();
+    let text = data.choices?.[0]?.message?.content?.trim() || null;
+
+    // Strip <think>...</think> reasoning blocks that thinking models emit
+    if (text) {
+        text = text.replace(THINK_TAG_RE, '').trim() || null;
+    }
+
     if (IS_DEBUG_HM) {
         console.log('[Haimaker] Response:', { model: modelId, text: text || '(empty)' });
         if (!text) console.warn('[Haimaker] Empty response! Full data:', data);
     }
-    return text || null;
+    return text;
 }

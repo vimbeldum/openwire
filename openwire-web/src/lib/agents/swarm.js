@@ -942,7 +942,8 @@ CRITICAL — DISTINGUISH HUMANS FROM CHARACTERS:
                 : this._provider === 'qwen' ? generateQwenMessage
                     : this._provider === 'haimaker' ? generateHaimakerMessage
                         : generateMessage;
-            let text = await gen(modelId, systemPrompt, trigger, 120);
+            const maxTok = this._provider === 'haimaker' ? 4096 : 120;
+            let text = await gen(modelId, systemPrompt, trigger, maxTok);
 
             // If primary model returns empty, retry with a fallback
             if (!text) {
@@ -953,7 +954,7 @@ CRITICAL — DISTINGUISH HUMANS FROM CHARACTERS:
                 const fallbackModel = pool.find(m => m.id !== modelId)?.id;
                 if (fallbackModel) {
                     this._log(`[Generate] ${c.name} got empty from ${modelId}, retrying with ${fallbackModel}`);
-                    text = await gen(fallbackModel, systemPrompt, trigger, 120);
+                    text = await gen(fallbackModel, systemPrompt, trigger, maxTok);
                 }
             }
 
