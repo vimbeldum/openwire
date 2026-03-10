@@ -1107,7 +1107,11 @@ async fn handle_behaviour_event(network: &mut Network, event: OpenWireBehaviourE
                             .unwrap_or_else(|| std::path::PathBuf::from("."))
                             .join("openwire-received");
                         let _ = std::fs::create_dir_all(&save_dir);
-                        let save_path = save_dir.join(&file_msg.filename);
+                        // Sanitize filename to prevent path traversal
+                        let safe_name = std::path::Path::new(&file_msg.filename)
+                            .file_name()
+                            .unwrap_or_default();
+                        let save_path = save_dir.join(safe_name);
                         if let Err(e) = std::fs::write(&save_path, &file_msg.data) {
                             tracing::error!("Failed to save file: {}", e);
                         } else {

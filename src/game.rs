@@ -653,17 +653,8 @@ impl Blackjack {
     }
 
     fn shuffle_deck(deck: &mut [Card]) {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let seed = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
-        // Simple Fisher-Yates with seed
-        let n = deck.len();
-        for i in (1..n).rev() {
-            let j = (seed.wrapping_mul(1103515245).wrapping_add(12345) % (i + 1) as u64) as usize;
-            deck.swap(i, j);
-        }
+        use rand::seq::SliceRandom;
+        deck.shuffle(&mut rand::rng());
     }
 
     pub fn add_player(&mut self, peer_id: String, nick: String) {
@@ -879,10 +870,8 @@ impl Blackjack {
             "┌──┐\n│??│\n└──┘".to_string()
         } else {
             let sym = card.symbol();
-            format!(
-                "┌──┐\n│{}│\n└──┘",
-                if sym.len() > 2 { &sym[..2] } else { &sym }
-            )
+            let display: String = sym.chars().take(2).collect();
+            format!("┌──┐\n│{}│\n└──┘", display)
         }
     }
 

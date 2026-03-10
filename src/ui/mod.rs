@@ -979,17 +979,29 @@ impl UiApp {
         }
     }
 
+    /// Safely truncate a string to at most `n` chars, appending "…"
+    fn short_id(s: &str, n: usize) -> String {
+        if s.len() > n {
+            format!(
+                "{}…",
+                &s[..s.char_indices().nth(n).map(|(i, _)| i).unwrap_or(s.len())]
+            )
+        } else {
+            s.to_string()
+        }
+    }
+
     /// Handle incoming network events
     fn handle_network_event(&mut self, event: NetworkEvent) {
         match event {
             NetworkEvent::MessageReceived { from, data, .. } => {
                 let content = String::from_utf8_lossy(&data).to_string();
-                let short_id = format!("{}…", &from.to_string()[..8]);
-                self.state.add_chat_message(&short_id, &content);
+                let short = Self::short_id(&from.to_string(), 8);
+                self.state.add_chat_message(&short, &content);
             }
             NetworkEvent::FileReceived { from, filename, .. } => {
-                let short_id = format!("{}…", &from.to_string()[..8]);
-                self.state.add_file_message(&short_id, &filename);
+                let short = Self::short_id(&from.to_string(), 8);
+                self.state.add_file_message(&short, &filename);
                 self.state
                     .add_system_message(&format!("File saved to ~/openwire-received/{}", filename));
             }
@@ -997,7 +1009,7 @@ impl UiApp {
                 let id_str = peer_id.to_string();
                 if !self.state.peers.contains(&id_str) {
                     self.state.peers.push(id_str.clone());
-                    let short = format!("{}…", &id_str[..8]);
+                    let short = Self::short_id(&id_str, 8);
                     self.state
                         .add_system_message(&format!("Peer joined: {}", short));
                 }
@@ -1005,12 +1017,12 @@ impl UiApp {
             NetworkEvent::PeerDisconnected(peer_id) => {
                 let id_str = peer_id.to_string();
                 self.state.peers.retain(|p| p != &id_str);
-                let short = format!("{}…", &id_str[..8]);
+                let short = Self::short_id(&id_str, 8);
                 self.state
                     .add_system_message(&format!("Peer left: {}", short));
             }
             NetworkEvent::KeysExchanged(peer_id) => {
-                let short = format!("{}…", &peer_id.to_string()[..8]);
+                let short = Self::short_id(&peer_id.to_string(), 8);
                 self.state
                     .add_system_message(&format!("🔐 Keys exchanged with {}", short));
             }
