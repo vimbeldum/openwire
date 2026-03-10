@@ -548,6 +548,10 @@ pub struct BlackjackPlayer {
     pub hand: Vec<Card>,
     pub status: PlayerStatus,
     pub bet: u32,
+    pub split_hand: Vec<Card>,        // second hand if split
+    pub doubled_down: bool,           // whether player doubled
+    pub insurance_bet: u32,           // insurance side-bet amount (0 = no insurance)
+    pub insurance_resolved: bool,     // has insurance been resolved
 }
 
 impl BlackjackPlayer {
@@ -558,6 +562,10 @@ impl BlackjackPlayer {
             hand: Vec::new(),
             status: PlayerStatus::Waiting,
             bet: 0,
+            split_hand: Vec::new(),
+            doubled_down: false,
+            insurance_bet: 0,
+            insurance_resolved: false,
         }
     }
 }
@@ -598,6 +606,14 @@ pub enum BlackjackAction {
     DealerPlay,
     /// New round
     NewRound,
+    /// Player doubles down (doubles bet, takes exactly one more card then stands)
+    DoubleDown { peer_id: String },
+    /// Player splits their pair into two hands
+    Split { peer_id: String },
+    /// Player buys insurance (half bet that dealer has blackjack)
+    Insurance { peer_id: String },
+    /// Insurance resolved
+    InsuranceResolved { won: bool },
 }
 
 impl BlackjackAction {
@@ -788,8 +804,12 @@ impl Blackjack {
 
         for player in &mut self.players {
             player.hand.clear();
+            player.split_hand.clear();
             player.status = PlayerStatus::Waiting;
             player.bet = 0;
+            player.doubled_down = false;
+            player.insurance_bet = 0;
+            player.insurance_resolved = false;
         }
     }
 
@@ -847,6 +867,42 @@ impl Blackjack {
         }
 
         self.phase = BlackjackPhase::Ended;
+    }
+
+    pub fn double_down(&mut self, peer_id: &str) -> Result<(), &'static str> {
+        let player = self.players.iter_mut().find(|p| p.peer_id == peer_id)
+            .ok_or("Player not found")?;
+        if player.doubled_down { return Err("Already doubled down"); }
+        if player.hand.len() != 2 { return Err("Can only double on initial two cards"); }
+        player.doubled_down = true;
+        if let Some(card) = self.deck.pop() {
+            player.hand.push(card);
+        }
+        Ok(())
+    }
+
+    pub fn split(&mut self, peer_id: &str) -> Result<(), &'static str> {
+        let player = self.players.iter_mut().find(|p| p.peer_id == peer_id)
+            .ok_or("Player not found")?;
+        if player.hand.len() != 2 { return Err("Can only split two cards"); }
+        if player.hand[0].value != player.hand[1].value { return Err("Cards must be a pair to split"); }
+        if !player.split_hand.is_empty() { return Err("Already split"); }
+        let second = player.hand.remove(1);
+        player.split_hand.push(second);
+        // Deal one card to each hand
+        if let Some(c) = self.deck.pop() { player.hand.push(c); }
+        if let Some(c) = self.deck.pop() { player.split_hand.push(c); }
+        Ok(())
+    }
+
+    pub fn buy_insurance(&mut self, peer_id: &str) -> Result<(), &'static str> {
+        let player = self.players.iter_mut().find(|p| p.peer_id == peer_id)
+            .ok_or("Player not found")?;
+        if player.insurance_bet > 0 { return Err("Already have insurance"); }
+        if player.bet == 0 { return Err("No bet placed"); }
+        let ins = player.bet / 2;
+        player.insurance_bet = ins;
+        Ok(())
     }
 
     pub fn run_dealer_turn(&mut self) {
@@ -1278,6 +1334,52 @@ impl std::fmt::Display for AndarBaharSide {
     }
 }
 
+/// Side bet on how many cards are dealt before match
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AndarBaharCountRange {
+    Cards1To5,   // 3.5x payout
+    Cards6To10,  // 4.5x payout
+    Cards11To15, // 5.5x payout
+    Cards16To25, // 6.5x payout
+    Cards26Plus, // 8.0x payout
+}
+
+impl AndarBaharCountRange {
+    pub fn payout_multiplier(&self) -> f64 {
+        match self {
+            Self::Cards1To5 => 3.5,
+            Self::Cards6To10 => 4.5,
+            Self::Cards11To15 => 5.5,
+            Self::Cards16To25 => 6.5,
+            Self::Cards26Plus => 8.0,
+        }
+    }
+    pub fn matches(&self, count: usize) -> bool {
+        match self {
+            Self::Cards1To5 => count <= 5,
+            Self::Cards6To10 => (6..=10).contains(&count),
+            Self::Cards11To15 => (11..=15).contains(&count),
+            Self::Cards16To25 => (16..=25).contains(&count),
+            Self::Cards26Plus => count >= 26,
+        }
+    }
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Cards1To5 => "1-5 cards (3.5x)",
+            Self::Cards6To10 => "6-10 cards (4.5x)",
+            Self::Cards11To15 => "11-15 cards (5.5x)",
+            Self::Cards16To25 => "16-25 cards (6.5x)",
+            Self::Cards26Plus => "26+ cards (8.0x)",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AndarBaharCountBet {
+    pub range: AndarBaharCountRange,
+    pub amount: u32,
+}
+
 /// A single Andar Bahar bet
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AndarBaharBet {
@@ -1285,6 +1387,8 @@ pub struct AndarBaharBet {
     pub nick: String,
     pub side: AndarBaharSide,
     pub amount: u32,
+    /// Optional side-bet on number of cards dealt (None = no side bet)
+    pub count_side_bet: Option<AndarBaharCountBet>,
 }
 
 /// Andar Bahar network action
@@ -1440,6 +1544,7 @@ impl AndarBaharEngine {
             None => return payouts,
         };
         let trump_first_is_bahar = matches!(&self.trump_first, Some(AndarBaharSide::Bahar));
+        let total_cards = self.andar.len() + self.bahar.len();
 
         for bet in &self.bets {
             let net: i64 = if bet.side == *winning_side {
@@ -1455,6 +1560,16 @@ impl AndarBaharEngine {
                 -(bet.amount as i64)
             };
             *payouts.entry(bet.peer_id.clone()).or_insert(0) += net;
+
+            // Count side bet payout
+            if let Some(csb) = &bet.count_side_bet {
+                let side_net: i64 = if csb.range.matches(total_cards) {
+                    (csb.amount as f64 * csb.range.payout_multiplier()) as i64
+                } else {
+                    -(csb.amount as i64)
+                };
+                *payouts.entry(bet.peer_id.clone()).or_insert(0) += side_net;
+            }
         }
         payouts
     }
@@ -1753,10 +1868,11 @@ impl Wallet {
     }
 
     fn today_day() -> u64 {
-        std::time::SystemTime::now()
+        (std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs()
+            + 19800) // UTC+5:30 (IST)
             / 86400
     }
 
@@ -1841,5 +1957,76 @@ impl CasinoState {
             }
             self.last_updated = other.last_updated;
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TRANSACTION LEDGER
+// Persists to ~/.openwire/history.json
+// Tracks wins/losses per game session (last 500 entries).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// A single game transaction
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Transaction {
+    pub timestamp: u64,
+    pub game: String,
+    pub amount: i64,  // positive = win, negative = loss
+    pub balance_after: u32,
+}
+
+/// Persistent transaction ledger
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TransactionLedger {
+    pub entries: Vec<Transaction>,
+}
+
+impl TransactionLedger {
+    fn ledger_path() -> std::path::PathBuf {
+        let home = dirs_next::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+        home.join(".openwire").join("history.json")
+    }
+
+    pub fn load() -> Self {
+        let path = Self::ledger_path();
+        if let Ok(data) = std::fs::read_to_string(&path)
+            && let Ok(l) = serde_json::from_str::<TransactionLedger>(&data)
+        {
+            return l;
+        }
+        Self::default()
+    }
+
+    pub fn save(&self) {
+        let path = Self::ledger_path();
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(json) = serde_json::to_string_pretty(self) {
+            let _ = std::fs::write(&path, json);
+        }
+    }
+
+    pub fn record(&mut self, game: &str, amount: i64, balance_after: u32) {
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        self.entries.push(Transaction {
+            timestamp: ts,
+            game: game.to_string(),
+            amount,
+            balance_after,
+        });
+        // Keep last 500 entries
+        if self.entries.len() > 500 {
+            self.entries.drain(0..self.entries.len() - 500);
+        }
+        self.save();
+    }
+
+    pub fn recent(&self, n: usize) -> &[Transaction] {
+        let len = self.entries.len();
+        if len <= n { &self.entries } else { &self.entries[len - n..] }
     }
 }
