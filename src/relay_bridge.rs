@@ -52,6 +52,7 @@ enum RelayIn {
     Message {
         nick: String,
         data: String,
+        #[serde(alias = "from")]
         peer_id: String,
     },
     PeerJoined {
