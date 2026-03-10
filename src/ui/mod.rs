@@ -267,7 +267,15 @@ impl UiApp {
                 if let Event::Mouse(mouse) = &ev {
                     if self.state.game_overlay.visible {
                         if let Some(action_key) = game_ui::handle_game_mouse(*mouse, &self.state.game_overlay) {
-                            self.handle_overlay_action_key(action_key).await;
+                            if action_key == '\x1b' {
+                                // "Esc=Chat" button clicked — close overlay
+                                self.state.game_overlay.visible = false;
+                            } else if action_key == '\n' && !self.state.game_overlay.bet_input.is_empty() {
+                                // "Enter=Confirm" button clicked during bet entry
+                                self.handle_overlay_bet_confirm().await;
+                            } else {
+                                self.handle_overlay_action_key(action_key).await;
+                            }
                         }
                     }
                     continue; // don't fall through to key handling
@@ -1021,7 +1029,9 @@ impl UiApp {
         // Start new game
         if cmd.is_empty() || cmd.trim() == "" {
             if self.state.blackjack_game.is_some() {
-                // Show overlay for existing game
+                // Show overlay for existing game, reset stale overlay state
+                self.state.game_overlay.entering_bet = false;
+                self.state.game_overlay.bet_input.clear();
                 self.state.game_overlay.view = game_ui::ActiveGameView::Blackjack;
                 self.state.game_overlay.visible = true;
                 return;
@@ -1069,17 +1079,25 @@ impl UiApp {
 
         if let Some(amount_str) = cmd.strip_prefix("bet ") {
             let amount: u32 = match amount_str.trim().parse() {
-                Ok(a) => a,
-                Err(_) => {
-                    self.state.add_system_message("Usage: /bj bet <amount>");
+                Ok(a) if a > 0 => a,
+                _ => {
+                    self.state.add_system_message("Usage: /bj bet <amount> (must be > 0)");
                     return;
                 }
             };
+            // Debit wallet before placing bet
+            let mut wallet = self.state.wallet.clone();
+            wallet.refresh_if_needed();
+            if let Err(e) = wallet.debit(amount) {
+                self.state.add_system_message(&format!("Wallet: {}", e));
+                return;
+            }
+            self.state.wallet = wallet;
             if let Some(ref mut game) = self.state.blackjack_game {
                 game.place_bet(&self.state.local_peer_id, amount);
             }
             self.state
-                .add_system_message(&format!("Bet placed: ${}", amount));
+                .add_system_message(&format!("Bet placed: ${}. Balance: {}", amount, self.state.wallet.balance));
             self.broadcast_bj_state().await;
         } else if cmd == "deal" {
             let can_deal = {
@@ -1132,6 +1150,73 @@ impl UiApp {
             }
             if let Some(ref mut game) = self.state.blackjack_game {
                 game.stand(&self.state.local_peer_id);
+            }
+            self.render_blackjack();
+            self.broadcast_bj_state().await;
+            self.maybe_run_dealer().await;
+        } else if cmd == "double" {
+            let is_turn = {
+                if let Some(ref game) = self.state.blackjack_game {
+                    game.is_player_turn(&self.state.local_peer_id)
+                } else {
+                    false
+                }
+            };
+            if !is_turn {
+                self.state.add_system_message("It's not your turn!");
+                return;
+            }
+            // Double down costs an additional bet equal to original
+            let extra_bet = self.state.blackjack_game.as_ref()
+                .and_then(|g| g.players.iter().find(|p| p.peer_id == self.state.local_peer_id))
+                .map(|p| p.bet)
+                .unwrap_or(0);
+            if extra_bet > 0 {
+                let mut wallet = self.state.wallet.clone();
+                wallet.refresh_if_needed();
+                if let Err(e) = wallet.debit(extra_bet) {
+                    self.state.add_system_message(&format!("Can't double: {}", e));
+                    return;
+                }
+                self.state.wallet = wallet;
+            }
+            if let Some(ref mut game) = self.state.blackjack_game {
+                let _ = game.double_down(&self.state.local_peer_id);
+            }
+            self.render_blackjack();
+            self.broadcast_bj_state().await;
+            self.maybe_run_dealer().await;
+        } else if cmd == "split" {
+            let is_turn = {
+                if let Some(ref game) = self.state.blackjack_game {
+                    game.is_player_turn(&self.state.local_peer_id)
+                } else {
+                    false
+                }
+            };
+            if !is_turn {
+                self.state.add_system_message("It's not your turn!");
+                return;
+            }
+            // Split costs an additional bet equal to original
+            let extra_bet = self.state.blackjack_game.as_ref()
+                .and_then(|g| g.players.iter().find(|p| p.peer_id == self.state.local_peer_id))
+                .map(|p| p.bet)
+                .unwrap_or(0);
+            if extra_bet > 0 {
+                let mut wallet = self.state.wallet.clone();
+                wallet.refresh_if_needed();
+                if let Err(e) = wallet.debit(extra_bet) {
+                    self.state.add_system_message(&format!("Can't split: {}", e));
+                    return;
+                }
+                self.state.wallet = wallet;
+            }
+            if let Some(ref mut game) = self.state.blackjack_game {
+                if let Err(e) = game.split(&self.state.local_peer_id) {
+                    self.state.add_system_message(&format!("Can't split: {}", e));
+                    return;
+                }
             }
             self.render_blackjack();
             self.broadcast_bj_state().await;
@@ -1925,7 +2010,9 @@ impl UiApp {
         }
 
         if cmd.is_empty() {
-            // Show visual overlay instead of text dump
+            // Show visual overlay, reset stale state from other games
+            self.state.game_overlay.entering_bet = false;
+            self.state.game_overlay.bet_input.clear();
             self.state.game_overlay.view = game_ui::ActiveGameView::Roulette;
             self.state.game_overlay.visible = true;
             return;
@@ -2022,6 +2109,13 @@ impl UiApp {
                     .await;
             }
         } else if cmd == "spin" {
+            // Guard: don't spin with zero bets
+            let has_bets = self.state.roulette_game.as_ref()
+                .is_some_and(|g| !g.bets.is_empty());
+            if !has_bets {
+                self.state.add_system_message("Place at least one bet before spinning!");
+                return;
+            }
             let (payouts, room_id) = {
                 let game = match self.state.roulette_game.as_mut() {
                     Some(g) => g,
@@ -2078,9 +2172,8 @@ impl UiApp {
             }
             self.state.casino_state.record_payout("roulette", total_net);
 
-            if let Some(ref mut game) = self.state.roulette_game {
-                game.new_round();
-            }
+            // Don't call new_round() here — let the overlay display the result.
+            // User presses Space again to start a new round (handled in overlay action).
 
             let action = RouletteAction::Spin;
             let _ = self
@@ -2357,8 +2450,16 @@ impl UiApp {
                 .map(|(id, _)| id.clone())
                 .unwrap_or_else(|| "local".to_string());
             self.state.slots_engine = Some(SlotsEngine::new(room_id));
-            self.state.game_overlay.view = game_ui::ActiveGameView::Slots;
-            self.state.game_overlay.visible = true;
+        }
+
+        // Show/re-show overlay (also handles rejoin after Esc)
+        self.state.game_overlay.entering_bet = false;
+        self.state.game_overlay.bet_input.clear();
+        self.state.game_overlay.view = game_ui::ActiveGameView::Slots;
+        self.state.game_overlay.visible = true;
+
+        if cmd.is_empty() {
+            return;
         }
 
         if let Some(amount_str) = cmd.strip_prefix("spin ") {
@@ -2380,7 +2481,13 @@ impl UiApp {
             self.state.wallet = wallet;
 
             let payout = {
-                let engine = self.state.slots_engine.as_mut().unwrap();
+                let engine = match self.state.slots_engine.as_mut() {
+                    Some(e) => e,
+                    None => {
+                        self.state.add_system_message("Slots engine not initialized. Use /slots to start.");
+                        return;
+                    }
+                };
                 engine.spin(amount)
             };
 

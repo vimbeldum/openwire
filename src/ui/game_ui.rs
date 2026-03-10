@@ -200,6 +200,13 @@ fn render_rl(f: &mut Frame, area: Rect, game: &RouletteEngine, bal: u32, ov: &mu
         s("EVEN", Color::White), Span::raw("│"), s(" RED", Color::Red), Span::raw("│"),
         s("BLK ", Color::White), Span::raw("│"), s(" ODD", Color::White), Span::raw("│"),
         s("19-36", Color::White), Span::raw("│")]));
+    // Phase indicator
+    let phase_text = match game.phase {
+        RoulettePhase::Betting => "BETTING — place your bets",
+        RoulettePhase::Spinning => "SPINNING...",
+        RoulettePhase::Ended => "ROUND ENDED — press Space for new round",
+    };
+    l.push(Line::from(s(&format!("  Phase: {}", phase_text), Color::Cyan)));
     l.push(Line::from(""));
 
     // Show individual bets
@@ -224,7 +231,7 @@ fn render_rl(f: &mut Frame, area: Rect, game: &RouletteEngine, bal: u32, ov: &mu
     let acts: Vec<(&str, char)> = match game.phase {
         RoulettePhase::Betting => if ov.entering_bet { vec![("Enter=Confirm",'\n'),("Esc=Cancel",'\x1b')] }
             else { vec![("Red",'r'),("blacK",'k'),("Odd",'o'),("Even",'e'),("#num",'#'),("Spin",' ')] },
-        _ => vec![("Spin (new)", ' ')],
+        RoulettePhase::Spinning | RoulettePhase::Ended => vec![("New round",' ')],
     };
     register_actions(ov, &acts);
 }
