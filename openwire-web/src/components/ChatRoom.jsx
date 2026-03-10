@@ -440,8 +440,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     text,
                     characterId,
                 }));
-                // Feed back into context
-                swarm.addContext(nick, text);
+                // Feed back into context — mark as agent since this came from our own swarm
+                swarm.addContext(nick, text, true);
             },
             onError: (msg) => {
                 console.warn('[AgentSwarm]', msg);
