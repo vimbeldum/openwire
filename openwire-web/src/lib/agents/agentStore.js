@@ -42,6 +42,7 @@ function buildDefaults() {
         reactive_tags: c.reactive_tags || [],
         agent_triggers: c.agent_triggers || [],
         moods: c.moods || { normal: '' },
+        gender: c.gender || null,
     }));
 
     return {

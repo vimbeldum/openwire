@@ -9,7 +9,8 @@ const PROXY = '/api/haimaker';
 // Haimaker models (e.g. minimax) are thinking models — skip prompt repetition
 // and strip <think> tags from output
 const THINKING_MODEL_RE = /think|reasoning|deepseek-r1|qwq|minimax/i;
-const THINK_TAG_RE = /<think>[\s\S]*?<\/think>\s*/g;
+const THINK_TAG_RE = /<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\s*/gi;
+const UNCLOSED_THINK_RE = /<think(?:ing)?>[\s\S]*$/gi; // handles truncated responses
 
 /**
  * Fetch available Haimaker models (curated list from proxy).
@@ -60,7 +61,7 @@ export async function generateHaimakerMessage(modelId, systemPrompt, contextMess
 
     // Build OpenAI-style messages array — higher token budget because thinking models
     // use internal reasoning tokens before producing the visible reply
-    const instruction = systemPrompt + '\n\nReminder: Roman-script Hinglish only. No Devanagari. 1-2 short sentences max. No emoji. You MAY use *asterisks* ONLY for physical actions (e.g., *slaps him*, *runs away*). Always finish your sentence completely — never stop mid-word or mid-sentence.';
+    const instruction = systemPrompt + '\n\nReminder: Roman-script Hinglish only. No Devanagari. 1-2 short sentences max. No emoji. No asterisks. Output ONLY your in-character dialogue — no thinking, reasoning, meta-commentary, or preamble. Always finish your sentence completely — never stop mid-word or mid-sentence.';
 
     // Triple prompt repetition for non-thinking models (research shows 3x improves accuracy)
     const isThinking = THINKING_MODEL_RE.test(modelId);
@@ -114,8 +115,9 @@ export async function generateHaimakerMessage(modelId, systemPrompt, contextMess
     let text = data.choices?.[0]?.message?.content?.trim() || null;
 
     // Strip <think>...</think> reasoning blocks that thinking models emit
+    // Also handle unclosed <think> tags (response cut off mid-reasoning)
     if (text) {
-        text = text.replace(THINK_TAG_RE, '').trim() || null;
+        text = text.replace(THINK_TAG_RE, '').replace(UNCLOSED_THINK_RE, '').trim() || null;
     }
 
     if (IS_DEBUG_HM) {

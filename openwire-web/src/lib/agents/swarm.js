@@ -446,8 +446,18 @@ export class AgentSwarm {
     get mentionOnlyMode() { return this._mentionOnlyMode; }
     setMentionOnlyMode(on) {
         this._mentionOnlyMode = !!on;
-        if (!on) this._charActiveUntil = {}; // clear all activation windows
-        this._log(`[Config] Mention-only mode -> ${on ? 'ON' : 'OFF'}`);
+        if (on) {
+            // Activate ALL characters for 4 minutes on enable
+            const MENTION_ACTIVE_MS = 4 * 60 * 1000;
+            const until = Date.now() + MENTION_ACTIVE_MS;
+            Object.keys(this._characters).forEach(id => {
+                this._charActiveUntil[id] = until;
+            });
+            this._log(`[MentionOnly] ON — all characters active for 4 minutes`);
+        } else {
+            this._charActiveUntil = {};
+            this._log(`[Config] Mention-only mode -> OFF`);
+        }
     }
 
     setMood(characterId, mood) {
@@ -838,7 +848,7 @@ ${actionEngine}
 - IMPORTANT: When reacting to a group decision, use YOUR OWN WORDS. Do NOT repeat the exact phrase someone else just used. Add a unique angle!
 </group_decisions>
 
-${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}
+${c.gender ? `<gender>You are ${c.gender}. Use ${c.gender === 'male' ? 'he/him' : c.gender === 'female' ? 'she/her' : c.gender} pronouns when others refer to you.</gender>\n` : ''}${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}
 
 <task_execution>
 TASK DETECTION: When a human user asks you to DO something specific (pick players, write something, make a list, create a plan, track scores, remember teams, solve a problem step by step), this is a TASK — not just conversation. Detect it by verbs like: banao, karo, likho, yaad rakho, select karo, bata do, soch ke bata, note karo, plan banao, decide karo, write, pick, choose, list, track, remember, solve, explain step by step.
@@ -996,8 +1006,10 @@ CRITICAL — DISTINGUISH HUMANS FROM CHARACTERS:
 
             this._onTyping(characterId, c.name, c.avatar, false);
 
-            // Post-generation cleanup: strip emoji and asterisk actions the LLM may have added
+            // Post-generation cleanup: strip thinking tags, emoji, and asterisk actions
             if (text) {
+                // Strip <think>...</think> blocks and unclosed <think> tags from any provider
+                text = text.replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\s*/gi, '').replace(/<think(?:ing)?>[\s\S]*$/gi, '');
                 text = stripEmoji(text);
                 text = text.trim();
             }
@@ -1019,7 +1031,8 @@ CRITICAL — DISTINGUISH HUMANS FROM CHARACTERS:
                 this._checkCrossOver(characterId);
 
                 // Agent-to-agent @mention chain: if this agent tagged another agent, trigger their response
-                if (chainDepth < MAX_AGENT_CHAIN_DEPTH) {
+                // Disabled entirely in mention-only mode — only humans can activate characters
+                if (!this._mentionOnlyMode && chainDepth < MAX_AGENT_CHAIN_DEPTH) {
                     const mentionMatches = text.match(/@([A-Za-z][A-Za-z.\s()]*[A-Za-z)])/g);
                     if (mentionMatches) {
                         const triggered = new Set();
@@ -1035,8 +1048,7 @@ CRITICAL — DISTINGUISH HUMANS FROM CHARACTERS:
                                     || ch.id === mentionedLower
                                     || nameLower.startsWith(mentionedLower);
                             });
-                            if (target && target.id !== characterId && this._isActive(target.id) && !triggered.has(target.id)
-                                && (!this._mentionOnlyMode || (this._charActiveUntil[target.id] && this._charActiveUntil[target.id] > Date.now()))) {
+                            if (target && target.id !== characterId && this._isActive(target.id) && !triggered.has(target.id)) {
                                 triggered.add(target.id);
                                 this._log(`[AgentChain] ${c.name} tagged @${target.name} → triggering response (depth ${chainDepth + 1})`);
                                 this._generate(target.id, { force: true, chainDepth: chainDepth + 1 });
