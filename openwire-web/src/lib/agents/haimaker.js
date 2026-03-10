@@ -54,7 +54,7 @@ export function formatHaimakerLabel(model) {
  * Uses OpenAI-compatible chat completions format.
  */
 const IS_DEBUG_HM = typeof localStorage !== 'undefined' && localStorage.getItem('openwire_debug') === 'true';
-const FETCH_TIMEOUT_MS = 30_000;
+const FETCH_TIMEOUT_MS = 120_000; // Thinking models need up to 2 mins
 
 export async function generateHaimakerMessage(modelId, systemPrompt, contextMessages, maxTokens = 4096) {
 

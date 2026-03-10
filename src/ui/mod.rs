@@ -81,6 +81,8 @@ pub struct UiState {
     pub casino_state: CasinoState,
     /// Peers currently typing: (peer_short_id -> last_typing_time)
     pub typing_peers: std::collections::HashMap<String, std::time::Instant>,
+    /// Peer nicks from relay: (full_peer_id -> nick)
+    pub peer_nicks: std::collections::HashMap<String, String>,
     /// Path to persist chat history
     pub message_history_path: std::path::PathBuf,
     /// Game overlay state (visual game UI on top of chat)
@@ -108,6 +110,7 @@ impl UiState {
             wallet: Wallet::load(),
             casino_state: CasinoState::new(),
             typing_peers: std::collections::HashMap::new(),
+            peer_nicks: std::collections::HashMap::new(),
             message_history_path: dirs_next::home_dir()
                 .unwrap_or_else(|| std::path::PathBuf::from("."))
                 .join(".openwire")
@@ -1639,6 +1642,8 @@ impl UiApp {
                     if let Some(bracket_end) = content.find("] ") {
                         let nick = &content[7..bracket_end]; // skip "[relay:"
                         let rest = &content[bracket_end + 2..];
+                        // Store nick in peer_nicks map for future lookups
+                        self.state.peer_nicks.insert(from.to_string(), nick.to_string());
                         (Some(nick.to_string()), rest.to_string())
                     } else {
                         (None, content.clone())
@@ -1697,16 +1702,22 @@ impl UiApp {
                 if !self.state.peers.contains(&id_str) {
                     self.state.peers.push(id_str.clone());
                     let short = Self::short_id(&id_str, 8);
+                    let display = self.state.peer_nicks.get(&id_str)
+                        .map(|n| format!("{} ({})", n, short))
+                        .unwrap_or_else(|| short);
                     self.state
-                        .add_system_message(&format!("Peer joined: {}", short));
+                        .add_system_message(&format!("Peer joined: {}", display));
                 }
             }
             NetworkEvent::PeerDisconnected(peer_id) => {
                 let id_str = peer_id.to_string();
                 self.state.peers.retain(|p| p != &id_str);
                 let short = Self::short_id(&id_str, 8);
+                let display = self.state.peer_nicks.remove(&id_str)
+                    .map(|n| format!("{} ({})", n, short))
+                    .unwrap_or_else(|| short);
                 self.state
-                    .add_system_message(&format!("Peer left: {}", short));
+                    .add_system_message(&format!("Peer left: {}", display));
             }
             NetworkEvent::KeysExchanged(peer_id) => {
                 let short = Self::short_id(&peer_id.to_string(), 8);
@@ -2009,14 +2020,16 @@ impl UiApp {
                 .peers
                 .iter()
                 .map(|p| {
-                    let short = if p.len() > 12 {
+                    let display = if let Some(nick) = self.state.peer_nicks.get(p) {
+                        nick.clone()
+                    } else if p.len() > 12 {
                         format!("{}…", &p[..12])
                     } else {
                         p.clone()
                     };
                     ListItem::new(Line::from(vec![
                         Span::styled("● ", Style::default().fg(Color::Green)),
-                        Span::styled(short, Style::default().fg(Color::White)),
+                        Span::styled(display, Style::default().fg(Color::White)),
                     ]))
                 })
                 .collect();

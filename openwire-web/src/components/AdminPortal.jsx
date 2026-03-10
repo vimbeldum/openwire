@@ -370,27 +370,29 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                         {/* AI Cooldown controls */}
                         <div className="admin-agents-controls" style={{ marginTop: 0 }}>
                             <div className="admin-slider-group">
-                                <label>Per-character cooldown: <strong>{perCharCooldown}s</strong></label>
+                                <label>Per-character cooldown (s):</label>
                                 <input
-                                    type="range" min="1" max="30" step="1"
+                                    type="number" min="1" max="120"
                                     value={perCharCooldown}
                                     onChange={e => {
-                                        const v = parseInt(e.target.value);
+                                        const v = Math.max(1, parseInt(e.target.value) || 1);
                                         setPerCharCooldown(v);
                                         swarm?.setPerCharCooldown(v);
                                     }}
+                                    style={{ width: 70, padding: '4px 8px', background: 'var(--bg-primary, #111)', color: 'var(--text, #ccc)', border: '1px solid var(--border, #333)', borderRadius: 4 }}
                                 />
                             </div>
                             <div className="admin-slider-group">
-                                <label>Global AI cooldown: <strong>{globalCooldown}s</strong></label>
+                                <label>Global AI cooldown (s):</label>
                                 <input
-                                    type="range" min="1" max="20" step="1"
+                                    type="number" min="1" max="120"
                                     value={globalCooldown}
                                     onChange={e => {
-                                        const v = parseInt(e.target.value);
+                                        const v = Math.max(1, parseInt(e.target.value) || 1);
                                         setGlobalCooldown(v);
                                         swarm?.setGlobalCooldown(v);
                                     }}
+                                    style={{ width: 70, padding: '4px 8px', background: 'var(--bg-primary, #111)', color: 'var(--text, #ccc)', border: '1px solid var(--border, #333)', borderRadius: 4 }}
                                 />
                             </div>
                         </div>
