@@ -32,6 +32,8 @@ pub struct GameOverlay {
     pub button_areas: Vec<(String, Rect, char)>,
     pub bet_input: String,
     pub entering_bet: bool,
+    /// Roulette bet type key: 'r'=red, 'k'=black, 'o'=odd, 'e'=even, '#'=straight
+    pub bet_type_key: char,
     pub anim_frame: u16,
     pub animating: bool,
 }
@@ -40,7 +42,8 @@ impl GameOverlay {
     pub fn new() -> Self {
         Self {
             view: ActiveGameView::None, visible: false, button_areas: Vec::new(),
-            bet_input: String::new(), entering_bet: false, anim_frame: 0, animating: false,
+            bet_input: String::new(), entering_bet: false, bet_type_key: 'r',
+            anim_frame: 0, animating: false,
         }
     }
 }
@@ -164,7 +167,7 @@ fn render_bj(f: &mut Frame, area: Rect, game: &Blackjack, my_id: &str, bal: u32,
             if me.is_some_and(|p| p.hand.len() == 2 && p.split_hand.is_empty() && p.hand[0].value == p.hand[1].value) { a.push(("sPlit",'p')); }
             a
         }
-        BlackjackPhase::Ended => vec![("New round",'n')],
+        BlackjackPhase::Ended | BlackjackPhase::Settlement => vec![("New round",'n')],
         _ => vec![],
     };
     register_actions(ov, &acts);
@@ -198,12 +201,25 @@ fn render_rl(f: &mut Frame, area: Rect, game: &RouletteEngine, bal: u32, ov: &mu
         s("BLK ", Color::White), Span::raw("│"), s(" ODD", Color::White), Span::raw("│"),
         s("19-36", Color::White), Span::raw("│")]));
     l.push(Line::from(""));
+
+    // Show individual bets
+    if game.bets.is_empty() {
+        l.push(Line::from(s("  No bets placed — press [R]ed [K]black [O]dd [E]ven", Color::DarkGray)));
+    } else {
+        let mut bet_spans: Vec<Span<'static>> = vec![Span::raw("  Bets: ")];
+        for (i, bet) in game.bets.iter().enumerate() {
+            if i > 0 { bet_spans.push(Span::raw(", ")); }
+            bet_spans.push(s(&format!("${} {:?}", bet.amount, bet.bet_type), Color::Yellow));
+        }
+        l.push(Line::from(bet_spans));
+    }
+
+    // Result display
     let rt = if let Some(n) = game.result {
         let cn = if n == 0 { "Green" } else if ROULETTE_REDS.contains(&n) { "Red" } else { "Black" };
         format!("  Result: * {} ({})  ", n, cn)
-    } else { "  No result yet  ".into() };
-    l.push(Line::from(vec![s(&format!("  Bets: {}  ", game.bets.len()), Color::White),
-        s(&rt, Color::Yellow), s(&format!("Bal: ${}", bal), Color::Green)]));
+    } else { "  Waiting for spin...  ".into() };
+    l.push(Line::from(vec![s(&rt, Color::Yellow), s(&format!("  Bal: ${}", bal), Color::Green)]));
     f.render_widget(Paragraph::new(l), area);
     let acts: Vec<(&str, char)> = match game.phase {
         RoulettePhase::Betting => if ov.entering_bet { vec![("Enter=Confirm",'\n'),("Esc=Cancel",'\x1b')] }
@@ -372,14 +388,14 @@ pub fn handle_game_key(
                 _ => GameKeyResult::Ignored,
             },
             ActiveGameView::Roulette => match c {
-                'r'|'k'|'o'|'e'|'#' => { overlay.entering_bet = true; overlay.bet_input.clear(); GameKeyResult::Consumed }
+                'r'|'k'|'o'|'e'|'#' => { overlay.entering_bet = true; overlay.bet_input.clear(); overlay.bet_type_key = c; GameKeyResult::Consumed }
                 ' ' => GameKeyResult::Consumed,
                 _ => GameKeyResult::Ignored,
             },
             ActiveGameView::Slots => match c { ' '|'1'..='5' => GameKeyResult::Consumed, _ => GameKeyResult::Ignored },
             ActiveGameView::TicTacToe => match c { '1'..='9'|'r' => GameKeyResult::Consumed, _ => GameKeyResult::Ignored },
             ActiveGameView::AndarBahar => match c {
-                'a'|'b' => { overlay.entering_bet = true; overlay.bet_input.clear(); GameKeyResult::Consumed }
+                'a'|'b' => { overlay.entering_bet = true; overlay.bet_input.clear(); overlay.bet_type_key = c; GameKeyResult::Consumed }
                 'd' => GameKeyResult::Consumed,
                 _ => GameKeyResult::Ignored,
             },

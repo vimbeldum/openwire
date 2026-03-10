@@ -27,8 +27,8 @@ use tokio::sync::mpsc;
 
 use crate::game::{
     AndarBaharAction, AndarBaharBet, AndarBaharCountRange, AndarBaharEngine, AndarBaharSide,
-    Blackjack, BlackjackAction, BlackjackPhase, CasinoState, GameAction, RouletteAction, RouletteBet,
-    RouletteBetType, RouletteEngine, SlotsEngine, TicTacToe, TransactionLedger, Wallet,
+    Blackjack, BlackjackAction, BlackjackPhase, CasinoState, GameAction, PlayerStatus, RouletteAction, RouletteBet,
+    RouletteBetType, RouletteEngine, RoulettePhase, SlotsEngine, TicTacToe, TransactionLedger, Wallet,
 };
 use crate::network::{NetworkCommand, NetworkEvent};
 
@@ -209,6 +209,8 @@ pub struct UiApp {
     event_receiver: mpsc::Receiver<NetworkEvent>,
     /// Throttle typing broadcasts to once per 2 seconds
     last_typing_broadcast: std::time::Instant,
+    /// Whether mouse capture is currently enabled (only when overlay visible)
+    mouse_captured: bool,
 }
 
 impl UiApp {
@@ -222,7 +224,7 @@ impl UiApp {
     ) -> Result<Self> {
         enable_raw_mode()?;
         let mut stdout = io::stdout();
-        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        execute!(stdout, EnterAlternateScreen)?;
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend)?;
 
@@ -233,6 +235,7 @@ impl UiApp {
             event_receiver,
             last_typing_broadcast: std::time::Instant::now()
                 - std::time::Duration::from_secs(10),
+            mouse_captured: false,
         })
     }
 
@@ -244,6 +247,16 @@ impl UiApp {
             // Process any pending network events (non-blocking)
             while let Ok(event) = self.event_receiver.try_recv() {
                 self.handle_network_event(event);
+            }
+
+            // Toggle mouse capture: enable only when game overlay is visible
+            let want_mouse = self.state.game_overlay.visible;
+            if want_mouse && !self.mouse_captured {
+                let _ = execute!(io::stdout(), EnableMouseCapture);
+                self.mouse_captured = true;
+            } else if !want_mouse && self.mouse_captured {
+                let _ = execute!(io::stdout(), DisableMouseCapture);
+                self.mouse_captured = false;
             }
 
             // Poll for input events with a small timeout
@@ -411,8 +424,19 @@ impl UiApp {
                 _ => {}
             },
             game_ui::ActiveGameView::Roulette => match c {
-                ' ' => self.handle_roulette_command("/roulette spin").await,
-                _ => { /* bet entry handled separately */ }
+                ' ' => {
+                    // Space = spin (betting phase) or new round (after spin)
+                    if self.state.roulette_game.as_ref().map(|g| &g.phase) == Some(&RoulettePhase::Betting) {
+                        self.handle_roulette_command("/roulette spin").await;
+                    } else {
+                        // Start new round
+                        if let Some(ref mut game) = self.state.roulette_game {
+                            game.new_round();
+                        }
+                        self.state.add_system_message("Roulette: New round — place your bets!");
+                    }
+                }
+                _ => { /* bet entry handled separately via handle_overlay_bet_confirm */ }
             },
             game_ui::ActiveGameView::Slots => match c {
                 ' ' => self.handle_slots_command("/slots spin 10").await,
@@ -472,14 +496,23 @@ impl UiApp {
                 self.handle_blackjack_command(&cmd).await;
             }
             game_ui::ActiveGameView::Roulette => {
-                // For roulette, bet type was stored when user pressed r/k/o/e/#
-                // Default to red if unclear
-                let cmd = format!("/roulette bet red {}", amount_str);
+                let bet_type = match self.state.game_overlay.bet_type_key {
+                    'r' => "red",
+                    'k' => "black",
+                    'o' => "odd",
+                    'e' => "even",
+                    '#' => "straight",
+                    _ => "red",
+                };
+                let cmd = format!("/roulette bet {} {}", bet_type, amount_str);
                 self.handle_roulette_command(&cmd).await;
             }
             game_ui::ActiveGameView::AndarBahar => {
-                // Default to andar
-                let cmd = format!("/ab bet andar {}", amount_str);
+                let side = match self.state.game_overlay.bet_type_key {
+                    'b' => "bahar",
+                    _ => "andar",
+                };
+                let cmd = format!("/ab bet {} {}", side, amount_str);
                 self.handle_andarbahar_command(&cmd).await;
             }
             _ => {}
@@ -552,7 +585,7 @@ impl UiApp {
             self.state.add_system_message("");
             self.state.add_system_message("PRIVATE ROOMS:");
             self.state
-                .add_system_message("  /room create <name>         - Create room");
+                .add_system_message("  /room create <name>         - Create room (alias: /create <name>)");
             self.state
                 .add_system_message("  /room invite <peer> <room>  - Invite peer");
             self.state
@@ -663,6 +696,10 @@ impl UiApp {
             false
         } else if let Some(room_cmd) = input.strip_prefix("/room ") {
             self.handle_room_command(room_cmd.trim()).await;
+            false
+        } else if let Some(name) = input.strip_prefix("/create ") {
+            // Alias: /create <name> → /room create <name>
+            self.handle_room_command(&format!("create {}", name.trim())).await;
             false
         } else if let Some(game_cmd) = input.strip_prefix("/game ") {
             self.handle_game_command(game_cmd.trim()).await;
@@ -1130,6 +1167,43 @@ impl UiApp {
             if let Some(ref mut game) = self.state.blackjack_game {
                 game.run_dealer_turn();
             }
+
+            // Credit wallet based on settlement results
+            // Extract payout info first to avoid borrow conflicts
+            let my_id = self.state.local_peer_id.clone();
+            let payout_info: Option<(i64, u32)> = self.state.blackjack_game.as_ref().and_then(|game| {
+                game.players.iter().find(|p| p.peer_id == my_id).map(|player| {
+                    let payout: i64 = match player.status {
+                        PlayerStatus::BlackjackWin => (player.bet as i64) + (player.bet as i64 * 3 / 2),
+                        PlayerStatus::Win => (player.bet as i64) * 2,
+                        PlayerStatus::Push => player.bet as i64,
+                        _ => 0,
+                    };
+                    (payout, player.bet)
+                })
+            });
+            if let Some((payout, bet)) = payout_info {
+                if payout > 0 {
+                    self.state.wallet.credit(payout as u32);
+                    let net = payout - bet as i64;
+                    if net > 0 {
+                        self.state.casino_state.record_payout("blackjack", net);
+                        self.state.add_system_message(
+                            &format!("Blackjack: You won ${}! Balance: ${}", net, self.state.wallet.balance),
+                        );
+                    } else {
+                        self.state.add_system_message(
+                            &format!("Blackjack: Push — bet returned. Balance: ${}", self.state.wallet.balance),
+                        );
+                    }
+                } else {
+                    self.state.casino_state.record_payout("blackjack", -(bet as i64));
+                    self.state.add_system_message(
+                        &format!("Blackjack: You lost ${}. Balance: ${}", bet, self.state.wallet.balance),
+                    );
+                }
+            }
+
             self.render_blackjack();
             if let Some(rid) = room_id {
                 self.broadcast_bj_state_to_room(&rid).await;
@@ -2496,7 +2570,10 @@ impl Drop for UiApp {
     fn drop(&mut self) {
         self.state.save_message_history();
         let _ = disable_raw_mode();
-        let _ = execute!(self.terminal.backend_mut(), DisableMouseCapture, LeaveAlternateScreen);
+        if self.mouse_captured {
+            let _ = execute!(self.terminal.backend_mut(), DisableMouseCapture);
+        }
+        let _ = execute!(self.terminal.backend_mut(), LeaveAlternateScreen);
         let _ = self.terminal.show_cursor();
     }
 }
