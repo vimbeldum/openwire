@@ -382,6 +382,11 @@ async fn build_welcome(peer_id: &str, state: &WebState) -> String {
 async fn network_event_to_json(event: NetworkEvent, state: &WebState) -> Option<String> {
     match event {
         NetworkEvent::MessageReceived { from, data, .. } => {
+            let text = String::from_utf8_lossy(&data).into_owned();
+            // Don't forward internal CLI protocol messages to web clients
+            if text.starts_with("TYPING:") || text.starts_with("TICKER:") {
+                return None;
+            }
             let nick = {
                 let peers = state.connected_peers.read().await;
                 peers
@@ -389,7 +394,6 @@ async fn network_event_to_json(event: NetworkEvent, state: &WebState) -> Option<
                     .cloned()
                     .unwrap_or_else(|| from.to_string())
             };
-            let text = String::from_utf8_lossy(&data).into_owned();
             Some(
                 serde_json::to_string(&ServerMsg::Message {
                     nick,

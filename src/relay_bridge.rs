@@ -137,6 +137,10 @@ pub async fn run_relay_bridge(
                     }
 
                     let text = String::from_utf8_lossy(&data).into_owned();
+                    // Don't leak internal CLI protocol messages to relay peers
+                    if text.starts_with("TYPING:") || text.starts_with("TICKER:") {
+                        continue;
+                    }
                     let out = match serde_json::to_string(&RelayOut::Message { data: text }) {
                         Ok(s) => s,
                         Err(e) => {
