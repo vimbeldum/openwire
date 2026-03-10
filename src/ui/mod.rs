@@ -1541,6 +1541,58 @@ impl UiApp {
         }
     }
 
+    /// Try to parse a JSON message from web clients (agent_message, etc.)
+    /// Returns:
+    ///   Some(Some(display)) — recognized, show this string
+    ///   Some(None) — recognized internal protocol message, suppress entirely
+    ///   None — not JSON or not recognized, show raw content
+    fn try_parse_web_json(content: &str) -> Option<Option<String>> {
+        // Strip [web:Nick] or [relay:Nick] prefix if present
+        let json_str = if let Some(bracket_end) = content.find("] ") {
+            let after = &content[bracket_end + 2..];
+            if after.starts_with('{') { after } else { return None; }
+        } else if content.starts_with('{') {
+            content
+        } else {
+            return None;
+        };
+
+        let parsed: serde_json::Value = serde_json::from_str(json_str).ok()?;
+        let msg_type = parsed.get("type")?.as_str()?;
+
+        match msg_type {
+            "agent_message" => {
+                let nick = parsed.get("nick").and_then(|v| v.as_str()).unwrap_or("AI");
+                let text = parsed.get("text").and_then(|v| v.as_str()).unwrap_or("");
+                Some(Some(format!("[AI:{}] {}", nick, text)))
+            }
+            "mention_notify" => {
+                let from = parsed.get("from_nick").and_then(|v| v.as_str()).unwrap_or("?");
+                let text = parsed.get("text").and_then(|v| v.as_str()).unwrap_or("");
+                Some(Some(format!("[@{}] {}", from, text)))
+            }
+            "casino_ticker" | "tip" => {
+                let text = parsed.get("text")
+                    .or_else(|| parsed.get("message"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                Some(Some(format!("[ticker] {}", text)))
+            }
+            "context_summary" => {
+                let summary = parsed.get("summary").and_then(|v| v.as_str()).unwrap_or("");
+                Some(Some(format!("[AI summary] {}", summary)))
+            }
+            "game_new_round" => {
+                let game = parsed.get("game").and_then(|v| v.as_str()).unwrap_or("game");
+                Some(Some(format!("[web] New {} round started", game)))
+            }
+            // Silently consume internal protocol messages — don't show in TUI
+            "typing" | "react" | "ready_up" | "swarm_config" | "admin_announce"
+            | "screenshot_alert" | "whisper" => Some(None),
+            _ => None,
+        }
+    }
+
     /// Safely truncate a string to at most `n` chars, appending "…"
     fn short_id(s: &str, n: usize) -> String {
         if s.len() > n {
@@ -1585,16 +1637,23 @@ impl UiApp {
                 let display_content = if content.starts_with("[whisper from ") {
                     format!("[PM] {}", content)
                 } else {
-                    // Check for @mention of our nick
-                    let mention_marker = if content
-                        .to_lowercase()
-                        .contains(&format!("@{}", self.state.nick.to_lowercase()))
-                    {
-                        "[@] "
-                    } else {
-                        ""
-                    };
-                    format!("{}{}", mention_marker, content)
+                    // Try to parse JSON agent/custom messages from web clients
+                    match Self::try_parse_web_json(&content) {
+                        Some(Some(display)) => display,
+                        Some(None) => return, // Internal protocol message — suppress entirely
+                        None => {
+                            // Check for @mention of our nick
+                            let mention_marker = if content
+                                .to_lowercase()
+                                .contains(&format!("@{}", self.state.nick.to_lowercase()))
+                            {
+                                "[@] "
+                            } else {
+                                ""
+                            };
+                            format!("{}{}", mention_marker, content)
+                        }
+                    }
                 };
                 self.state.add_chat_message(&short, &display_content);
             }

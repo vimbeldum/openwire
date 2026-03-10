@@ -141,6 +141,10 @@ pub async fn run_relay_bridge(
                     if text.starts_with("TYPING:") || text.starts_with("TICKER:") {
                         continue;
                     }
+                    // Don't forward web-bridge loopbacks to relay (prevents echo)
+                    if text.starts_with("[web:") || text.starts_with("[relay:") {
+                        continue;
+                    }
                     let out = match serde_json::to_string(&RelayOut::Message { data: text }) {
                         Ok(s) => s,
                         Err(e) => {

@@ -87,6 +87,10 @@ enum ClientMsg {
         room_id: String,
         target_peer_id: String,
     },
+    /// Game action forwarded as a general broadcast (shared game room)
+    GameAction {
+        data: String,
+    },
     Ping,
 }
 
@@ -118,6 +122,11 @@ enum ServerMsg<'a> {
     RoomMessage {
         room_id: String,
         nick: String,
+        data: String,
+        peer_id: String,
+    },
+    /// Game state/action forwarded from CLI to web
+    GameAction {
         data: String,
         peer_id: String,
     },
@@ -523,6 +532,8 @@ async fn handle_client_message(
         }
 
         ClientMsg::RoomCreate { name } => {
+            // Create room via network — the RoomCreated event will be broadcast
+            // to all web clients and TUI via network_event_to_json
             let _ = state
                 .network_tx
                 .send(NetworkCommand::CreateRoom { name })
@@ -544,13 +555,30 @@ async fn handle_client_message(
         }
 
         ClientMsg::RoomMessage { room_id, data } => {
+            let nick = state
+                .connected_peers
+                .read()
+                .await
+                .get(peer_id)
+                .cloned()
+                .unwrap_or_else(|| peer_id[..8.min(peer_id.len())].to_string());
+            // Forward to gossipsub for P2P peers
             let _ = state
                 .network_tx
                 .send(NetworkCommand::SendRoomMessage {
-                    room_id,
-                    data: data.into_bytes(),
+                    room_id: room_id.clone(),
+                    data: data.clone().into_bytes(),
                 })
                 .await;
+            // Loopback to TUI + other web clients so the message is visible locally
+            let event = NetworkEvent::RoomMessageReceived {
+                from: peer_libp2p,
+                room_id,
+                sender_nick: nick,
+                content: data.into_bytes(),
+            };
+            let _ = state.event_broadcast.send(event.clone());
+            let _ = state.event_tx.send(event).await;
         }
 
         ClientMsg::RoomInvite {
@@ -564,6 +592,33 @@ async fn handle_client_message(
                     peer_id: target_peer_id,
                 })
                 .await;
+        }
+
+        ClientMsg::GameAction { data } => {
+            let nick = state
+                .connected_peers
+                .read()
+                .await
+                .get(peer_id)
+                .cloned()
+                .unwrap_or_else(|| peer_id[..8.min(peer_id.len())].to_string());
+            // Forward game action as a broadcast so CLI picks it up as a room message
+            let _ = state
+                .network_tx
+                .send(NetworkCommand::Broadcast {
+                    data: data.clone().into_bytes(),
+                    nick: nick.clone(),
+                })
+                .await;
+            // Loopback so all web clients see it too
+            let display = format!("[web:{}] {}", nick, data);
+            let event = NetworkEvent::MessageReceived {
+                from: peer_libp2p,
+                topic: "openwire-general".to_string(),
+                data: display.into_bytes(),
+            };
+            let _ = state.event_broadcast.send(event.clone());
+            let _ = state.event_tx.send(event).await;
         }
 
         ClientMsg::Ping => {
