@@ -107,8 +107,14 @@ async fn main() -> Result<()> {
     // Start web interface if --web flag is set
     if args.web {
         let web_port = args.web_port;
+        let web_command_tx = handle.command_sender.clone();
+        let web_event_broadcast = handle.event_broadcast.clone();
+        let web_peer_id = local_peer_id.clone();
         tokio::spawn(async move {
-            if let Err(e) = web::start_web_server(web_port).await {
+            if let Err(e) =
+                web::start_web_server(web_port, web_peer_id, web_command_tx, web_event_broadcast)
+                    .await
+            {
                 tracing::error!("Web server error: {}", e);
             }
         });
