@@ -1,20 +1,33 @@
 import { useState } from 'react';
 import { AdminPasswordGate } from './AdminPortal';
 
+const CLI_NODE_URL_KEY = 'openwire_cli_node_url';
+const DEFAULT_CLI_URL = import.meta.env.VITE_CLI_BRIDGE_URL || 'ws://localhost:18080';
+
 export default function Landing({ onJoin }) {
     const [name, setName] = useState('');
     const [showAdminGate, setShowAdminGate] = useState(false);
+    const [connectMode, setConnectMode] = useState('relay'); // 'relay' | 'cli-node'
+    const [cliUrl, setCliUrl] = useState(
+        () => localStorage.getItem(CLI_NODE_URL_KEY) || DEFAULT_CLI_URL
+    );
 
     const handleSubmit = (e) => {
         e.preventDefault();
         const nick = name.trim().replace(/[\x00-\x1f\x7f]/g, '').slice(0, 24) || 'Anonymous';
-        onJoin(nick, false);
+        if (connectMode === 'cli-node') {
+            const trimmed = cliUrl.trim() || DEFAULT_CLI_URL;
+            localStorage.setItem(CLI_NODE_URL_KEY, trimmed);
+            onJoin(nick, false, { mode: 'cli-node', cliUrl: trimmed });
+        } else {
+            onJoin(nick, false, { mode: 'relay' });
+        }
     };
 
     const handleAdminSuccess = () => {
         setShowAdminGate(false);
         const nick = name.trim() || 'Admin';
-        onJoin(nick, true);
+        onJoin(nick, true, { mode: 'relay' });
     };
 
     return (
@@ -35,6 +48,44 @@ export default function Landing({ onJoin }) {
                     autoFocus
                     maxLength={24}
                 />
+
+                {/* Connection mode selector */}
+                <div className="landing-connect-via">
+                    <span className="landing-connect-via-label">Connect via</span>
+                    <div className="landing-connect-via-options">
+                        <label className="landing-radio-option">
+                            <input
+                                type="radio"
+                                name="connectMode"
+                                value="relay"
+                                checked={connectMode === 'relay'}
+                                onChange={() => setConnectMode('relay')}
+                            />
+                            <span>OpenWire Relay</span>
+                        </label>
+                        <label className="landing-radio-option">
+                            <input
+                                type="radio"
+                                name="connectMode"
+                                value="cli-node"
+                                checked={connectMode === 'cli-node'}
+                                onChange={() => setConnectMode('cli-node')}
+                            />
+                            <span>Local CLI Node</span>
+                        </label>
+                    </div>
+                    {connectMode === 'cli-node' && (
+                        <input
+                            className="landing-cli-url-input"
+                            type="text"
+                            placeholder="ws://192.168.1.x:18080"
+                            value={cliUrl}
+                            onChange={(e) => setCliUrl(e.target.value)}
+                            spellCheck={false}
+                        />
+                    )}
+                </div>
+
                 <button type="submit">Connect →</button>
             </form>
             <button

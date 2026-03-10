@@ -61,7 +61,7 @@ function saveMessages(messages) {
     } catch { }
 }
 
-export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin }) {
+export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, connectionConfig = { mode: 'relay' } }) {
     // Dynamic agent characters from store (for @mention matching) — memoized to avoid rebuild every render
     const CHARACTERS = useMemo(() => getCharactersDict(loadStore()), []);
 
@@ -1641,13 +1641,26 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin })
                 setConnected(false);
                 addMsg('★', '⚠ Disconnected — reconnecting...', 'system');
                 break;
+
+            case 'cli_node_connecting':
+                addMsg('★', `Connecting to CLI node at ${msg.url}...`, 'system');
+                break;
+
+            case 'cli_node_fallback':
+                addMsg('★', `CLI node unreachable — falling back to OpenWire Relay`, 'system');
+                break;
         }
     };
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         const adminSecret = isAdminRef.current ? (localStorage.getItem('openwire_admin_secret') || '') : '';
-        socket.connect(nickRef.current, (msg) => onWsEventRef.current?.(msg), { isAdmin: isAdminRef.current, adminSecret });
+        const opts = { isAdmin: isAdminRef.current, adminSecret };
+        if (connectionConfig.mode === 'cli-node' && connectionConfig.cliUrl) {
+            socket.connectToCliNode(connectionConfig.cliUrl, nickRef.current, (msg) => onWsEventRef.current?.(msg), opts);
+        } else {
+            socket.connect(nickRef.current, (msg) => onWsEventRef.current?.(msg), opts);
+        }
         return () => socket.disconnect();
     }, []);
 
