@@ -15,10 +15,14 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{RwLock, broadcast, mpsc};
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::network::{NetworkCommand, NetworkEvent};
+
+/// Monotonically-increasing counter so each WS connection gets a unique ID.
+static CONNECTION_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 // ── Shared app state ────────────────────────────────────────────────────────
 
@@ -31,6 +35,8 @@ pub struct WebState {
     network_tx: mpsc::Sender<NetworkCommand>,
     /// Broadcast sender — each WS handler subscribes a new receiver
     event_broadcast: broadcast::Sender<NetworkEvent>,
+    /// Direct sender into the TUI event queue (used to inject synthetic events)
+    event_tx: mpsc::Sender<NetworkEvent>,
     /// peer_id → nick for every known web client
     connected_peers: Arc<RwLock<HashMap<String, String>>>,
     /// room_id → room_name
@@ -126,11 +132,13 @@ pub async fn start_web_server(
     local_peer_id: String,
     network_tx: mpsc::Sender<NetworkCommand>,
     event_broadcast: broadcast::Sender<NetworkEvent>,
+    event_tx: mpsc::Sender<NetworkEvent>,
 ) -> Result<()> {
     let state = WebState {
         local_peer_id: Arc::new(local_peer_id),
         network_tx,
         event_broadcast,
+        event_tx,
         connected_peers: Arc::new(RwLock::new(HashMap::new())),
         rooms: Arc::new(RwLock::new(HashMap::new())),
     };
@@ -232,7 +240,14 @@ async fn ws_handler(
 /// Both tasks share a channel that is closed when either side exits, so the
 /// connection is torn down cleanly without leaking tasks.
 async fn handle_ws_connection(socket: WebSocket, state: WebState) {
-    let peer_id = state.local_peer_id.as_str().to_owned();
+    // Give every connection a unique, stable ID so multiple web clients
+    // don't collide in connected_peers.
+    let conn_n = CONNECTION_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let conn_str = format!("webclient-{:08x}", conn_n);
+    let peer_libp2p = peer_id_for_web_client(&conn_str);
+    // Use the libp2p PeerId's base58 string as the canonical map key so that
+    // NetworkEvent::PeerDiscovered(peer_libp2p) lookups find the right nick.
+    let peer_id = peer_libp2p.to_string();
 
     // Subscribe to broadcast events before anything else so we don't miss any
     let mut event_rx = state.event_broadcast.subscribe();
@@ -304,6 +319,7 @@ async fn handle_ws_connection(socket: WebSocket, state: WebState) {
     // ── Task C: read from WS client → forward to network ────────────────────
     let state_c = state.clone();
     let peer_id_c = peer_id.clone();
+    let peer_libp2p_c = peer_libp2p;
     let ws_tx_c = ws_tx;
     while let Some(result) = {
         use futures::StreamExt;
@@ -311,7 +327,14 @@ async fn handle_ws_connection(socket: WebSocket, state: WebState) {
     } {
         match result {
             Ok(Message::Text(text)) => {
-                handle_client_message(text.as_str(), &peer_id_c, &state_c, &ws_tx_c).await;
+                handle_client_message(
+                    text.as_str(),
+                    &peer_id_c,
+                    peer_libp2p_c,
+                    &state_c,
+                    &ws_tx_c,
+                )
+                .await;
             }
             Ok(Message::Close(_)) | Err(_) => break,
             _ => {} // ping/pong/binary — ignore
@@ -322,7 +345,11 @@ async fn handle_ws_connection(socket: WebSocket, state: WebState) {
     network_task.abort();
     send_task.abort();
 
-    // Remove from known peers
+    // Announce disconnect to all remaining web clients and TUI
+    let disc_event = NetworkEvent::PeerDisconnected(peer_libp2p_c);
+    let _ = state.event_broadcast.send(disc_event.clone());
+    let _ = state.event_tx.send(disc_event).await;
+
     state.connected_peers.write().await.remove(&peer_id);
     tracing::debug!("WebSocket client disconnected: {}", peer_id);
 }
@@ -437,6 +464,7 @@ async fn network_event_to_json(event: NetworkEvent, state: &WebState) -> Option<
 async fn handle_client_message(
     text: &str,
     peer_id: &str,
+    peer_libp2p: libp2p::PeerId,
     state: &WebState,
     ws_tx: &mpsc::Sender<String>,
 ) {
@@ -456,15 +484,39 @@ async fn handle_client_message(
                 .await
                 .insert(peer_id.to_owned(), nick.clone());
             tracing::debug!("Web client joined as '{}'", nick);
+            // Announce to all other web clients (→ ServerMsg::PeerJoined) and TUI
+            let event = NetworkEvent::PeerDiscovered(peer_libp2p);
+            let _ = state.event_broadcast.send(event.clone());
+            let _ = state.event_tx.send(event).await;
         }
 
         ClientMsg::Message { data } => {
+            // Forward to gossipsub for any P2P peers on the network
             let _ = state
                 .network_tx
                 .send(NetworkCommand::Broadcast {
-                    data: data.into_bytes(),
+                    data: data.clone().into_bytes(),
                 })
                 .await;
+            // Echo to ALL web clients on this bridge + TUI, regardless of
+            // gossipsub success (no P2P peers needed for local delivery).
+            let nick = {
+                state
+                    .connected_peers
+                    .read()
+                    .await
+                    .get(peer_id)
+                    .cloned()
+                    .unwrap_or_else(|| peer_id[..8.min(peer_id.len())].to_string())
+            };
+            let display = format!("[web:{}] {}", nick, data);
+            let event = NetworkEvent::MessageReceived {
+                from: peer_libp2p,
+                topic: "openwire-general".to_string(),
+                data: display.into_bytes(),
+            };
+            let _ = state.event_broadcast.send(event.clone());
+            let _ = state.event_tx.send(event).await;
         }
 
         ClientMsg::RoomCreate { name } => {
@@ -515,5 +567,23 @@ async fn handle_client_message(
             let pong = serde_json::to_string(&ServerMsg::Pong).unwrap_or_default();
             let _ = ws_tx.send(pong).await;
         }
+    }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Deterministically derive a stable `PeerId` from a web-client connection ID
+/// string.  The same approach is used in `relay_bridge` so both bridges are
+/// consistent: SHA-256 of the string → treat as ed25519 seed → PeerId.
+fn peer_id_for_web_client(s: &str) -> libp2p::PeerId {
+    use sha2::Digest;
+    let digest = sha2::Sha256::digest(s.as_bytes());
+    let mut kp_bytes = [0u8; 64];
+    kp_bytes[..32].copy_from_slice(&digest);
+    kp_bytes[32..].copy_from_slice(&digest);
+    if let Ok(kp) = libp2p::identity::ed25519::Keypair::try_from_bytes(&mut kp_bytes) {
+        libp2p::PeerId::from(libp2p::identity::Keypair::from(kp).public())
+    } else {
+        libp2p::PeerId::random()
     }
 }

@@ -81,6 +81,10 @@ dirs-next = "2"
 # HTTP client for GIF API
 reqwest = { version = "0.12", features = ["json"] }
 
+# WebSocket client for relay bridge
+tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
+tungstenite = "0.26"
+
 [profile.release]
 lto = true
 codegen-units = 1

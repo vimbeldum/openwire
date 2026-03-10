@@ -19,6 +19,7 @@ mod game;
 mod klipy;
 mod media;
 mod network;
+mod relay_bridge;
 mod room;
 mod ui;
 mod web;
@@ -56,6 +57,11 @@ struct Args {
     /// Log level (trace, debug, info, warn, error)
     #[arg(short, long, default_value = "warn")]
     log_level: String,
+
+    /// Cloud relay URL to bridge into (enables relay bridge when set).
+    /// Example: wss://openwire-relay.openwire.workers.dev
+    #[arg(long)]
+    relay_url: Option<String>,
 }
 
 #[tokio::main]
@@ -109,13 +115,53 @@ async fn main() -> Result<()> {
         let web_port = args.web_port;
         let web_command_tx = handle.command_sender.clone();
         let web_event_broadcast = handle.event_broadcast.clone();
+        let web_event_tx = handle.event_tx.clone();
         let web_peer_id = local_peer_id.clone();
         tokio::spawn(async move {
-            if let Err(e) =
-                web::start_web_server(web_port, web_peer_id, web_command_tx, web_event_broadcast)
-                    .await
+            if let Err(e) = web::start_web_server(
+                web_port,
+                web_peer_id,
+                web_command_tx,
+                web_event_broadcast,
+                web_event_tx,
+            )
+            .await
             {
                 tracing::error!("Web server error: {}", e);
+            }
+        });
+    }
+
+    // Start relay bridge if --relay-url is set
+    if let Some(relay_url) = args.relay_url {
+        let relay_command_tx = handle.command_sender.clone();
+        let relay_event_broadcast = handle.event_broadcast.clone();
+        let relay_event_tx = handle.event_tx.clone();
+        let relay_nick = args.nick.clone();
+        tokio::spawn(async move {
+            loop {
+                if let Err(e) = relay_bridge::run_relay_bridge(
+                    relay_url.clone(),
+                    relay_nick.clone(),
+                    relay_command_tx.clone(),
+                    relay_event_broadcast.clone(),
+                    relay_event_tx.clone(),
+                )
+                .await
+                {
+                    tracing::warn!("Relay bridge disconnected: {}. Reconnecting...", e);
+                }
+                // Exponential back-off capped at 30 s
+                static BACKOFF: std::sync::atomic::AtomicU64 =
+                    std::sync::atomic::AtomicU64::new(1);
+                let secs = BACKOFF
+                    .fetch_update(
+                        std::sync::atomic::Ordering::Relaxed,
+                        std::sync::atomic::Ordering::Relaxed,
+                        |v| Some((v * 2).min(30)),
+                    )
+                    .unwrap_or(5);
+                tokio::time::sleep(std::time::Duration::from_secs(secs)).await;
             }
         });
     }

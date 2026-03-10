@@ -270,6 +270,8 @@ pub struct NetworkHandle {
     pub event_receiver: mpsc::Receiver<NetworkEvent>,
     /// Subscribe to broadcast of all network events (used by web bridge)
     pub event_broadcast: broadcast::Sender<NetworkEvent>,
+    /// Inject events directly into the TUI event queue (used by relay bridge and web bridge)
+    pub event_tx: mpsc::Sender<NetworkEvent>,
 }
 
 /// The main network manager
@@ -394,6 +396,9 @@ impl Network {
         let encryption_key = crypto.read().await.encryption_public_key();
         let room_manager = Arc::new(RwLock::new(RoomManager::new(encryption_key)));
 
+        // Clone before moving event_sender into the network struct
+        let event_tx_for_handle = event_sender.clone();
+
         let network = Self {
             swarm,
             event_sender,
@@ -412,6 +417,7 @@ impl Network {
             command_sender,
             event_receiver,
             event_broadcast,
+            event_tx: event_tx_for_handle,
         };
 
         Ok((network, handle))
