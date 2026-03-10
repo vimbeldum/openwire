@@ -12,11 +12,11 @@
 use anyhow::Result;
 use futures::StreamExt;
 use libp2p::{
-    gossipsub, mdns, noise, swarm::NetworkBehaviour, tcp, yamux, Multiaddr, PeerId, SwarmBuilder,
+    Multiaddr, PeerId, SwarmBuilder, gossipsub, mdns, noise, swarm::NetworkBehaviour, tcp, yamux,
 };
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 
 use crate::crypto::CryptoManager;
 use crate::room::RoomManager;
@@ -961,11 +961,10 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                             let mut room_manager = network.room_manager.write().await;
                             room_manager.leave_room(&room_id)
                         };
-                        if let Some(_room) = room {
-                            if let Err(e) = network.unsubscribe_from_room(&room_id) {
+                        if let Some(_room) = room
+                            && let Err(e) = network.unsubscribe_from_room(&room_id) {
                                 tracing::error!("Failed to unsubscribe from room {}: {}", room_id, e);
                             }
-                        }
                     }
                     NetworkCommand::ListRooms => {
                         let rooms = {

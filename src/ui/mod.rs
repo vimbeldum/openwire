@@ -7,9 +7,10 @@ use anyhow::Result;
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
@@ -18,7 +19,6 @@ use ratatui::{
         Block, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
         Wrap,
     },
-    Terminal,
 };
 use std::io;
 use tokio::sync::mpsc;
@@ -174,86 +174,85 @@ impl UiApp {
             }
 
             // Poll for keyboard events with a small timeout
-            if event::poll(std::time::Duration::from_millis(50))? {
-                if let Event::Key(key) = event::read()? {
-                    match (key.code, key.modifiers) {
-                        (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
-                            let _ = self.command_sender.send(NetworkCommand::Shutdown).await;
+            if event::poll(std::time::Duration::from_millis(50))?
+                && let Event::Key(key) = event::read()?
+            {
+                match (key.code, key.modifiers) {
+                    (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
+                        let _ = self.command_sender.send(NetworkCommand::Shutdown).await;
+                        break;
+                    }
+                    (KeyCode::Esc, _) => {
+                        let _ = self.command_sender.send(NetworkCommand::Shutdown).await;
+                        break;
+                    }
+                    (KeyCode::Enter, _) => {
+                        if self.handle_submit().await {
                             break;
                         }
-                        (KeyCode::Esc, _) => {
-                            let _ = self.command_sender.send(NetworkCommand::Shutdown).await;
-                            break;
+                    }
+                    (KeyCode::Char(c), _) => {
+                        self.state.input.insert(self.state.cursor_pos, c);
+                        self.state.cursor_pos += 1;
+                    }
+                    (KeyCode::Backspace, _) => {
+                        if self.state.cursor_pos > 0 {
+                            self.state.cursor_pos -= 1;
+                            self.state.input.remove(self.state.cursor_pos);
                         }
-                        (KeyCode::Enter, _) => {
-                            if self.handle_submit().await {
-                                break;
-                            }
+                    }
+                    (KeyCode::Delete, _) => {
+                        if self.state.cursor_pos < self.state.input.len() {
+                            self.state.input.remove(self.state.cursor_pos);
                         }
-                        (KeyCode::Char(c), _) => {
-                            self.state.input.insert(self.state.cursor_pos, c);
+                    }
+                    (KeyCode::Left, _) => {
+                        if self.state.cursor_pos > 0 {
+                            self.state.cursor_pos -= 1;
+                        }
+                    }
+                    (KeyCode::Right, _) => {
+                        if self.state.cursor_pos < self.state.input.len() {
                             self.state.cursor_pos += 1;
                         }
-                        (KeyCode::Backspace, _) => {
-                            if self.state.cursor_pos > 0 {
-                                self.state.cursor_pos -= 1;
-                                self.state.input.remove(self.state.cursor_pos);
-                            }
-                        }
-                        (KeyCode::Delete, _) => {
-                            if self.state.cursor_pos < self.state.input.len() {
-                                self.state.input.remove(self.state.cursor_pos);
-                            }
-                        }
-                        (KeyCode::Left, _) => {
-                            if self.state.cursor_pos > 0 {
-                                self.state.cursor_pos -= 1;
-                            }
-                        }
-                        (KeyCode::Right, _) => {
-                            if self.state.cursor_pos < self.state.input.len() {
-                                self.state.cursor_pos += 1;
-                            }
-                        }
-                        (KeyCode::Home, _) => {
-                            self.state.cursor_pos = 0;
-                        }
-                        (KeyCode::End, _) => {
-                            self.state.cursor_pos = self.state.input.len();
-                        }
-                        (KeyCode::Up, _) => {
-                            // Scroll up (towards older messages)
-                            self.state.auto_scroll = false;
-                            let max_scroll = self.state.messages.len().saturating_sub(1);
-                            if self.state.scroll_offset < max_scroll {
-                                self.state.scroll_offset += 1;
-                            }
-                        }
-                        (KeyCode::Down, _) => {
-                            // Scroll down (towards newer messages)
-                            if self.state.scroll_offset > 0 {
-                                self.state.scroll_offset -= 1;
-                            }
-                            if self.state.scroll_offset == 0 {
-                                self.state.auto_scroll = true;
-                            }
-                        }
-                        (KeyCode::PageUp, _) => {
-                            // Scroll up by 10 messages
-                            self.state.auto_scroll = false;
-                            let max_scroll = self.state.messages.len().saturating_sub(1);
-                            self.state.scroll_offset =
-                                (self.state.scroll_offset + 10).min(max_scroll);
-                        }
-                        (KeyCode::PageDown, _) => {
-                            // Scroll down by 10 messages
-                            self.state.scroll_offset = self.state.scroll_offset.saturating_sub(10);
-                            if self.state.scroll_offset == 0 {
-                                self.state.auto_scroll = true;
-                            }
-                        }
-                        _ => {}
                     }
+                    (KeyCode::Home, _) => {
+                        self.state.cursor_pos = 0;
+                    }
+                    (KeyCode::End, _) => {
+                        self.state.cursor_pos = self.state.input.len();
+                    }
+                    (KeyCode::Up, _) => {
+                        // Scroll up (towards older messages)
+                        self.state.auto_scroll = false;
+                        let max_scroll = self.state.messages.len().saturating_sub(1);
+                        if self.state.scroll_offset < max_scroll {
+                            self.state.scroll_offset += 1;
+                        }
+                    }
+                    (KeyCode::Down, _) => {
+                        // Scroll down (towards newer messages)
+                        if self.state.scroll_offset > 0 {
+                            self.state.scroll_offset -= 1;
+                        }
+                        if self.state.scroll_offset == 0 {
+                            self.state.auto_scroll = true;
+                        }
+                    }
+                    (KeyCode::PageUp, _) => {
+                        // Scroll up by 10 messages
+                        self.state.auto_scroll = false;
+                        let max_scroll = self.state.messages.len().saturating_sub(1);
+                        self.state.scroll_offset = (self.state.scroll_offset + 10).min(max_scroll);
+                    }
+                    (KeyCode::PageDown, _) => {
+                        // Scroll down by 10 messages
+                        self.state.scroll_offset = self.state.scroll_offset.saturating_sub(10);
+                        if self.state.scroll_offset == 0 {
+                            self.state.auto_scroll = true;
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -520,8 +519,10 @@ impl UiApp {
             if room_id.is_empty() {
                 // Try to use the first room if available
                 if self.state.rooms.is_empty() {
-                    self.state.add_system_message("Usage: /game tictactoe <room_id>");
-                    self.state.add_system_message("You must be in a room first. Use /room create <name>");
+                    self.state
+                        .add_system_message("Usage: /game tictactoe <room_id>");
+                    self.state
+                        .add_system_message("You must be in a room first. Use /room create <name>");
                     return;
                 }
                 let room_id = self.state.rooms[0].0.clone();
@@ -543,18 +544,25 @@ impl UiApp {
                     challenger_nick: self.state.nick.clone(),
                     room_id: room_id.clone(),
                 };
-                let _ = self.command_sender.send(NetworkCommand::SendRoomMessage {
-                    room_id,
-                    data: action.to_bytes(),
-                }).await;
+                let _ = self
+                    .command_sender
+                    .send(NetworkCommand::SendRoomMessage {
+                        room_id,
+                        data: action.to_bytes(),
+                    })
+                    .await;
             } else {
-                self.state.add_system_message("No active game. Start one with /game tictactoe <room_id>");
+                self.state
+                    .add_system_message("No active game. Start one with /game tictactoe <room_id>");
             }
         } else {
             self.state.add_system_message("Game commands:");
-            self.state.add_system_message("  /game tictactoe <room_id>  - Start a game");
-            self.state.add_system_message("  /game rematch              - Play again");
-            self.state.add_system_message("  /move <1-9>                - Make a move");
+            self.state
+                .add_system_message("  /game tictactoe <room_id>  - Start a game");
+            self.state
+                .add_system_message("  /game rematch              - Play again");
+            self.state
+                .add_system_message("  /move <1-9>                - Make a move");
         }
     }
 
@@ -562,11 +570,13 @@ impl UiApp {
     async fn start_game_challenge(&mut self, room_id: &str) {
         // Verify we're in this room
         if !self.state.rooms.iter().any(|(id, _)| id == room_id) {
-            self.state.add_system_message(&format!("You are not in room '{}'", room_id));
+            self.state
+                .add_system_message(&format!("You are not in room '{}'", room_id));
             return;
         }
 
-        self.state.add_system_message("🎮 Starting Tic-Tac-Toe! Waiting for opponent...");
+        self.state
+            .add_system_message("🎮 Starting Tic-Tac-Toe! Waiting for opponent...");
 
         // Send challenge to the room
         let action = GameAction::Challenge {
@@ -574,10 +584,13 @@ impl UiApp {
             challenger_nick: self.state.nick.clone(),
             room_id: room_id.to_string(),
         };
-        let _ = self.command_sender.send(NetworkCommand::SendRoomMessage {
-            room_id: room_id.to_string(),
-            data: action.to_bytes(),
-        }).await;
+        let _ = self
+            .command_sender
+            .send(NetworkCommand::SendRoomMessage {
+                room_id: room_id.to_string(),
+                data: action.to_bytes(),
+            })
+            .await;
     }
 
     /// Handle /move command
@@ -637,24 +650,31 @@ impl UiApp {
             room_id: room_id.clone(),
             player: self.state.local_peer_id.clone(),
         };
-        let _ = self.command_sender.send(NetworkCommand::SendRoomMessage {
-            room_id,
-            data: action.to_bytes(),
-        }).await;
+        let _ = self
+            .command_sender
+            .send(NetworkCommand::SendRoomMessage {
+                room_id,
+                data: action.to_bytes(),
+            })
+            .await;
     }
 
     /// Handle blackjack commands
     async fn handle_blackjack_command(&mut self, cmd: &str) {
-        let cmd = cmd.strip_prefix("/bj").unwrap_or(cmd.strip_prefix("/blackjack").unwrap_or(cmd));
+        let cmd = cmd
+            .strip_prefix("/bj")
+            .unwrap_or(cmd.strip_prefix("/blackjack").unwrap_or(cmd));
 
         // Start new game
         if cmd.is_empty() || cmd.trim() == "" {
             if self.state.blackjack_game.is_some() {
-                self.state.add_system_message("Blackjack game already in progress.");
+                self.state
+                    .add_system_message("Blackjack game already in progress.");
                 return;
             }
             if self.state.rooms.is_empty() {
-                self.state.add_system_message("You need to be in a room first. /room create <name>");
+                self.state
+                    .add_system_message("You need to be in a room first. /room create <name>");
                 return;
             }
             let room_id = self.state.rooms[0].0.clone();
@@ -662,7 +682,8 @@ impl UiApp {
             game.add_player(self.state.local_peer_id.clone(), self.state.nick.clone());
 
             self.state.blackjack_game = Some(game);
-            self.state.add_system_message("🃏 Blackjack started! /bj bet <amount> to place your bet.");
+            self.state
+                .add_system_message("🃏 Blackjack started! /bj bet <amount> to place your bet.");
 
             // Broadcast start
             let action = BlackjackAction::Start {
@@ -670,16 +691,20 @@ impl UiApp {
                 host: self.state.local_peer_id.clone(),
                 host_nick: self.state.nick.clone(),
             };
-            let _ = self.command_sender.send(NetworkCommand::SendRoomMessage {
-                room_id: self.state.rooms[0].0.clone(),
-                data: action.to_bytes(),
-            }).await;
+            let _ = self
+                .command_sender
+                .send(NetworkCommand::SendRoomMessage {
+                    room_id: self.state.rooms[0].0.clone(),
+                    data: action.to_bytes(),
+                })
+                .await;
             return;
         }
 
         // Other commands need an active game
         if self.state.blackjack_game.is_none() {
-            self.state.add_system_message("No blackjack game. Use /blackjack to start one.");
+            self.state
+                .add_system_message("No blackjack game. Use /blackjack to start one.");
             return;
         }
 
@@ -696,9 +721,9 @@ impl UiApp {
             if let Some(ref mut game) = self.state.blackjack_game {
                 game.place_bet(&self.state.local_peer_id, amount);
             }
-            self.state.add_system_message(&format!("Bet placed: ${}", amount));
+            self.state
+                .add_system_message(&format!("Bet placed: ${}", amount));
             self.broadcast_bj_state().await;
-
         } else if cmd == "deal" {
             let can_deal = {
                 if let Some(ref game) = self.state.blackjack_game {
@@ -708,7 +733,8 @@ impl UiApp {
                 }
             };
             if !can_deal {
-                self.state.add_system_message("No one has placed a bet yet!");
+                self.state
+                    .add_system_message("No one has placed a bet yet!");
                 return;
             }
             if let Some(ref mut game) = self.state.blackjack_game {
@@ -717,7 +743,6 @@ impl UiApp {
             self.render_blackjack();
             self.broadcast_bj_state().await;
             self.maybe_run_dealer().await;
-
         } else if cmd == "hit" {
             let is_turn = {
                 if let Some(ref game) = self.state.blackjack_game {
@@ -736,7 +761,6 @@ impl UiApp {
             self.render_blackjack();
             self.broadcast_bj_state().await;
             self.maybe_run_dealer().await;
-
         } else if cmd == "stand" {
             let is_turn = {
                 if let Some(ref game) = self.state.blackjack_game {
@@ -755,16 +779,16 @@ impl UiApp {
             self.render_blackjack();
             self.broadcast_bj_state().await;
             self.maybe_run_dealer().await;
-
         } else if cmd == "newround" || cmd == "new" {
             if let Some(ref mut game) = self.state.blackjack_game {
                 game.new_round();
             }
-            self.state.add_system_message("New round! /bj bet <amount> to place your bet.");
+            self.state
+                .add_system_message("New round! /bj bet <amount> to place your bet.");
             self.broadcast_bj_state().await;
-
         } else {
-            self.state.add_system_message("Blackjack commands: bet <amount>, deal, hit, stand, newround");
+            self.state
+                .add_system_message("Blackjack commands: bet <amount>, deal, hit, stand, newround");
         }
     }
 
@@ -778,11 +802,10 @@ impl UiApp {
         };
         if needs_dealer {
             let room_id = {
-                if let Some(ref game) = self.state.blackjack_game {
-                    Some(game.room_id.clone())
-                } else {
-                    None
-                }
+                self.state
+                    .blackjack_game
+                    .as_ref()
+                    .map(|game| game.room_id.clone())
             };
             if let Some(ref mut game) = self.state.blackjack_game {
                 game.run_dealer_turn();
@@ -807,10 +830,13 @@ impl UiApp {
             let room_id = game.room_id.clone();
             let state_json = serde_json::to_string(game).unwrap_or_default();
             let action = BlackjackAction::State { state_json };
-            let _ = self.command_sender.send(NetworkCommand::SendRoomMessage {
-                room_id,
-                data: action.to_bytes(),
-            }).await;
+            let _ = self
+                .command_sender
+                .send(NetworkCommand::SendRoomMessage {
+                    room_id,
+                    data: action.to_bytes(),
+                })
+                .await;
         }
     }
 
@@ -818,29 +844,41 @@ impl UiApp {
         if let Some(ref game) = self.state.blackjack_game {
             let state_json = serde_json::to_string(game).unwrap_or_default();
             let action = BlackjackAction::State { state_json };
-            let _ = self.command_sender.send(NetworkCommand::SendRoomMessage {
-                room_id: room_id.to_string(),
-                data: action.to_bytes(),
-            }).await;
+            let _ = self
+                .command_sender
+                .send(NetworkCommand::SendRoomMessage {
+                    room_id: room_id.to_string(),
+                    data: action.to_bytes(),
+                })
+                .await;
         }
     }
 
     /// Handle an incoming game action from another player
-    fn handle_incoming_game_action(&mut self, room_id: &str, sender_nick: &str, action: GameAction) {
+    fn handle_incoming_game_action(
+        &mut self,
+        room_id: &str,
+        sender_nick: &str,
+        action: GameAction,
+    ) {
         match action {
-            GameAction::Challenge { challenger, challenger_nick, room_id: action_room } => {
+            GameAction::Challenge {
+                challenger,
+                challenger_nick,
+                room_id: action_room,
+            } => {
                 // Check if we already have an active game in this room
-                if let Some(ref game) = self.state.active_game {
-                    if game.room_id == action_room {
-                        // This is a rematch notification — reset our board
-                        let mut new_game = game.clone();
-                        new_game.new_round();
-                        self.state.active_game = Some(new_game);
-                        for line in self.state.active_game.as_ref().unwrap().render_status() {
-                            self.state.add_system_message(&line);
-                        }
-                        return;
+                if let Some(ref game) = self.state.active_game
+                    && game.room_id == action_room
+                {
+                    // This is a rematch notification — reset our board
+                    let mut new_game = game.clone();
+                    new_game.new_round();
+                    self.state.active_game = Some(new_game);
+                    for line in self.state.active_game.as_ref().unwrap().render_status() {
+                        self.state.add_system_message(&line);
                     }
+                    return;
                 }
 
                 // Auto-accept: create a new game (challenger is X, we are O)
@@ -859,7 +897,8 @@ impl UiApp {
                 }
 
                 // If we're X (shouldn't happen since challenger is X), note it
-                self.state.add_system_message("You are O — use /move <1-9> when it's your turn");
+                self.state
+                    .add_system_message("You are O — use /move <1-9> when it's your turn");
                 self.state.active_game = Some(game);
 
                 // Send accept
@@ -870,13 +909,19 @@ impl UiApp {
                 };
                 let nick = self.state.nick.clone();
                 // We can't await here (non-async fn), so use try_send
-                let _ = self.command_sender.try_send(NetworkCommand::SendRoomMessage {
-                    room_id: room_id.to_string(),
-                    data: accept.to_bytes(),
-                });
+                let _ = self
+                    .command_sender
+                    .try_send(NetworkCommand::SendRoomMessage {
+                        room_id: room_id.to_string(),
+                        data: accept.to_bytes(),
+                    });
                 let _ = nick; // suppress warning
             }
-            GameAction::Accept { accepter, accepter_nick, room_id: action_room } => {
+            GameAction::Accept {
+                accepter,
+                accepter_nick,
+                room_id: action_room,
+            } => {
                 // Someone accepted our challenge — create the game if we don't have one
                 if self.state.active_game.is_none() {
                     let game = TicTacToe::new(
@@ -887,18 +932,21 @@ impl UiApp {
                     self.state.active_game = Some(game);
                 }
 
-                self.state.add_system_message(&format!(
-                    "🎮 {} accepted! Game on!",
-                    accepter_nick
-                ));
-                self.state.add_system_message("You are X — you go first! Use /move <1-9>");
+                self.state
+                    .add_system_message(&format!("🎮 {} accepted! Game on!", accepter_nick));
+                self.state
+                    .add_system_message("You are X — you go first! Use /move <1-9>");
                 if let Some(ref game) = self.state.active_game {
                     for line in game.render_status() {
                         self.state.add_system_message(&line);
                     }
                 }
             }
-            GameAction::Move { position, room_id: _, player } => {
+            GameAction::Move {
+                position,
+                room_id: _,
+                player,
+            } => {
                 // Apply the opponent's move to our local game
                 if let Some(ref mut game) = self.state.active_game {
                     match game.make_move(position, &player) {
@@ -916,12 +964,17 @@ impl UiApp {
                     }
                 }
             }
-            GameAction::Resign { room_id: _, player: _ } => {
-                self.state.add_system_message(&format!("🏳️ {} resigned!", sender_nick));
+            GameAction::Resign {
+                room_id: _,
+                player: _,
+            } => {
+                self.state
+                    .add_system_message(&format!("🏳️ {} resigned!", sender_nick));
                 self.state.active_game = None;
             }
             GameAction::Decline { .. } => {
-                self.state.add_system_message(&format!("{} declined the game.", sender_nick));
+                self.state
+                    .add_system_message(&format!("{} declined the game.", sender_nick));
             }
         }
     }

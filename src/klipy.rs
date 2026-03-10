@@ -91,7 +91,8 @@ impl KlipyClient {
         // 4. {"results": [...]}                       — top-level results
         // 5. Top-level array [...]                    — bare array
 
-        let items_array = json.get("data")
+        let items_array = json
+            .get("data")
             .and_then(|d| {
                 if d.is_array() {
                     Some(d)
@@ -101,8 +102,9 @@ impl KlipyClient {
                         .or_else(|| d.get("results"))
                         .or_else(|| d.get("gifs"))
                         .filter(|v| v.is_array())
+                } else {
+                    None
                 }
-                else { None }
             })
             .or_else(|| json.get("results").filter(|v| v.is_array()))
             .or_else(|| json.get("items").filter(|v| v.is_array()))
@@ -118,16 +120,25 @@ impl KlipyClient {
                     if v.get("type").and_then(|t| t.as_str()) == Some("ad") {
                         return None;
                     }
-                    let id = v.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    let title = v.get("title").and_then(|v| v.as_str()).map(|s| s.to_string());
+                    let id = v
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let title = v
+                        .get("title")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
                     // Try multiple URL field names
-                    let url = v.get("original_url")
+                    let url = v
+                        .get("original_url")
                         .or_else(|| v.get("url"))
                         .or_else(|| v.get("itemurl"))
                         .or_else(|| v.get("content_url"))
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string());
-                    let preview_url = v.get("preview_url")
+                    let preview_url = v
+                        .get("preview_url")
                         .or_else(|| v.get("preview"))
                         .or_else(|| v.get("thumbnail"))
                         .and_then(|v| v.as_str())
@@ -135,7 +146,13 @@ impl KlipyClient {
                     if id.is_empty() && url.is_none() {
                         return None;
                     }
-                    Some(Gif { id, title, url, preview_url, media_formats: None })
+                    Some(Gif {
+                        id,
+                        title,
+                        url,
+                        preview_url,
+                        media_formats: None,
+                    })
                 })
                 .collect()
         } else if let Some(data) = json.get("data").filter(|d| d.is_object()) {
@@ -144,22 +161,42 @@ impl KlipyClient {
                 .unwrap()
                 .values()
                 .filter_map(|v| {
-                    if !v.is_object() { return None; }
-                    let id = v.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    let title = v.get("title").and_then(|v| v.as_str()).map(|s| s.to_string());
-                    let url = v.get("original_url")
+                    if !v.is_object() {
+                        return None;
+                    }
+                    let id = v
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let title = v
+                        .get("title")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    let url = v
+                        .get("original_url")
                         .or_else(|| v.get("url"))
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string());
-                    let preview_url = v.get("preview_url")
+                    let preview_url = v
+                        .get("preview_url")
                         .or_else(|| v.get("preview"))
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string());
-                    Some(Gif { id, title, url, preview_url, media_formats: None })
+                    Some(Gif {
+                        id,
+                        title,
+                        url,
+                        preview_url,
+                        media_formats: None,
+                    })
                 })
                 .collect()
         } else {
-            tracing::error!("Unrecognized Klipy response format: {}", &body[..body.len().min(200)]);
+            tracing::error!(
+                "Unrecognized Klipy response format: {}",
+                &body[..body.len().min(200)]
+            );
             return Err(anyhow::anyhow!(
                 "Failed to parse Klipy response. Unrecognized format."
             ));

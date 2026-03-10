@@ -4,7 +4,7 @@
 //! Serves status and peer info via REST API.
 
 use anyhow::Result;
-use axum::{routing::get, Json, Router};
+use axum::{Json, Router, routing::get};
 use serde::Serialize;
 use std::net::SocketAddr;
 use tower_http::cors::{Any, CorsLayer};

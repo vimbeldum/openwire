@@ -272,14 +272,30 @@ pub mod image_support {
 
     /// Create a picker for the terminal
     pub fn create_picker() -> Result<Picker> {
-        let mut picker = Picker::from_termios().map_err(|e| anyhow::anyhow!("{e}"))?;
-        picker.guess_protocol();
-        Ok(picker)
+        #[cfg(unix)]
+        {
+            let mut picker = Picker::from_termios().map_err(|e| anyhow::anyhow!("{e}"))?;
+            picker.guess_protocol();
+            Ok(picker)
+        }
+        #[cfg(not(unix))]
+        {
+            let mut picker = Picker::new((8, 16));
+            picker.guess_protocol();
+            Ok(picker)
+        }
     }
 
     /// Check if the terminal supports image display
     pub fn supports_images() -> bool {
-        Picker::from_termios().is_ok()
+        #[cfg(unix)]
+        {
+            Picker::from_termios().is_ok()
+        }
+        #[cfg(not(unix))]
+        {
+            true
+        }
     }
 }
 

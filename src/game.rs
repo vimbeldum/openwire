@@ -28,7 +28,7 @@ impl Cell {
 /// Game outcome
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GameResult {
-    Win(Cell),  // X or O won
+    Win(Cell), // X or O won
     Draw,
     InProgress,
 }
@@ -54,9 +54,7 @@ pub enum GameAction {
         room_id: String,
     },
     /// Decline a challenge
-    Decline {
-        room_id: String,
-    },
+    Decline { room_id: String },
     /// Make a move (position 1-9)
     Move {
         position: u8, // 1-9
@@ -64,10 +62,7 @@ pub enum GameAction {
         player: String, // peer_id of the player
     },
     /// Resign/forfeit
-    Resign {
-        room_id: String,
-        player: String,
-    },
+    Resign { room_id: String, player: String },
 }
 
 impl GameAction {
@@ -135,11 +130,7 @@ pub struct TicTacToe {
 
 impl TicTacToe {
     /// Start a new game
-    pub fn new(
-        player_x: (String, String),
-        player_o: (String, String),
-        room_id: String,
-    ) -> Self {
+    pub fn new(player_x: (String, String), player_o: (String, String), room_id: String) -> Self {
         Self {
             board: [Cell::Empty; 9],
             current_turn: Cell::X,
@@ -190,14 +181,18 @@ impl TicTacToe {
             return Err("Game is already over!".to_string());
         }
 
-        let cell = self.player_cell(peer_id)
+        let cell = self
+            .player_cell(peer_id)
             .ok_or_else(|| "You are not a player in this game".to_string())?;
 
         if cell != self.current_turn {
-            return Err(format!("Not your turn! Waiting for {}", self.nick_for(self.current_turn)));
+            return Err(format!(
+                "Not your turn! Waiting for {}",
+                self.nick_for(self.current_turn)
+            ));
         }
 
-        if position < 1 || position > 9 {
+        if !(1..=9).contains(&position) {
             return Err("Position must be 1-9".to_string());
         }
 
@@ -227,9 +222,14 @@ impl TicTacToe {
     /// Check the board for a winner or draw
     fn check_result(&self) -> GameResult {
         const WINS: [[usize; 3]; 8] = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
-            [0, 3, 6], [1, 4, 7], [2, 5, 8], // cols
-            [0, 4, 8], [2, 4, 6],             // diagonals
+            [0, 1, 2],
+            [3, 4, 5],
+            [6, 7, 8], // rows
+            [0, 3, 6],
+            [1, 4, 7],
+            [2, 5, 8], // cols
+            [0, 4, 8],
+            [2, 4, 6], // diagonals
         ];
 
         for line in &WINS {
@@ -287,10 +287,7 @@ impl TicTacToe {
     pub fn render_status(&self) -> Vec<String> {
         let mut lines = vec![
             "═══════════ TIC-TAC-TOE ═══════════".to_string(),
-            format!(
-                "  {} (X)  vs  {} (O)",
-                self.player_x.1, self.player_o.1
-            ),
+            format!("  {} (X)  vs  {} (O)", self.player_x.1, self.player_o.1),
             String::new(),
         ];
 
@@ -479,7 +476,9 @@ mod tests {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const SUITS: &[&str] = &["♠", "♥", "♦", "♣"];
-const VALUES: &[&str] = &["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+const VALUES: &[&str] = &[
+    "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K",
+];
 
 /// A playing card
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -499,9 +498,7 @@ impl Card {
     }
 
     pub fn symbol(&self) -> String {
-        let is_red = self.suit == "♥" || self.suit == "♦";
-        if is_red { format!("{}{}", self.value, self.suit) }
-        else { format!("{}{}", self.value, self.suit) }
+        format!("{}{}", self.value, self.suit)
     }
 
     pub fn is_red(&self) -> bool {
@@ -578,7 +575,11 @@ pub enum BlackjackPhase {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum BlackjackAction {
     /// Start a new game
-    Start { room_id: String, host: String, host_nick: String },
+    Start {
+        room_id: String,
+        host: String,
+        host_nick: String,
+    },
     /// Full game state sync
     State { state_json: String },
     /// Player joins
@@ -674,7 +675,11 @@ impl Blackjack {
     pub fn place_bet(&mut self, peer_id: &str, amount: u32) {
         if let Some(player) = self.players.iter_mut().find(|p| p.peer_id == peer_id) {
             player.bet = amount;
-            player.status = if amount > 0 { PlayerStatus::Ready } else { PlayerStatus::Waiting };
+            player.status = if amount > 0 {
+                PlayerStatus::Ready
+            } else {
+                PlayerStatus::Waiting
+            };
         }
     }
 
@@ -682,11 +687,11 @@ impl Blackjack {
         // Deal 2 cards to each player and dealer
         for _ in 0..2 {
             for player in &mut self.players {
-                if player.bet > 0 {
-                    if let Some(card) = self.deck.pop() {
-                        player.hand.push(card);
-                        player.status = PlayerStatus::Playing;
-                    }
+                if player.bet > 0
+                    && let Some(card) = self.deck.pop()
+                {
+                    player.hand.push(card);
+                    player.status = PlayerStatus::Playing;
                 }
             }
             if let Some(card) = self.deck.pop() {
@@ -702,7 +707,9 @@ impl Blackjack {
         }
 
         // Find first player
-        self.current_player_index = self.players.iter()
+        self.current_player_index = self
+            .players
+            .iter()
             .position(|p| p.status == PlayerStatus::Playing)
             .map(|i| i as i32)
             .unwrap_or(-1);
@@ -721,9 +728,16 @@ impl Blackjack {
 
         for card in cards {
             match card.value.as_str() {
-                "A" => { aces += 1; total += 11; }
-                "K" | "Q" | "J" => { total += 10; }
-                v => { total += v.parse::<u32>().unwrap_or(0); }
+                "A" => {
+                    aces += 1;
+                    total += 11;
+                }
+                "K" | "Q" | "J" => {
+                    total += 10;
+                }
+                v => {
+                    total += v.parse::<u32>().unwrap_or(0);
+                }
             }
         }
 
@@ -787,7 +801,9 @@ impl Blackjack {
     }
 
     fn advance_to_next_player(&mut self) {
-        let next = self.players.iter()
+        let next = self
+            .players
+            .iter()
             .enumerate()
             .skip((self.current_player_index + 1) as usize)
             .find(|(_, p)| p.status == PlayerStatus::Playing)
@@ -828,9 +844,7 @@ impl Blackjack {
 
             if player_blackjack && !dealer_blackjack {
                 player.status = PlayerStatus::BlackjackWin;
-            } else if dealer_bust {
-                player.status = PlayerStatus::Win;
-            } else if player_total > dealer_total {
+            } else if dealer_bust || player_total > dealer_total {
                 player.status = PlayerStatus::Win;
             } else if player_total < dealer_total {
                 player.status = PlayerStatus::Lose;
@@ -848,8 +862,11 @@ impl Blackjack {
     }
 
     pub fn is_player_turn(&self, peer_id: &str) -> bool {
-        if self.phase != BlackjackPhase::Playing { return false; }
-        self.players.iter()
+        if self.phase != BlackjackPhase::Playing {
+            return false;
+        }
+        self.players
+            .iter()
             .enumerate()
             .find(|(_, p)| p.peer_id == peer_id)
             .map(|(i, _)| i as i32 == self.current_player_index)
@@ -862,7 +879,10 @@ impl Blackjack {
             "┌──┐\n│??│\n└──┘".to_string()
         } else {
             let sym = card.symbol();
-            format!("┌──┐\n│{}│\n└──┘", if sym.len() > 2 { &sym[..2] } else { &sym })
+            format!(
+                "┌──┐\n│{}│\n└──┘",
+                if sym.len() > 2 { &sym[..2] } else { &sym }
+            )
         }
     }
 
@@ -882,12 +902,24 @@ impl Blackjack {
             "-".to_string()
         };
 
-        let dealer_cards: Vec<String> = self.dealer_hand.iter()
+        let dealer_cards: Vec<String> = self
+            .dealer_hand
+            .iter()
             .enumerate()
-            .map(|(i, c)| if i == 1 && !self.dealer_revealed { "[??]".to_string() } else { c.symbol() })
+            .map(|(i, c)| {
+                if i == 1 && !self.dealer_revealed {
+                    "[??]".to_string()
+                } else {
+                    c.symbol()
+                }
+            })
             .collect();
 
-        lines.push(format!("Dealer: {} | {}", dealer_cards.join(" "), dealer_value));
+        lines.push(format!(
+            "Dealer: {} | {}",
+            dealer_cards.join(" "),
+            dealer_value
+        ));
         lines.push(String::new());
         lines.push("──────────────────────────────────────────".to_string());
         lines.push(String::new());
@@ -908,7 +940,10 @@ impl Blackjack {
                 cards.join(" "),
                 player.bet,
                 value,
-                if player.status != PlayerStatus::Playing && player.status != PlayerStatus::Waiting && player.status != PlayerStatus::Ready {
+                if player.status != PlayerStatus::Playing
+                    && player.status != PlayerStatus::Waiting
+                    && player.status != PlayerStatus::Ready
+                {
                     format!(" ({})", player.status.display())
                 } else {
                     String::new()

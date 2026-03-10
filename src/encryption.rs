@@ -11,8 +11,8 @@
 
 use anyhow::Result;
 use chacha20poly1305::{
-    aead::{Aead, KeyInit, Payload},
     ChaCha20Poly1305, Nonce,
+    aead::{Aead, KeyInit, Payload},
 };
 use hkdf::Hkdf;
 use rand::TryRng;
