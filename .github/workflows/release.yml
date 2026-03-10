@@ -134,38 +134,96 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release edit ${{ github.ref_name }} --draft=false
 
-      # Auto-bump Cargo.toml and Homebrew Formula on master
+      # Auto-bump Cargo.toml on master
       - name: Sync version to master
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          TAG="${GITHUB_REF_NAME}"
 
           # Update Cargo.toml version
           sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" Cargo.toml
 
-          # Update Homebrew Formula URL
-          sed -i "s|archive/refs/tags/v[0-9.]*\.tar\.gz|archive/refs/tags/${TAG}.tar.gz|" Formula/openwire.rb
-
-          # Calculate SHA256 of the tarball and update formula
-          TARBALL_URL="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${TAG}.tar.gz"
-          SHA256=$(curl -sL "$TARBALL_URL" | sha256sum | cut -d' ' -f1)
-
-          # Update or add sha256 line in formula
-          if grep -q "^  sha256 " Formula/openwire.rb; then
-            sed -i "s/^  sha256 \".*\"/  sha256 \"${SHA256}\"/" Formula/openwire.rb
-          else
-            sed -i "/^  url \".*\"/a\\  sha256 \"${SHA256}\"" Formula/openwire.rb
-          fi
-
-          echo "Updated formula with SHA256: ${SHA256}"
-
           # Commit and push if there are changes
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Cargo.toml Formula/openwire.rb
+          git add Cargo.toml
           if git diff --cached --quiet; then
             echo "No version changes needed"
           else
             git commit -m "chore: bump version to ${VERSION} [skip ci]"
             git push origin master
           fi
+
+  # Stage 4: Update Homebrew tap via PR + auto-merge
+  homebrew:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute tarball SHA256
+        id: sha
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          TARBALL_URL="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${TAG}.tar.gz"
+          SHA256=$(curl -sL "$TARBALL_URL" | sha256sum | cut -d' ' -f1)
+          echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout homebrew tap
+        uses: actions/checkout@v6
+        with:
+          repository: vimbeldum/homebrew-openwire
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update formula
+        run: |
+          TAG="${{ steps.sha.outputs.tag }}"
+          SHA256="${{ steps.sha.outputs.sha256 }}"
+          VERSION="${{ steps.sha.outputs.version }}"
+          FORMULA="homebrew-tap/Formula/openwire.rb"
+
+          sed -i "s|archive/refs/tags/v[0-9.]*\.tar\.gz|archive/refs/tags/${TAG}.tar.gz|" "$FORMULA"
+          sed -i "s/^  sha256 \".*\"/  sha256 \"${SHA256}\"/" "$FORMULA"
+
+          echo "Formula updated to ${TAG} (sha256: ${SHA256})"
+          cat "$FORMULA"
+
+      - name: Create PR and auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          TAG="${{ steps.sha.outputs.tag }}"
+          VERSION="${{ steps.sha.outputs.version }}"
+          BRANCH="bump/${TAG}"
+
+          cd homebrew-tap
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add Formula/openwire.rb
+
+          if git diff --cached --quiet; then
+            echo "Formula already up to date"
+            exit 0
+          fi
+
+          git commit -m "chore: update openwire to ${TAG}"
+          git push origin "$BRANCH"
+
+          # Create PR
+          PR_URL=$(gh pr create \
+            --repo vimbeldum/homebrew-openwire \
+            --title "Update openwire to ${TAG}" \
+            --body "Automated formula update for OpenWire ${TAG}." \
+            --base master \
+            --head "$BRANCH")
+
+          echo "Created PR: $PR_URL"
+
+          # Enable auto-merge (squash) — merges immediately if all checks pass
+          gh pr merge "$PR_URL" \
+            --repo vimbeldum/homebrew-openwire \
+            --auto \
+            --squash \
+            --delete-branch
