@@ -1094,7 +1094,12 @@ impl UiApp {
             }
             self.state.wallet = wallet;
             if let Some(ref mut game) = self.state.blackjack_game {
-                game.place_bet(&self.state.local_peer_id, amount);
+                if let Err(e) = game.place_bet(&self.state.local_peer_id, amount) {
+                    // Refund wallet on invalid bet
+                    self.state.wallet.credit(amount);
+                    self.state.add_system_message(&format!("Can't bet: {}", e));
+                    return;
+                }
             }
             self.state
                 .add_system_message(&format!("Bet placed: ${}. Balance: {}", amount, self.state.wallet.balance));
@@ -1181,7 +1186,14 @@ impl UiApp {
                 self.state.wallet = wallet;
             }
             if let Some(ref mut game) = self.state.blackjack_game {
-                let _ = game.double_down(&self.state.local_peer_id);
+                if let Err(e) = game.double_down(&self.state.local_peer_id) {
+                    // Refund the wallet on failure
+                    if extra_bet > 0 {
+                        self.state.wallet.credit(extra_bet);
+                    }
+                    self.state.add_system_message(&format!("Can't double: {}", e));
+                    return;
+                }
             }
             self.render_blackjack();
             self.broadcast_bj_state().await;
@@ -1934,7 +1946,7 @@ impl UiApp {
             }
             BlackjackAction::Bet { peer_id, amount } => {
                 if let Some(ref mut game) = self.state.blackjack_game {
-                    game.place_bet(&peer_id, amount);
+                    let _ = game.place_bet(&peer_id, amount);
                 }
             }
             BlackjackAction::Hit { peer_id } => {

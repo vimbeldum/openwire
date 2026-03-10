@@ -14,7 +14,7 @@ use crate::game::{
     RouletteEngine, RoulettePhase, SlotsEngine, TicTacToe,
 };
 
-const ROULETTE_REDS: &[u8] = &[1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
+use crate::game::ROULETTE_RED as ROULETTE_REDS;
 
 #[derive(Clone, PartialEq)]
 pub enum ActiveGameView { None, Blackjack, Roulette, AndarBahar, Slots, TicTacToe }

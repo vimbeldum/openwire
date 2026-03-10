@@ -681,7 +681,10 @@ impl Blackjack {
         }
     }
 
-    pub fn place_bet(&mut self, peer_id: &str, amount: u32) {
+    pub fn place_bet(&mut self, peer_id: &str, amount: u32) -> Result<(), &'static str> {
+        if self.phase != BlackjackPhase::Betting {
+            return Err("Bets can only be placed during the betting phase");
+        }
         if let Some(player) = self.players.iter_mut().find(|p| p.peer_id == peer_id) {
             player.bet = amount;
             player.status = if amount > 0 {
@@ -689,6 +692,9 @@ impl Blackjack {
             } else {
                 PlayerStatus::Waiting
             };
+            Ok(())
+        } else {
+            Err("Player not found")
         }
     }
 
@@ -849,20 +855,49 @@ impl Blackjack {
         for player in &mut self.players {
             if player.status == PlayerStatus::Bust {
                 player.status = PlayerStatus::Lose;
-                continue;
+                // Still evaluate split hand below if it exists
+            } else {
+                let player_total = Self::calculate_hand(&player.hand);
+                let player_blackjack = Self::is_blackjack(&player.hand);
+
+                if player_blackjack && !dealer_blackjack {
+                    player.status = PlayerStatus::BlackjackWin;
+                } else if dealer_bust || player_total > dealer_total {
+                    player.status = PlayerStatus::Win;
+                } else if player_total < dealer_total {
+                    player.status = PlayerStatus::Lose;
+                } else {
+                    player.status = PlayerStatus::Push;
+                }
             }
 
-            let player_total = Self::calculate_hand(&player.hand);
-            let player_blackjack = Self::is_blackjack(&player.hand);
-
-            if player_blackjack && !dealer_blackjack {
-                player.status = PlayerStatus::BlackjackWin;
-            } else if dealer_bust || player_total > dealer_total {
-                player.status = PlayerStatus::Win;
-            } else if player_total < dealer_total {
-                player.status = PlayerStatus::Lose;
-            } else {
-                player.status = PlayerStatus::Push;
+            // Evaluate split hand: if it wins, upgrade the main status
+            // (split bet equals original bet, so a split win adds another bet's worth)
+            if !player.split_hand.is_empty() {
+                let split_total = Self::calculate_hand(&player.split_hand);
+                let split_bust = Self::is_bust(&player.split_hand);
+                if !split_bust {
+                    if dealer_bust || split_total > dealer_total {
+                        // Split hand wins — if main hand also won, upgrade to Win;
+                        // if main hand lost, set to Push (net zero across both hands)
+                        if player.status == PlayerStatus::Lose || player.status == PlayerStatus::Bust {
+                            player.status = PlayerStatus::Push;
+                        }
+                        // If main hand already won, the split win adds extra payout
+                        // which is handled by the wallet credit logic checking split_hand
+                    } else if split_total < dealer_total {
+                        // Split hand loses — if main hand won, downgrade to Push
+                        if player.status == PlayerStatus::Win || player.status == PlayerStatus::BlackjackWin {
+                            player.status = PlayerStatus::Push;
+                        }
+                    }
+                    // split_total == dealer_total: push on split, no change to main status
+                } else {
+                    // Split hand busted — if main hand won, downgrade to Push
+                    if player.status == PlayerStatus::Win || player.status == PlayerStatus::BlackjackWin {
+                        player.status = PlayerStatus::Push;
+                    }
+                }
             }
         }
 
