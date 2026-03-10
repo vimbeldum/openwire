@@ -175,7 +175,7 @@ export class RelayRoom {
                     if (!peerInfo) return;
                     this.broadcast({
                         type: "message",
-                        from: peerInfo.peer_id,
+                        peer_id: peerInfo.peer_id,
                         nick: peerInfo.nick,
                         data: msg.data,
                     }, ws);

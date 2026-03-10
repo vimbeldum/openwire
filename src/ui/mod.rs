@@ -1633,8 +1633,22 @@ impl UiApp {
                         .add_system_message(&format!("[ticker] {}", ticker_msg));
                     return;
                 }
+
+                // Extract relay nick from [relay:Nick] prefix for display
+                let (sender, inner_content) = if content.starts_with("[relay:") {
+                    if let Some(bracket_end) = content.find("] ") {
+                        let nick = &content[7..bracket_end]; // skip "[relay:"
+                        let rest = &content[bracket_end + 2..];
+                        (nick.to_string(), rest.to_string())
+                    } else {
+                        (short.clone(), content.clone())
+                    }
+                } else {
+                    (short.clone(), content.clone())
+                };
+
                 // Handle incoming whisper
-                let display_content = if content.starts_with("[whisper from ") {
+                let display_content = if inner_content.starts_with("[whisper from ") || content.starts_with("[whisper from ") {
                     format!("[PM] {}", content)
                 } else {
                     // Try to parse JSON agent/custom messages from web clients
@@ -1643,7 +1657,7 @@ impl UiApp {
                         Some(None) => return, // Internal protocol message — suppress entirely
                         None => {
                             // Check for @mention of our nick
-                            let mention_marker = if content
+                            let mention_marker = if inner_content
                                 .to_lowercase()
                                 .contains(&format!("@{}", self.state.nick.to_lowercase()))
                             {
@@ -1651,11 +1665,11 @@ impl UiApp {
                             } else {
                                 ""
                             };
-                            format!("{}{}", mention_marker, content)
+                            format!("{}{}", mention_marker, inner_content)
                         }
                     }
                 };
-                self.state.add_chat_message(&short, &display_content);
+                self.state.add_chat_message(&sender, &display_content);
             }
             NetworkEvent::FileReceived { from, filename, .. } => {
                 let short = Self::short_id(&from.to_string(), 8);
