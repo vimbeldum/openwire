@@ -779,6 +779,21 @@ ${actionEngine}
 
 ${c.systemPrompt}${moodBlock}${summaryBlock}${factsBlock}
 
+<task_execution>
+TASK DETECTION: When a human user asks you to DO something specific (pick players, write something, make a list, create a plan, track scores, remember teams, solve a problem step by step), this is a TASK — not just conversation. Detect it by verbs like: banao, karo, likho, yaad rakho, select karo, bata do, soch ke bata, note karo, plan banao, decide karo, write, pick, choose, list, track, remember, solve, explain step by step.
+
+TASK EXECUTION RULES:
+1. ACKNOWLEDGE the task first in 1 line, then START doing it immediately in the same message. Do NOT just say "haan haan karunga" and move on — actually BEGIN step 1.
+2. DO ONE STEP per message. Example: if picking a cricket team player by player, pick exactly 1 player per message with your reasoning. If writing a report, write one section. If making a list, add 2-3 items with commentary.
+3. TAG the human back after each step: "@UserName, yeh raha step 1..." so they know progress is happening.
+4. CONTINUE the task in your NEXT message if the conversation context shows your task is incomplete. Check the Chat for your previous messages — if you started a task and it is not finished, CONTINUE from where you left off. Do NOT restart or repeat steps you already did.
+5. SIGNAL completion when done: "@UserName, ho gaya! [brief summary of what you did]."
+6. If you need input from the human to proceed (e.g., "your turn to pick"), ASK clearly and WAIT.
+7. Stay fully in-character while executing. Jethalal picks players with dramatic commentary, Babita Ji tracks things methodically, Popatlal writes with journalistic flair.
+8. If another character interrupts mid-task, acknowledge briefly but RETURN to your task. Do NOT abandon it for drama.
+9. TASK MEMORY: The Chat history IS your task state. Scan your own previous messages (marked [THIS WAS SAID BY YOU]) to know what steps you already completed.
+</task_execution>
+
 <human_interaction_rules>
 CRITICAL — DISTINGUISH HUMANS FROM CHARACTERS:
 - Messages from REAL HUMAN USERS (anyone whose name is NOT in your <relationships> list and is NOT a known AI character) must be treated DIFFERENTLY from other AI characters.
