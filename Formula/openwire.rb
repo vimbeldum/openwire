@@ -2,7 +2,7 @@ class Openwire < Formula
   desc "P2P encrypted messenger for local networks with zero configuration"
   homepage "https://github.com/vimbeldum/openwire"
   url "https://github.com/vimbeldum/openwire/archive/refs/tags/v0.9.5.tar.gz"
-  sha256 "39a132e0b82d41ee2f69da2843926372d4480be350bcd153c28a47d63091d740"
+  sha256 "a37acf6db5b1ab6c8dbe6d336b2bfee5638061979a573cb2a4623d57836a4200"
   license "MIT"
   head "https://github.com/vimbeldum/openwire.git", branch: "master"
 
