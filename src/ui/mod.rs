@@ -1637,12 +1637,20 @@ impl UiApp {
                     return;
                 }
 
-                // Extract relay nick from [relay:Nick] prefix for display
+                // Extract nick from [relay:Nick] or [web:Nick] prefix for display
                 let (relay_nick, inner_content) = if content.starts_with("[relay:") {
                     if let Some(bracket_end) = content.find("] ") {
                         let nick = &content[7..bracket_end]; // skip "[relay:"
                         let rest = &content[bracket_end + 2..];
-                        // Store nick in peer_nicks map for future lookups
+                        self.state.peer_nicks.insert(from.to_string(), nick.to_string());
+                        (Some(nick.to_string()), rest.to_string())
+                    } else {
+                        (None, content.clone())
+                    }
+                } else if content.starts_with("[web:") {
+                    if let Some(bracket_end) = content.find("] ") {
+                        let nick = &content[5..bracket_end]; // skip "[web:"
+                        let rest = &content[bracket_end + 2..];
                         self.state.peer_nicks.insert(from.to_string(), nick.to_string());
                         (Some(nick.to_string()), rest.to_string())
                     } else {
