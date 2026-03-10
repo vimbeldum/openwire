@@ -50,6 +50,7 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
     const [qwenLoading, setQwenLoading] = useState(false);
     const [haimakerModels, setHaimakerModels] = useState(swarm?.haimakerModels ?? []);
     const [haimakerLoading, setHaimakerLoading] = useState(false);
+    const [mentionOnlyMode, setMentionOnlyMode] = useState(swarm?.mentionOnlyMode ?? false);
     const [charMoods, setCharMoods] = useState(() => {
         const init = {};
         Object.keys(CHARACTERS).forEach(id => { init[id] = swarm?.getMood(id) ?? 'normal'; });
@@ -395,6 +396,22 @@ export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjus
                                     style={{ width: 70, padding: '4px 8px', background: 'var(--bg-primary, #111)', color: 'var(--text, #ccc)', border: '1px solid var(--border, #333)', borderRadius: 4 }}
                                 />
                             </div>
+                        </div>
+
+                        {/* Mention-only mode toggle */}
+                        <div className="admin-agents-controls" style={{ marginTop: 0 }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={mentionOnlyMode}
+                                    onChange={e => {
+                                        const on = e.target.checked;
+                                        setMentionOnlyMode(on);
+                                        swarm?.setMentionOnlyMode(on);
+                                    }}
+                                />
+                                Mention-only mode (AI speaks only when @tagged, active 4 min)
+                            </label>
                         </div>
 
                         {/* Flush AI context */}

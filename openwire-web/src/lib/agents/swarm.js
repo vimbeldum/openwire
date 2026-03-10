@@ -112,6 +112,10 @@ export class AgentSwarm {
         // Mention ownership — suppresses other characters during directed @mentions
         this._mentionTargets = new Set(); // characterIds of all @mentioned characters in current batch
         this._mentionActiveUntil = 0;     // timestamp when cooldown expires
+
+        // Mention-only mode: AI only speaks when @mentioned, stays active for 4 mins
+        this._mentionOnlyMode = false;
+        this._charActiveUntil = {};       // characterId → timestamp when their 4-min window expires
         this._lastCrossOverAt = 0;        // global crossover cooldown tracker
 
         // #1/#2: Track stagger timers so they can be cleared on stop/reload
@@ -351,6 +355,20 @@ export class AgentSwarm {
         const hasMention = /@\w+/.test(text);
         if (hasMention) {
             this._log(`[Reactivity] Skipped — message contains @mention, deferring to mention handler`);
+        } else if (this._mentionOnlyMode) {
+            // In mention-only mode, reactive triggers only fire for characters in their active window
+            const lower = text.toLowerCase();
+            const now = Date.now();
+            const matched = Object.values(this._characters).filter(c => {
+                if (!this._isActive(c.id)) return false;
+                if (!this._charActiveUntil[c.id] || this._charActiveUntil[c.id] <= now) return false;
+                if (!c.reactive_tags?.length) return false;
+                return c.reactive_tags.some(tag => lower.includes(tag.toLowerCase()));
+            });
+            if (matched.length > 0) {
+                this._log(`[MentionOnly] Reactive: ${matched.map(c => c.name).join(', ')} (still in active window)`);
+                matched.forEach(c => this._generate(c.id));
+            }
         } else {
             // Collect all matching characters — more can jump in when guardrails are OFF
             const lower = text.toLowerCase();
@@ -424,6 +442,13 @@ export class AgentSwarm {
 
     get perCharCooldown() { return this._perCharCooldown / 1000; }
     get globalCooldown() { return this._globalCooldown / 1000; }
+
+    get mentionOnlyMode() { return this._mentionOnlyMode; }
+    setMentionOnlyMode(on) {
+        this._mentionOnlyMode = !!on;
+        if (!on) this._charActiveUntil = {}; // clear all activation windows
+        this._log(`[Config] Mention-only mode -> ${on ? 'ON' : 'OFF'}`);
+    }
 
     setMood(characterId, mood) {
         const c = this._characters[characterId];
@@ -586,8 +611,12 @@ export class AgentSwarm {
                 if (this._mentionTargets.size > 0 && this._mentionActiveUntil <= Date.now()) {
                     this._mentionTargets.clear();
                 }
+                // Mention-only mode: only generate if character is in their active window
+                if (this._mentionOnlyMode && (!this._charActiveUntil[characterId] || this._charActiveUntil[characterId] <= Date.now())) {
+                    this._log(`[MentionOnly] ${c.name} skipped — not in active window`);
+                }
                 // Structural gate: suppress during directed @mention cooldown
-                if (this._mentionActiveUntil > Date.now() && !this._mentionTargets.has(characterId)) {
+                else if (this._mentionActiveUntil > Date.now() && !this._mentionTargets.has(characterId)) {
                     this._log(`[Timer] ${c.name} suppressed — @mention cooldown active`);
                 } else {
                     const roll = Math.random() * 10;
@@ -629,6 +658,13 @@ export class AgentSwarm {
                 this._log(`[Cooldown] ${c.name} blocked — per-character 10s cooldown`);
                 return;
             }
+        }
+
+        // In mention-only mode, always set activation window on @mention (even if already queued)
+        if (force && this._mentionOnlyMode) {
+            const MENTION_ACTIVE_MS = 4 * 60 * 1000; // 4 minutes
+            this._charActiveUntil[characterId] = Date.now() + MENTION_ACTIVE_MS;
+            this._log(`[MentionOnly] ${c.name} activated for 4 minutes`);
         }
 
         // Don't queue duplicate tasks for the same character
@@ -999,7 +1035,8 @@ CRITICAL — DISTINGUISH HUMANS FROM CHARACTERS:
                                     || ch.id === mentionedLower
                                     || nameLower.startsWith(mentionedLower);
                             });
-                            if (target && target.id !== characterId && this._isActive(target.id) && !triggered.has(target.id)) {
+                            if (target && target.id !== characterId && this._isActive(target.id) && !triggered.has(target.id)
+                                && (!this._mentionOnlyMode || (this._charActiveUntil[target.id] && this._charActiveUntil[target.id] > Date.now()))) {
                                 triggered.add(target.id);
                                 this._log(`[AgentChain] ${c.name} tagged @${target.name} → triggering response (depth ${chainDepth + 1})`);
                                 this._generate(target.id, { force: true, chainDepth: chainDepth + 1 });
@@ -1062,6 +1099,8 @@ CRITICAL — DISTINGUISH HUMANS FROM CHARACTERS:
 
     _checkCrossOver(speakerId) {
         if (!this._running) return;
+        // In mention-only mode, suppress all cross-overs
+        if (this._mentionOnlyMode) return;
         // Suppress cross-over during @mention cooldown — let the conversation stay focused
         if (this._mentionActiveUntil > Date.now()) {
             this._log(`[CrossOver] Suppressed — @mention cooldown active`);
