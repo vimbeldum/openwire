@@ -24,9 +24,9 @@ use std::io;
 use tokio::sync::mpsc;
 
 use crate::game::{
-    AndarBaharAction, AndarBaharBet, AndarBaharEngine, AndarBaharSide, Blackjack, BlackjackAction,
-    CasinoState, GameAction, RouletteAction, RouletteBet, RouletteBetType, RouletteEngine,
-    SlotsEngine, TicTacToe, Wallet,
+    AndarBaharAction, AndarBaharBet, AndarBaharCountRange, AndarBaharEngine, AndarBaharSide,
+    Blackjack, BlackjackAction, CasinoState, GameAction, RouletteAction, RouletteBet,
+    RouletteBetType, RouletteEngine, SlotsEngine, TicTacToe, TransactionLedger, Wallet,
 };
 use crate::network::{NetworkCommand, NetworkEvent};
 
@@ -77,6 +77,10 @@ pub struct UiState {
     pub wallet: Wallet,
     /// Casino house P&L tracker
     pub casino_state: CasinoState,
+    /// Peers currently typing: (peer_short_id -> last_typing_time)
+    pub typing_peers: std::collections::HashMap<String, std::time::Instant>,
+    /// Path to persist chat history
+    pub message_history_path: std::path::PathBuf,
 }
 
 impl UiState {
@@ -99,6 +103,11 @@ impl UiState {
             slots_engine: None,
             wallet: Wallet::load(),
             casino_state: CasinoState::new(),
+            typing_peers: std::collections::HashMap::new(),
+            message_history_path: dirs_next::home_dir()
+                .unwrap_or_else(|| std::path::PathBuf::from("."))
+                .join(".openwire")
+                .join("chat_history.json"),
         };
         state.add_system_message("Welcome to OpenWire! End-to-end encrypted P2P messenger.");
         state.add_system_message("Peers on the same LAN are discovered automatically via mDNS.");
@@ -142,6 +151,30 @@ impl UiState {
         if self.auto_scroll {
             self.scroll_offset = 0;
         }
+        if self.messages.len() % 10 == 0 {
+            self.save_message_history();
+        }
+    }
+
+    fn save_message_history(&self) {
+        let filtered: Vec<_> = self.messages.iter().filter(|m| !m.is_system).collect();
+        let start = filtered.len().saturating_sub(200);
+        let to_save: Vec<serde_json::Value> = filtered[start..]
+            .iter()
+            .map(|m| {
+                serde_json::json!({
+                    "time": m.time,
+                    "sender": m.sender,
+                    "content": m.content,
+                })
+            })
+            .collect();
+        if let Ok(json) = serde_json::to_string_pretty(&to_save) {
+            if let Some(parent) = self.message_history_path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::write(&self.message_history_path, json);
+        }
     }
 
     pub fn add_file_message(&mut self, sender: &str, filename: &str) {
@@ -169,6 +202,8 @@ pub struct UiApp {
     state: UiState,
     command_sender: mpsc::Sender<NetworkCommand>,
     event_receiver: mpsc::Receiver<NetworkEvent>,
+    /// Throttle typing broadcasts to once per 2 seconds
+    last_typing_broadcast: std::time::Instant,
 }
 
 impl UiApp {
@@ -191,6 +226,8 @@ impl UiApp {
             state: UiState::new(nick, local_peer_id, web_port, relay),
             command_sender,
             event_receiver,
+            last_typing_broadcast: std::time::Instant::now()
+                - std::time::Duration::from_secs(10),
         })
     }
 
@@ -225,6 +262,22 @@ impl UiApp {
                     (KeyCode::Char(c), _) => {
                         self.state.input.insert(self.state.cursor_pos, c);
                         self.state.cursor_pos += 1;
+                        // Throttled typing indicator broadcast
+                        let now = std::time::Instant::now();
+                        if now.duration_since(self.last_typing_broadcast)
+                            > std::time::Duration::from_secs(2)
+                        {
+                            self.last_typing_broadcast = now;
+                            let typing_msg = format!("TYPING:{}", self.state.nick);
+                            let nick = self.state.nick.clone();
+                            let _ = self
+                                .command_sender
+                                .send(NetworkCommand::Broadcast {
+                                    data: typing_msg.into_bytes(),
+                                    nick,
+                                })
+                                .await;
+                        }
                     }
                     (KeyCode::Backspace, _) => {
                         if self.state.cursor_pos > 0 {
@@ -412,6 +465,14 @@ impl UiApp {
             self.state
                 .add_system_message("  /wallet  or  /chips         - Show chip balance");
             self.state.add_system_message("");
+            self.state.add_system_message("HELP:");
+            self.state
+                .add_system_message("  /rules <game>  - Show how to play a game");
+            self.state
+                .add_system_message("  /history       - Show recent game history");
+            self.state
+                .add_system_message("  /whisper <id> <msg>  - Send private message");
+            self.state.add_system_message("");
             self.state.add_system_message("MESSAGE SCROLLING:");
             self.state
                 .add_system_message("  Up / Down        - Scroll one line");
@@ -480,6 +541,58 @@ impl UiApp {
             false
         } else if input == "/wallet" || input == "/chips" {
             self.handle_wallet_command().await;
+            false
+        } else if let Some(rest) = input
+            .strip_prefix("/whisper ")
+            .or_else(|| input.strip_prefix("/w "))
+        {
+            let parts: Vec<&str> = rest.splitn(2, ' ').collect();
+            if parts.len() < 2 {
+                self.state
+                    .add_system_message("Usage: /whisper <nick_or_peer_id> <message>");
+                return false;
+            }
+            let target = parts[0];
+            let msg = parts[1];
+            let found_peer = self
+                .state
+                .peers
+                .iter()
+                .find(|p| {
+                    let short = Self::short_id(p, 8);
+                    short.starts_with(target) || p.starts_with(target)
+                })
+                .cloned();
+            if let Some(peer_id) = found_peer {
+                self.state.add_chat_message(
+                    &format!(
+                        "{}->{}",
+                        self.state.nick.clone(),
+                        Self::short_id(&peer_id, 8)
+                    ),
+                    &format!("[whisper] {}", msg),
+                );
+                let whisper_payload =
+                    format!("[whisper from {}] {}", self.state.nick, msg);
+                let _ = self
+                    .command_sender
+                    .send(NetworkCommand::SendToPeer {
+                        peer_id,
+                        data: whisper_payload.into_bytes(),
+                    })
+                    .await;
+            } else {
+                self.state.add_system_message(&format!(
+                    "Peer '{}' not found. Check the Peers panel.",
+                    target
+                ));
+            }
+            false
+        } else if let Some(game_name) = input.strip_prefix("/rules").map(|s| s.trim()) {
+            self.show_how_to_play(game_name);
+            false
+        } else if input == "/history" || input.starts_with("/history ") {
+            self.handle_history_command().await;
             false
         } else {
             // Regular chat message
@@ -1066,7 +1179,44 @@ impl UiApp {
             NetworkEvent::MessageReceived { from, data, .. } => {
                 let content = String::from_utf8_lossy(&data).to_string();
                 let short = Self::short_id(&from.to_string(), 8);
-                self.state.add_chat_message(&short, &content);
+                // Handle typing indicator
+                if content.starts_with("TYPING:") {
+                    let typer_nick = content
+                        .strip_prefix("TYPING:")
+                        .unwrap_or("")
+                        .to_string();
+                    let _ = typer_nick; // nick stored under short peer ID key
+                    self.state
+                        .typing_peers
+                        .insert(short, std::time::Instant::now());
+                    return;
+                }
+                // Handle casino ticker
+                if content.starts_with("TICKER:") {
+                    let ticker_msg = content
+                        .strip_prefix("TICKER:")
+                        .unwrap_or(&content)
+                        .to_string();
+                    self.state
+                        .add_system_message(&format!("[ticker] {}", ticker_msg));
+                    return;
+                }
+                // Handle incoming whisper
+                let display_content = if content.starts_with("[whisper from ") {
+                    format!("[PM] {}", content)
+                } else {
+                    // Check for @mention of our nick
+                    let mention_marker = if content
+                        .to_lowercase()
+                        .contains(&format!("@{}", self.state.nick.to_lowercase()))
+                    {
+                        "[@] "
+                    } else {
+                        ""
+                    };
+                    format!("{}{}", mention_marker, content)
+                };
+                self.state.add_chat_message(&short, &display_content);
             }
             NetworkEvent::FileReceived { from, filename, .. } => {
                 let short = Self::short_id(&from.to_string(), 8);
@@ -1367,7 +1517,23 @@ impl UiApp {
                 .split(main_chunks[1]);
 
             // -- Peers Panel --
-            let peer_items: Vec<ListItem> = self
+            let now_typing = std::time::Instant::now();
+            let typing_items: Vec<ListItem> = self
+                .state
+                .typing_peers
+                .iter()
+                .filter(|(_, t)| {
+                    now_typing.duration_since(**t) < std::time::Duration::from_secs(3)
+                })
+                .map(|(nick, _)| {
+                    ListItem::new(Line::from(vec![Span::styled(
+                        format!("{} is typing...", nick),
+                        Style::default().fg(Color::DarkGray),
+                    )]))
+                })
+                .collect();
+
+            let mut peer_items: Vec<ListItem> = self
                 .state
                 .peers
                 .iter()
@@ -1383,6 +1549,7 @@ impl UiApp {
                     ]))
                 })
                 .collect();
+            peer_items.extend(typing_items);
 
             let peers_block = Block::default()
                 .title(format!(" Peers ({}) ", self.state.peers.len()))
@@ -1492,6 +1659,26 @@ impl UiApp {
                 }
                 self.state
                     .add_system_message("New blackjack round! /bj bet <amount>");
+            }
+            BlackjackAction::DoubleDown { peer_id } => {
+                if let Some(ref mut game) = self.state.blackjack_game {
+                    let _ = game.double_down(&peer_id);
+                    self.render_blackjack();
+                }
+            }
+            BlackjackAction::Split { peer_id } => {
+                if let Some(ref mut game) = self.state.blackjack_game {
+                    let _ = game.split(&peer_id);
+                    self.render_blackjack();
+                }
+            }
+            BlackjackAction::Insurance { peer_id } => {
+                if let Some(ref mut game) = self.state.blackjack_game {
+                    let _ = game.buy_insurance(&peer_id);
+                }
+            }
+            BlackjackAction::InsuranceResolved { .. } => {
+                // Insurance resolution is handled during settlement
             }
         }
     }
@@ -1650,6 +1837,18 @@ impl UiApp {
                             "You won {}! Balance: {}",
                             net, self.state.wallet.balance
                         ));
+                        let ticker = format!(
+                            "TICKER:{} won {} chips on Roulette!",
+                            self.state.nick, net
+                        );
+                        let nick = self.state.nick.clone();
+                        let _ = self
+                            .command_sender
+                            .send(NetworkCommand::Broadcast {
+                                data: ticker.into_bytes(),
+                                nick,
+                            })
+                            .await;
                     } else {
                         self.state.add_system_message(&format!(
                             "You lost {}. Balance: {}",
@@ -1752,6 +1951,7 @@ impl UiApp {
                 nick: state.nick.clone(),
                 side,
                 amount,
+                count_side_bet: None,
             };
             let room_id = state
                 .andarbahar_game
@@ -1860,9 +2060,53 @@ impl UiApp {
                     data: action.to_bytes(),
                 })
                 .await;
+        } else if let Some(rest) = cmd.strip_prefix("count ") {
+            let parts: Vec<&str> = rest.split_whitespace().collect();
+            if parts.len() < 2 {
+                self.state.add_system_message(
+                    "Usage: /ab count <1-5|6-10|11-15|16-25|26+> <amount>",
+                );
+                return;
+            }
+            let range_str = parts[0];
+            let amount_str = parts[1];
+            let range = match range_str {
+                "1-5" => AndarBaharCountRange::Cards1To5,
+                "6-10" => AndarBaharCountRange::Cards6To10,
+                "11-15" => AndarBaharCountRange::Cards11To15,
+                "16-25" => AndarBaharCountRange::Cards16To25,
+                "26+" => AndarBaharCountRange::Cards26Plus,
+                _ => {
+                    self.state
+                        .add_system_message("Valid ranges: 1-5, 6-10, 11-15, 16-25, 26+");
+                    return;
+                }
+            };
+            let amount: u32 = match amount_str.parse() {
+                Ok(a) if a > 0 => a,
+                _ => {
+                    self.state
+                        .add_system_message("Amount must be a positive number.");
+                    return;
+                }
+            };
+            let mut wallet = self.state.wallet.clone();
+            wallet.refresh_if_needed();
+            if let Err(e) = wallet.debit(amount) {
+                self.state.add_system_message(&format!("Wallet: {}", e));
+                return;
+            }
+            self.state.wallet = wallet;
+            self.state.add_system_message(&format!(
+                "Count side-bet: {} chips on {}. Balance: {}",
+                amount,
+                range.label(),
+                self.state.wallet.balance
+            ));
         } else {
-            self.state
-                .add_system_message("Usage: /ab andar <amount> | /ab bahar <amount> | /ab deal");
+            self.state.add_system_message(
+                "Usage: /ab andar <amount> | /ab bahar <amount> | /ab deal | /ab count <range> <amount>",
+            );
         }
     }
 
@@ -1927,6 +2171,18 @@ impl UiApp {
             if payout > 0 {
                 self.state.wallet.credit(amount + payout as u32);
                 self.state.casino_state.record_payout("slots", payout);
+                let ticker = format!(
+                    "TICKER:{} won {} chips on Slots!",
+                    self.state.nick, payout
+                );
+                let nick = self.state.nick.clone();
+                let _ = self
+                    .command_sender
+                    .send(NetworkCommand::Broadcast {
+                        data: ticker.into_bytes(),
+                        nick,
+                    })
+                    .await;
             } else {
                 self.state.casino_state.record_payout("slots", payout);
             }
@@ -1973,10 +2229,130 @@ impl UiApp {
             }
         }
     }
+
+    fn show_how_to_play(&mut self, game: &str) {
+        match game {
+            "blackjack" | "bj" => {
+                self.state.add_system_message("== BLACKJACK RULES ==");
+                self.state
+                    .add_system_message("Goal: Get closer to 21 than the dealer without going over.");
+                self.state
+                    .add_system_message("Cards: 2-10 = face value. J/Q/K = 10. A = 1 or 11.");
+                self.state.add_system_message("Commands:");
+                self.state
+                    .add_system_message("  /bj bet <amount>  - Place bet before deal");
+                self.state
+                    .add_system_message("  /bj deal          - Deal cards (host only)");
+                self.state.add_system_message("  /bj hit           - Take another card");
+                self.state.add_system_message("  /bj stand         - End your turn");
+                self.state
+                    .add_system_message("  /bj double        - Double bet, take 1 card");
+                self.state
+                    .add_system_message("  /bj split         - Split a pair into 2 hands");
+                self.state.add_system_message(
+                    "  /bj insurance     - Buy insurance vs dealer BJ (half bet)",
+                );
+                self.state
+                    .add_system_message("  /bj newround      - Start new round");
+                self.state
+                    .add_system_message("Payouts: Win=1:1, Blackjack=3:2, Insurance=2:1");
+            }
+            "roulette" => {
+                self.state.add_system_message("== ROULETTE RULES ==");
+                self.state
+                    .add_system_message("Spin a wheel with 37 pockets (0-36). Bet on outcome.");
+                self.state.add_system_message("Bet types:");
+                self.state
+                    .add_system_message("  number <0-36>  -> 35:1 payout");
+                self.state.add_system_message("  red / black    -> 1:1 payout");
+                self.state.add_system_message("  even / odd     -> 1:1 payout");
+                self.state
+                    .add_system_message("  low (1-18) / high (19-36) -> 1:1");
+                self.state.add_system_message(
+                    "Commands: /roulette bet <type> <amount>  /roulette spin",
+                );
+            }
+            "andarbahar" | "ab" => {
+                self.state.add_system_message("== ANDAR BAHAR RULES ==");
+                self.state.add_system_message(
+                    "A joker card is revealed. Cards are dealt alternately to Andar and Bahar.",
+                );
+                self.state.add_system_message(
+                    "The side that gets a card matching the joker's value wins.",
+                );
+                self.state.add_system_message("Commands:");
+                self.state
+                    .add_system_message("  /ab andar <amount>  - Bet on Andar side");
+                self.state
+                    .add_system_message("  /ab bahar <amount>  - Bet on Bahar side");
+                self.state.add_system_message(
+                    "  /ab count <range> <amount>  - Side bet on card count",
+                );
+                self.state.add_system_message(
+                    "     Ranges: 1-5(3.5x) 6-10(4.5x) 11-15(5.5x) 16-25(6.5x) 26+(8x)",
+                );
+                self.state.add_system_message("  /ab deal   - Deal all cards");
+                self.state.add_system_message(
+                    "Payout: Main bet pays 0.9:1 (Andar) or 1:1 (Bahar)",
+                );
+            }
+            "slots" => {
+                self.state.add_system_message("== SLOTS RULES ==");
+                self.state.add_system_message("Spin 3 reels. Match symbols to win.");
+                self.state.add_system_message(
+                    "Symbols: 7(50x), Diamond(20x), Crown(10x), Cherry(5x), Bell(3x), Bar(2x)",
+                );
+                self.state.add_system_message("Command: /slots spin <amount>");
+            }
+            "tictactoe" | "ttt" => {
+                self.state.add_system_message("== TIC TAC TOE RULES ==");
+                self.state.add_system_message(
+                    "3x3 grid. Get 3 in a row (horizontal, vertical, diagonal) to win.",
+                );
+                self.state.add_system_message("Commands:");
+                self.state
+                    .add_system_message("  /game tictactoe <room_id>  - Start a game");
+                self.state
+                    .add_system_message("  /move <1-9>                - Place your mark");
+                self.state.add_system_message("     1|2|3");
+                self.state.add_system_message("     4|5|6");
+                self.state.add_system_message("     7|8|9");
+            }
+            _ => {
+                self.state.add_system_message(
+                    "Available games: blackjack (bj), roulette, andarbahar (ab), slots, tictactoe (ttt)",
+                );
+                self.state.add_system_message("Usage: /rules <game>");
+            }
+        }
+    }
+
+    async fn handle_history_command(&mut self) {
+        let ledger = TransactionLedger::load();
+        let recent = ledger.recent(20);
+        if recent.is_empty() {
+            self.state
+                .add_system_message("No game history yet. Play some games!");
+            return;
+        }
+        self.state
+            .add_system_message("== RECENT GAME HISTORY (last 20) ==");
+        for t in recent {
+            let sign = if t.amount >= 0 { "+" } else { "" };
+            let time = chrono::DateTime::from_timestamp(t.timestamp as i64, 0)
+                .map(|dt: chrono::DateTime<chrono::Utc>| dt.format("%m/%d %H:%M").to_string())
+                .unwrap_or_else(|| "??:??".to_string());
+            self.state.add_system_message(&format!(
+                "  [{}] {} {}{}  (bal: {})",
+                time, t.game, sign, t.amount, t.balance_after
+            ));
+        }
+    }
 }
 
 impl Drop for UiApp {
     fn drop(&mut self) {
+        self.state.save_message_history();
         let _ = disable_raw_mode();
         let _ = execute!(self.terminal.backend_mut(), LeaveAlternateScreen);
         let _ = self.terminal.show_cursor();
