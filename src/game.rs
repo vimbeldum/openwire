@@ -699,6 +699,9 @@ impl Blackjack {
     }
 
     pub fn deal_initial_cards(&mut self) {
+        if self.phase != BlackjackPhase::Betting {
+            return; // Only deal during betting phase
+        }
         // Deal 2 cards to each player and dealer
         for _ in 0..2 {
             for player in &mut self.players {
@@ -914,8 +917,13 @@ impl Blackjack {
         if let Some(card) = self.deck.pop() {
             player.hand.push(card);
         }
-        // Auto-stand after double down (standard Blackjack rule)
-        player.status = PlayerStatus::Stand;
+        // Check for bust after the dealt card
+        if Self::is_bust(&player.hand) {
+            player.status = PlayerStatus::Bust;
+        } else {
+            // Auto-stand after double down (standard Blackjack rule)
+            player.status = PlayerStatus::Stand;
+        }
         // Advance to next player
         self.advance_to_next_player();
         Ok(())

@@ -26,7 +26,7 @@ use std::io;
 use tokio::sync::mpsc;
 
 use crate::game::{
-    AndarBaharAction, AndarBaharBet, AndarBaharCountRange, AndarBaharEngine, AndarBaharSide,
+    AndarBaharAction, AndarBaharBet, AndarBaharCountRange, AndarBaharEngine, AndarBaharPhase, AndarBaharSide,
     Blackjack, BlackjackAction, BlackjackPhase, CasinoState, GameAction, PlayerStatus, RouletteAction, RouletteBet,
     RouletteBetType, RouletteEngine, RoulettePhase, SlotsEngine, TicTacToe, TransactionLedger, Wallet,
 };
@@ -141,6 +141,10 @@ impl UiState {
         // Reset scroll to bottom if auto-scroll is enabled
         if self.auto_scroll {
             self.scroll_offset = 0;
+        }
+        // Mirror to overlay status message so it's visible behind the overlay
+        if self.game_overlay.visible {
+            self.game_overlay.status_message = Some(msg.to_string());
         }
     }
 
@@ -306,8 +310,7 @@ impl UiApp {
                             }
                             game_ui::GameKeyResult::BroadcastAction(_data) => {}
                             game_ui::GameKeyResult::Ignored => {
-                                // Fall through to normal key handling below
-                                self.handle_normal_key(key).await;
+                                // Consume the key — don't leak to chat input while overlay is visible
                             }
                         }
                         continue;
@@ -485,7 +488,17 @@ impl UiApp {
                 _ => {}
             },
             game_ui::ActiveGameView::AndarBahar => match c {
-                'd' => self.handle_andarbahar_command("/ab deal").await,
+                'd' => {
+                    // If round ended, start new round directly; otherwise deal
+                    if self.state.andarbahar_game.as_ref().is_some_and(|g| g.phase == AndarBaharPhase::Ended) {
+                        if let Some(ref mut game) = self.state.andarbahar_game {
+                            game.new_round();
+                        }
+                        self.state.add_system_message("Andar Bahar: New round — place your bets!");
+                    } else {
+                        self.handle_andarbahar_command("/ab deal").await;
+                    }
+                }
                 _ => { /* bet entry handled separately */ }
             },
             game_ui::ActiveGameView::None => {}
@@ -1247,6 +1260,10 @@ impl UiApp {
             }
             if let Some(ref mut game) = self.state.blackjack_game {
                 if let Err(e) = game.split(&self.state.local_peer_id) {
+                    // Refund the wallet on failure
+                    if extra_bet > 0 {
+                        self.state.wallet.credit(extra_bet);
+                    }
                     self.state.add_system_message(&format!("Can't split: {}", e));
                     return;
                 }
@@ -2412,6 +2429,12 @@ impl UiApp {
                     Some(g) => g,
                     None => return,
                 };
+                // If round already ended, start a new round first
+                if game.phase == AndarBaharPhase::Ended {
+                    game.new_round();
+                    self.state.add_system_message("Andar Bahar: New round — place your bets!");
+                    return;
+                }
                 game.deal_all();
                 game.room_id.clone()
             };
@@ -2506,6 +2529,18 @@ impl UiApp {
                 return;
             }
             self.state.wallet = wallet;
+            // Attach count side bet to player's existing main bet
+            if let Some(ref mut game) = self.state.andarbahar_game {
+                let my_id = self.state.local_peer_id.clone();
+                if let Some(bet) = game.bets.iter_mut().find(|b| b.peer_id == my_id) {
+                    bet.count_side_bet = Some(crate::game::AndarBaharCountBet { range: range.clone(), amount });
+                } else {
+                    // No main bet yet — refund and warn
+                    self.state.wallet.credit(amount);
+                    self.state.add_system_message("Place a main bet (andar/bahar) before adding a count side-bet.");
+                    return;
+                }
+            }
             self.state.add_system_message(&format!(
                 "Count side-bet: {} chips on {}. Balance: {}",
                 amount,

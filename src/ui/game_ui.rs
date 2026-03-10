@@ -40,6 +40,8 @@ pub struct GameOverlay {
     pub straight_entering_amount: bool,
     pub anim_frame: u16,
     pub animating: bool,
+    /// Transient status message displayed inside the overlay (auto-clears)
+    pub status_message: Option<String>,
 }
 
 impl GameOverlay {
@@ -48,7 +50,7 @@ impl GameOverlay {
             view: ActiveGameView::None, visible: false, button_areas: Vec::new(),
             bet_input: String::new(), entering_bet: false, bet_type_key: 'r',
             straight_number: None, straight_entering_amount: false,
-            anim_frame: 0, animating: false,
+            anim_frame: 0, animating: false, status_message: None,
         }
     }
 }
@@ -89,8 +91,13 @@ pub fn render_game_overlay(
         .border_style(Style::default().fg(Color::Yellow));
     let inner = outer.inner(popup);
     frame.render_widget(outer, popup);
+    let has_status = overlay.status_message.is_some();
     let chunks = Layout::default().direction(Direction::Vertical)
-        .constraints([Constraint::Min(3), Constraint::Length(3)]).split(inner);
+        .constraints(if has_status {
+            vec![Constraint::Min(3), Constraint::Length(1), Constraint::Length(3)]
+        } else {
+            vec![Constraint::Min(3), Constraint::Length(0), Constraint::Length(3)]
+        }).split(inner);
     let bal = state.wallet.balance;
     overlay.button_areas.clear();
     match &overlay.view {
@@ -101,7 +108,16 @@ pub fn render_game_overlay(
         ActiveGameView::TicTacToe => { if let Some(g) = &state.active_game { render_ttt(frame, chunks[0], g, &state.local_peer_id, overlay); } }
         ActiveGameView::None => {}
     }
-    render_action_bar(frame, chunks[1], overlay);
+    // Render status message if present
+    if let Some(ref msg) = overlay.status_message {
+        let status_line = Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled(msg.clone(), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        ]);
+        frame.render_widget(Paragraph::new(status_line), chunks[1]);
+    }
+    render_action_bar(frame, chunks[2], overlay);
+    // Status message persists until next action clears it (shown for ~1 render cycle minimum)
 }
 
 // ─── Card rendering ─────────────────────────────────────────────────────────
@@ -414,6 +430,8 @@ fn render_action_bar(f: &mut Frame, area: Rect, ov: &mut GameOverlay) {
 pub fn handle_game_key(
     key: KeyEvent, overlay: &mut GameOverlay,
 ) -> GameKeyResult {
+    // Clear status message on any new key press
+    overlay.status_message = None;
     if key.code == KeyCode::Esc {
         if overlay.entering_bet { overlay.entering_bet = false; overlay.bet_input.clear(); return GameKeyResult::Consumed; }
         return GameKeyResult::ExitOverlay;
