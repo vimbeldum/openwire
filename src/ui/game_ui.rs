@@ -34,6 +34,10 @@ pub struct GameOverlay {
     pub entering_bet: bool,
     /// Roulette bet type key: 'r'=red, 'k'=black, 'o'=odd, 'e'=even, '#'=straight
     pub bet_type_key: char,
+    /// For straight bets: which number (0-36) — entered after '#'
+    pub straight_number: Option<u8>,
+    /// Two-step input: false=entering number, true=entering amount
+    pub straight_entering_amount: bool,
     pub anim_frame: u16,
     pub animating: bool,
 }
@@ -43,6 +47,7 @@ impl GameOverlay {
         Self {
             view: ActiveGameView::None, visible: false, button_areas: Vec::new(),
             bet_input: String::new(), entering_bet: false, bet_type_key: 'r',
+            straight_number: None, straight_entering_amount: false,
             anim_frame: 0, animating: false,
         }
     }
@@ -165,6 +170,10 @@ fn render_bj(f: &mut Frame, area: Rect, game: &Blackjack, my_id: &str, bal: u32,
             let mut a = vec![("Hit",'h'),("Stand",'s')];
             if me.is_some_and(|p| p.hand.len() == 2 && !p.doubled_down) { a.push(("Double",'d')); }
             if me.is_some_and(|p| p.hand.len() == 2 && p.split_hand.is_empty() && p.hand[0].value == p.hand[1].value) { a.push(("sPlit",'p')); }
+            // Show insurance when dealer's face-up card is Ace and player hasn't bought yet
+            if game.dealer_hand.first().is_some_and(|c| c.value == "A")
+                && me.is_some_and(|p| p.insurance_bet == 0 && p.hand.len() == 2)
+            { a.push(("Ins",'i')); }
             a
         }
         BlackjackPhase::Ended | BlackjackPhase::Settlement => vec![("New round",'n')],
@@ -258,7 +267,7 @@ fn render_sl(f: &mut Frame, area: Rect, eng: &SlotsEngine, bal: u32, ov: &mut Ga
         l.push(Line::from(o));
     }
     f.render_widget(Paragraph::new(l), area);
-    register_actions(ov, &[("$10",'1'),("$25",'2'),("$50",'3'),("$100",'4'),("Spin",' ')]);
+    register_actions(ov, &[("$10",'1'),("$25",'2'),("$50",'3'),("$100",'4'),("$500",'5'),("Spin",' ')]);
 }
 
 // ─── Tic-Tac-Toe ────────────────────────────────────────────────────────────
@@ -352,11 +361,28 @@ fn render_action_bar(f: &mut Frame, area: Rect, ov: &mut GameOverlay) {
     let btn_y = if ov.entering_bet && inner.height > 1 {
         // Show bet input on first line, buttons on second
         let bet_text = if ov.bet_input.is_empty() { "_" } else { &ov.bet_input };
-        let input_line = Line::from(vec![
-            sb("  Bet: $", Color::Green),
-            sb(bet_text, Color::Yellow),
-            s("▌", Color::DarkGray),
-        ]);
+        let input_line = if ov.bet_type_key == '#' && !ov.straight_entering_amount {
+            // Step 1: entering the number (0-36)
+            Line::from(vec![
+                sb("  Number (0-36): ", Color::Cyan),
+                sb(bet_text, Color::Yellow),
+                s("▌", Color::DarkGray),
+            ])
+        } else if ov.bet_type_key == '#' && ov.straight_entering_amount {
+            // Step 2: entering the amount
+            let num = ov.straight_number.map(|n| n.to_string()).unwrap_or_default();
+            Line::from(vec![
+                sb(&format!("  Straight #{} — Bet: $", num), Color::Green),
+                sb(bet_text, Color::Yellow),
+                s("▌", Color::DarkGray),
+            ])
+        } else {
+            Line::from(vec![
+                sb("  Bet: $", Color::Green),
+                sb(bet_text, Color::Yellow),
+                s("▌", Color::DarkGray),
+            ])
+        };
         f.render_widget(Paragraph::new(input_line), Rect::new(inner.x, inner.y, inner.width, 1));
         inner.y + 1
     } else {
@@ -393,10 +419,36 @@ pub fn handle_game_key(
         return GameKeyResult::ExitOverlay;
     }
     if overlay.entering_bet {
+        // Straight bet two-step: first enter number (0-36), then amount
+        if overlay.bet_type_key == '#' && !overlay.straight_entering_amount {
+            return match key.code {
+                KeyCode::Char(c) if c.is_ascii_digit() => {
+                    if overlay.bet_input.len() < 2 { overlay.bet_input.push(c); }
+                    GameKeyResult::Consumed
+                }
+                KeyCode::Backspace => { overlay.bet_input.pop(); GameKeyResult::Consumed }
+                KeyCode::Enter => {
+                    // Parse the number, validate 0-36
+                    if let Ok(n) = overlay.bet_input.parse::<u8>() {
+                        if n <= 36 {
+                            overlay.straight_number = Some(n);
+                            overlay.straight_entering_amount = true;
+                            overlay.bet_input.clear();
+                        }
+                    }
+                    GameKeyResult::Consumed
+                }
+                _ => GameKeyResult::Consumed,
+            };
+        }
         return match key.code {
             KeyCode::Char(c) if c.is_ascii_digit() => { if overlay.bet_input.len() < 7 { overlay.bet_input.push(c); } GameKeyResult::Consumed }
             KeyCode::Backspace => { overlay.bet_input.pop(); GameKeyResult::Consumed }
-            KeyCode::Enter => { overlay.entering_bet = false; GameKeyResult::Consumed }
+            KeyCode::Enter => {
+                overlay.entering_bet = false;
+                overlay.straight_entering_amount = false;
+                GameKeyResult::Consumed
+            }
             _ => GameKeyResult::Consumed,
         };
     }

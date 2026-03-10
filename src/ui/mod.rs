@@ -510,15 +510,22 @@ impl UiApp {
                     self.state.game_overlay.bet_input.clear();
                     return;
                 }
-                let bet_type = match self.state.game_overlay.bet_type_key {
-                    'r' => "red",
-                    'k' => "black",
-                    'o' => "odd",
-                    'e' => "even",
-                    '#' => "straight",
-                    _ => "red",
+                let cmd = match self.state.game_overlay.bet_type_key {
+                    'r' => format!("/roulette bet red {}", amount_str),
+                    'k' => format!("/roulette bet black {}", amount_str),
+                    'o' => format!("/roulette bet odd {}", amount_str),
+                    'e' => format!("/roulette bet even {}", amount_str),
+                    '#' => {
+                        if let Some(n) = self.state.game_overlay.straight_number {
+                            format!("/roulette bet straight {} {}", n, amount_str)
+                        } else {
+                            self.state.add_system_message("No number selected for straight bet.");
+                            self.state.game_overlay.bet_input.clear();
+                            return;
+                        }
+                    }
+                    _ => format!("/roulette bet red {}", amount_str),
                 };
-                let cmd = format!("/roulette bet {} {}", bet_type, amount_str);
                 self.handle_roulette_command(&cmd).await;
             }
             game_ui::ActiveGameView::AndarBahar => {
@@ -891,6 +898,14 @@ impl UiApp {
     /// Handle /game commands
     async fn handle_game_command(&mut self, cmd: &str) {
         if let Some(room_arg) = cmd.strip_prefix("tictactoe") {
+            // Re-show overlay if game already active
+            if self.state.active_game.is_some() && room_arg.trim().is_empty() {
+                self.state.game_overlay.entering_bet = false;
+                self.state.game_overlay.bet_input.clear();
+                self.state.game_overlay.view = game_ui::ActiveGameView::TicTacToe;
+                self.state.game_overlay.visible = true;
+                return;
+            }
             let room_id = room_arg.trim();
             if room_id.is_empty() {
                 // Use first joined room, or "local" for solo play
@@ -1239,6 +1254,35 @@ impl UiApp {
             self.render_blackjack();
             self.broadcast_bj_state().await;
             self.maybe_run_dealer().await;
+        } else if cmd == "insurance" || cmd == "ins" {
+            // Insurance costs half the original bet
+            let ins_cost = self.state.blackjack_game.as_ref()
+                .and_then(|g| g.players.iter().find(|p| p.peer_id == self.state.local_peer_id))
+                .map(|p| p.bet / 2)
+                .unwrap_or(0);
+            if ins_cost == 0 {
+                self.state.add_system_message("Can't buy insurance: no bet placed.");
+                return;
+            }
+            let mut wallet = self.state.wallet.clone();
+            wallet.refresh_if_needed();
+            if let Err(e) = wallet.debit(ins_cost) {
+                self.state.add_system_message(&format!("Can't buy insurance: {}", e));
+                return;
+            }
+            self.state.wallet = wallet;
+            if let Some(ref mut game) = self.state.blackjack_game {
+                if let Err(e) = game.buy_insurance(&self.state.local_peer_id) {
+                    // Refund on failure
+                    self.state.wallet.credit(ins_cost);
+                    self.state.add_system_message(&format!("Insurance: {}", e));
+                    return;
+                }
+            }
+            self.state.add_system_message(&format!(
+                "Insurance bought for ${}. Balance: {}", ins_cost, self.state.wallet.balance
+            ));
+            self.broadcast_bj_state().await;
         } else if cmd == "newround" || cmd == "new" {
             if let Some(ref mut game) = self.state.blackjack_game {
                 game.new_round();
@@ -1248,7 +1292,7 @@ impl UiApp {
             self.broadcast_bj_state().await;
         } else {
             self.state
-                .add_system_message("Blackjack commands: bet <amount>, deal, hit, stand, newround");
+                .add_system_message("Blackjack commands: bet <amount>, deal, hit, stand, double, split, insurance, newround");
         }
     }
 
