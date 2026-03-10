@@ -281,6 +281,19 @@ export function sendStateSnapshot(roomId, state) {
     send({ type: 'room_state_snapshot', room_id: roomId, state });
 }
 
+/**
+ * Returns true if a peer object represents a CLI bridge node.
+ * Bridge peers connect via WebSocket but relay messages to/from the
+ * libp2p gossipsub network. They are identified by `is_bridge: true`
+ * in the peer_joined message and in the welcome peer list.
+ *
+ * @param {{ is_bridge?: boolean }} peer
+ * @returns {boolean}
+ */
+export function isBridgePeer(peer) {
+    return peer?.is_bridge === true;
+}
+
 // Pause pings when tab is hidden
 if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {

@@ -1351,7 +1351,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 ));
                 break;
             case 'peer_joined':
-                setPeers(prev => [...prev.filter(p => p.peer_id !== msg.peer_id), { peer_id: msg.peer_id, nick: msg.nick, is_admin: msg.is_admin || false }]);
+                setPeers(prev => [...prev.filter(p => p.peer_id !== msg.peer_id), { peer_id: msg.peer_id, nick: msg.nick, is_admin: msg.is_admin || false, is_bridge: msg.is_bridge || false }]);
                 addMsg('★', `${msg.nick} joined`, 'system');
                 break;
             case 'peer_left':
@@ -2915,6 +2915,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                         <div key={p.peer_id} className="peer-item">
                             <span className="peer-dot" />
                             <span className="peer-nick">{p.nick}</span>
+                            {p.is_bridge && <span className="peer-bridge-badge" title="CLI bridge node">🔗 CLI</span>}
                             {p.balance > 0 && <span className="peer-chips">{p.balance.toLocaleString()}</span>}
                             <button
                                 className="whisper-btn"

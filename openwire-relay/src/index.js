@@ -151,8 +151,10 @@ export class RelayRoom {
 
                     // Admin auth: constant-time comparison prevents timing attacks
                     const is_admin = typeof msg.admin_secret === 'string' && this.timingSafeEqual(msg.admin_secret, this.getAdminSecret());
+                    // Bridge peers are CLI nodes relaying between gossipsub and the web
+                    const is_bridge = msg.is_bridge === true;
 
-                    peerInfo = { peer_id, nick, ip: clientIp, rooms: new Set(), balance: 0, is_admin };
+                    peerInfo = { peer_id, nick, ip: clientIp, rooms: new Set(), balance: 0, is_admin, is_bridge };
                     this.peers.set(ws, peerInfo);
                     // Track IP connection count
                     this.ipConnectionCount.set(clientIp, (this.ipConnectionCount.get(clientIp) || 0) + 1);
@@ -165,7 +167,7 @@ export class RelayRoom {
                         rooms: this.roomList(),
                     });
 
-                    this.broadcast({ type: "peer_joined", peer_id, nick, is_admin: peerInfo.is_admin }, ws);
+                    this.broadcast({ type: "peer_joined", peer_id, nick, is_admin: peerInfo.is_admin, is_bridge: peerInfo.is_bridge }, ws);
                     break;
                 }
 
@@ -455,6 +457,7 @@ export class RelayRoom {
             peer_id: p.peer_id,
             nick: p.nick,
             balance: p.balance || 0,
+            is_bridge: p.is_bridge || false,
         }));
     }
 
