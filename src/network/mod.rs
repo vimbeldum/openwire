@@ -16,7 +16,7 @@ use libp2p::{
 };
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{RwLock, mpsc};
+use tokio::sync::{RwLock, broadcast, mpsc};
 
 use crate::crypto::CryptoManager;
 use crate::room::RoomManager;
@@ -266,8 +266,10 @@ pub struct OpenWireBehaviour {
 pub struct NetworkHandle {
     /// Send commands to the network event loop
     pub command_sender: mpsc::Sender<NetworkCommand>,
-    /// Receive events from the network event loop
+    /// Receive events from the network event loop (used by TUI)
     pub event_receiver: mpsc::Receiver<NetworkEvent>,
+    /// Subscribe to broadcast of all network events (used by web bridge)
+    pub event_broadcast: broadcast::Sender<NetworkEvent>,
 }
 
 /// The main network manager
@@ -280,8 +282,10 @@ pub struct NetworkHandle {
 pub struct Network {
     /// The libp2p swarm
     swarm: libp2p::Swarm<OpenWireBehaviour>,
-    /// Sender for network events (to the UI/consumer)
+    /// Sender for network events (to the UI/consumer via mpsc)
     event_sender: mpsc::Sender<NetworkEvent>,
+    /// Broadcast sender — cloned by the web bridge to subscribe to all events
+    event_broadcast: broadcast::Sender<NetworkEvent>,
     /// Receiver for network commands (from the UI/controller)
     command_receiver: mpsc::Receiver<NetworkCommand>,
     /// Crypto manager for E2E encryption
@@ -383,6 +387,8 @@ impl Network {
         // Create channels — both halves are now properly used
         let (event_sender, event_receiver) = mpsc::channel(256);
         let (command_sender, command_receiver) = mpsc::channel(256);
+        // Broadcast channel for the web bridge — capacity 64 is plenty for websocket clients
+        let (event_broadcast, _) = broadcast::channel(64);
 
         let crypto = Arc::new(RwLock::new(crypto));
         let encryption_key = crypto.read().await.encryption_public_key();
@@ -391,6 +397,7 @@ impl Network {
         let network = Self {
             swarm,
             event_sender,
+            event_broadcast: event_broadcast.clone(),
             command_receiver,
             crypto,
             room_manager,
@@ -404,6 +411,7 @@ impl Network {
         let handle = NetworkHandle {
             command_sender,
             event_receiver,
+            event_broadcast,
         };
 
         Ok((network, handle))
@@ -464,10 +472,12 @@ impl Network {
             peer_id
         );
 
-        let _ = self
-            .event_sender
-            .send(NetworkEvent::KeysExchanged(peer_id))
-            .await;
+        send_event(
+            &self.event_sender,
+            &self.event_broadcast,
+            NetworkEvent::KeysExchanged(peer_id),
+        )
+        .await;
 
         Ok(())
     }
@@ -679,14 +689,16 @@ impl Network {
             peer_id
         );
 
-        let _ = self
-            .event_sender
-            .send(NetworkEvent::RoomInviteReceived {
+        send_event(
+            &self.event_sender,
+            &self.event_broadcast,
+            NetworkEvent::RoomInviteReceived {
                 from: peer_id,
                 room_id: invite.room_id,
                 room_name: invite.room_name,
-            })
-            .await;
+            },
+        )
+        .await;
 
         Ok(())
     }
@@ -720,18 +732,34 @@ impl Network {
             room_id
         );
 
-        let _ = self
-            .event_sender
-            .send(NetworkEvent::RoomMessageReceived {
+        send_event(
+            &self.event_sender,
+            &self.event_broadcast,
+            NetworkEvent::RoomMessageReceived {
                 from: peer_id,
                 room_id: room_id.to_string(),
                 sender_nick: room_msg.sender_nick,
                 content: room_msg.content,
-            })
-            .await;
+            },
+        )
+        .await;
 
         Ok(())
     }
+}
+
+/// Send a network event to both the mpsc consumer (TUI) and the broadcast channel (web bridge).
+///
+/// Accepts the two channel primitives directly so no `&Network` borrow is held
+/// across an `.await` point — which would make the future `!Send`.
+async fn send_event(
+    event_sender: &mpsc::Sender<NetworkEvent>,
+    event_broadcast: &broadcast::Sender<NetworkEvent>,
+    event: NetworkEvent,
+) {
+    // Best-effort broadcast to web clients — ignore if no subscribers
+    let _ = event_broadcast.send(event.clone());
+    let _ = event_sender.send(event).await;
 }
 
 /// Run the network event loop.
@@ -758,7 +786,7 @@ pub async fn run_network(mut network: Network) -> Result<()> {
 
                     libp2p::swarm::SwarmEvent::ConnectionEstablished { peer_id, .. } => {
                         tracing::info!("Connection established with: {}", peer_id);
-                        let _ = network.event_sender.send(NetworkEvent::PeerConnected(peer_id)).await;
+                        send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::PeerConnected(peer_id)).await;
 
                         // Send our keys to newly connected peers
                         if let Err(e) = network.send_key_exchange().await {
@@ -768,15 +796,13 @@ pub async fn run_network(mut network: Network) -> Result<()> {
 
                     libp2p::swarm::SwarmEvent::ConnectionClosed { peer_id, .. } => {
                         tracing::info!("Connection closed with: {}", peer_id);
-                        let _ = network.event_sender.send(NetworkEvent::PeerDisconnected(peer_id)).await;
+                        send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::PeerDisconnected(peer_id)).await;
                     }
 
                     libp2p::swarm::SwarmEvent::NewListenAddr { address, .. } => {
                         let full_addr = format!("{}/p2p/{}", address, network.local_peer_id);
                         tracing::info!("Listening on {}", full_addr);
-                        let _ = network.event_sender.send(
-                            NetworkEvent::ListenAddress(full_addr)
-                        ).await;
+                        send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::ListenAddress(full_addr)).await;
                     }
 
                     _ => {}
@@ -789,33 +815,25 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                     NetworkCommand::Broadcast { data } => {
                         if let Err(e) = network.publish_signed(data).await {
                             tracing::error!("Failed to broadcast: {}", e);
-                            let _ = network.event_sender.send(
-                                NetworkEvent::Error(format!("Broadcast failed: {}", e))
-                            ).await;
+                            send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error(format!("Broadcast failed: {}", e))).await;
                         }
                     }
                     NetworkCommand::SendToPeer { peer_id, data } => {
                         if let Err(e) = network.send_to_peer(&peer_id, data).await {
                             tracing::error!("Failed to send to peer {}: {}", peer_id, e);
-                            let _ = network.event_sender.send(
-                                NetworkEvent::Error(format!("Send to peer failed: {}", e))
-                            ).await;
+                            send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error(format!("Send to peer failed: {}", e))).await;
                         }
                     }
                     NetworkCommand::SendFile { path } => {
                         if let Err(e) = network.send_file(&path).await {
                             tracing::error!("Failed to send file: {}", e);
-                            let _ = network.event_sender.send(
-                                NetworkEvent::Error(format!("File send failed: {}", e))
-                            ).await;
+                            send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error(format!("File send failed: {}", e))).await;
                         }
                     }
                     NetworkCommand::Connect(addr) => {
                         if let Err(e) = network.dial(&addr) {
                             tracing::error!("Failed to connect to {}: {}", addr, e);
-                            let _ = network.event_sender.send(
-                                NetworkEvent::Error(format!("Connection failed: {}", e))
-                            ).await;
+                            send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error(format!("Connection failed: {}", e))).await;
                         }
                     }
                     NetworkCommand::Shutdown => {
@@ -825,25 +843,19 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                     NetworkCommand::SubscribeToRoom { room_id } => {
                         if let Err(e) = network.subscribe_to_room(&room_id) {
                             tracing::error!("Failed to subscribe to room {}: {}", room_id, e);
-                            let _ = network.event_sender.send(
-                                NetworkEvent::Error(format!("Failed to join room: {}", e))
-                            ).await;
+                            send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error(format!("Failed to join room: {}", e))).await;
                         }
                     }
                     NetworkCommand::UnsubscribeFromRoom { room_id } => {
                         if let Err(e) = network.unsubscribe_from_room(&room_id) {
                             tracing::error!("Failed to unsubscribe from room {}: {}", room_id, e);
-                            let _ = network.event_sender.send(
-                                NetworkEvent::Error(format!("Failed to leave room: {}", e))
-                            ).await;
+                            send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error(format!("Failed to leave room: {}", e))).await;
                         }
                     }
                     NetworkCommand::SendRoomMessage { room_id, data } => {
                         if let Err(e) = network.send_room_message(&room_id, data).await {
                             tracing::error!("Failed to send room message: {}", e);
-                            let _ = network.event_sender.send(
-                                NetworkEvent::Error(format!("Room message failed: {}", e))
-                            ).await;
+                            send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error(format!("Room message failed: {}", e))).await;
                         }
                     }
                     NetworkCommand::SendRoomInvite { peer_id: _, invite_data } => {
@@ -851,9 +863,7 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                         let topic = gossipsub::IdentTopic::new(ROOM_INVITE_TOPIC);
                         if let Err(e) = network.swarm.behaviour_mut().gossipsub.publish(topic, invite_data) {
                             tracing::error!("Failed to send room invite: {}", e);
-                            let _ = network.event_sender.send(
-                                NetworkEvent::Error(format!("Failed to send room invite: {}", e))
-                            ).await;
+                            send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error(format!("Failed to send room invite: {}", e))).await;
                         }
                     }
                     NetworkCommand::CreateRoom { name } => {
@@ -867,15 +877,11 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                                 if let Err(e) = network.subscribe_to_room(&room_id) {
                                     tracing::error!("Failed to subscribe to room {}: {}", room_id, e);
                                 }
-                                let _ = network.event_sender.send(
-                                    NetworkEvent::RoomCreated { room_id, room_name }
-                                ).await;
+                                send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::RoomCreated { room_id, room_name }).await;
                             }
                             Err(e) => {
                                 tracing::error!("Failed to create room: {}", e);
-                                let _ = network.event_sender.send(
-                                    NetworkEvent::Error(format!("Failed to create room: {}", e))
-                                ).await;
+                                send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error(format!("Failed to create room: {}", e))).await;
                             }
                         }
                     }
@@ -939,20 +945,14 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                                 let topic = gossipsub::IdentTopic::new(ROOM_INVITE_TOPIC);
                                 if let Err(e) = network.swarm.behaviour_mut().gossipsub.publish(topic, invite_data) {
                                     tracing::error!("Failed to send room invite: {}", e);
-                                    let _ = network.event_sender.send(
-                                        NetworkEvent::Error(format!("Failed to send room invite: {}", e))
-                                    ).await;
+                                    send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error(format!("Failed to send room invite: {}", e))).await;
                                 } else {
-                                    let _ = network.event_sender.send(
-                                        NetworkEvent::RoomCreated { room_id, room_name: format!("Invited {} to room", peer_id) }
-                                    ).await;
+                                    send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::RoomCreated { room_id, room_name: format!("Invited {} to room", peer_id) }).await;
                                 }
                             }
                             Err(e) => {
                                 tracing::error!("Failed to create room invite: {}", e);
-                                let _ = network.event_sender.send(
-                                    NetworkEvent::Error(format!("Failed to create invite: {}", e))
-                                ).await;
+                                send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error(format!("Failed to create invite: {}", e))).await;
                             }
                         }
                     }
@@ -973,16 +973,12 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                                 .map(|r| (r.id.clone(), r.name.clone()))
                                 .collect()
                         };
-                        let _ = network.event_sender.send(
-                            NetworkEvent::RoomList { rooms }
-                        ).await;
+                        send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::RoomList { rooms }).await;
                     }
                     NetworkCommand::JoinRoom { room_id: _ } => {
                         // Note: You can only join a room if you receive a proper invite
                         // This command is for future use when manual room joining is implemented
-                        let _ = network.event_sender.send(
-                            NetworkEvent::Error("Room joining requires an invite. Ask a room member to invite you.".to_string())
-                        ).await;
+                        send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error("Room joining requires an invite. Ask a room member to invite you.".to_string())).await;
                     }
                     NetworkCommand::SearchGif { query } => {
                         if let Some(ref client) = network.klipy_client {
@@ -1000,18 +996,14 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                                         .collect();
 
                                     if results.is_empty() {
-                                        let _ = network.event_sender.send(
-                                            NetworkEvent::Error(format!("No GIFs found for: {}", query))
-                                        ).await;
+                                        send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error(format!("No GIFs found for: {}", query))).await;
                                     } else {
                                         // Send first GIF result to peers
                                         if let Some(first_gif) = results.first() {
-                                            let _ = network.event_sender.send(
-                                                NetworkEvent::GifSearchResult {
-                                                    query: query.clone(),
-                                                    gifs: results.clone(),
-                                                }
-                                            ).await;
+                                            send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::GifSearchResult {
+                                                query: query.clone(),
+                                                gifs: results.clone(),
+                                            }).await;
 
                                             // Broadcast GIF URL to peers
                                             let gif_message = format!("[GIF] {} - {}", first_gif.title, first_gif.url);
@@ -1025,15 +1017,11 @@ pub async fn run_network(mut network: Network) -> Result<()> {
                                     }
                                 }
                                 Err(e) => {
-                                    let _ = network.event_sender.send(
-                                        NetworkEvent::Error(format!("GIF search failed: {}", e))
-                                    ).await;
+                                    send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error(format!("GIF search failed: {}", e))).await;
                                 }
                             }
                         } else {
-                            let _ = network.event_sender.send(
-                                NetworkEvent::Error("GIF search unavailable: KLIPY_KEY not configured".to_string())
-                            ).await;
+                            send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error("GIF search unavailable: KLIPY_KEY not configured".to_string())).await;
                         }
                     }
                 }
@@ -1070,14 +1058,16 @@ async fn handle_behaviour_event(network: &mut Network, event: OpenWireBehaviourE
                                 peer_id,
                                 topic
                             );
-                            let _ = network
-                                .event_sender
-                                .send(NetworkEvent::MessageReceived {
+                            send_event(
+                                &network.event_sender,
+                                &network.event_broadcast,
+                                NetworkEvent::MessageReceived {
                                     from: peer_id,
                                     topic: topic.to_string(),
                                     data: signed.content,
-                                })
-                                .await;
+                                },
+                            )
+                            .await;
                         }
                         Err(e) => {
                             tracing::warn!(
@@ -1118,14 +1108,16 @@ async fn handle_behaviour_event(network: &mut Network, event: OpenWireBehaviourE
                             tracing::info!("Saved file to {:?}", save_path);
                         }
 
-                        let _ = network
-                            .event_sender
-                            .send(NetworkEvent::FileReceived {
+                        send_event(
+                            &network.event_sender,
+                            &network.event_broadcast,
+                            NetworkEvent::FileReceived {
                                 from: peer_id,
                                 filename: file_msg.filename,
                                 data: file_msg.data,
-                            })
-                            .await;
+                            },
+                        )
+                        .await;
                     }
                     Err(e) => {
                         tracing::debug!("Could not parse file message from {}: {}", peer_id, e);
@@ -1159,10 +1151,12 @@ async fn handle_behaviour_event(network: &mut Network, event: OpenWireBehaviourE
                     .gossipsub
                     .add_explicit_peer(&peer_id);
 
-                let _ = network
-                    .event_sender
-                    .send(NetworkEvent::PeerDiscovered(peer_id))
-                    .await;
+                send_event(
+                    &network.event_sender,
+                    &network.event_broadcast,
+                    NetworkEvent::PeerDiscovered(peer_id),
+                )
+                .await;
 
                 // Send our encryption keys to the newly discovered peer
                 if let Err(e) = network.send_key_exchange().await {
@@ -1182,10 +1176,12 @@ async fn handle_behaviour_event(network: &mut Network, event: OpenWireBehaviourE
                     .gossipsub
                     .remove_explicit_peer(&peer_id);
 
-                let _ = network
-                    .event_sender
-                    .send(NetworkEvent::PeerDisconnected(peer_id))
-                    .await;
+                send_event(
+                    &network.event_sender,
+                    &network.event_broadcast,
+                    NetworkEvent::PeerDisconnected(peer_id),
+                )
+                .await;
             }
         }
 
