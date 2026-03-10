@@ -121,6 +121,11 @@ export class AgentSwarm {
         // #7: Cached agent names set (invalidated on config change)
         this._agentNamesCache = null;
 
+        // Task queue — browser-side persistence for AI task tracking
+        this._taskQueue = new Map();
+        this._onTaskUpdate = null;   // callback for UI task progress
+        this._loadTasks();
+
         // Dynamic config — loaded from agentStore
         this._characters = {};  // dict { id: charObj }
         this._groups = {};      // dict { id: groupObj }
@@ -314,6 +319,9 @@ export class AgentSwarm {
         this._context.push({ role: 'user', content: `${nick}: ${safeText}`, _isAgent: isAgent });
         if (this._context.length > CONTEXT_BUFFER_SIZE) this._context.shift();
         this._contextDirty = true;
+
+        // Task detection — only for human messages
+        if (!isAgent) this._detectTask(nick, safeText);
 
         // Trigger compaction when context grows past threshold (fire-and-forget, non-blocking)
         if (this._running && this._context.length >= COMPACT_THRESHOLD && !this._isCompacting) {
@@ -792,7 +800,7 @@ TASK EXECUTION RULES:
 7. Stay fully in-character while executing. Jethalal picks players with dramatic commentary, Babita Ji tracks things methodically, Popatlal writes with journalistic flair.
 8. If another character interrupts mid-task, acknowledge briefly but RETURN to your task. Do NOT abandon it for drama.
 9. TASK MEMORY: The Chat history IS your task state. Scan your own previous messages (marked [THIS WAS SAID BY YOU]) to know what steps you already completed.
-</task_execution>
+</task_execution>${this._buildTaskPrompt(characterId)}
 
 <human_interaction_rules>
 CRITICAL — DISTINGUISH HUMANS FROM CHARACTERS:
@@ -951,6 +959,7 @@ CRITICAL — DISTINGUISH HUMANS FROM CHARACTERS:
                 this._log(`[Message] ${c.name}: "${text.slice(0, 50)}${text.length > 50 ? '...' : ''}"`);
 
                 this._extractFact(c.name, text);
+                this._detectStepCompletion(characterId, text);
                 this._checkCrossOver(characterId);
 
                 // Agent-to-agent @mention chain: if this agent tagged another agent, trigger their response
@@ -1208,4 +1217,182 @@ ${text}`;
         this._sessionFacts.push(fact);
         this._log(`[Memory] Stored fact: "${fact.slice(0, 50)}..."`);
     }
+
+    // ── Task Queue — Browser-side task persistence ───────────
+
+    static TASK_STORAGE_KEY = 'openwire_task_queue';
+    static TASK_VERBS = /\b(pick|select|choose|list|make|write|create|track|find|compare|rank|sort|plan|draft|suggest|recommend|build|design|banao|karo|likho|rakho|bata|soch|note|decide)\b/i;
+    static TASK_COMPLETE_RE = /\b(task\s+complete|ho\s+gaya|done|khatam|finished|all\s+done|list\s+complete|mukammal)\b/i;
+    static TASK_STEP_RE = /\bstep\s+(\d+)\s*[:\-]/i;
+    static TASK_PROGRESS_RE = /\b(yeh\s+raha|yeh\s+lo|yeh\s+dekho|here\s+is|here\s+are|next\s+pick|agle|ab\s+main)\b/i;
+
+    _loadTasks() {
+        try {
+            const stored = localStorage.getItem(AgentSwarm.TASK_STORAGE_KEY);
+            if (stored) {
+                const entries = JSON.parse(stored);
+                this._taskQueue = new Map(entries);
+                // Prune tasks completed > 24h ago
+                const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+                for (const [id, t] of this._taskQueue) {
+                    if (t.status === 'done' && t.updatedAt < cutoff) this._taskQueue.delete(id);
+                }
+            }
+        } catch { this._taskQueue = new Map(); }
+    }
+
+    _persistTasks() {
+        try {
+            localStorage.setItem(AgentSwarm.TASK_STORAGE_KEY, JSON.stringify([...this._taskQueue.entries()]));
+        } catch { /* quota exceeded */ }
+    }
+
+    _fireTaskUpdate(type, task) {
+        if (this._onTaskUpdate) {
+            this._onTaskUpdate({ type, task: { ...task }, characterId: task.assignee });
+        }
+    }
+
+    /**
+     * Detect if a human message is assigning a task to a character via @mention + verb.
+     * Called from addContext() for non-agent messages only.
+     */
+    _detectTask(nick, text) {
+        // Extract @mention
+        const mentionMatch = text.match(/@(\w+)/);
+        if (!mentionMatch) return;
+        const mentioned = mentionMatch[1].toLowerCase();
+
+        // Resolve to a character ID
+        const charId = Object.keys(this._characters).find(id => {
+            const c = this._characters[id];
+            return id === mentioned || c.name.toLowerCase().startsWith(mentioned);
+        });
+        if (!charId) return;
+
+        // Check for task verb
+        const taskText = text.replace(/@\w+/g, '').trim();
+        if (!AgentSwarm.TASK_VERBS.test(taskText)) return;
+
+        // Duplicate check — skip if active task exists for same assignee with similar description
+        for (const [, t] of this._taskQueue) {
+            if (t.assignee === charId && t.status === 'active' &&
+                t.description.slice(0, 30) === taskText.slice(0, 30)) return;
+        }
+
+        const task = {
+            id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            assignee: charId,
+            assignedBy: nick,
+            description: taskText,
+            stepsCompleted: 0,
+            totalSteps: 3,
+            status: 'active',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            result: null,
+        };
+
+        this._taskQueue.set(task.id, task);
+        this._persistTasks();
+        this._fireTaskUpdate('created', task);
+        this._log(`[TaskQueue] Created task ${task.id.slice(-6)} for ${charId}: "${taskText.slice(0, 40)}"`);
+    }
+
+    /**
+     * Build <active_tasks> prompt block for a specific character.
+     * Returns empty string if no active tasks.
+     */
+    _buildTaskPrompt(characterId) {
+        const tasks = [];
+        for (const [, t] of this._taskQueue) {
+            if (t.assignee === characterId && t.status === 'active') tasks.push(t);
+        }
+        if (!tasks.length) return '';
+
+        // Limit to 3 oldest active tasks
+        tasks.sort((a, b) => a.createdAt - b.createdAt);
+        const active = tasks.slice(0, 3);
+
+        const lines = active.map(t => {
+            const shortId = t.id.slice(-4);
+            const step = t.stepsCompleted + 1;
+            return `TASK #${shortId}: "${t.description}" (assigned by @${t.assignedBy})
+  Status: Step ${step} of ${t.totalSteps}${t.stepsCompleted > 0 ? ` — ${t.stepsCompleted} steps done` : ''}
+  Action: Continue with step ${step}. Tag @${t.assignedBy} with progress. Say "ho gaya" when done.`;
+        });
+
+        return `\n<active_tasks>
+You have ${active.length} active task(s). CONTINUE working on them — do NOT ignore or forget.
+${lines.join('\n\n')}
+</active_tasks>`;
+    }
+
+    /**
+     * After AI generates a response, check if it completes a task step.
+     * Called from _generate() after the LLM response is cleaned.
+     */
+    _detectStepCompletion(characterId, text) {
+        // Find active task for this character
+        let task = null;
+        for (const [, t] of this._taskQueue) {
+            if (t.assignee === characterId && t.status === 'active') {
+                task = t;
+                break; // FIFO — oldest active task
+            }
+        }
+        if (!task) return;
+
+        if (AgentSwarm.TASK_COMPLETE_RE.test(text)) {
+            task.status = 'done';
+            task.stepsCompleted = task.totalSteps;
+            task.result = text.slice(0, 200);
+            task.updatedAt = Date.now();
+            this._persistTasks();
+            this._fireTaskUpdate('task_completed', task);
+            this._log(`[TaskQueue] Task ${task.id.slice(-6)} COMPLETED by ${characterId}`);
+            return;
+        }
+
+        const stepMatch = text.match(AgentSwarm.TASK_STEP_RE);
+        if (stepMatch) {
+            const stepNum = parseInt(stepMatch[1], 10);
+            if (stepNum > task.stepsCompleted) {
+                task.stepsCompleted = stepNum;
+                if (task.stepsCompleted > task.totalSteps) task.totalSteps = task.stepsCompleted + 1;
+                task.updatedAt = Date.now();
+                this._persistTasks();
+                this._fireTaskUpdate('step_completed', task);
+                this._log(`[TaskQueue] Task ${task.id.slice(-6)} step ${stepNum} completed`);
+            }
+            return;
+        }
+
+        if (AgentSwarm.TASK_PROGRESS_RE.test(text)) {
+            task.stepsCompleted++;
+            if (task.stepsCompleted >= task.totalSteps) task.totalSteps = task.stepsCompleted + 1;
+            task.updatedAt = Date.now();
+            this._persistTasks();
+            this._fireTaskUpdate('step_completed', task);
+            this._log(`[TaskQueue] Task ${task.id.slice(-6)} progress +1 → step ${task.stepsCompleted}`);
+        }
+    }
+
+    /** Cancel a task by ID (called from UI) */
+    cancelTask(taskId) {
+        const task = this._taskQueue.get(taskId);
+        if (!task) return;
+        task.status = 'cancelled';
+        task.updatedAt = Date.now();
+        this._persistTasks();
+        this._fireTaskUpdate('cancelled', task);
+    }
+
+    /** Get all active tasks (for UI rendering) */
+    getActiveTasks() {
+        return [...this._taskQueue.values()].filter(t => t.status === 'active');
+    }
+
+    /** Set task update callback */
+    set onTaskUpdate(fn) { this._onTaskUpdate = fn; }
 }
