@@ -654,10 +654,22 @@ impl Network {
 
         let topic_name = format!("openwire-room-{}", room_id);
         let topic = gossipsub::IdentTopic::new(&topic_name);
-        self.swarm
+        if let Err(e) = self
+            .swarm
             .behaviour_mut()
             .gossipsub
-            .publish(topic, encrypted_bytes)?;
+            .publish(topic, encrypted_bytes)
+        {
+            let msg = format!("{:?}", e);
+            // Suppress errors when no remote peers are subscribed to the room topic.
+            // The creator is subscribed locally; the game/chat still works for the
+            // host — remote peers simply won't receive this particular message.
+            if msg.contains("InsufficientPeers") || msg.contains("NoPeersSubscribed") {
+                tracing::debug!("Room {}: no remote subscribers (solo mode)", room_id);
+            } else {
+                return Err(anyhow::anyhow!("Room publish failed: {}", msg));
+            }
+        }
 
         tracing::debug!("Sent encrypted message to room: {}", room_id);
         Ok(())

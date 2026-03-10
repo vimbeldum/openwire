@@ -699,15 +699,13 @@ impl UiApp {
         if let Some(room_arg) = cmd.strip_prefix("tictactoe") {
             let room_id = room_arg.trim();
             if room_id.is_empty() {
-                // Try to use the first room if available
-                if self.state.rooms.is_empty() {
-                    self.state
-                        .add_system_message("Usage: /game tictactoe <room_id>");
-                    self.state
-                        .add_system_message("You must be in a room first. Use /room create <name>");
-                    return;
-                }
-                let room_id = self.state.rooms[0].0.clone();
+                // Use first joined room, or "local" for solo play
+                let room_id = self
+                    .state
+                    .rooms
+                    .first()
+                    .map(|(id, _)| id.clone())
+                    .unwrap_or_else(|| "local".to_string());
                 self.start_game_challenge(&room_id).await;
             } else {
                 self.start_game_challenge(room_id).await;
@@ -750,13 +748,6 @@ impl UiApp {
 
     /// Start a tic-tac-toe challenge in a room
     async fn start_game_challenge(&mut self, room_id: &str) {
-        // Verify we're in this room
-        if !self.state.rooms.iter().any(|(id, _)| id == room_id) {
-            self.state
-                .add_system_message(&format!("You are not in room '{}'", room_id));
-            return;
-        }
-
         self.state
             .add_system_message("🎮 Starting Tic-Tac-Toe! Waiting for opponent...");
 
@@ -854,12 +845,13 @@ impl UiApp {
                     .add_system_message("Blackjack game already in progress.");
                 return;
             }
-            if self.state.rooms.is_empty() {
-                self.state
-                    .add_system_message("You need to be in a room first. /room create <name>");
-                return;
-            }
-            let room_id = self.state.rooms[0].0.clone();
+            // Use first joined room, or "local" for solo play
+            let room_id = self
+                .state
+                .rooms
+                .first()
+                .map(|(id, _)| id.clone())
+                .unwrap_or_else(|| "local".to_string());
             let mut game = Blackjack::new(room_id.clone());
             game.add_player(self.state.local_peer_id.clone(), self.state.nick.clone());
 
@@ -867,16 +859,16 @@ impl UiApp {
             self.state
                 .add_system_message("🃏 Blackjack started! /bj bet <amount> to place your bet.");
 
-            // Broadcast start
+            // Broadcast start (no-op if solo — room publish silently skipped)
             let action = BlackjackAction::Start {
-                room_id,
+                room_id: room_id.clone(),
                 host: self.state.local_peer_id.clone(),
                 host_nick: self.state.nick.clone(),
             };
             let _ = self
                 .command_sender
                 .send(NetworkCommand::SendRoomMessage {
-                    room_id: self.state.rooms[0].0.clone(),
+                    room_id,
                     data: action.to_bytes(),
                 })
                 .await;
@@ -1690,12 +1682,12 @@ impl UiApp {
 
         // Ensure a game exists
         if self.state.roulette_game.is_none() {
-            if self.state.rooms.is_empty() {
-                self.state
-                    .add_system_message("Join a room first: /room create <name>");
-                return;
-            }
-            let room_id = self.state.rooms[0].0.clone();
+            let room_id = self
+                .state
+                .rooms
+                .first()
+                .map(|(id, _)| id.clone())
+                .unwrap_or_else(|| "local".to_string());
             self.state.roulette_game = Some(RouletteEngine::new(room_id));
         }
 
@@ -1906,12 +1898,12 @@ impl UiApp {
 
         // Ensure a game exists
         if self.state.andarbahar_game.is_none() {
-            if self.state.rooms.is_empty() {
-                self.state
-                    .add_system_message("Join a room first: /room create <name>");
-                return;
-            }
-            let room_id = self.state.rooms[0].0.clone();
+            let room_id = self
+                .state
+                .rooms
+                .first()
+                .map(|(id, _)| id.clone())
+                .unwrap_or_else(|| "local".to_string());
             self.state.andarbahar_game = Some(AndarBaharEngine::new(room_id));
         }
 
