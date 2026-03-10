@@ -88,7 +88,6 @@ jobs:
     name: SonarQube
     runs-on: ubuntu-latest
     needs: check
-    if: secrets.SONAR_TOKEN != ''
     continue-on-error: true
     steps:
       - uses: actions/checkout@v6
