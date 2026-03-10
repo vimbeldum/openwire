@@ -819,20 +819,29 @@ pub async fn run_network(mut network: Network) -> Result<()> {
             // Handle commands from the UI/controller
             Some(cmd) = network.command_receiver.recv() => {
                 match cmd {
-                    NetworkCommand::Broadcast { data, nick } => {
-                        // Loopback to relay bridge + web bridge clients so they can
-                        // forward the local user's message.  We only send on the
-                        // broadcast channel — TUI already shows the message immediately.
+                    NetworkCommand::Broadcast { data, nick: _ } => {
+                        // Loopback to relay bridge + web bridge — broadcast channel only.
+                        // TUI already shows sent messages immediately via add_chat_message.
+                        // Send raw data (no nick prefix): the relay server already knows
+                        // the sender's nick from the join message and will attribute it
+                        // correctly. Prefixing here would cause "Nick: Nick: message".
                         let loopback = NetworkEvent::MessageReceived {
                             from: network.local_peer_id,
                             topic: "openwire-general".to_string(),
-                            data: format!("{}: {}", nick, String::from_utf8_lossy(&data)).into_bytes(),
+                            data: data.clone(),
                         };
                         let _ = network.event_broadcast.send(loopback);
 
                         if let Err(e) = network.publish_signed(data).await {
-                            tracing::error!("Failed to broadcast: {}", e);
-                            send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error(format!("Broadcast failed: {}", e))).await;
+                            // NoPeersSubscribedToTopic is expected when only relay/web
+                            // clients are connected — suppress it to avoid confusing the user.
+                            let msg = e.to_string();
+                            if msg.contains("NoPeersSubscribed") {
+                                tracing::debug!("Gossipsub: no P2P peers (relay bridge active)");
+                            } else {
+                                tracing::error!("Failed to broadcast: {}", e);
+                                send_event(&network.event_sender, &network.event_broadcast, NetworkEvent::Error(format!("Broadcast failed: {}", e))).await;
+                            }
                         }
                     }
                     NetworkCommand::SendToPeer { peer_id, data } => {
