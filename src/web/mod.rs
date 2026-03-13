@@ -645,3 +645,180 @@ fn peer_id_for_web_client(s: &str) -> libp2p::PeerId {
         libp2p::PeerId::random()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── ClientMsg deserialization ────────────────────────────────────────
+
+    #[test]
+    fn test_client_msg_join() {
+        let json = r#"{"type":"join","nick":"Alice"}"#;
+        let msg: ClientMsg = serde_json::from_str(json).unwrap();
+        match msg {
+            ClientMsg::Join { nick } => assert_eq!(nick, "Alice"),
+            other => panic!("Expected Join, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_client_msg_message() {
+        let json = r#"{"type":"message","data":"Hello world"}"#;
+        let msg: ClientMsg = serde_json::from_str(json).unwrap();
+        match msg {
+            ClientMsg::Message { data } => assert_eq!(data, "Hello world"),
+            other => panic!("Expected Message, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_client_msg_ping() {
+        let json = r#"{"type":"ping"}"#;
+        let msg: ClientMsg = serde_json::from_str(json).unwrap();
+        assert!(matches!(msg, ClientMsg::Ping));
+    }
+
+    #[test]
+    fn test_client_msg_room_create() {
+        let json = r#"{"type":"room_create","name":"my-room"}"#;
+        let msg: ClientMsg = serde_json::from_str(json).unwrap();
+        match msg {
+            ClientMsg::RoomCreate { name } => assert_eq!(name, "my-room"),
+            other => panic!("Expected RoomCreate, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_client_msg_room_message() {
+        let json = r#"{"type":"room_message","room_id":"r1","data":"hi"}"#;
+        let msg: ClientMsg = serde_json::from_str(json).unwrap();
+        match msg {
+            ClientMsg::RoomMessage { room_id, data } => {
+                assert_eq!(room_id, "r1");
+                assert_eq!(data, "hi");
+            }
+            other => panic!("Expected RoomMessage, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_client_msg_game_action() {
+        let json = r#"{"type":"game_action","data":"{\"move\":5}"}"#;
+        let msg: ClientMsg = serde_json::from_str(json).unwrap();
+        match msg {
+            ClientMsg::GameAction { data } => assert!(data.contains("move")),
+            other => panic!("Expected GameAction, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_client_msg_invalid_type_fails() {
+        let json = r#"{"type":"nonexistent","data":"x"}"#;
+        assert!(serde_json::from_str::<ClientMsg>(json).is_err());
+    }
+
+    // ── ServerMsg serialization ─────────────────────────────────────────
+
+    #[test]
+    fn test_server_msg_pong() {
+        let json = serde_json::to_string(&ServerMsg::Pong).unwrap();
+        assert_eq!(json, r#"{"type":"pong"}"#);
+    }
+
+    #[test]
+    fn test_server_msg_message_roundtrip() {
+        let msg = ServerMsg::Message {
+            nick: "Bob".into(),
+            data: "Hello".into(),
+            peer_id: "peer123".into(),
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["type"], "message");
+        assert_eq!(parsed["nick"], "Bob");
+        assert_eq!(parsed["data"], "Hello");
+        assert_eq!(parsed["peer_id"], "peer123");
+    }
+
+    #[test]
+    fn test_server_msg_welcome_includes_peers_and_rooms() {
+        let msg = ServerMsg::Welcome {
+            peer_id: "local-peer",
+            peers: vec![serde_json::json!({"peer_id": "p1", "nick": "A"})],
+            rooms: vec![serde_json::json!({"room_id": "r1", "name": "Lobby"})],
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["type"], "welcome");
+        assert_eq!(parsed["peer_id"], "local-peer");
+        assert_eq!(parsed["peers"][0]["nick"], "A");
+        assert_eq!(parsed["rooms"][0]["name"], "Lobby");
+    }
+
+    #[test]
+    fn test_server_msg_peer_joined() {
+        let msg = ServerMsg::PeerJoined {
+            peer_id: "p42".into(),
+            nick: "Eve".into(),
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["type"], "peer_joined");
+        assert_eq!(parsed["nick"], "Eve");
+    }
+
+    // ── REST response types ─────────────────────────────────────────────
+
+    #[test]
+    fn test_health_response_serialization() {
+        let resp = HealthResponse {
+            status: "ok",
+            version: "0.1.0",
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["status"], "ok");
+        assert_eq!(parsed["version"], "0.1.0");
+    }
+
+    #[test]
+    fn test_status_response_serialization() {
+        let resp = StatusResponse {
+            status: "running",
+            version: "0.2.0",
+            description: "OpenWire P2P Encrypted Messenger",
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["status"], "running");
+        assert_eq!(parsed["description"], "OpenWire P2P Encrypted Messenger");
+    }
+
+    // ── peer_id_for_web_client ──────────────────────────────────────────
+
+    #[test]
+    fn test_peer_id_returns_valid_peer_id() {
+        let a = peer_id_for_web_client("webclient-00000001");
+        // Should return a valid PeerId (not panic)
+        assert!(!a.to_string().is_empty());
+    }
+
+    #[test]
+    fn test_peer_id_different_inputs_produce_peer_ids() {
+        let a = peer_id_for_web_client("webclient-00000001");
+        let b = peer_id_for_web_client("webclient-00000002");
+        // Both return valid PeerIds
+        assert!(!a.to_string().is_empty());
+        assert!(!b.to_string().is_empty());
+    }
+
+    // ── CONNECTION_COUNTER ──────────────────────────────────────────────
+
+    #[test]
+    fn test_connection_counter_increments() {
+        let a = CONNECTION_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let b = CONNECTION_COUNTER.fetch_add(1, Ordering::Relaxed);
+        assert_eq!(b, a + 1);
+    }
+}

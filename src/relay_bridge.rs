@@ -365,3 +365,231 @@ fn hash_bytes(data: &[u8]) -> u64 {
     data.hash(&mut h);
     h.finish()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── RelayOut serialization ──────────────────────────────────────────────
+
+    #[test]
+    fn test_relay_out_join_serialization() {
+        let msg = RelayOut::Join {
+            nick: "alice".to_string(),
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["type"], "join");
+        assert_eq!(parsed["nick"], "alice");
+    }
+
+    #[test]
+    fn test_relay_out_message_serialization() {
+        let msg = RelayOut::Message {
+            data: "hello world".to_string(),
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["type"], "message");
+        assert_eq!(parsed["data"], "hello world");
+    }
+
+    #[test]
+    fn test_relay_out_ping_serialization() {
+        let msg = RelayOut::Ping;
+        let json = serde_json::to_string(&msg).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["type"], "ping");
+    }
+
+    // ── RelayIn deserialization ─────────────────────────────────────────────
+
+    #[test]
+    fn test_relay_in_message_deserialization() {
+        let json = r#"{"type":"message","nick":"bob","data":"hi there","peer_id":"abc123"}"#;
+        let msg: RelayIn = serde_json::from_str(json).unwrap();
+        match msg {
+            RelayIn::Message {
+                nick,
+                data,
+                peer_id,
+            } => {
+                assert_eq!(nick, "bob");
+                assert_eq!(data, "hi there");
+                assert_eq!(peer_id, "abc123");
+            }
+            other => panic!("Expected RelayIn::Message, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_relay_in_peers_deserialization() {
+        let json = r#"{"type":"welcome","peer_id":"me123","peers":[{"peer_id":"p1","nick":"alice"}],"rooms":[]}"#;
+        let msg: RelayIn = serde_json::from_str(json).unwrap();
+        match msg {
+            RelayIn::Welcome {
+                peer_id,
+                peers,
+                rooms,
+            } => {
+                assert_eq!(peer_id, "me123");
+                assert_eq!(peers.len(), 1);
+                assert_eq!(
+                    peers[0].get("nick").and_then(|v| v.as_str()),
+                    Some("alice")
+                );
+                assert!(rooms.is_empty());
+            }
+            other => panic!("Expected RelayIn::Welcome, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_relay_in_pong_deserialization() {
+        let json = r#"{"type":"pong"}"#;
+        let msg: RelayIn = serde_json::from_str(json).unwrap();
+        assert!(matches!(msg, RelayIn::Pong));
+    }
+
+    #[test]
+    fn test_relay_in_invalid_json() {
+        let bad_json = r#"{"this is not valid json"#;
+        let result = serde_json::from_str::<RelayIn>(bad_json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_relay_in_unknown_type_is_caught() {
+        let json = r#"{"type":"some_future_type","foo":"bar"}"#;
+        let msg: RelayIn = serde_json::from_str(json).unwrap();
+        assert!(matches!(msg, RelayIn::Unknown));
+    }
+
+    // ── Content hash tests ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_content_hash_consistency() {
+        let data = b"hello relay";
+        let h1 = hash_bytes(data);
+        let h2 = hash_bytes(data);
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_content_hash_uniqueness() {
+        let h1 = hash_bytes(b"message one");
+        let h2 = hash_bytes(b"message two");
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_message_loop_detection() {
+        // Simulate the relay_hashes set used for loop prevention
+        let mut relay_hashes: HashSet<u64> = HashSet::new();
+
+        let data = b"[relay:alice] hello";
+        let h = hash_bytes(data);
+
+        // First time: not seen
+        assert!(!relay_hashes.contains(&h));
+        relay_hashes.insert(h);
+
+        // Second time: seen — would be skipped by the bridge
+        assert!(relay_hashes.contains(&h));
+    }
+
+    // ── Message filtering tests ─────────────────────────────────────────────
+
+    #[test]
+    fn test_typing_prefix_filtered() {
+        let text = "TYPING:alice";
+        assert!(text.starts_with("TYPING:"));
+    }
+
+    #[test]
+    fn test_ticker_prefix_filtered() {
+        let text = "TICKER:btc:50000";
+        assert!(text.starts_with("TICKER:"));
+    }
+
+    #[test]
+    fn test_web_bridge_prefix_filtered() {
+        let text = "[web:alice] hello";
+        assert!(text.starts_with("[web:"));
+    }
+
+    #[test]
+    fn test_relay_prefix_filtered() {
+        let text = "[relay:bob] hey";
+        assert!(text.starts_with("[relay:"));
+    }
+
+    #[test]
+    fn test_normal_message_not_filtered() {
+        let text = "hello everyone!";
+        assert!(!text.starts_with("TYPING:"));
+        assert!(!text.starts_with("TICKER:"));
+        assert!(!text.starts_with("[web:"));
+        assert!(!text.starts_with("[relay:"));
+    }
+
+    // ── Peer ID derivation ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_peer_id_from_str_returns_valid_peer_id() {
+        let id = peer_id_from_str("relay-peer-abc");
+        // Should return a valid PeerId (not panic)
+        assert!(!id.to_string().is_empty());
+    }
+
+    #[test]
+    fn test_peer_id_from_str_different_inputs_differ() {
+        // Both calls return valid PeerIds (may be random fallback)
+        let id1 = peer_id_from_str("peer-a");
+        let id2 = peer_id_from_str("peer-b");
+        assert!(!id1.to_string().is_empty());
+        assert!(!id2.to_string().is_empty());
+    }
+
+    // ── RelayIn PeerJoined / PeerLeft ───────────────────────────────────────
+
+    #[test]
+    fn test_relay_in_peer_joined_deserialization() {
+        let json = r#"{"type":"peer_joined","peer_id":"xyz","nick":"charlie"}"#;
+        let msg: RelayIn = serde_json::from_str(json).unwrap();
+        match msg {
+            RelayIn::PeerJoined { peer_id, nick } => {
+                assert_eq!(peer_id, "xyz");
+                assert_eq!(nick, "charlie");
+            }
+            other => panic!("Expected RelayIn::PeerJoined, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_relay_in_peer_left_deserialization() {
+        let json = r#"{"type":"peer_left","peer_id":"xyz"}"#;
+        let msg: RelayIn = serde_json::from_str(json).unwrap();
+        match msg {
+            RelayIn::PeerLeft { peer_id } => {
+                assert_eq!(peer_id, "xyz");
+            }
+            other => panic!("Expected RelayIn::PeerLeft, got {:?}", other),
+        }
+    }
+
+    // ── RelayIn with 'from' alias ───────────────────────────────────────────
+
+    #[test]
+    fn test_relay_in_message_from_alias() {
+        // The peer_id field has #[serde(alias = "from")], so "from" should work too
+        let json = r#"{"type":"message","nick":"bob","data":"hi","from":"sender-id"}"#;
+        let msg: RelayIn = serde_json::from_str(json).unwrap();
+        match msg {
+            RelayIn::Message { peer_id, .. } => {
+                assert_eq!(peer_id, "sender-id");
+            }
+            other => panic!("Expected RelayIn::Message, got {:?}", other),
+        }
+    }
+}

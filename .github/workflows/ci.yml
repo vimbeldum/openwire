@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ master ]
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
@@ -88,6 +91,7 @@ jobs:
     name: SonarQube
     runs-on: ubuntu-latest
     needs: check
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     continue-on-error: true
     steps:
       - uses: actions/checkout@v6
@@ -99,3 +103,105 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  web-test:
+    name: Web Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: openwire-web/node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('openwire-web/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Install dependencies
+        working-directory: openwire-web
+        run: npm ci
+
+      - name: Run tests with coverage
+        working-directory: openwire-web
+        run: npx vitest run --coverage
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-coverage
+          path: openwire-web/coverage
+          retention-days: 14
+
+  e2e-test:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    needs: web-test
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: openwire-web/node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('openwire-web/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('openwire-web/package-lock.json') }}
+
+      - name: Install dependencies
+        working-directory: openwire-web
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: openwire-web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests
+        working-directory: openwire-web
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: |
+            openwire-web/test-results
+            openwire-web/playwright-report
+          retention-days: 14
+
+  ci-gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [check, test, clippy, fmt, web-test, e2e-test]
+    steps:
+      - name: Check job results
+        run: |
+          if [[ "${{ needs.check.result }}" != "success" ||
+                "${{ needs.test.result }}" != "success" ||
+                "${{ needs.clippy.result }}" != "success" ||
+                "${{ needs.fmt.result }}" != "success" ||
+                "${{ needs.web-test.result }}" != "success" ||
+                "${{ needs.e2e-test.result }}" != "success" ]]; then
+            echo "One or more required jobs failed"
+            exit 1
+          fi
+          echo "All checks passed"

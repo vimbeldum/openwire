@@ -1244,3 +1244,344 @@ async fn handle_behaviour_event(network: &mut Network, event: OpenWireBehaviourE
 pub fn general_topic() -> &'static str {
     GENERAL_TOPIC
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Topic constants ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_gossipsub_topic_constants() {
+        assert_eq!(KEY_EXCHANGE_TOPIC, "openwire-key-exchange");
+        assert_eq!(GENERAL_TOPIC, "openwire-general");
+        assert_eq!(FILE_TRANSFER_TOPIC, "openwire-file-transfer");
+        assert_eq!(ROOM_INVITE_TOPIC, "openwire-room-invite");
+    }
+
+    #[test]
+    fn test_general_topic_accessor() {
+        assert_eq!(general_topic(), "openwire-general");
+    }
+
+    // ── Max constants ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_file_transfer_message_max_size() {
+        assert_eq!(MAX_FILE_SIZE, 1_048_576); // 1 MB
+    }
+
+    #[test]
+    fn test_max_timestamp_skew_value() {
+        assert_eq!(MAX_TIMESTAMP_SKEW, 60); // 60 seconds
+    }
+
+    // ── KeyExchangeMessage serialization ────────────────────────────────────
+
+    #[test]
+    fn test_key_exchange_message_serialization() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let msg = KeyExchangeMessage {
+            signing_public_key: [1u8; 32],
+            encryption_public_key: [2u8; 32],
+            timestamp: now,
+            signature: vec![0u8; 64],
+        };
+
+        let bytes = msg.to_bytes().unwrap();
+        assert!(!bytes.is_empty());
+
+        // Should be valid JSON
+        let _: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    }
+
+    #[test]
+    fn test_key_exchange_message_deserialization() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let original = KeyExchangeMessage {
+            signing_public_key: [42u8; 32],
+            encryption_public_key: [99u8; 32],
+            timestamp: now,
+            signature: vec![7u8; 64],
+        };
+
+        let bytes = original.to_bytes().unwrap();
+        let restored = KeyExchangeMessage::from_bytes(&bytes).unwrap();
+
+        assert_eq!(original.signing_public_key, restored.signing_public_key);
+        assert_eq!(
+            original.encryption_public_key,
+            restored.encryption_public_key
+        );
+        assert_eq!(original.timestamp, restored.timestamp);
+        assert_eq!(original.signature, restored.signature);
+    }
+
+    #[test]
+    fn test_key_exchange_invalid_json() {
+        let garbage = b"not valid json at all{{{";
+        let result = KeyExchangeMessage::from_bytes(garbage);
+        assert!(result.is_err());
+    }
+
+    // ── KeyExchangeMessage timestamp validation ─────────────────────────────
+
+    #[test]
+    fn test_timestamp_validation_fresh() {
+        // A message with a current timestamp but a dummy signature will fail
+        // signature verification — but the timestamp check itself should pass.
+        // We verify this by checking the error message: a stale message says
+        // "timestamp too old", while a fresh one with bad sig says something else.
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let msg = KeyExchangeMessage {
+            signing_public_key: [0u8; 32],
+            encryption_public_key: [0u8; 32],
+            timestamp: now,
+            signature: vec![0u8; 64],
+        };
+
+        let result = msg.verify();
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        // Fresh timestamp should NOT fail on the timestamp check
+        assert!(
+            !err_msg.contains("timestamp too old"),
+            "Fresh message should pass timestamp check, but got: {}",
+            err_msg
+        );
+    }
+
+    #[test]
+    fn test_timestamp_validation_stale() {
+        // A message from 200 seconds ago exceeds MAX_TIMESTAMP_SKEW (60s)
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let msg = KeyExchangeMessage {
+            signing_public_key: [0u8; 32],
+            encryption_public_key: [0u8; 32],
+            timestamp: now - 200,
+            signature: vec![0u8; 64],
+        };
+
+        let result = msg.verify();
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("timestamp too old") || err_msg.contains("skew"),
+            "Stale message should fail timestamp check, but got: {}",
+            err_msg
+        );
+    }
+
+    #[test]
+    fn test_timestamp_validation_future() {
+        // A message from 200 seconds in the future also exceeds MAX_TIMESTAMP_SKEW
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let msg = KeyExchangeMessage {
+            signing_public_key: [0u8; 32],
+            encryption_public_key: [0u8; 32],
+            timestamp: now + 200,
+            signature: vec![0u8; 64],
+        };
+
+        let result = msg.verify();
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("too far in the future") || err_msg.contains("skew"),
+            "Future message should fail timestamp check, but got: {}",
+            err_msg
+        );
+    }
+
+    // ── KeyExchangeMessage signature length validation ──────────────────────
+
+    #[test]
+    fn test_key_exchange_bad_signature_length() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let msg = KeyExchangeMessage {
+            signing_public_key: [0u8; 32],
+            encryption_public_key: [0u8; 32],
+            timestamp: now,
+            signature: vec![0u8; 32], // Wrong length — should be 64
+        };
+
+        let result = msg.verify();
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("Invalid signature length"),
+            "Bad sig length should fail, but got: {}",
+            err_msg
+        );
+    }
+
+    // ── FileTransferMessage serialization ───────────────────────────────────
+
+    #[test]
+    fn test_file_transfer_message_serialization() {
+        let msg = FileTransferMessage {
+            filename: "test.txt".to_string(),
+            size: 13,
+            data: b"Hello, World!".to_vec(),
+            sender_public_key: vec![1u8; 32],
+            signature: vec![2u8; 64],
+            timestamp: 1700000000,
+        };
+
+        let json = serde_json::to_vec(&msg).unwrap();
+        let restored: FileTransferMessage = serde_json::from_slice(&json).unwrap();
+
+        assert_eq!(restored.filename, "test.txt");
+        assert_eq!(restored.size, 13);
+        assert_eq!(restored.data, b"Hello, World!");
+        assert_eq!(restored.sender_public_key.len(), 32);
+        assert_eq!(restored.signature.len(), 64);
+        assert_eq!(restored.timestamp, 1700000000);
+    }
+
+    #[test]
+    fn test_file_transfer_message_roundtrip() {
+        let original = FileTransferMessage {
+            filename: "photo.png".to_string(),
+            size: 4,
+            data: vec![0x89, 0x50, 0x4E, 0x47],
+            sender_public_key: vec![10u8; 32],
+            signature: vec![20u8; 64],
+            timestamp: 1700000001,
+        };
+
+        let bytes = serde_json::to_vec(&original).unwrap();
+        let restored: FileTransferMessage = serde_json::from_slice(&bytes).unwrap();
+
+        assert_eq!(original.filename, restored.filename);
+        assert_eq!(original.size, restored.size);
+        assert_eq!(original.data, restored.data);
+        assert_eq!(original.sender_public_key, restored.sender_public_key);
+        assert_eq!(original.signature, restored.signature);
+        assert_eq!(original.timestamp, restored.timestamp);
+    }
+
+    // ── Peer ID format ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_peer_id_format() {
+        // libp2p PeerIds are base58-encoded multihash strings
+        let peer_id = PeerId::random();
+        let peer_str = peer_id.to_string();
+        // PeerId strings are typically 40+ chars
+        assert!(
+            peer_str.len() > 10,
+            "PeerId string should be reasonably long, got: {}",
+            peer_str
+        );
+        // Should be a valid base58 string (only alphanumeric, no 0OIl)
+        assert!(
+            peer_str.chars().all(|c| c.is_ascii_alphanumeric()),
+            "PeerId should be base58-encoded, got: {}",
+            peer_str
+        );
+    }
+
+    // ── NetworkEvent enum construction ──────────────────────────────────────
+
+    #[test]
+    fn test_network_event_message_received() {
+        let peer_id = PeerId::random();
+        let event = NetworkEvent::MessageReceived {
+            from: peer_id,
+            topic: "openwire-general".to_string(),
+            data: b"test".to_vec(),
+        };
+        match event {
+            NetworkEvent::MessageReceived { from, topic, data } => {
+                assert_eq!(from, peer_id);
+                assert_eq!(topic, "openwire-general");
+                assert_eq!(data, b"test");
+            }
+            _ => panic!("Expected MessageReceived variant"),
+        }
+    }
+
+    #[test]
+    fn test_network_event_clone() {
+        let peer_id = PeerId::random();
+        let event = NetworkEvent::PeerDiscovered(peer_id);
+        let cloned = event.clone();
+        match (event, cloned) {
+            (NetworkEvent::PeerDiscovered(a), NetworkEvent::PeerDiscovered(b)) => {
+                assert_eq!(a, b);
+            }
+            _ => panic!("Clone should produce identical variant"),
+        }
+    }
+
+    // ── KeyExchangeMessage with real CryptoManager ──────────────────────────
+
+    #[test]
+    fn test_key_exchange_message_new_and_verify() {
+        let crypto = crate::crypto::CryptoManager::new().unwrap();
+        let msg = KeyExchangeMessage::new(&crypto).unwrap();
+
+        // Fields should match the crypto manager's keys
+        assert_eq!(msg.signing_public_key, crypto.signing_public_key());
+        assert_eq!(msg.encryption_public_key, crypto.encryption_public_key());
+        assert_eq!(msg.signature.len(), 64);
+
+        // Should verify successfully
+        assert!(msg.verify().is_ok());
+    }
+
+    #[test]
+    fn test_key_exchange_message_roundtrip_with_verify() {
+        let crypto = crate::crypto::CryptoManager::new().unwrap();
+        let original = KeyExchangeMessage::new(&crypto).unwrap();
+
+        // Serialize and deserialize
+        let bytes = original.to_bytes().unwrap();
+        let restored = KeyExchangeMessage::from_bytes(&bytes).unwrap();
+
+        // Restored message should still verify
+        assert!(restored.verify().is_ok());
+        assert_eq!(original.signing_public_key, restored.signing_public_key);
+        assert_eq!(
+            original.encryption_public_key,
+            restored.encryption_public_key
+        );
+    }
+
+    #[test]
+    fn test_key_exchange_message_tampered_fails() {
+        let crypto = crate::crypto::CryptoManager::new().unwrap();
+        let mut msg = KeyExchangeMessage::new(&crypto).unwrap();
+
+        // Tamper with the encryption key
+        msg.encryption_public_key[0] ^= 0xFF;
+
+        // Should fail verification
+        assert!(msg.verify().is_err());
+    }
+}
