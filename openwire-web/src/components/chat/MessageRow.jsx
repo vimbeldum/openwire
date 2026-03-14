@@ -47,9 +47,10 @@ function MessageRow({ msg, renderContent, onReact, onJoinInvite, onDismissInvite
         );
     }
 
-    // Resolve cosmetic CSS classes for own messages
+    // Resolve cosmetic CSS classes for own and peer messages
     const isSelf = msg.type === 'self';
-    const cos = isSelf && myCosmetics ? myCosmetics : null;
+    const isPeer = msg.type === 'peer';
+    const cos = isSelf ? myCosmetics : (isPeer ? msg.peerCosmetics : null);
     const bubbleClass = cos?.bubbleStyle || '';
     const nameClass = cos?.nameColor || '';
     const flairClass = cos?.chatFlair || '';

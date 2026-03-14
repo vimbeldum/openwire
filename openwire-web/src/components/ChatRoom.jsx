@@ -135,6 +135,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const [tambolaGame, setTambolaGame] = useState(false);
     const [showKarmaGuide, setShowKarmaGuide] = useState(false);
     const [profile, setProfile] = useState(null);
+    const peerCosmeticsRef = useRef({}); // peer_id → { bubbleStyle, nameColor, chatFlair }
     const [catalog, setCatalog] = useState(DEFAULT_CATALOG);
     const [jackpotPool, setJackpotPool] = useState(() => createJackpotState('general'));
 
@@ -919,6 +920,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     }
                 }
                 break;
+            case 'cosmetics_update':
+                // Store peer's equipped cosmetics for rendering their messages
+                if (msg.peer_id && msg.peer_id !== myIdRef.current && action.cosmetics) {
+                    peerCosmeticsRef.current = { ...peerCosmeticsRef.current, [msg.peer_id]: action.cosmetics };
+                }
+                break;
         }
     }, [addMsg, addReaction, addTicker, updateWallet, amIHost, clearReadyPeers, startBlackjackTimer]);
 
@@ -994,10 +1001,18 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     }
                 }
 
-                // Broadcast wallet balance
+                // Broadcast wallet balance + cosmetics
                 if (walletRef.current) {
                     setTimeout(() => socket.send({ type: 'balance_update', balance: wallet.getTotalBalance(walletRef.current) }), 500);
                 }
+                // Broadcast equipped cosmetics so peers see our style
+                setTimeout(() => {
+                    const p = profile || (initialNick ? loadProfile(initialNick) : null);
+                    if (p) {
+                        const cos = getEquippedClasses(p);
+                        socket.sendChat(JSON.stringify({ type: 'cosmetics_update', cosmetics: cos }));
+                    }
+                }, 800);
                 // Fetch ban list and broadcast admin status if admin
                 if (isAdminRef.current) {
                     setTimeout(() => socket.send({ type: 'admin_get_bans' }), 600);
@@ -1029,14 +1044,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma', 'cosmetics_update'];
                         if (CUSTOM.includes(parsed.type)) msgCustom = parsed;
                     } catch { /* not JSON */ }
                 }
                 if (msgCustom) {
                     handleCustomAction(msg, msgCustom);
                 } else {
-                    addMsg(msg.nick, msg.data, 'peer');
+                    addMsg(msg.nick, msg.data, 'peer', { peerCosmetics: peerCosmeticsRef.current[msg.peer_id] || null });
                     // Process @mentions from remote peers — triggers agent responses
                     // on the swarm host session (processMentions is a no-op if swarm isn't running)
                     if (msg.data) processMentions(msg.data, msg.nick);
@@ -1088,7 +1103,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (!isBjMsg && !isRlMsg && !isAbMsg && !isPmMsg && !isGameMsg && msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma', 'cosmetics_update'];
                         if (CUSTOM.includes(parsed.type)) customAction = parsed;
                     } catch { /* not JSON */ }
                 }
@@ -1122,9 +1137,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 } else if (isCurrentRoom) {
                     const gifMatch = msg.data.match(/^\[GIF\](.+)$/);
                     if (gifMatch) {
-                        addMsg(msg.nick, '', 'peer', { gif: gifMatch[1], roomId: msg.room_id });
+                        addMsg(msg.nick, '', 'peer', { gif: gifMatch[1], roomId: msg.room_id, peerCosmetics: peerCosmeticsRef.current[msg.peer_id] || null });
                     } else if (msg.data) {
-                        addMsg(msg.nick, msg.data, 'peer', { roomId: msg.room_id });
+                        addMsg(msg.nick, msg.data, 'peer', { roomId: msg.room_id, peerCosmetics: peerCosmeticsRef.current[msg.peer_id] || null });
                         // Process @mentions from remote peers in rooms too
                         processMentions(msg.data, msg.nick);
                         // Check if we were @mentioned
@@ -2556,11 +2571,18 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     }}
                     onEquip={(itemId) => {
                         const result = equipItem(profile, itemId);
-                        if (result.success) { setProfile(prev => { saveProfile(result.profile); return result.profile; }); }
+                        if (result.success) {
+                            setProfile(prev => { saveProfile(result.profile); return result.profile; });
+                            // Broadcast updated cosmetics to all peers
+                            const cos = getEquippedClasses(result.profile);
+                            socket.sendChat(JSON.stringify({ type: 'cosmetics_update', cosmetics: cos }));
+                        }
                     }}
                     onUnequip={(category) => {
                         const updated = unequipItem(profile, category);
                         setProfile(prev => { saveProfile(updated); return updated; });
+                        const cos = getEquippedClasses(updated);
+                        socket.sendChat(JSON.stringify({ type: 'cosmetics_update', cosmetics: cos }));
                     }}
                 />
             )}
