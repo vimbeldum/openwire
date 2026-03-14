@@ -235,7 +235,6 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
                 setBetAgainQueued(false);
                 setTimeout(() => {
                     onActionRef.current({ type: 'bulkBet', bets: queued.map(b => ({ betType: b.betType, betTarget: b.betTarget, amount: b.amount })) });
-                    onReadyRef.current?.();
                 }, 50);
             }
         }
@@ -255,22 +254,20 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
         onAction({ type: 'bet', betType: type, betTarget: target, amount: betAmount });
     };
 
-    // Bet Again in betting phase: place all bets atomically + auto-ready
+    // Bet Again in betting phase: place all bets atomically (player must Ready separately)
     const handleBetAgain = () => {
         if (!lastMyBets.length) return;
         const total = lastMyBets.reduce((s, b) => s + b.amount, 0);
         if (total > balance) return;
         onAction({ type: 'bulkBet', bets: lastMyBets.map(b => ({ betType: b.betType, betTarget: b.betTarget, amount: b.amount })) });
-        if (!isReady) onReady?.();
     };
 
-    // Double in betting phase: place doubled bets atomically + auto-ready
+    // Double in betting phase: place doubled bets atomically
     const handleDouble = () => {
         if (!lastMyBets.length) return;
         const total = lastMyBets.reduce((s, b) => s + b.amount * 2, 0);
         if (total > balance) return;
         onAction({ type: 'bulkBet', bets: lastMyBets.map(b => ({ betType: b.betType, betTarget: b.betTarget, amount: b.amount * 2 })) });
-        if (!isReady) onReady?.();
     };
 
     // Queue bets to be placed when next betting round starts (called from results phase)
