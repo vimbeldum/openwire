@@ -8,6 +8,23 @@ import { formatQwenLabel } from '../lib/agents/qwen.js';
 import { formatHaimakerLabel } from '../lib/agents/haimaker.js';
 
 const TABS = ['Players', 'Ban List', 'Activity Log', 'Stats', 'Agents'];
+
+// Country code → flag emoji (e.g. "US" → "🇺🇸")
+function countryFlag(code) {
+    if (!code || code.length !== 2) return '';
+    return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+}
+
+// Extract short browser name from User-Agent
+function parseBrowser(ua) {
+    if (!ua) return '';
+    if (ua.includes('Firefox/')) return 'Firefox';
+    if (ua.includes('Edg/')) return 'Edge';
+    if (ua.includes('OPR/') || ua.includes('Opera')) return 'Opera';
+    if (ua.includes('Chrome/')) return 'Chrome';
+    if (ua.includes('Safari/') && !ua.includes('Chrome')) return 'Safari';
+    return '';
+}
 const CHATTER_LABELS = { 0.25: 'Quiet', 0.5: 'Calm', 1: 'Normal', 1.5: 'Active', 2: 'Chaotic' };
 const GAME_LABELS = { roulette: '🎰 Roulette', blackjack: '🃏 Blackjack', andarbahar: '🎴 Andar Bahar', slots: '🎲 Slots' };
 
@@ -123,25 +140,45 @@ function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, onAdj
                                 <tr>
                                     <th>Nick</th>
                                     <th>Balance</th>
-                                    <th>IP</th>
+                                    <th>Location</th>
+                                    <th>Network</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {peers.length === 0 && (
-                                    <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No players online</td></tr>
+                                    <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No players online</td></tr>
                                 )}
-                                {peers.map(p => (
+                                {peers.map(p => {
+                                    const geo = p.geo || {};
+                                    const flag = geo.country ? countryFlag(geo.country) : '';
+                                    const loc = [geo.city, geo.region, geo.country].filter(Boolean).join(', ') || '—';
+                                    const isMobile = /Mobile|Android|iPhone/i.test(geo.userAgent || '');
+                                    const browser = parseBrowser(geo.userAgent || '');
+                                    return (
                                     <tr key={p.peer_id}>
                                         <td>
                                             <span className="peer-dot" style={{ marginRight: 6 }} />
                                             {p.nick}
+                                            {p.is_admin && <span className="admin-badge-sm" title="Admin">A</span>}
+                                            <span className="admin-device-icon" title={isMobile ? 'Mobile' : 'Desktop'}>{isMobile ? '📱' : '💻'}</span>
                                         </td>
                                         <td>
                                             <span className="admin-chips">{(p.balance || 0).toLocaleString()} 💰</span>
                                         </td>
                                         <td>
-                                            <span className="admin-ip">{p.ip || '—'}</span>
+                                            <div className="admin-geo">
+                                                <span className="admin-geo-flag">{flag}</span>
+                                                <span className="admin-geo-loc">{loc}</span>
+                                                {geo.timezone && <span className="admin-geo-tz">{geo.timezone}</span>}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div className="admin-net">
+                                                <span className="admin-ip">{p.ip || '—'}</span>
+                                                {geo.asOrganization && <span className="admin-isp">{geo.asOrganization}</span>}
+                                                {browser && <span className="admin-browser">{browser}</span>}
+                                            </div>
                                         </td>
                                         <td className="admin-actions-cell">
                                             <button className="admin-btn kick"
@@ -158,7 +195,8 @@ function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, onAdj
                                             </button>
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
 

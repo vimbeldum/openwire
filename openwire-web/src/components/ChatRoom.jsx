@@ -1016,7 +1016,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 ));
                 break;
             case 'peer_joined':
-                setPeers(prev => [...prev.filter(p => p.peer_id !== msg.peer_id), { peer_id: msg.peer_id, nick: msg.nick, is_admin: msg.is_admin || false, is_bridge: msg.is_bridge || false, ip: msg.ip || null }]);
+                setPeers(prev => [...prev.filter(p => p.peer_id !== msg.peer_id), { peer_id: msg.peer_id, nick: msg.nick, is_admin: msg.is_admin || false, is_bridge: msg.is_bridge || false, ip: msg.ip || null, geo: msg.geo || null }]);
                 addMsg('★', `${msg.nick} joined`, 'system');
                 break;
             case 'peer_left':

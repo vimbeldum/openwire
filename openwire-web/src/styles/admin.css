@@ -230,7 +230,7 @@
 
 .admin-ip {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--text-dim);
   word-break: break-all;
 }
@@ -238,6 +238,57 @@
 .admin-ip.banned {
   color: var(--red);
   font-size: 0.85rem;
+}
+
+/* Geo & network info */
+.admin-geo, .admin-net {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.75rem;
+}
+
+.admin-geo-flag {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.admin-geo-loc {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.admin-geo-tz {
+  color: var(--text-dim);
+  font-size: 0.65rem;
+}
+
+.admin-isp {
+  color: var(--text-dim);
+  font-size: 0.65rem;
+}
+
+.admin-browser {
+  color: var(--text-dim);
+  font-size: 0.65rem;
+  opacity: 0.7;
+}
+
+.admin-badge-sm {
+  display: inline-block;
+  margin-left: 0.3rem;
+  padding: 0 0.25rem;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  background: rgba(232, 183, 48, 0.25);
+  color: #E8B730;
+  vertical-align: middle;
+}
+
+.admin-device-icon {
+  margin-left: 0.25rem;
+  font-size: 0.7rem;
 }
 
 .admin-actions-cell {

@@ -103,9 +103,21 @@ export class RelayRoom {
             return new Response(null, { status: 101, webSocket: client, headers: corsHeaders() });
         }
 
+        // Extract geo/device info from Cloudflare request
+        const cf = request.cf || {};
+        const geoInfo = {
+            country: cf.country || request.headers.get('CF-IPCountry') || null,
+            city: cf.city || null,
+            region: cf.region || null,
+            timezone: cf.timezone || null,
+            asn: cf.asn || null,
+            asOrganization: cf.asOrganization || null,
+            userAgent: (request.headers.get('User-Agent') || '').slice(0, 200),
+        };
+
         const pair = new WebSocketPair();
         const [client, server] = Object.values(pair);
-        this.handleSession(server, clientIp);
+        this.handleSession(server, clientIp, geoInfo);
 
         return new Response(null, {
             status: 101,
@@ -114,7 +126,7 @@ export class RelayRoom {
         });
     }
 
-    handleSession(ws, clientIp) {
+    handleSession(ws, clientIp, geoInfo) {
         ws.accept();
         let peerInfo = null;
 
@@ -154,7 +166,7 @@ export class RelayRoom {
                     // Bridge peers are CLI nodes relaying between gossipsub and the web
                     const is_bridge = msg.is_bridge === true;
 
-                    peerInfo = { peer_id, nick, ip: clientIp, rooms: new Set(), balance: 0, is_admin, is_bridge };
+                    peerInfo = { peer_id, nick, ip: clientIp, rooms: new Set(), balance: 0, is_admin, is_bridge, geo: geoInfo };
                     this.peers.set(ws, peerInfo);
                     // Track IP connection count
                     this.ipConnectionCount.set(clientIp, (this.ipConnectionCount.get(clientIp) || 0) + 1);
@@ -167,7 +179,7 @@ export class RelayRoom {
                         rooms: this.roomList(),
                     });
 
-                    this.broadcast({ type: "peer_joined", peer_id, nick, is_admin: peerInfo.is_admin, is_bridge: peerInfo.is_bridge, ip: clientIp }, ws);
+                    this.broadcast({ type: "peer_joined", peer_id, nick, is_admin: peerInfo.is_admin, is_bridge: peerInfo.is_bridge, ip: clientIp, geo: geoInfo }, ws);
                     break;
                 }
 
@@ -460,6 +472,7 @@ export class RelayRoom {
             is_admin: p.is_admin || false,
             is_bridge: p.is_bridge || false,
             ip: p.ip || null,
+            geo: p.geo || null,
         }));
     }
 
