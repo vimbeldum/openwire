@@ -11,10 +11,11 @@ const TABS = ['Players', 'Ban List', 'Activity Log', 'Stats', 'Agents'];
 const CHATTER_LABELS = { 0.25: 'Quiet', 0.5: 'Calm', 1: 'Normal', 1.5: 'Active', 2: 'Chaotic' };
 const GAME_LABELS = { roulette: '🎰 Roulette', blackjack: '🃏 Blackjack', andarbahar: '🎴 Andar Bahar', slots: '🎲 Slots' };
 
-function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, activityLog, bannedIps, bankLedger, casinoState, swarm, swarmLogs, onProviderChange, onClose }) {
+function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, onAdjustKarma, activityLog, bannedIps, bankLedger, casinoState, swarm, swarmLogs, onProviderChange, onClose }) {
     const [tab, setTab] = useState('Players');
     const [adjustTarget, setAdjustTarget] = useState(null);
     const [adjustAmount, setAdjustAmount] = useState(100);
+    const [adjustKarmaAmount, setAdjustKarmaAmount] = useState(10);
     const [pnlFilter, setPnlFilter] = useState('all');
 
     // Dynamic store
@@ -165,8 +166,8 @@ function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, activ
                         {adjustTarget && (
                             <div className="admin-adjust-modal">
                                 <div className="admin-adjust-card">
-                                    <h3>Adjust Balance — {adjustTarget.nick}</h3>
-                                    <p>Current: <strong>{(adjustTarget.balance || 0).toLocaleString()}</strong> chips</p>
+                                    <h3>Adjust — {adjustTarget.nick}</h3>
+                                    <p>Chips: <strong>{(adjustTarget.balance || 0).toLocaleString()}</strong></p>
                                     <div className="admin-adjust-row">
                                         <input
                                             type="number"
@@ -177,14 +178,31 @@ function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, activ
                                         />
                                         <button className="admin-btn adjust"
                                             onClick={() => { onAdjustBalance(adjustTarget.peer_id, adjustTarget.nick, adjustAmount); setAdjustTarget(null); }}>
-                                            + Add
+                                            + Chips
                                         </button>
                                         <button className="admin-btn kick"
                                             onClick={() => { onAdjustBalance(adjustTarget.peer_id, adjustTarget.nick, -adjustAmount); setAdjustTarget(null); }}>
-                                            − Deduct
+                                            − Chips
                                         </button>
-                                        <button className="admin-btn" onClick={() => setAdjustTarget(null)}>Cancel</button>
                                     </div>
+                                    <div className="admin-adjust-row" style={{ marginTop: '0.5rem' }}>
+                                        <input
+                                            type="number"
+                                            value={adjustKarmaAmount}
+                                            onChange={(e) => setAdjustKarmaAmount(Number(e.target.value))}
+                                            min={1}
+                                            max={1000}
+                                        />
+                                        <button className="admin-btn adjust"
+                                            onClick={() => { onAdjustKarma?.(adjustTarget.peer_id, adjustTarget.nick, adjustKarmaAmount); setAdjustTarget(null); }}>
+                                            ⭐ + Karma
+                                        </button>
+                                        <button className="admin-btn kick"
+                                            onClick={() => { onAdjustKarma?.(adjustTarget.peer_id, adjustTarget.nick, -adjustKarmaAmount); setAdjustTarget(null); }}>
+                                            ⭐ − Karma
+                                        </button>
+                                    </div>
+                                    <button className="admin-btn" style={{ marginTop: '0.5rem' }} onClick={() => setAdjustTarget(null)}>Cancel</button>
                                 </div>
                             </div>
                         )}

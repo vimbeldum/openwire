@@ -51,7 +51,7 @@ import * as ledger from '../lib/core/ledger.js';
 import { getRoomAlias } from '../lib/core/identity.js';
 import { loadStore, getCharactersDict } from '../lib/agents/agentStore.js';
 import { loadProfile, saveProfile, updateStreak } from '../lib/profile.js';
-import { applyKarma, KARMA_EVENTS } from '../lib/reputation.js';
+import { applyKarma, KARMA_EVENTS, getTier } from '../lib/reputation.js';
 import * as vaultLib from '../lib/vault.js';
 import { DEFAULT_CATALOG } from '../lib/cosmetics.js';
 import { purchaseItem, equipItem, unequipItem, isAvailable } from '../lib/cosmetics.js';
@@ -797,6 +797,24 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     addMsg('★', `💰 Admin ${action.delta > 0 ? 'added' : 'deducted'} ${Math.abs(action.delta)} chips (${action.reason})`, 'system');
                 }
                 break;
+            case 'admin_adjust_karma':
+                if (action.peer_id === myIdRef.current && msg.peer_id !== myIdRef.current) {
+                    setProfile(prev => {
+                        if (!prev) return prev;
+                        const currentKarma = prev.reputation?.karma ?? 0;
+                        const newKarma = Math.max(0, currentKarma + action.delta);
+                        const tier = getTier(newKarma).name;
+                        const history = [
+                            { eventType: 'admin_adjust', delta: action.delta, reason: action.reason, timestamp: Date.now(), data: {} },
+                            ...(prev.reputation?.history ?? []),
+                        ].slice(0, 50);
+                        const updated = { ...prev, reputation: { karma: newKarma, tier, history } };
+                        saveProfile(updated);
+                        return updated;
+                    });
+                    addMsg('★', `⭐ Admin ${action.delta > 0 ? 'added' : 'removed'} ${Math.abs(action.delta)} karma`, 'system');
+                }
+                break;
             case 'mention_notify':
                 if (action.to === myId) {
                     const toastId = Date.now() + Math.random();
@@ -972,7 +990,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'admin_adjust_balance'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'admin_adjust_balance', 'admin_adjust_karma'];
                         if (CUSTOM.includes(parsed.type)) msgCustom = parsed;
                     } catch { /* not JSON */ }
                 }
@@ -1031,7 +1049,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (!isBjMsg && !isRlMsg && !isAbMsg && !isPmMsg && !isGameMsg && msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'admin_adjust_balance'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'admin_adjust_balance', 'admin_adjust_karma'];
                         if (CUSTOM.includes(parsed.type)) customAction = parsed;
                     } catch { /* not JSON */ }
                 }
@@ -1508,6 +1526,28 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         setPeers(prev => prev.map(p =>
             p.peer_id === peer_id ? { ...p, balance: Math.max(0, (p.balance || 0) + delta) } : p
         ));
+    };
+    const handleAdminAdjustKarma = (peer_id, nick, delta) => {
+        const reason = `Admin karma grant from ${nickRef.current}`;
+        socket.sendChat(JSON.stringify({ type: 'admin_adjust_karma', peer_id, delta, reason }));
+        addActivityLog(`Adjusted ${nick}'s karma by ${delta}`);
+        // Apply locally if we are the target
+        if (peer_id === myIdRef.current) {
+            setProfile(prev => {
+                if (!prev) return prev;
+                const currentKarma = prev.reputation?.karma ?? 0;
+                const newKarma = Math.max(0, currentKarma + delta);
+                const tier = getTier(newKarma).name;
+                const history = [
+                    { eventType: 'admin_adjust', delta, reason, timestamp: Date.now(), data: {} },
+                    ...(prev.reputation?.history ?? []),
+                ].slice(0, 50);
+                const updated = { ...prev, reputation: { karma: newKarma, tier, history } };
+                saveProfile(updated);
+                return updated;
+            });
+            addMsg('★', `⭐ Admin ${delta > 0 ? 'added' : 'removed'} ${Math.abs(delta)} karma`, 'system');
+        }
     };
 
     // ── Paste handler for Images/GIFs ───────────────────────────────
@@ -2542,6 +2582,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     onBanIp={handleAdminBanIp}
                     onUnbanIp={handleAdminUnbanIp}
                     onAdjustBalance={handleAdminAdjustBalance}
+                    onAdjustKarma={handleAdminAdjustKarma}
                     onProviderChange={(provider, defaultModel) => {
                         socket.sendChat(JSON.stringify({
                             type: 'swarm_config', provider, defaultModel,

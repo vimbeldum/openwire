@@ -180,6 +180,14 @@
   }
 }
 
+/* Ball stopped at the winning number (top of wheel, under the pointer) */
+.rl-ball-stopped {
+  animation: none;
+  transform: translateY(-90px);
+  will-change: auto;
+  transition: none;
+}
+
 .rl-wheel-info {
   display: flex;
   flex-direction: column;
@@ -652,3 +660,34 @@
     min-height: 1.8em;
   }
 }
+
+/* ── Quick bet row (Bet Again / Double) ────────── */
+.rl-new-round-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.rl-quick-bet-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.rl-bet-again-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.rl-bet-again-btn:hover:not(:disabled) { background: rgba(255,255,255,0.18); }
+.rl-bet-again-btn.double { border-color: #FFD700; color: #FFD700; }
+.rl-bet-again-btn:disabled { opacity: 0.4; cursor: not-allowed; }

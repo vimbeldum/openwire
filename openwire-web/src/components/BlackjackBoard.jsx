@@ -210,6 +210,7 @@ function useDelayedResults(game) {
 /* ── Main Board ───────────────────────────────────── */
 export default memo(function BlackjackBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost, onReady, onNewRound, readyCount, totalBettors, isReady }) {
     const [selectedBet, setSelectedBet] = useState(50);
+    const [lastBet, setLastBet] = useState(0);
     const { revealedCards } = useDealAnimation(game);
     const showResults = useDelayedResults(game);
 
@@ -236,7 +237,19 @@ export default memo(function BlackjackBoard({ game, myId, myNick, wallet, onActi
 
     const handleBet = () => {
         if (selectedBet > balance) return;
+        setLastBet(selectedBet);
         onAction({ type: 'bet', amount: selectedBet });
+    };
+
+    const handleBetAgain = () => {
+        if (!lastBet || lastBet > balance) return;
+        onAction({ type: 'bet', amount: lastBet });
+    };
+
+    const handleDouble = () => {
+        const doubled = lastBet * 2;
+        if (!lastBet || doubled > balance) return;
+        onAction({ type: 'bet', amount: doubled });
     };
 
     // Split/Insurance/Double checks
@@ -318,6 +331,12 @@ export default memo(function BlackjackBoard({ game, myId, myNick, wallet, onActi
                                 </button>
                             ) : myPlayer.status === 'waiting' ? (
                                 <div className="bj-bet-row">
+                                    {lastBet > 0 && (
+                                        <div className="bj-quick-bet-row">
+                                            <button className="rl-bet-again-btn" onClick={handleBetAgain} disabled={lastBet > balance}>↺ {lastBet}</button>
+                                            <button className="rl-bet-again-btn double" onClick={handleDouble} disabled={lastBet * 2 > balance}>✕2 {lastBet * 2}</button>
+                                        </div>
+                                    )}
                                     <div className="chip-selector">
                                         {BET_AMOUNTS.map(a => (
                                             <button
@@ -384,6 +403,12 @@ export default memo(function BlackjackBoard({ game, myId, myNick, wallet, onActi
                                             </div>
                                         );
                                     })}
+                                </div>
+                            )}
+                            {lastBet > 0 && (
+                                <div className="bj-quick-bet-row">
+                                    <button className="rl-bet-again-btn" onClick={handleBetAgain} disabled={lastBet > balance}>↺ Bet Again ({lastBet})</button>
+                                    <button className="rl-bet-again-btn double" onClick={handleDouble} disabled={lastBet * 2 > balance}>✕2 Double ({lastBet * 2})</button>
                                 </div>
                             )}
                             <button className="bj-btn-primary deal" onClick={onNewRound}>

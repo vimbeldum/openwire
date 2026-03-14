@@ -1427,7 +1427,7 @@
 /* ── Dead Drops Panel ───────────────────────────────────────── */
 .dd-sort-tabs { display: flex; gap: 0.25rem; align-items: center; }
 .dd-sort-btn { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; color: var(--text-muted); font-size: 0.75rem; padding: 2px 8px; cursor: pointer; }
-.dd-sort-btn.active { background: var(--brand); color: #000; border-color: var(--brand); font-weight: 600; }
+.dd-sort-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); font-weight: 600; }
 .dd-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; }
 .dd-body { font-size: 0.9rem; line-height: 1.4; margin-bottom: 0.4rem; word-break: break-word; }
 .dd-meta { display: flex; align-items: center; gap: 0.75rem; font-size: 0.75rem; color: var(--text-muted); }

@@ -129,6 +129,7 @@ const BET_AMOUNTS = [10, 25, 50, 100, 250, 500];
 /* ── Main Board ─────────────────────────────────── */
 export default memo(function AndarBaharBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost, onReady, onNewRound, readyCount, totalBettors, isReady }) {
     const [selectedAmount, setSelectedAmount] = useState(50);
+    const [lastMyBets, setLastMyBets] = useState([]);
 
     if (!game) return null;
 
@@ -152,6 +153,32 @@ export default memo(function AndarBaharBoard({ game, myId, myNick, wallet, onAct
 
     const myPayout = game.payouts?.[myId];
     const resultColor = game.result === 'andar' ? 'blue' : 'orange';
+
+    // Save bets when game ends so we can offer Bet Again / Double
+    if (game.phase === 'ended' && myBets.length > 0 && lastMyBets.length === 0) {
+        setLastMyBets(myBets);
+    }
+    if (game.phase === 'betting' && lastMyBets.length > 0 && bets.filter(b => b.peer_id === myId).length === 0) {
+        // new round started — lastMyBets stays so quick-bet buttons are shown
+    }
+
+    const handleBetAgain = () => {
+        if (!lastMyBets.length) return;
+        const total = lastMyBets.reduce((s, b) => s + b.amount, 0);
+        if (total > balance) return;
+        for (const b of lastMyBets) {
+            onAction({ type: 'bet', side: b.side, amount: b.amount });
+        }
+    };
+
+    const handleDoubleDown = () => {
+        if (!lastMyBets.length) return;
+        const total = lastMyBets.reduce((s, b) => s + b.amount * 2, 0);
+        if (total > balance) return;
+        for (const b of lastMyBets) {
+            onAction({ type: 'bet', side: b.side, amount: b.amount * 2 });
+        }
+    };
 
     // Pile card slice — show last 6 only to avoid overflow
     const andarVisible = game.andar.slice(-8);
@@ -280,6 +307,12 @@ export default memo(function AndarBaharBoard({ game, myId, myNick, wallet, onAct
                 )}
                 {game.phase === 'ended' && (
                     <div className="ab-new-round-row">
+                        {lastMyBets.length > 0 && (
+                            <>
+                                <button className="rl-bet-again-btn" onClick={handleBetAgain} disabled={lastMyBets.reduce((s,b)=>s+b.amount,0) > balance}>↺ Bet Again</button>
+                                <button className="rl-bet-again-btn double" onClick={handleDoubleDown} disabled={lastMyBets.reduce((s,b)=>s+b.amount*2,0) > balance}>✕2 Double</button>
+                            </>
+                        )}
                         <button className="ready-btn" onClick={onNewRound}>Next Round</button>
                     </div>
                 )}
@@ -287,6 +320,13 @@ export default memo(function AndarBaharBoard({ game, myId, myNick, wallet, onAct
                 {/* Betting controls */}
                 {canBet && bettingOpen && (
                     <div className="ab-bet-controls">
+                        {/* Bet Again / Double from last round */}
+                        {lastMyBets.length > 0 && myBets.length === 0 && (
+                            <div className="rl-quick-bet-row" style={{ justifyContent: 'center', marginBottom: '0.5rem' }}>
+                                <button className="rl-bet-again-btn" onClick={handleBetAgain} disabled={lastMyBets.reduce((s,b)=>s+b.amount,0) > balance}>↺ Bet Again</button>
+                                <button className="rl-bet-again-btn double" onClick={handleDoubleDown} disabled={lastMyBets.reduce((s,b)=>s+b.amount*2,0) > balance}>✕2 Double</button>
+                            </div>
+                        )}
                         {/* Chip selector */}
                         <div className="chip-selector">
                             {BET_AMOUNTS.map(a => (

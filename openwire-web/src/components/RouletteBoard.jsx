@@ -112,7 +112,9 @@ function RouletteWheel({ spinning, result }) {
                 <circle cx={cx} cy={cy} r="7" fill="#1A1A1A" stroke="#FFD700" strokeWidth="1.2" />
                 <circle cx={cx} cy={cy} r="3.5" fill="#FFD700" />
             </svg>
-            {spinning && <div className="rl-ball" />}
+            {(spinning || game?.phase === 'results') && (
+                <div className={`rl-ball${!spinning ? ' rl-ball-stopped' : ''}`} />
+            )}
         </div>
     );
 }
@@ -198,16 +200,20 @@ const BET_AMOUNTS = [5, 10, 25, 50, 100, 250];
 export default memo(function RouletteBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost, onReady, onNewRound, readyCount, totalBettors, isReady }) {
     const [betAmount, setBetAmount] = useState(25);
     const [spinning, setSpinning] = useState(false);
+    const [lastMyBets, setLastMyBets] = useState([]);
 
     useEffect(() => {
         if (game?.phase === 'spinning' && game?.result !== null && game?.result !== undefined) {
             setSpinning(true);
+            // Save my bets before they disappear on new round
+            const myBetsNow = game.bets?.filter(b => b.peer_id === myId) || [];
+            if (myBetsNow.length > 0) setLastMyBets(myBetsNow);
         } else if (game?.phase === 'results') {
             setSpinning(false);
         } else if (game?.phase === 'betting') {
             setSpinning(false);
         }
-    }, [game?.phase, game?.result]);
+    }, [game?.phase, game?.result, myId]);
 
     if (!game) return null;
 
@@ -221,6 +227,24 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
         if (!canBet) return;
         if (betAmount > balance - totalMyBet) return;
         onAction({ type: 'bet', betType: type, betTarget: target, amount: betAmount });
+    };
+
+    const handleBetAgain = () => {
+        if (!lastMyBets.length) return;
+        const total = lastMyBets.reduce((s, b) => s + b.amount, 0);
+        if (total > balance) return;
+        for (const b of lastMyBets) {
+            onAction({ type: 'bet', betType: b.betType, betTarget: b.betTarget, amount: b.amount });
+        }
+    };
+
+    const handleDouble = () => {
+        if (!lastMyBets.length) return;
+        const total = lastMyBets.reduce((s, b) => s + b.amount * 2, 0);
+        if (total > balance) return;
+        for (const b of lastMyBets) {
+            onAction({ type: 'bet', betType: b.betType, betTarget: b.betTarget, amount: b.amount * 2 });
+        }
     };
 
     const resultColor = game.result === null || game.result === undefined
@@ -315,6 +339,14 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
                     <div className="rl-right-col">
                         <div className="rl-betting-area">
 
+                            {/* Bet Again / Double from last round */}
+                            {game.phase === 'betting' && lastMyBets.length > 0 && myBets.length === 0 && (
+                                <div className="rl-quick-bet-row">
+                                    <button className="rl-bet-again-btn" onClick={handleBetAgain} disabled={lastMyBets.reduce((s,b) => s+b.amount,0) > balance}>↺ Bet Again</button>
+                                    <button className="rl-bet-again-btn double" onClick={handleDouble} disabled={lastMyBets.reduce((s,b) => s+b.amount*2,0) > balance}>✕2 Double</button>
+                                </div>
+                            )}
+
                             {/* Chip selector */}
                             <div className="chip-selector">
                                 {BET_AMOUNTS.map(a => (
@@ -407,6 +439,12 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
                             )}
                             {game.phase === 'results' && (
                                 <div className="rl-new-round-row">
+                                    {lastMyBets.length > 0 && (
+                                        <>
+                                            <button className="rl-bet-again-btn" onClick={handleBetAgain} disabled={lastMyBets.reduce((s,b) => s+b.amount,0) > balance}>Bet Again</button>
+                                            <button className="rl-bet-again-btn double" onClick={handleDouble} disabled={lastMyBets.reduce((s,b) => s+b.amount*2,0) > balance}>Double</button>
+                                        </>
+                                    )}
                                     <button className="ready-btn" onClick={onNewRound}>Next Round</button>
                                 </div>
                             )}

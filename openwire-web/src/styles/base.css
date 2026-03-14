@@ -13,6 +13,10 @@
   --bg-elevated: #2D2D2D;
   --bg-hover: #3D3D3D;
 
+  /* Shorthand aliases used by panels */
+  --surface: #1E1E1E;
+  --brand: #66A1EE;
+
   /* Primary Accent - Trust/Tech */
   --accent: #66A1EE;
   --accent-bright: #3080E8;

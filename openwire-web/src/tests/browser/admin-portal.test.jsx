@@ -184,7 +184,7 @@ describe('AdminPortal — Balance adjust modal', () => {
         const peer = makePeer({ nick: 'Alice', balance: 1000 });
         render(<AdminPortal {...makeDefaultProps({ peers: [peer] })} />);
         await userEvent.click(screen.getByRole('button', { name: /adjust/i }));
-        expect(screen.getByText(/Adjust Balance — Alice/)).toBeInTheDocument();
+        expect(screen.getByText(/Adjust — Alice/)).toBeInTheDocument();
     });
 
     it('calls onAdjustBalance with positive amount when Add is clicked', async () => {
@@ -193,8 +193,8 @@ describe('AdminPortal — Balance adjust modal', () => {
         render(<AdminPortal {...makeDefaultProps({ peers: [peer], onAdjustBalance })} />);
 
         await userEvent.click(screen.getByRole('button', { name: /adjust/i }));
-        // Default adjustAmount is 100 — click Add without changing value
-        await userEvent.click(screen.getByRole('button', { name: /\+ add/i }));
+        // Default adjustAmount is 100 — click + Chips without changing value
+        await userEvent.click(screen.getByRole('button', { name: /\+ Chips/i }));
         expect(onAdjustBalance).toHaveBeenCalledWith('p1', 'Alice', 100);
     });
 
@@ -204,7 +204,7 @@ describe('AdminPortal — Balance adjust modal', () => {
         render(<AdminPortal {...makeDefaultProps({ peers: [peer], onAdjustBalance })} />);
 
         await userEvent.click(screen.getByRole('button', { name: /adjust/i }));
-        await userEvent.click(screen.getByRole('button', { name: /deduct/i }));
+        await userEvent.click(screen.getByRole('button', { name: /− Chips/i }));
         expect(onAdjustBalance).toHaveBeenCalledWith('p1', 'Alice', -100);
     });
 
@@ -213,10 +213,10 @@ describe('AdminPortal — Balance adjust modal', () => {
         render(<AdminPortal {...makeDefaultProps({ peers: [peer] })} />);
 
         await userEvent.click(screen.getByRole('button', { name: /adjust/i }));
-        expect(screen.getByText(/Adjust Balance — Alice/)).toBeInTheDocument();
+        expect(screen.getByText(/Adjust — Alice/)).toBeInTheDocument();
 
         await userEvent.click(screen.getByRole('button', { name: /cancel/i }));
-        expect(screen.queryByText(/Adjust Balance — Alice/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Adjust — Alice/)).not.toBeInTheDocument();
     });
 });
 
