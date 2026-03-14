@@ -167,7 +167,7 @@ export class RelayRoom {
                         rooms: this.roomList(),
                     });
 
-                    this.broadcast({ type: "peer_joined", peer_id, nick, is_admin: peerInfo.is_admin, is_bridge: peerInfo.is_bridge }, ws);
+                    this.broadcast({ type: "peer_joined", peer_id, nick, is_admin: peerInfo.is_admin, is_bridge: peerInfo.is_bridge, ip: clientIp }, ws);
                     break;
                 }
 
@@ -457,7 +457,9 @@ export class RelayRoom {
             peer_id: p.peer_id,
             nick: p.nick,
             balance: p.balance || 0,
+            is_admin: p.is_admin || false,
             is_bridge: p.is_bridge || false,
+            ip: p.ip || null,
         }));
     }
 
