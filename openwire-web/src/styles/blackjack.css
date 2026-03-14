@@ -371,6 +371,36 @@
   color: #E8B730;
 }
 
+/* ── Turn timer countdown ─────────────────────────── */
+.bj-turn-timer {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.8);
+  min-width: 2rem;
+  text-align: center;
+}
+
+.bj-turn-timer.urgent {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+  animation: turnPulse 0.8s ease-in-out infinite;
+}
+
+.bj-turn-timer.my-turn {
+  font-size: 0.9rem;
+}
+
+@keyframes turnPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 .bj-players-area {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

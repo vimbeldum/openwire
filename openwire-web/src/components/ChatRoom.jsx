@@ -609,8 +609,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
 
     const {
         blackjackGame, setBlackjackGame,
-        blackjackRef, bjHostRef, hasJoinedBj, bjDealerTimerRef,
-        startBlackjackTimer, bjCheckDealerTransition,
+        blackjackRef, bjHostRef, hasJoinedBj, bjDealerTimerRef, bjTurnTimerRef,
+        startBlackjackTimer, startTurnTimer, bjCheckDealerTransition,
         handleBlackjackAction, startBlackjack, handleBjAction,
     } = useBlackjackGame(gameDeps);
 
@@ -1454,6 +1454,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 const dealtGame = bj.dealInitialCards(bjGame);
                 setBlackjackGame(dealtGame);
                 socket.sendRoomMessage(bjGame.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(dealtGame) }));
+                bjCheckDealerTransition('betting', dealtGame);
+                if (dealtGame.phase === 'playing') startTurnTimer(dealtGame);
             }
         }
 
@@ -1502,7 +1504,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 }, ab.DEAL_INTERVAL_MS);
             }
         }
-    }, [readyPeers, amIHost, clearReadyPeers, updateBankLedger, resolvePayoutEvent, startRouletteTimer, startAbCycle]);
+    }, [readyPeers, amIHost, clearReadyPeers, updateBankLedger, resolvePayoutEvent, startRouletteTimer, startAbCycle, startTurnTimer, bjCheckDealerTransition]);
 
     // ── Clear ready peers when phase changes away from betting ──
     useEffect(() => {
@@ -2006,6 +2008,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         bjHostRef.current = null;
         hasJoinedBj.current = false;
         if (bjDealerTimerRef.current) { clearTimeout(bjDealerTimerRef.current); bjDealerTimerRef.current = null; }
+        if (bjTurnTimerRef.current) { clearTimeout(bjTurnTimerRef.current); bjTurnTimerRef.current = null; }
     }, []);
     const closeRl = useCallback(() => {
         setRouletteGame(null);

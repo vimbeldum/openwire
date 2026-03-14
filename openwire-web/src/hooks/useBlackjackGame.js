@@ -30,6 +30,7 @@ export default function useBlackjackGame(deps) {
     const bjHostRef = useRef(null);
     const hasJoinedBj = useRef(false);
     const bjDealerTimerRef = useRef(null);
+    const bjTurnTimerRef = useRef(null);
 
     useEffect(() => { blackjackRef.current = blackjackGame; }, [blackjackGame]);
 
@@ -54,6 +55,34 @@ export default function useBlackjackGame(deps) {
         }
     }, [amIHost, updateBankLedger, resolvePayoutEvent]);
 
+    // ── Per-player turn timeout (host-only) ────────────────
+    const startTurnTimer = useCallback((gameVal) => {
+        if (bjTurnTimerRef.current) clearTimeout(bjTurnTimerRef.current);
+        if (!gameVal || gameVal.phase !== 'playing' || gameVal.currentPlayerIndex < 0) return;
+        if (!gameVal.turnDeadline) return;
+
+        const msLeft = Math.max(0, gameVal.turnDeadline - Date.now());
+
+        bjTurnTimerRef.current = setTimeout(() => {
+            const currentGame = blackjackRef.current;
+            if (!currentGame || !amIHost(bjHostRef.current) || currentGame.phase !== 'playing') return;
+            const activePlayer = currentGame.players[currentGame.currentPlayerIndex];
+            if (!activePlayer) return;
+
+            // Auto-stand for the timed-out player
+            const prevPhase = currentGame.phase;
+            const updated = bj.stand(currentGame, activePlayer.peer_id);
+            setBlackjackGame(updated);
+            socket.sendRoomMessage(updated.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(updated) }));
+            bjCheckDealerTransition(prevPhase, updated);
+
+            // If still playing with a new active player, restart timer
+            if (updated.phase === 'playing' && updated.currentPlayerIndex >= 0) {
+                startTurnTimer(updated);
+            }
+        }, msLeft);
+    }, [amIHost, bjCheckDealerTransition]);
+
     // ── Blackjack Auto-deal timer ──────────────────────────
     const startBlackjackTimer = useCallback((gameVal) => {
         if (!gameVal || gameVal.phase !== 'betting') return;
@@ -72,8 +101,10 @@ export default function useBlackjackGame(deps) {
             socket.sendRoomMessage(currentGame.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(dealtGame) }));
             // If all players got blackjack, game goes straight to dealer phase — run dealer turn
             bjCheckDealerTransition('betting', dealtGame);
+            // Start per-player turn timer if in playing phase
+            if (dealtGame.phase === 'playing') startTurnTimer(dealtGame);
         }, msLeft);
-    }, [amIHost, bjCheckDealerTransition]);
+    }, [amIHost, bjCheckDealerTransition, startTurnTimer]);
 
     // ── Blackjack message handler ────────────────────────────
     const handleBlackjackAction = useCallback((msg, action) => {
@@ -160,13 +191,16 @@ export default function useBlackjackGame(deps) {
                     setTimeout(() => {
                         socket.sendRoomMessage(updated.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(updated) }));
                         bjCheckDealerTransition(prevPhase, updated);
+                        if (updated.phase === 'playing' && updated.currentPlayerIndex >= 0) {
+                            startTurnTimer(updated);
+                        }
                     }, 0);
                     return updated;
                 });
                 break;
             }
         }
-    }, [addMsg, addActivityLog, amIHost, bjCheckDealerTransition, resolvePayoutEvent]);
+    }, [addMsg, addActivityLog, amIHost, bjCheckDealerTransition, resolvePayoutEvent, startTurnTimer]);
 
     // ── Blackjack start ───────────────────────────────────
     const startBlackjack = useCallback((roomId) => {
@@ -282,19 +316,24 @@ export default function useBlackjackGame(deps) {
         setBlackjackGame(newGame);
         socket.sendRoomMessage(newGame.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(newGame) }));
         bjCheckDealerTransition(blackjackGame.phase, newGame);
-    }, [amIHost, addMsg, updateWallet, startBlackjackTimer, bjCheckDealerTransition]);
+        // Restart turn timer if still in playing phase
+        if (newGame.phase === 'playing' && newGame.currentPlayerIndex >= 0) {
+            startTurnTimer(newGame);
+        }
+    }, [amIHost, addMsg, updateWallet, startBlackjackTimer, bjCheckDealerTransition, startTurnTimer]);
 
-    // Cleanup timer on unmount
+    // Cleanup timers on unmount
     useEffect(() => {
         return () => {
             if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
+            if (bjTurnTimerRef.current) clearTimeout(bjTurnTimerRef.current);
         };
     }, []);
 
     return {
         blackjackGame, setBlackjackGame,
-        blackjackRef, bjHostRef, hasJoinedBj, bjDealerTimerRef,
-        startBlackjackTimer, bjCheckDealerTransition,
+        blackjackRef, bjHostRef, hasJoinedBj, bjDealerTimerRef, bjTurnTimerRef,
+        startBlackjackTimer, startTurnTimer, bjCheckDealerTransition,
         handleBlackjackAction, startBlackjack, handleBjAction,
     };
 }

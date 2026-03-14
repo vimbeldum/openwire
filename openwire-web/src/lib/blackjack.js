@@ -16,6 +16,7 @@ export const DEALER_PLAY_MS = 3 * 1000;        // 3s delay before round ends
 export const DEAL_CARD_DELAY_MS = 600;         // delay between each dealt card
 export const DEALER_REVEAL_DELAY_MS = 1500;    // delay before showing dealer result
 export const MIN_DECK_CARDS = 15;              // reshuffle threshold
+export const TURN_TIMEOUT_MS = 30 * 1000;      // 30s per player turn before auto-stand
 
 // Create a fresh deck
 export function createDeck() {
@@ -135,24 +136,35 @@ export function placeBet(game, peer_id, bet) {
 // Deal initial cards (2 to each player, 2 to dealer)
 export function dealInitialCards(game) {
     let deck = [...game.deck];
-    let players = game.players.map(p => ({ ...p, hand: [], status: 'playing' }));
+    // Players with no bet sit out — they don't get cards
+    let players = game.players.map(p => ({
+        ...p, hand: [], status: p.bet > 0 ? 'playing' : 'sitting_out',
+    }));
     let dealer = { ...game.dealer, hand: [], revealed: false };
 
+    const activePlayers = players.filter(p => p.status === 'playing');
+    // If nobody placed a bet, skip dealing entirely
+    if (activePlayers.length === 0) {
+        return { ...game, deck, players, dealer, currentPlayerIndex: -1, phase: 'ended', turnDeadline: null };
+    }
+
     // Reshuffle if not enough cards for initial deal
-    const cardsNeeded = (players.length + 1) * 2;
+    const cardsNeeded = (activePlayers.length + 1) * 2;
     if (deck.length < cardsNeeded) deck = [...createDeck()];
 
-    // Deal 2 cards to each player and dealer
+    // Deal 2 cards to each active player and dealer
     for (let round = 0; round < 2; round++) {
         for (let i = 0; i < players.length; i++) {
-            players[i].hand.push(deck.pop());
+            if (players[i].status !== 'sitting_out') {
+                players[i].hand.push(deck.pop());
+            }
         }
         dealer.hand.push(deck.pop());
     }
 
     // Check for blackjacks
     players = players.map(p => {
-        if (isBlackjack(p.hand)) {
+        if (p.status === 'playing' && isBlackjack(p.hand)) {
             return { ...p, status: 'blackjack' };
         }
         return p;
@@ -161,11 +173,14 @@ export function dealInitialCards(game) {
     // Find first player who is still playing
     let currentPlayerIndex = players.findIndex(p => p.status === 'playing');
     let phase = 'playing';
+    let turnDeadline = null;
 
     // If all players have blackjack or bust, go to dealer
     if (currentPlayerIndex === -1) {
         phase = 'dealer';
         dealer.revealed = true;
+    } else {
+        turnDeadline = Date.now() + TURN_TIMEOUT_MS;
     }
 
     return {
@@ -175,6 +190,7 @@ export function dealInitialCards(game) {
         dealer,
         currentPlayerIndex,
         phase,
+        turnDeadline,
     };
 }
 
@@ -245,6 +261,7 @@ export function hit(game, peer_id) {
         currentPlayerIndex,
         phase,
         dealer,
+        turnDeadline: phase === 'dealer' ? null : Date.now() + TURN_TIMEOUT_MS,
     };
 }
 
@@ -294,6 +311,7 @@ export function stand(game, peer_id) {
         currentPlayerIndex,
         phase,
         dealer,
+        turnDeadline: phase === 'dealer' ? null : Date.now() + TURN_TIMEOUT_MS,
     };
 }
 
@@ -355,10 +373,11 @@ export function split(game, peer_id) {
             phase = 'dealer';
             dealer.revealed = true;
         }
-        return { ...game, deck, players, currentPlayerIndex, phase, dealer };
+        return { ...game, deck, players, currentPlayerIndex, phase, dealer, turnDeadline: phase === 'dealer' ? null : Date.now() + TURN_TIMEOUT_MS };
     }
 
-    return { ...game, deck, players };
+    // Reset deadline for current player (split gives new cards to think about)
+    return { ...game, deck, players, turnDeadline: Date.now() + TURN_TIMEOUT_MS };
 }
 
 // Check if player can take insurance (dealer shows Ace)
@@ -440,7 +459,7 @@ export function doubleDown(game, peer_id) {
         }
     }
 
-    return { ...game, deck, players, currentPlayerIndex, phase, dealer };
+    return { ...game, deck, players, currentPlayerIndex, phase, dealer, turnDeadline: phase === 'dealer' ? null : Date.now() + TURN_TIMEOUT_MS };
 }
 
 // Dealer plays (hits until 17 or higher)
@@ -519,6 +538,7 @@ export function newRound(game) {
         ...createGame(game.roomId, game.dealer.peer_id),
         hostPeerId: game.hostPeerId ?? game.dealer.peer_id,
         deck: createDeck(),
+        turnDeadline: null,
         players: game.players.map(p => ({
             peer_id: p.peer_id,
             nick: p.nick,

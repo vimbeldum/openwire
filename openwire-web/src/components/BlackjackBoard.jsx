@@ -110,6 +110,27 @@ function Hand({ cards, label, value, hidden = false, status = '', isMyTurn = fal
     );
 }
 
+function TurnCountdown({ deadline, isMyTurn }) {
+    const [now, setNow] = useState(Date.now());
+
+    useEffect(() => {
+        if (!deadline) return;
+        const key = setInterval(() => setNow(Date.now()), 250);
+        return () => clearInterval(key);
+    }, [deadline]);
+
+    if (!deadline) return null;
+
+    const s = Math.max(0, Math.ceil((deadline - now) / 1000));
+    const urgent = s <= 10;
+
+    return (
+        <span className={`bj-turn-timer ${urgent ? 'urgent' : ''} ${isMyTurn ? 'my-turn' : ''}`}>
+            {s}s
+        </span>
+    );
+}
+
 const BET_AMOUNTS = [10, 25, 50, 100, 250, 500];
 
 function Countdown({ game }) {
@@ -294,6 +315,7 @@ export default memo(function BlackjackBoard({ game, myId, myNick, wallet, onActi
                         <div className="bj-phase-msg highlight">
                             {game.players[game.currentPlayerIndex]?.nick}'s turn
                             {isMyTurn && ' (You)'}
+                            <TurnCountdown deadline={game.turnDeadline} isMyTurn={isMyTurn} />
                         </div>
                     )}
                     {game.phase === 'dealer' && <div className="bj-phase-msg">Dealer is playing...</div>}
