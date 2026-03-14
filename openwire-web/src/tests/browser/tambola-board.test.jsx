@@ -110,8 +110,8 @@ describe('TambolaBoard', () => {
         });
 
         it('shows the wallet chip count in the header badge', () => {
-            renderBoard({ wallet: 1000 });
-            expect(screen.getByText('1000 chips')).toBeInTheDocument();
+            renderBoard({ wallet: { baseBalance: 1000, adminBonus: 0 } });
+            expect(screen.getByText('1,000 chips')).toBeInTheDocument();
         });
 
         it('close button calls onClose', () => {
