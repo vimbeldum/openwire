@@ -168,7 +168,7 @@ function Countdown({ nextSpinAt, phase }) {
 }
 
 /* ── Number Grid Cell ───────────────────────────── */
-function NumberCell({ n, selected, onBet, disabled }) {
+const NumberCell = memo(function NumberCell({ n, selected, onBet, disabled }) {
     const color = getColor(n);
     return (
         <button
@@ -180,10 +180,10 @@ function NumberCell({ n, selected, onBet, disabled }) {
             {n}
         </button>
     );
-}
+});
 
 /* ── Outside Bet Button ─────────────────────────── */
-function OutsideBtn({ label, type, target, myBets, onBet, disabled, className = '' }) {
+const OutsideBtn = memo(function OutsideBtn({ label, type, target, myBets, onBet, disabled, className = '' }) {
     const active = myBets.some(b => b.betType === type && b.betTarget === target);
     return (
         <button
@@ -194,9 +194,16 @@ function OutsideBtn({ label, type, target, myBets, onBet, disabled, className = 
             {label}
         </button>
     );
-}
+});
 
 const BET_AMOUNTS = [5, 10, 25, 50, 100, 250];
+
+// 12 rows × 3 columns: each row is [col1, col2, col3] — static, no need to recreate per render
+const GRID_ROWS = Array.from({ length: 12 }, (_, i) => [
+    i * 3 + 1,
+    i * 3 + 2,
+    i * 3 + 3,
+]);
 
 /* ── Main Board ─────────────────────────────────── */
 export default memo(function RouletteBoard({ game, myId, myNick, wallet, onAction, onClose, onHelp, isHost, onReady, onNewRound, readyCount, totalBettors, isReady }) {
@@ -284,12 +291,7 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
     const resultColor = game.result === null || game.result === undefined
         ? '' : getColor(game.result);
 
-    // 12 rows × 3 columns: each row is [col1, col2, col3]
-    const rows = Array.from({ length: 12 }, (_, i) => [
-        i * 3 + 1,
-        i * 3 + 2,
-        i * 3 + 3,
-    ]);
+    const rows = GRID_ROWS;
 
     return (
         <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && game?.phase === 'betting' && onClose?.()}>

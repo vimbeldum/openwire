@@ -3,7 +3,7 @@ import '../styles/blackjack.css';
 import * as bj from '../lib/blackjack';
 
 /* ── Reusable Premium Card ────────────────────────── */
-function Card({ card, hidden = false, index = 0, placeholder = false, revealed = false }) {
+const Card = memo(function Card({ card, hidden = false, index = 0, placeholder = false, revealed = false }) {
     const [flipped, setFlipped] = useState(false);
 
     useEffect(() => {
@@ -50,7 +50,7 @@ function Card({ card, hidden = false, index = 0, placeholder = false, revealed =
             </div>
         </div>
     );
-}
+});
 
 /* ── Player / Dealer Hand ─────────────────────────── */
 function Hand({ cards, label, value, hidden = false, status = '', isMyTurn = false, revealCount = 999, splitCards, splitValue, splitStatus, playingSplit }) {

@@ -467,8 +467,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             onModelLoad: () => setAgentRunning(true),
             onLog: (line) => {
                 // Mutate in place to avoid spread-copy GC pressure on every log line
-                const logs = swarmLogsRef.current;
-                if (logs.length >= 200) logs.shift();
+                let logs = swarmLogsRef.current;
+                if (logs.length >= 200) { logs = logs.slice(-199); swarmLogsRef.current = logs; }
                 logs.push(line);
                 if (debugModeRef.current) console.log('[AgentSwarm]', line);
             },
@@ -611,11 +611,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     }, []);
 
     // ── Game hooks (extracted from ChatRoom) ─────────────────
-    const gameDeps = { myIdRef, nickRef, walletRef, addMsg, updateWallet, amIHost, updateBankLedger, resolvePayoutEvent, addActivityLog };
+    const gameDeps = useMemo(() => ({ myIdRef, nickRef, walletRef, addMsg, updateWallet, amIHost, updateBankLedger, resolvePayoutEvent, addActivityLog }), [addMsg, updateWallet, amIHost, updateBankLedger, resolvePayoutEvent, addActivityLog]);
 
     const {
         blackjackGame, setBlackjackGame,
-        blackjackRef, bjHostRef, hasJoinedBj, bjDealerTimerRef, bjTurnTimerRef,
+        blackjackRef, bjHostRef, hasJoinedBj, bjDealerTimerRef, bjTurnTimerRef, bjDealerTransitionTimerRef,
         startBlackjackTimer, startTurnTimer, bjCheckDealerTransition,
         handleBlackjackAction, startBlackjack, handleBjAction,
     } = useBlackjackGame(gameDeps);
@@ -1036,6 +1036,17 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 break;
             case 'peer_left':
                 setPeers(prev => prev.filter(p => p.peer_id !== msg.peer_id));
+                delete peerCosmeticsRef.current[msg.peer_id];
+                setReadyPeers(prev => {
+                    const next = { ...prev };
+                    for (const key of Object.keys(next)) {
+                        if (next[key].has(msg.peer_id)) {
+                            next[key] = new Set(next[key]);
+                            next[key].delete(msg.peer_id);
+                        }
+                    }
+                    return next;
+                });
                 addMsg('★', `${msg.nick} left`, 'system');
                 break;
             case 'message': {
@@ -2041,6 +2052,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         hasJoinedBj.current = false;
         if (bjDealerTimerRef.current) { clearTimeout(bjDealerTimerRef.current); bjDealerTimerRef.current = null; }
         if (bjTurnTimerRef.current) { clearTimeout(bjTurnTimerRef.current); bjTurnTimerRef.current = null; }
+        if (bjDealerTransitionTimerRef.current) { clearTimeout(bjDealerTransitionTimerRef.current); bjDealerTransitionTimerRef.current = null; }
     }, []);
     const closeRl = useCallback(() => {
         setRouletteGame(null);

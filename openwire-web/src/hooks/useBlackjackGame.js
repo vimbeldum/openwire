@@ -31,13 +31,16 @@ export default function useBlackjackGame(deps) {
     const hasJoinedBj = useRef(false);
     const bjDealerTimerRef = useRef(null);
     const bjTurnTimerRef = useRef(null);
+    const bjDealerTransitionTimerRef = useRef(null);
 
     useEffect(() => { blackjackRef.current = blackjackGame; }, [blackjackGame]);
 
     // Shared helper: after a BJ game update, check for dealer phase transition
     const bjCheckDealerTransition = useCallback((prevPhase, newGame) => {
         if (newGame.phase === 'dealer' && prevPhase !== 'dealer') {
-            setTimeout(() => {
+            if (bjDealerTransitionTimerRef.current) clearTimeout(bjDealerTransitionTimerRef.current);
+            bjDealerTransitionTimerRef.current = setTimeout(() => {
+                bjDealerTransitionTimerRef.current = null;
                 const settled = bj.runDealerTurn(newGame);
                 const payoutEvent = new bj.BlackjackEngine(settled).calculateResults(settled);
                 settled.payouts = payoutEvent.totals || {};
@@ -327,12 +330,13 @@ export default function useBlackjackGame(deps) {
         return () => {
             if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
             if (bjTurnTimerRef.current) clearTimeout(bjTurnTimerRef.current);
+            if (bjDealerTransitionTimerRef.current) clearTimeout(bjDealerTransitionTimerRef.current);
         };
     }, []);
 
     return {
         blackjackGame, setBlackjackGame,
-        blackjackRef, bjHostRef, hasJoinedBj, bjDealerTimerRef, bjTurnTimerRef,
+        blackjackRef, bjHostRef, hasJoinedBj, bjDealerTimerRef, bjTurnTimerRef, bjDealerTransitionTimerRef,
         startBlackjackTimer, startTurnTimer, bjCheckDealerTransition,
         handleBlackjackAction, startBlackjack, handleBjAction,
     };
