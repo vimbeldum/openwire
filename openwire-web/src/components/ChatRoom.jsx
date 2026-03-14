@@ -44,6 +44,7 @@ const VaultPanel = lazyRetry(() => import('./VaultPanel'));
 const DeadDropsPanel = lazyRetry(() => import('./DeadDropsPanel'));
 const CosmeticsShop = lazyRetry(() => import('./CosmeticsShop'));
 const TambolaBoard = lazyRetry(() => import('./TambolaBoard'));
+const KarmaGuide   = lazyRetry(() => import('./KarmaGuide'));
 import LiveTicker from './chat/LiveTicker';
 import TypingBar from './chat/TypingBar';
 import * as ledger from '../lib/core/ledger.js';
@@ -127,6 +128,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const [showDeadDrops, setShowDeadDrops] = useState(false);
     const [showCosmetics, setShowCosmetics] = useState(false);
     const [tambolaGame, setTambolaGame] = useState(false);
+    const [showKarmaGuide, setShowKarmaGuide] = useState(false);
     const [profile, setProfile] = useState(null);
     const [catalog, setCatalog] = useState(DEFAULT_CATALOG);
     const [jackpotPool, setJackpotPool] = useState(() => createJackpotState('general'));
@@ -2129,8 +2131,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                             </div>
                             <div className="wallet-resets">Resets at midnight IST</div>
                             {profile && (
-                                <div className="wallet-sub" style={{ marginTop: '4px', color: 'var(--brand)' }}>
+                                <div className="wallet-sub" style={{ marginTop: '4px', color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                                     ⭐ Karma: {profile.reputation?.karma ?? 0} · {profile.reputation?.tier ?? 'newcomer'}
+                                    <button
+                                        onClick={() => setShowKarmaGuide(true)}
+                                        title="How does karma work?"
+                                        style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '16px', height: '16px', fontSize: '0.6rem', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', padding: 0, lineHeight: '14px', flexShrink: 0 }}
+                                    >?</button>
                                     {profile.vault?.staked > 0 && (
                                         <span style={{ marginLeft: '6px', color: '#FFD700' }}>
                                             🏦 {profile.vault.staked.toLocaleString()} staked
@@ -2437,6 +2444,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                         // Add rake to jackpot
                         setJackpotPool(prev => addRake(prev, 'tambola', 100));
                     }}
+                />
+            )}
+            {showKarmaGuide && (
+                <KarmaGuide
+                    currentKarma={profile?.reputation?.karma ?? 0}
+                    currentTier={profile?.reputation?.tier ?? 'newcomer'}
+                    onClose={() => setShowKarmaGuide(false)}
                 />
             )}
             </Suspense>
