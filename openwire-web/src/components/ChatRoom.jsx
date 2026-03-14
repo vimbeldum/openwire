@@ -60,6 +60,7 @@ import * as vaultLib from '../lib/vault.js';
 import { DEFAULT_CATALOG } from '../lib/cosmetics.js';
 import { purchaseItem, equipItem, unequipItem, isAvailable, getEquippedClasses } from '../lib/cosmetics.js';
 import { createJackpotState, addRake } from '../lib/jackpot.js';
+import { setMinKarmaToPost } from '../lib/deaddrops.js';
 
 const MENTION_REGEX = /(@\w+)/g;
 
@@ -920,7 +921,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     }
                 }
                 break;
-            // cosmetics_update is handled via dedicated relay message (peer_cosmetics_update), not custom actions
+            case 'admin_setting':
+                // Admin broadcast a setting change — apply locally
+                if (action.key === 'dead_drop_min_karma' && typeof action.value === 'number') {
+                    setMinKarmaToPost(action.value);
+                }
+                break;
         }
     }, [addMsg, addReaction, addTicker, updateWallet, amIHost, clearReadyPeers, startBlackjackTimer]);
 
@@ -1060,7 +1066,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma', 'admin_setting'];
                         if (CUSTOM.includes(parsed.type)) msgCustom = parsed;
                     } catch { /* not JSON */ }
                 }
@@ -1119,7 +1125,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (!isBjMsg && !isRlMsg && !isAbMsg && !isPmMsg && !isGameMsg && msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma', 'admin_setting'];
                         if (CUSTOM.includes(parsed.type)) customAction = parsed;
                     } catch { /* not JSON */ }
                 }
@@ -2702,6 +2708,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     onProviderChange={(provider, defaultModel) => {
                         socket.sendChat(JSON.stringify({
                             type: 'swarm_config', provider, defaultModel,
+                        }));
+                    }}
+                    onSettingChange={(key, value) => {
+                        socket.sendChat(JSON.stringify({
+                            type: 'admin_setting', key, value,
                         }));
                     }}
                     onClose={() => setShowAdmin(false)}

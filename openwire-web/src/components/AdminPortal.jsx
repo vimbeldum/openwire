@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import '../styles/admin.css';
 import { getTotalHousePnl } from '../lib/casinoState.js';
+import { getMinKarmaToPost, setMinKarmaToPost } from '../lib/deaddrops.js';
 import { loadStore, getCharactersDict, getGroupsDict, getGroupCharacters } from '../lib/agents/agentStore.js';
 import { formatModelLabel } from '../lib/agents/openrouter.js';
 import { formatGeminiLabel } from '../lib/agents/gemini.js';
@@ -28,8 +29,9 @@ function parseBrowser(ua) {
 const CHATTER_LABELS = { 0.25: 'Quiet', 0.5: 'Calm', 1: 'Normal', 1.5: 'Active', 2: 'Chaotic' };
 const GAME_LABELS = { roulette: '🎰 Roulette', blackjack: '🃏 Blackjack', andarbahar: '🎴 Andar Bahar', slots: '🎲 Slots' };
 
-function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, onAdjustKarma, activityLog, bannedIps, bankLedger, casinoState, swarm, swarmLogs, onProviderChange, onClose }) {
+function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, onAdjustKarma, activityLog, bannedIps, bankLedger, casinoState, swarm, swarmLogs, onProviderChange, onSettingChange, onClose }) {
     const [tab, setTab] = useState('Players');
+    const [ddMinKarma, setDdMinKarma] = useState(getMinKarmaToPost);
     const [adjustTarget, setAdjustTarget] = useState(null);
     const [adjustAmount, setAdjustAmount] = useState(100);
     const [adjustKarmaAmount, setAdjustKarmaAmount] = useState(10);
@@ -302,6 +304,28 @@ function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, onAdj
 
                     return (
                         <div className="admin-content">
+                            {/* ── Settings ── */}
+                            <h3 className="admin-section-title">Settings</h3>
+                            <div className="admin-settings-row">
+                                <label className="admin-setting-label">
+                                    Dead Drops — Min Karma to Post
+                                </label>
+                                <div className="admin-setting-control">
+                                    <input
+                                        type="range" min={0} max={100} step={5}
+                                        value={ddMinKarma}
+                                        onChange={(e) => {
+                                            const val = Number(e.target.value);
+                                            setDdMinKarma(val);
+                                            setMinKarmaToPost(val);
+                                            onSettingChange?.('dead_drop_min_karma', val);
+                                        }}
+                                    />
+                                    <span className="admin-setting-value">{ddMinKarma}</span>
+                                </div>
+                            </div>
+
+                            <h3 className="admin-section-title" style={{ marginTop: '1.5rem' }}>Dashboard</h3>
                             <div className="admin-stats-grid">
                                 <div className="admin-stat-card">
                                     <div className="admin-stat-label">Players Online</div>

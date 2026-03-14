@@ -297,6 +297,53 @@
   flex-wrap: wrap;
 }
 
+/* ── Admin Settings ─────────────────────────── */
+.admin-section-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin: 0 0 0.5rem;
+}
+
+.admin-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.admin-setting-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.admin-setting-control {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.admin-setting-control input[type="range"] {
+  width: 120px;
+  accent-color: #E8B730;
+}
+
+.admin-setting-value {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #E8B730;
+  min-width: 2rem;
+  text-align: center;
+}
+
 .admin-btn {
   padding: 0.3rem 0.65rem;
   border-radius: var(--radius-sm);

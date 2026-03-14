@@ -86,7 +86,7 @@ describe('createPost', () => {
   });
 
   it('is blocked when karma is exactly MIN_KARMA_TO_POST - 1', () => {
-    const result = createPost(ROOM, 'Hi', DEVICE, 49, [], NOW);
+    const result = createPost(ROOM, 'Hi', DEVICE, MIN_KARMA_TO_POST - 1, [], NOW);
     expect(result.success).toBe(false);
   });
 

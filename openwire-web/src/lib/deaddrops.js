@@ -11,8 +11,26 @@ import { stripDangerousTags } from './socket.js';
 
 export const MAX_BODY_LENGTH = 500;
 export const RATE_LIMIT_PER_HOUR = 3;
-export const MIN_KARMA_TO_POST = 50;
+export const DEFAULT_MIN_KARMA_TO_POST = 10;
 export const AI_REACTION_THRESHOLD = 5;
+
+// Configurable min karma — persisted in localStorage, synced via admin broadcast
+const SETTINGS_KEY = 'openwire:dead_drop_settings';
+
+export function getMinKarmaToPost() {
+    try {
+        const v = localStorage.getItem(SETTINGS_KEY);
+        if (v) { const parsed = JSON.parse(v); return parsed.minKarma ?? DEFAULT_MIN_KARMA_TO_POST; }
+    } catch {}
+    return DEFAULT_MIN_KARMA_TO_POST;
+}
+
+export function setMinKarmaToPost(value) {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ minKarma: value })); } catch {}
+}
+
+// Backward-compat alias
+export const MIN_KARMA_TO_POST = DEFAULT_MIN_KARMA_TO_POST;
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -45,8 +63,9 @@ export { hashDeviceId };
  * @returns {{ success: boolean, post?: object, reason?: string }}
  */
 export function createPost(roomId, body, deviceId, karma, existingPosts, nowMs) {
-  if (karma < MIN_KARMA_TO_POST) {
-    return { success: false, reason: `Karma too low (need ${MIN_KARMA_TO_POST})` };
+  const minKarma = getMinKarmaToPost();
+  if (karma < minKarma) {
+    return { success: false, reason: `Karma too low (need ${minKarma})` };
   }
 
   if (!body || body.trim().length === 0) {
