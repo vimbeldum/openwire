@@ -203,6 +203,14 @@ export class RelayRoom {
                     break;
                 }
 
+                case "cosmetics_update": {
+                    if (!peerInfo) return;
+                    if (!msg.cosmetics || typeof msg.cosmetics !== 'object') return;
+                    peerInfo.cosmetics = msg.cosmetics;
+                    this.broadcast({ type: "peer_cosmetics_update", peer_id: peerInfo.peer_id, cosmetics: msg.cosmetics }, ws);
+                    break;
+                }
+
                 case "room_create": {
                     if (!peerInfo) return;
                     const room_id = "room-" + crypto.randomUUID().slice(0, 16);
@@ -473,6 +481,7 @@ export class RelayRoom {
             is_bridge: p.is_bridge || false,
             ip: p.ip || null,
             geo: p.geo || null,
+            cosmetics: p.cosmetics || null,
         }));
     }
 

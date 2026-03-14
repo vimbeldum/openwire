@@ -920,12 +920,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     }
                 }
                 break;
-            case 'cosmetics_update':
-                // Store peer's equipped cosmetics for rendering their messages
-                if (msg.peer_id && msg.peer_id !== myIdRef.current && action.cosmetics) {
-                    peerCosmeticsRef.current = { ...peerCosmeticsRef.current, [msg.peer_id]: action.cosmetics };
-                }
-                break;
+            // cosmetics_update is handled via dedicated relay message (peer_cosmetics_update), not custom actions
         }
     }, [addMsg, addReaction, addTicker, updateWallet, amIHost, clearReadyPeers, startBlackjackTimer]);
 
@@ -989,6 +984,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 setConnected(true);
                 setPeers(msg.peers || []);
                 setRooms(msg.rooms || []);
+                // Load existing peers' cosmetics
+                for (const p of (msg.peers || [])) {
+                    if (p.cosmetics) peerCosmeticsRef.current[p.peer_id] = p.cosmetics;
+                }
                 addMsg('★', `Connected! Your ID: ${msg.peer_id}`, 'system');
                 addMsg('★', 'Type /help for commands.', 'system');
 
@@ -1010,7 +1009,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     const p = profile || (initialNick ? loadProfile(initialNick) : null);
                     if (p) {
                         const cos = getEquippedClasses(p);
-                        socket.sendChat(JSON.stringify({ type: 'cosmetics_update', cosmetics: cos }));
+                        socket.send({ type: 'cosmetics_update', cosmetics: cos });
                     }
                 }, 800);
                 // Fetch ban list and broadcast admin status if admin
@@ -1029,6 +1028,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 setPeers(prev => prev.map(p =>
                     p.peer_id === msg.peer_id ? { ...p, balance: msg.balance } : p
                 ));
+                break;
+            case 'peer_cosmetics_update':
+                // Store peer's cosmetics for rendering their chat messages
+                if (msg.peer_id && msg.cosmetics) {
+                    peerCosmeticsRef.current = { ...peerCosmeticsRef.current, [msg.peer_id]: msg.cosmetics };
+                }
                 break;
             case 'peer_joined':
                 setPeers(prev => [...prev.filter(p => p.peer_id !== msg.peer_id), { peer_id: msg.peer_id, nick: msg.nick, is_admin: msg.is_admin || false, is_bridge: msg.is_bridge || false, ip: msg.ip || null, geo: msg.geo || null }]);
@@ -1055,7 +1060,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma', 'cosmetics_update'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma'];
                         if (CUSTOM.includes(parsed.type)) msgCustom = parsed;
                     } catch { /* not JSON */ }
                 }
@@ -1114,7 +1119,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (!isBjMsg && !isRlMsg && !isAbMsg && !isPmMsg && !isGameMsg && msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma', 'cosmetics_update'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma'];
                         if (CUSTOM.includes(parsed.type)) customAction = parsed;
                     } catch { /* not JSON */ }
                 }
@@ -2587,14 +2592,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                             setProfile(prev => { saveProfile(result.profile); return result.profile; });
                             // Broadcast updated cosmetics to all peers
                             const cos = getEquippedClasses(result.profile);
-                            socket.sendChat(JSON.stringify({ type: 'cosmetics_update', cosmetics: cos }));
+                            socket.send({ type: 'cosmetics_update', cosmetics: cos });
                         }
                     }}
                     onUnequip={(category) => {
                         const updated = unequipItem(profile, category);
                         setProfile(prev => { saveProfile(updated); return updated; });
                         const cos = getEquippedClasses(updated);
-                        socket.sendChat(JSON.stringify({ type: 'cosmetics_update', cosmetics: cos }));
+                        socket.send({ type: 'cosmetics_update', cosmetics: cos });
                     }}
                 />
             )}
