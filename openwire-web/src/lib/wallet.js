@@ -167,7 +167,7 @@ export function credit(wallet, amount, reason = 'Winnings', isAdminGrant = false
             },
         ],
     };
-    saveWallet(updated);
+    saveWalletSync(updated);
     return updated;
 }
 
@@ -182,7 +182,7 @@ export function adminAdjust(wallet, delta, reason = 'Admin adjustment') {
             { time: Date.now(), reason, amount: delta, balance: wallet.baseBalance + bonus },
         ],
     };
-    saveWallet(updated);
+    saveWalletSync(updated);
     return updated;
 }
 
