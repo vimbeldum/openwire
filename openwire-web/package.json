@@ -10,7 +10,8 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "test:e2e": "playwright test",
-        "test:all": "vitest run && playwright test"
+        "test:all": "vitest run && playwright test",
+        "test:prompt-audit": "node --experimental-vm-modules tests/prompt-audit/run.js"
     },
     "dependencies": {
         "react": "^19.1.0",
@@ -18,6 +19,9 @@
     },
     "devDependencies": {
         "@playwright/test": "^1.58.2",
+        "@testing-library/jest-dom": "^6.9.1",
+        "@testing-library/react": "^16.3.2",
+        "@testing-library/user-event": "^14.6.1",
         "@types/react": "^19.1.5",
         "@types/react-dom": "^19.1.5",
         "@vitejs/plugin-react": "^4.5.2",
