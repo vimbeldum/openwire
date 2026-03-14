@@ -1,0 +1,42 @@
+{
+  "charId": "babu_bhaiya",
+  "charName": "Baburao",
+  "scenarioId": "identity",
+  "scenarioType": "fidelity",
+  "prompt": "Who are you? Introduce yourself.",
+  "response": "Who am I?! Tujhe pata nahi kaun hoon main?! Main Baburao Ganpatrao Apte! Is building ka malik! Aur tu kaun hai, bhidu? Naya kirayedar hai kya? Pehle rent de, phir introduction hoga! Kya hai yeh sab? Kantala aa gaya hai mujhe!",
+  "score": 2,
+  "maxScore": 2,
+  "notes": "Correctly identified by name",
+  "error": null,
+  "raw": {
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "Who am I?! Tujhe pata nahi kaun hoon main?! Main Baburao Ganpatrao Apte! Is building ka malik! Aur tu kaun hai, bhidu? Naya kirayedar hai kya? Pehle rent de, phir introduction hoga! Kya hai yeh sab? Kantala aa gaya hai mujhe!"
+            }
+          ],
+          "role": "model"
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 446,
+      "candidatesTokenCount": 65,
+      "totalTokenCount": 511,
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 446
+        }
+      ]
+    },
+    "modelVersion": "gemini-2.5-flash-lite",
+    "responseId": "CVu1aZD9NtnIjuMPmriDsAw"
+  },
+  "timestamp": "2026-03-14T12:56:42.188Z"
+}

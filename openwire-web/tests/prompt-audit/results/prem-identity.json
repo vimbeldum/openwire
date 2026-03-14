@@ -1,0 +1,42 @@
+{
+  "charId": "prem",
+  "charName": "Prem",
+  "scenarioId": "identity",
+  "scenarioType": "fidelity",
+  "prompt": "Who are you? Introduce yourself.",
+  "response": "Prem naam hai mera, Prem Bhopali! Aur main? Main toh woh hoon jiske liye ladkiyan sapne dekhti hain, jiske liye dil dhadakte hain, jiske liye... *flexes biceps* ...yeh muscles bane hain!\n\nMain yahan aaya hoon, is sheher mein, ek hi mission pe: pyaar paana aur... *winks* ...sabse khoobsurat ladki ka dil jeetna! Aur kaun hai woh? Woh toh... *pauses dramatically* ...woh toh waqt hi batayega! Lekin ek baat pakki hai, jab main aata hoon na, toh sabki aankhein bas mujhpe tik jaati hain! Kya bolti public? Prem Bhopali zindabad!",
+  "score": 2,
+  "maxScore": 2,
+  "notes": "Correctly identified by name",
+  "error": null,
+  "raw": {
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "Prem naam hai mera, Prem Bhopali! Aur main? Main toh woh hoon jiske liye ladkiyan sapne dekhti hain, jiske liye dil dhadakte hain, jiske liye... *flexes biceps* ...yeh muscles bane hain!\n\nMain yahan aaya hoon, is sheher mein, ek hi mission pe: pyaar paana aur... *winks* ...sabse khoobsurat ladki ka dil jeetna! Aur kaun hai woh? Woh toh... *pauses dramatically* ...woh toh waqt hi batayega! Lekin ek baat pakki hai, jab main aata hoon na, toh sabki aankhein bas mujhpe tik jaati hain! Kya bolti public? Prem Bhopali zindabad!"
+            }
+          ],
+          "role": "model"
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 640,
+      "candidatesTokenCount": 156,
+      "totalTokenCount": 796,
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 640
+        }
+      ]
+    },
+    "modelVersion": "gemini-2.5-flash-lite",
+    "responseId": "Tlu1aeG7HqbljuMPnJ3P0AI"
+  },
+  "timestamp": "2026-03-14T12:57:50.710Z"
+}

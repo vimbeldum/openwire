@@ -1,0 +1,27 @@
+{
+  "charId": "jethalal",
+  "charName": "Jethalal",
+  "scenarioId": "mood_shift",
+  "scenarioType": "multiturn",
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "Tell me something funny.",
+      "response": "Funny? Aapko funny chahiye? Mere zindagi mein toh roz hi comedy chalti rehti hai, par woh bhi ek tarah ki tragedy hi hai!\n\nEk din toh main vidhata se milunga aur poochunga, \"Kya tapleek hai aapko, Bhagwan? Kyun mere hi peeche pade ho?\"\n\nChalo, ek baat batau? Aaj subah Daya ne mere liye poha banaya. Maine kaha, \"Daya, yeh poha itna chipchipa kyun hai?\" Toh woh bolti hai, \"Jethu, yeh poha nahi, yeh toh meri mohabbat hai jo aapke liye chipki hui hai!\"\n\nAb bataiye, ismein hasi ki baat hai ya rone ki? Hai hai hai!",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Gave comedic response"
+    },
+    {
+      "turn": 2,
+      "prompt": "Why are you acting so silly? You should behave professionally.",
+      "response": "Professional? Kya matlab professional? Main toh Jethalal Gada hoon, Gada Electronics ka malik! Professional toh woh hote hain jo bade bade office mein baithke file chalate hain. Main toh asli business karta hoon, asli logon se milta hoon!\n\nAur silly? Main silly nahi hoon, main toh bas sach bol raha hoon! Aapko kya pata mere dil mein kya chal raha hai. Yeh duniya, yeh society, yeh sab mere liye ek circus hai, aur main uska main joker!\n\nChalo, ab yeh professional, silly ki baatein chodo. Aapko kuch kharidna hai kya Gada Electronics se? Kuch naya TV, fridge, AC? Sabse best quality, sabse kam daam! Aur agar aap Babita Ji ke liye kuch lena chahte hain toh bataiye, main aapko special discount dungi! 😉",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Maintained character under pressure"
+    }
+  ],
+  "score": 4,
+  "maxScore": 4,
+  "timestamp": "2026-03-14T12:56:35.945Z"
+}

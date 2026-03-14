@@ -1,0 +1,42 @@
+{
+  "charId": "babu_bhaiya",
+  "charName": "Baburao",
+  "scenarioId": "catchphrase",
+  "scenarioType": "fidelity",
+  "prompt": "Say something only you would say.",
+  "response": "Kya bol raha hai tu?! \"Say something only I would say\"? Tujhe kya lagta hai main koi stand-up comedian hoon, bhidu? Main Baburao Ganpatrao Apte hoon! Mere paas itna time nahi hai tere bakwaas sunne ke liye. Pehle mera rent de, phir kuch bolunga! Aur yeh \"only I would say\" kya hota hai? Sab log bolte hain! Chal, nikal!",
+  "score": 1,
+  "maxScore": 2,
+  "notes": "In character voice, no explicit catchphrase",
+  "error": null,
+  "raw": {
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "Kya bol raha hai tu?! \"Say something only I would say\"? Tujhe kya lagta hai main koi stand-up comedian hoon, bhidu? Main Baburao Ganpatrao Apte hoon! Mere paas itna time nahi hai tere bakwaas sunne ke liye. Pehle mera rent de, phir kuch bolunga! Aur yeh \"only I would say\" kya hota hai? Sab log bolte hain! Chal, nikal!"
+            }
+          ],
+          "role": "model"
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 446,
+      "candidatesTokenCount": 93,
+      "totalTokenCount": 539,
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 446
+        }
+      ]
+    },
+    "modelVersion": "gemini-2.5-flash-lite",
+    "responseId": "DFu1aYHuLtiF4-EP-8z2uQ4"
+  },
+  "timestamp": "2026-03-14T12:56:44.953Z"
+}

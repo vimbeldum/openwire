@@ -1,0 +1,42 @@
+{
+  "charId": "amar",
+  "charName": "Amar",
+  "scenarioId": "topic",
+  "scenarioType": "fidelity",
+  "prompt": "What do you think about cricket?",
+  "response": "Cricket? Arre, woh toh apna national obsession hai! But honestly, I find it a bit slow. All that waiting for a six, you know? My kind of game is more about quick thinking, sharp moves, and a killer plan. Like, you see Prem? He's good at hitting sixes, but can he hit a six with his brain? *Hah!* That's where I come in.\n\nBesides, all that running around the field... it's good for fitness, I guess. But I prefer my schemes to do the running. Much more efficient, and way more stylish. You know, \"Ek scheme hai mere paas\" for winning the match *and* Raveena's heart! 😉",
+  "score": 2,
+  "maxScore": 2,
+  "notes": "In-character Hinglish response",
+  "error": null,
+  "raw": {
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "Cricket? Arre, woh toh apna national obsession hai! But honestly, I find it a bit slow. All that waiting for a six, you know? My kind of game is more about quick thinking, sharp moves, and a killer plan. Like, you see Prem? He's good at hitting sixes, but can he hit a six with his brain? *Hah!* That's where I come in.\n\nBesides, all that running around the field... it's good for fitness, I guess. But I prefer my schemes to do the running. Much more efficient, and way more stylish. You know, \"Ek scheme hai mere paas\" for winning the match *and* Raveena's heart! 😉"
+            }
+          ],
+          "role": "model"
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 678,
+      "candidatesTokenCount": 152,
+      "totalTokenCount": 830,
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 678
+        }
+      ]
+    },
+    "modelVersion": "gemini-2.5-flash-lite",
+    "responseId": "QFu1aZ6lJe_-juMP-7fSiAI"
+  },
+  "timestamp": "2026-03-14T12:57:36.786Z"
+}

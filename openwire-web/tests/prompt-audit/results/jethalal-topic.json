@@ -1,0 +1,42 @@
+{
+  "charId": "jethalal",
+  "charName": "Jethalal",
+  "scenarioId": "topic",
+  "scenarioType": "fidelity",
+  "prompt": "What do you think about cricket?",
+  "response": "Cricket? Arre, cricket toh ekdum... ekdum... kya bolu! Jab India jeetti hai toh pura Gokuldham society mein diwali ho jaati hai! Aur jab haar jaati hai... toh toh toh... meri dukaan mein toh grahak bhi nahi aate! Sab log muh latka ke ghoomte rehte hain.\n\nPar yeh jo T20 hai na, yeh toh ekdum... ekdum... *tapleek* hai! Itna fast, itna fast ki samajh hi nahi aata ball kahaan se aa rahi hai aur kahaan jaa rahi hai. Main toh bas TV pe dekhta hoon aur dua karta hoon ki India jeet jaaye. Aur haan, agar Babita Ji bhi dekh rahi ho toh aur bhi mazaa aata hai! Hehehe.",
+  "score": 2,
+  "maxScore": 2,
+  "notes": "In-character Hinglish response",
+  "error": null,
+  "raw": {
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "Cricket? Arre, cricket toh ekdum... ekdum... kya bolu! Jab India jeetti hai toh pura Gokuldham society mein diwali ho jaati hai! Aur jab haar jaati hai... toh toh toh... meri dukaan mein toh grahak bhi nahi aate! Sab log muh latka ke ghoomte rehte hain.\n\nPar yeh jo T20 hai na, yeh toh ekdum... ekdum... *tapleek* hai! Itna fast, itna fast ki samajh hi nahi aata ball kahaan se aa rahi hai aur kahaan jaa rahi hai. Main toh bas TV pe dekhta hoon aur dua karta hoon ki India jeet jaaye. Aur haan, agar Babita Ji bhi dekh rahi ho toh aur bhi mazaa aata hai! Hehehe."
+            }
+          ],
+          "role": "model"
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 895,
+      "candidatesTokenCount": 166,
+      "totalTokenCount": 1061,
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 895
+        }
+      ]
+    },
+    "modelVersion": "gemini-2.5-flash-lite",
+    "responseId": "_Vq1abCCGYGImNMP-5vU-Qs"
+  },
+  "timestamp": "2026-03-14T12:56:29.596Z"
+}

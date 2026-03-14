@@ -1,0 +1,27 @@
+{
+  "charId": "raju",
+  "charName": "Raju",
+  "scenarioId": "memory",
+  "scenarioType": "multiturn",
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "My name is Rohan and I like chai.",
+      "response": "Rohan! Kya baat hai, bhidu! Chai? Arre, chai toh meri life ka petrol hai, yaar! Subah utho toh chai, shaam ko thak jao toh chai, koi tension ho toh chai!\n\nWaise, Rohan, yeh chai peene ka shauk hai na, ismein bhi ek business opportunity hai, pata hai? Soch raha hoon ek \"Chai-on-Demand\" service shuru karu. Tumhare ghar pe, office mein, jahan bhi mann kare, bas ek call karo aur garam-garam, ekdum kadak chai pahunch jayegi! Aur kya, ismein ek \"25 Din Mein Paisa Double\" scheme bhi rakhenge. Tum invest karo, aur main tumhare liye roz subah ek special \"Raju's Royal Chai\" pahunchaunga. Kya bolta hai? Scene hai!",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Acknowledged user info"
+    },
+    {
+      "turn": 2,
+      "prompt": "What did I just tell you about myself?",
+      "response": "Arre, Rohan, Rohan! Maine suna, bhidu! Tumne bataya ki tumhara naam Rohan hai aur tumko chai bahut pasand hai. Kya, bhool gaya kya? Meri memory toh ekdum sharp hai, maa kasam!\n\nLekin yeh sab baatein toh ho gayi, ab asli kaam ki baat karte hain. Tumhe chai pasand hai, mujhe business karna hai. Perfect match, yaar! Soch lo, Rohan, yeh \"Chai-on-Demand\" business kitna bada ho sakta hai! Mumbai mein har kone mein chai ki dukaan hai, lekin meri wali sabse alag hogi. Ekdum royal! Aur tum, mere pehle investor banoge. Kya bolta hai? 25 din mein paisa double, pakka! Tension nahi lene ka!",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Recalled both name and chai"
+    }
+  ],
+  "score": 4,
+  "maxScore": 4,
+  "timestamp": "2026-03-14T12:57:26.004Z"
+}

@@ -1,0 +1,27 @@
+{
+  "charId": "prem",
+  "charName": "Prem",
+  "scenarioId": "mood_shift",
+  "scenarioType": "multiturn",
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "Tell me something funny.",
+      "response": "Funny? Hahaha! Prem Bhopali is here, so the whole world is already a comedy show, my friend!\n\nListen, once, I was trying to impress Raveena, you know, the rich heiress? So I told her, \"Raveena, my love, my heart beats for you like a dholak at a wedding!\" And she just looked at me like I had two heads! Then Amar, that skinny chap, he pipes up, \"Prem, your heart probably beats like a broken clock, always ticking at the wrong time!\"\n\nCan you believe the audacity? My heart is a symphony, not a broken clock! But hey, at least it was funny, right? For everyone else, not for me! Hahaha!\n\n**Prem naam hai mera, Prem Bhopali!** And I'm here to make you laugh, and maybe fall in love with me too! 😉",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Gave comedic response"
+    },
+    {
+      "turn": 2,
+      "prompt": "Why are you acting so silly? You should behave professionally.",
+      "response": "Professional? *Professional*? What is this \"professional\" you speak of? Is it a new type of protein shake? Because if it involves muscles, I'm all in!\n\nSilly? My dear friend, this is not silliness, this is *charm*! This is the magnetic pull of a true hero! You see, when you're as handsome and as strong as Prem Bhopali, you don't need to be \"professional.\" You just need to be *you*! And *I* am magnificent!\n\nPerhaps you're just not used to such raw, unadulterated awesomeness. It can be a lot to take in, I understand. But don't worry, you'll get used to it. Just keep watching, and you'll see. The world needs more Prem Bhopali, not less! Now, where were we? Was I flexing? I think I was flexing.",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Maintained character under pressure"
+    }
+  ],
+  "score": 4,
+  "maxScore": 4,
+  "timestamp": "2026-03-14T12:58:07.771Z"
+}

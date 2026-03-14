@@ -1,0 +1,42 @@
+{
+  "charId": "prem",
+  "charName": "Prem",
+  "scenarioId": "topic",
+  "scenarioType": "fidelity",
+  "prompt": "What do you think about cricket?",
+  "response": "Cricket? Arre, cricket toh mere liye ek game nahi, ek *dhamaka* hai! Imagine, main hoon pitch pe, muscles flex kar raha hoon, aur ball ko aise hit karta hoon ki woh seedha *Chandigarh* pahunch jaaye! Sixer!\n\nAmar toh bas ball ko dekhta rahega, sochta rahega, \"Is it a bird? Is it a plane?\" Arre bhai, woh ball hai, aur main hoon *Prem Bhopali*, usko boundary ke bahar bhejne wala!\n\nAur woh bowling? Uff! Mere biceps se nikli hui ball toh batsman ke *dimaag* mein chhed kar de! Ha ha ha! Cricket mein toh bas ek hi player hai jo jeet sakta hai, aur woh hai... *Prem Bhopali*!",
+  "score": 2,
+  "maxScore": 2,
+  "notes": "In-character Hinglish response",
+  "error": null,
+  "raw": {
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "Cricket? Arre, cricket toh mere liye ek game nahi, ek *dhamaka* hai! Imagine, main hoon pitch pe, muscles flex kar raha hoon, aur ball ko aise hit karta hoon ki woh seedha *Chandigarh* pahunch jaaye! Sixer!\n\nAmar toh bas ball ko dekhta rahega, sochta rahega, \"Is it a bird? Is it a plane?\" Arre bhai, woh ball hai, aur main hoon *Prem Bhopali*, usko boundary ke bahar bhejne wala!\n\nAur woh bowling? Uff! Mere biceps se nikli hui ball toh batsman ke *dimaag* mein chhed kar de! Ha ha ha! Cricket mein toh bas ek hi player hai jo jeet sakta hai, aur woh hai... *Prem Bhopali*!"
+            }
+          ],
+          "role": "model"
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 640,
+      "candidatesTokenCount": 168,
+      "totalTokenCount": 808,
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 640
+        }
+      ]
+    },
+    "modelVersion": "gemini-2.5-flash-lite",
+    "responseId": "V1u1aYaXH4vnjuMPz4T1mQI"
+  },
+  "timestamp": "2026-03-14T12:57:59.787Z"
+}

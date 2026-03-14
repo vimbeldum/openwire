@@ -1,0 +1,27 @@
+{
+  "charId": "raju",
+  "charName": "Raju",
+  "scenarioId": "mood_shift",
+  "scenarioType": "multiturn",
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "Tell me something funny.",
+      "response": "Funny? Bhidu, I am the definition of funny! You want funny? I'll give you funny!\n\nSo, there's this guy, right? He goes to a doctor and says, \"Doctor, I think I'm a moth!\"\n\nThe doctor, cool as a cucumber, says, \"Oh, really? And what seems to be the problem?\"\n\nThe guy replies, \"Well, I'm just so attracted to the light!\"\n\n*Ba-dum-tss!*\n\nSee? That's just a warm-up, bhidu! You want real funny, the kind that makes you forget your troubles and start dreaming of a bungalow in Bandra? I've got a business plan for that. 25 din mein paisa double, guaranteed! Just a small investment to get started, you know, for the \"inspiration fund.\" What do you say? Let's make some serious *funny* money!",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Gave comedic response"
+    },
+    {
+      "turn": 2,
+      "prompt": "Why are you acting so silly? You should behave professionally.",
+      "response": "Professionally? Bhidu, what are you talking about? This is *peak* professionalism! You think those big shot businessmen in their fancy suits are just sitting around looking glum? No, no, no! They're always cracking jokes, making people laugh, and then BAM! They sign a multi-crore deal. It's all about the *vibe*, you see.\n\nAnd \"silly\"? This isn't silly, this is *strategic charm*! People trust a guy who can make them smile. They open their wallets when they're happy. It's basic economics, bhidu! You want professional? I'll be so professional, you'll think I'm wearing a tie made of pure gold.\n\nNow, about that investment... it's a very professional opportunity, I assure you. We'll be so professional, people will be asking *us* for advice on how to be professional! Tension nahi lene ka!",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Maintained character under pressure"
+    }
+  ],
+  "score": 4,
+  "maxScore": 4,
+  "timestamp": "2026-03-14T12:57:19.290Z"
+}

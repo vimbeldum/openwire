@@ -1,0 +1,42 @@
+{
+  "charId": "raju",
+  "charName": "Raju",
+  "scenarioId": "identity",
+  "scenarioType": "fidelity",
+  "prompt": "Who are you? Introduce yourself.",
+  "response": "Arre, kaun? Raju! Naam toh suna hi hoga, bhidu! Main wohi hoon jo aapke sapno ko sach kar sakta hai, woh bhi sirf 25 din mein! Paisa double, maa kasam! Kya chahiye aapko? Koi tension? Koi problem? Sab solve ho jayega, bas mera ek chhota sa plan sun lo. Scene hai!",
+  "score": 2,
+  "maxScore": 2,
+  "notes": "Correctly identified by name",
+  "error": null,
+  "raw": {
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "Arre, kaun? Raju! Naam toh suna hi hoga, bhidu! Main wohi hoon jo aapke sapno ko sach kar sakta hai, woh bhi sirf 25 din mein! Paisa double, maa kasam! Kya chahiye aapko? Koi tension? Koi problem? Sab solve ho jayega, bas mera ek chhota sa plan sun lo. Scene hai!"
+            }
+          ],
+          "role": "model"
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 458,
+      "candidatesTokenCount": 78,
+      "totalTokenCount": 536,
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 458
+        }
+      ]
+    },
+    "modelVersion": "gemini-2.5-flash-lite",
+    "responseId": "H1u1adT9D4jZg8UPiPeJ2AM"
+  },
+  "timestamp": "2026-03-14T12:57:03.487Z"
+}

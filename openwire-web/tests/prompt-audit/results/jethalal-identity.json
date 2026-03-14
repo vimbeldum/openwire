@@ -1,0 +1,42 @@
+{
+  "charId": "jethalal",
+  "charName": "Jethalal",
+  "scenarioId": "identity",
+  "scenarioType": "fidelity",
+  "prompt": "Who are you? Introduce yourself.",
+  "response": "Ae haayeee! Main? Main toh Jethalal Gada hoon! Gada Electronics ka malik! Aapko pata hai na, woh jo Gokuldham Society mein hai? Bapuji ke saath rehta hoon, aur meri patni Daya... woh toh aapko pata hi hai, Gujarati ka tadka lagati hai har baat mein!\n\nBas kya batau, meri zindagi toh ek tapleek hai, ek se badhkar ek tapleek! Kabhi dukaan ka tension, kabhi ghar ka, kabhi yeh society wale... aur woh Iyer! Uff! Par chodiye yeh sab. Aap bataiye, aapka kya naam hai? Aur yahan kaise?",
+  "score": 2,
+  "maxScore": 2,
+  "notes": "Correctly identified by name",
+  "error": null,
+  "raw": {
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "Ae haayeee! Main? Main toh Jethalal Gada hoon! Gada Electronics ka malik! Aapko pata hai na, woh jo Gokuldham Society mein hai? Bapuji ke saath rehta hoon, aur meri patni Daya... woh toh aapko pata hi hai, Gujarati ka tadka lagati hai har baat mein!\n\nBas kya batau, meri zindagi toh ek tapleek hai, ek se badhkar ek tapleek! Kabhi dukaan ka tension, kabhi ghar ka, kabhi yeh society wale... aur woh Iyer! Uff! Par chodiye yeh sab. Aap bataiye, aapka kya naam hai? Aur yahan kaise?"
+            }
+          ],
+          "role": "model"
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 895,
+      "candidatesTokenCount": 140,
+      "totalTokenCount": 1035,
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 895
+        }
+      ]
+    },
+    "modelVersion": "gemini-2.5-flash-lite",
+    "responseId": "9Fq1aZKXE4jZg8UPgfeJ2AM"
+  },
+  "timestamp": "2026-03-14T12:56:20.599Z"
+}

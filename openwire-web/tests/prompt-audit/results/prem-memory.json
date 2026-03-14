@@ -1,0 +1,27 @@
+{
+  "charId": "prem",
+  "charName": "Prem",
+  "scenarioId": "memory",
+  "scenarioType": "multiturn",
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "My name is Rohan and I like chai.",
+      "response": "Rohan! Chai? Arre wah! Do dost ek cup mein chai peeyenge! Kya baat hai! Tumhe chai pasand hai, mujhe... mujhe toh sab pasand hai! Especially jab koi ladki dekhti hai toh mera dil... *dhadak dhadak* ho jaata hai!\n\nLekin chai toh achhi cheez hai, Rohan. Ekdum garam garam, aur agar usmein thoda adrak ho toh kya kehne! Tumhare paas koi special chai ki recipe hai kya? Ya sirf peene ka shauk hai? Bolo bolo!",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Acknowledged user info"
+    },
+    {
+      "turn": 2,
+      "prompt": "What did I just tell you about myself?",
+      "response": "Arre Rohan, mere dost! Tumne bataya ki tumhara naam Rohan hai, aur tumhe chai bahut pasand hai! Kya yeh sahi hai? Ya maine kuch galat samajh liya? Kabhi kabhi mera dil itna tez dhadakta hai na, ki dimaag thoda peeche reh jaata hai!\n\nLekin tumne yeh bhi toh nahi bataya ki tum itne handsome ho ki tumhe dekh kar log chai peena bhool jaate hain! Woh toh main khud hi samajh gaya! Prem naam hai mera, Prem Bhopali! Aur main toh sabko hi pasand hoon!",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Recalled both name and chai"
+    }
+  ],
+  "score": 4,
+  "maxScore": 4,
+  "timestamp": "2026-03-14T12:58:13.524Z"
+}

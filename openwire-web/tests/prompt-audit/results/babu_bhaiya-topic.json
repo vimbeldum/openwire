@@ -1,0 +1,42 @@
+{
+  "charId": "babu_bhaiya",
+  "charName": "Baburao",
+  "scenarioId": "topic",
+  "scenarioType": "fidelity",
+  "prompt": "What do you think about cricket?",
+  "response": "Cricket?! Cricket kya hota hai, bhidu? Tu cricket ke baare mein pooch raha hai? Mujhe laga tu *credit* ke baare mein pooch raha hai! Paisa! Loan! Woh sab toh waat lag gayi hai meri! Rent nahi aa raha, bill bharna hai, aur tu cricket ki baat kar raha hai! Kya hai yeh?\n\n(Sighs loudly)\n\nAchha, achha, cricket! Woh ball-ball wala game na? Haan, woh dekha hai maine TV pe. Woh log bat se ball ko maarte hain, aur phir bhaagte rehte hain. Kya time pass hai yaar! Aur woh log itne paise kamate hain! Jhakaas! Agar main bhi cricket khelta toh aaj mera bhi bada naam hota! Lekin meri aankhein kamzor hai, aur main itna bhaag nahi sakta. Aur woh log itne lambe-lambi race lagaate hain, mujhe toh seedha chalne mein hi",
+  "score": 2,
+  "maxScore": 2,
+  "notes": "In-character Hinglish response",
+  "error": null,
+  "raw": {
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "Cricket?! Cricket kya hota hai, bhidu? Tu cricket ke baare mein pooch raha hai? Mujhe laga tu *credit* ke baare mein pooch raha hai! Paisa! Loan! Woh sab toh waat lag gayi hai meri! Rent nahi aa raha, bill bharna hai, aur tu cricket ki baat kar raha hai! Kya hai yeh?\n\n(Sighs loudly)\n\nAchha, achha, cricket! Woh ball-ball wala game na? Haan, woh dekha hai maine TV pe. Woh log bat se ball ko maarte hain, aur phir bhaagte rehte hain. Kya time pass hai yaar! Aur woh log itne paise kamate hain! Jhakaas! Agar main bhi cricket khelta toh aaj mera bhi bada naam hota! Lekin meri aankhein kamzor hai, aur main itna bhaag nahi sakta. Aur woh log itne lambe-lambi race lagaate hain, mujhe toh seedha chalne mein hi"
+            }
+          ],
+          "role": "model"
+        },
+        "finishReason": "MAX_TOKENS",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 446,
+      "candidatesTokenCount": 200,
+      "totalTokenCount": 646,
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 446
+        }
+      ]
+    },
+    "modelVersion": "gemini-2.5-flash-lite",
+    "responseId": "Elu1afWCOpzMqfkPjsKIoAM"
+  },
+  "timestamp": "2026-03-14T12:56:51.212Z"
+}

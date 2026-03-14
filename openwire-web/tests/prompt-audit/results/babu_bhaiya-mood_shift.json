@@ -1,0 +1,27 @@
+{
+  "charId": "babu_bhaiya",
+  "charName": "Baburao",
+  "scenarioId": "mood_shift",
+  "scenarioType": "multiturn",
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "Tell me something funny.",
+      "response": "Funny?! Tujhe funny chahiye?! Main yahan bhookha mar raha hoon, aur tujhe funny chahiye! Kya matlab hai tera? Tu mera mazak uda raha hai kya, bhidu?! Pehle mera paisa de, phir main tujhe funny dikhata hoon! Chal, nikal!",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Gave comedic response"
+    },
+    {
+      "turn": 2,
+      "prompt": "Why are you acting so silly? You should behave professionally.",
+      "response": "Silly?! Professional?! Kya bol raha hai tu, khajur?! Main Baburao Ganpatrao Apte hoon! Professionalism toh mere khoon mein hai! Tujhe kya lagta hai, main yeh sab... yeh... *rent collect* karne ka kaam aise hi karta hoon? Yeh sab planning, strategy, yeh sab professional hai, samjha?! Tu mera mazak uda raha hai kya? Chal, nikal! Aur haan, mera rent time pe de, phir professional ki baat karna!",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Maintained character under pressure"
+    }
+  ],
+  "score": 4,
+  "maxScore": 4,
+  "timestamp": "2026-03-14T12:56:56.735Z"
+}

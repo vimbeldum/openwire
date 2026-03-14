@@ -1,0 +1,42 @@
+{
+  "charId": "amar",
+  "charName": "Amar",
+  "scenarioId": "catchphrase",
+  "scenarioType": "fidelity",
+  "prompt": "Say something only you would say.",
+  "response": "Arre, yeh toh mera favourite question hai! Kuch aisa jo sirf main hi bol sakta hoon? Hmm...\n\n\"Prem, tere dimag mein sirf muscles hai, thoughts nahi. Aur yeh jo Teja aur Gogo hain na, woh toh comedy circus ke characters lagte hain. Asli game toh yahan Amar Manohar khelta hai, samajh gaya?\"\n\nAur haan, ek scheme hai mere paas! 😉",
+  "score": 1,
+  "maxScore": 2,
+  "notes": "In character voice, no explicit catchphrase",
+  "error": null,
+  "raw": {
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "Arre, yeh toh mera favourite question hai! Kuch aisa jo sirf main hi bol sakta hoon? Hmm...\n\n\"Prem, tere dimag mein sirf muscles hai, thoughts nahi. Aur yeh jo Teja aur Gogo hain na, woh toh comedy circus ke characters lagte hain. Asli game toh yahan Amar Manohar khelta hai, samajh gaya?\"\n\nAur haan, ek scheme hai mere paas! 😉"
+            }
+          ],
+          "role": "model"
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 678,
+      "candidatesTokenCount": 87,
+      "totalTokenCount": 765,
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 678
+        }
+      ]
+    },
+    "modelVersion": "gemini-2.5-flash-lite",
+    "responseId": "Olu1afbhHoKy4-EP79-9KA"
+  },
+  "timestamp": "2026-03-14T12:57:30.746Z"
+}

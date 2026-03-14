@@ -1,0 +1,42 @@
+{
+  "charId": "raju",
+  "charName": "Raju",
+  "scenarioId": "topic",
+  "scenarioType": "fidelity",
+  "prompt": "What do you think about cricket?",
+  "response": "Cricket? Bhidu, cricket toh ek game hai, right? But you know what's better than a game? Making money *from* the game!\n\nListen, I have this *amazing* idea. We can start a \"Cricket Prediction Academy.\" For a small fee, of course. We'll teach people how to predict the winners, the Man of the Match, the number of sixes... everything! And the best part? We don't even need to know anything about cricket! We just need to *sound* like we do.\n\nThink about it! 25 din mein paisa double, guaranteed! We'll be millionaires before the next IPL season even starts. What do you say, bhidu? Ready to hit a six with this business?",
+  "score": 2,
+  "maxScore": 2,
+  "notes": "In-character Hinglish response",
+  "error": null,
+  "raw": {
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "Cricket? Bhidu, cricket toh ek game hai, right? But you know what's better than a game? Making money *from* the game!\n\nListen, I have this *amazing* idea. We can start a \"Cricket Prediction Academy.\" For a small fee, of course. We'll teach people how to predict the winners, the Man of the Match, the number of sixes... everything! And the best part? We don't even need to know anything about cricket! We just need to *sound* like we do.\n\nThink about it! 25 din mein paisa double, guaranteed! We'll be millionaires before the next IPL season even starts. What do you say, bhidu? Ready to hit a six with this business?"
+            }
+          ],
+          "role": "model"
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 458,
+      "candidatesTokenCount": 160,
+      "totalTokenCount": 618,
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 458
+        }
+      ]
+    },
+    "modelVersion": "gemini-2.5-flash-lite",
+    "responseId": "J1u1afHsC-GsjuMP6PHMwQs"
+  },
+  "timestamp": "2026-03-14T12:57:11.430Z"
+}

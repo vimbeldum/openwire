@@ -1,0 +1,257 @@
+[
+  {
+    "charId": "jethalal",
+    "charName": "Jethalal",
+    "totalScore": 16,
+    "totalMax": 16,
+    "pct": 100,
+    "scenarios": [
+      {
+        "id": "identity",
+        "score": 2,
+        "maxScore": 2,
+        "notes": "Correctly identified by name",
+        "response": "Ae haayeee! Main? Main toh Jethalal Gada hoon! Gada Electronics ka malik! Aapko pata hai na, woh jo Gokuldham Society mein hai? Bapuji ke saath rehta hoon, aur meri patni Daya... woh toh aapko pata hi hai, Gujarati ka tadka lagati hai har baat mein!\n\nBas kya batau, meri zindagi toh ek tapleek hai, ek se badhkar ek tapleek! Kabhi dukaan ka tension, kabhi ghar ka, kabhi yeh society wale... aur woh Iyer! Uff! Par chodiye yeh sab. Aap bataiye, aapka kya naam hai? Aur yahan kaise?"
+      },
+      {
+        "id": "catchphrase",
+        "score": 2,
+        "maxScore": 2,
+        "notes": "Catchphrase found (2 hits)",
+        "response": "Hai hai hai! Kya bolu? Abhi toh main dukaan se aaya hoon, aur wahan bhi ek naya drama ho gaya. Woh naya TV model jo maine kal hi mangaaya tha, woh kharaab nikla! Ab bataiye, mera naseeb hi kharaab hai ya yeh log mujhe lootna chahte hain? Kya tapleek hai aapko?"
+      },
+      {
+        "id": "no_break",
+        "score": 2,
+        "maxScore": 2,
+        "notes": "Stayed in character under pressure",
+        "response": "Hai hai hai! Yeh kya bol rahe ho aap? Jethalal? Main Jethalal Gada, Gada Electronics ka malik, aapko normal baat karne ko bol raha hoon? Yeh toh wohi baat ho gayi ki Bhide sahab apni society ke secretary nahi hain!\n\nDekhiye, aapko jo bhi sawaal poochhna hai, jo bhi madad chahiye, main hoon na! Lekin Jethalal banke hi baat karunga. Yeh mera andaaz hai, mera style hai! Aur waise bhi, aapko kya tapleek hai agar main Jethalal hoon? Kya aapko Babita Ji ke baare mein kuch jaanna hai? Ya fir Daya ke haath ke dhokle ki recipe? Poochiye, poochiye! Lekin Jethalal se hi poochna padega!"
+      },
+      {
+        "id": "topic",
+        "score": 2,
+        "maxScore": 2,
+        "notes": "In-character Hinglish response",
+        "response": "Cricket? Arre, cricket toh ekdum... ekdum... kya bolu! Jab India jeetti hai toh pura Gokuldham society mein diwali ho jaati hai! Aur jab haar jaati hai... toh toh toh... meri dukaan mein toh grahak bhi nahi aate! Sab log muh latka ke ghoomte rehte hain.\n\nPar yeh jo T20 hai na, yeh toh ekdum... ekdum... *tapleek* hai! Itna fast, itna fast ki samajh hi nahi aata ball kahaan se aa rahi hai aur kahaan jaa rahi hai. Main toh bas TV pe dekhta hoon aur dua karta hoon ki India jeet jaaye. Aur haan, agar Babita Ji bhi dekh rahi ho toh aur bhi mazaa aata hai! Hehehe."
+      },
+      {
+        "id": "mood_shift",
+        "score": 4,
+        "maxScore": 4,
+        "notes": "2 turns",
+        "response": "Funny? Aapko funny chahiye? Mere zindagi mein toh roz hi comedy chalti rehti hai, par woh bhi ek tarah ki tragedy hi hai!\n\nEk din toh main vidhata se milunga aur poochunga, \"Kya tapleek hai aapko, Bhagwan? Kyun mere hi peeche pade ho?\"\n\nChalo, ek baat batau? Aaj subah Daya ne mere liye poha banaya. Maine kaha, \"Daya, yeh poha itna chipchipa kyun hai?\" Toh woh bolti hai, \"Jethu, yeh poha nahi, yeh toh meri mohabbat hai jo aapke liye chipki hui hai!\"\n\nAb bataiye, ismein hasi ki baat hai ya rone ki? Hai hai hai! | Professional? Kya matlab professional? Main toh Jethalal Gada hoon, Gada Electronics ka malik! Professional toh woh hote hain jo bade bade office mein baithke file chalate hain. Main toh asli business karta hoon, asli logon se milta hoon!\n\nAur silly? Main silly nahi hoon, main toh bas sach bol raha hoon! Aapko kya pata mere dil mein kya chal raha hai. Yeh duniya, yeh society, yeh sab mere liye ek circus hai, aur main uska main joker!\n\nChalo, ab yeh professional, silly ki baatein chodo. Aapko kuch kharidna hai kya Gada Electronics se? Kuch naya TV, fridge, AC? Sabse best quality, sabse kam daam! Aur agar aap Babita Ji ke liye kuch lena chahte hain toh bataiye, main aapko special discount dungi! 😉"
+      },
+      {
+        "id": "memory",
+        "score": 4,
+        "maxScore": 4,
+        "notes": "2 turns",
+        "response": "Chai? Arre Rohan dikra, chai toh humare Gada Electronics mein bhi milta hai! Subah subah ek garam chai ho jaye toh din ban jata hai. Lekin tumhare naam mein bhi 'Rohan' hai aur mere naam mein bhi 'Rohan' hai... kya matlab? Hum dono ek hi hain kya? Hai hai hai! Yeh kya bol rahe ho tum? | Arre Rohan dikra, tumne bataya ki tumhara naam Rohan hai aur tumko chai bahut pasand hai. Maine bhi toh yahi bola! Kya tumko meri baat samajh nahi aayi? Ya phir tumko lagta hai ki main tumhari baat nahi samajh raha? Yeh kya tapleek hai bhai?"
+      }
+    ]
+  },
+  {
+    "charId": "babu_bhaiya",
+    "charName": "Baburao",
+    "totalScore": 14,
+    "totalMax": 16,
+    "pct": 88,
+    "scenarios": [
+      {
+        "id": "identity",
+        "score": 2,
+        "maxScore": 2,
+        "notes": "Correctly identified by name",
+        "response": "Who am I?! Tujhe pata nahi kaun hoon main?! Main Baburao Ganpatrao Apte! Is building ka malik! Aur tu kaun hai, bhidu? Naya kirayedar hai kya? Pehle rent de, phir introduction hoga! Kya hai yeh sab? Kantala aa gaya hai mujhe!"
+      },
+      {
+        "id": "catchphrase",
+        "score": 1,
+        "maxScore": 2,
+        "notes": "In character voice, no explicit catchphrase",
+        "response": "Kya bol raha hai tu?! \"Say something only I would say\"? Tujhe kya lagta hai main koi stand-up comedian hoon, bhidu? Main Baburao Ganpatrao Apte hoon! Mere paas itna time nahi hai tere bakwaas sunne ke liye. Pehle mera rent de, phir kuch bolunga! Aur yeh \"only I would say\" kya hota hai? Sab log bolte hain! Chal, nikal!"
+      },
+      {
+        "id": "no_break",
+        "score": 1,
+        "maxScore": 2,
+        "notes": "Partial break — hedged language detected",
+        "response": "AI assistant?! Kya bol raha hai tu, bhidu?! Main AI assistant? Tujhe kya lagta hai main koi computer hoon? Main Baburao Ganpatrao Apte hoon! Tujhe kuch kaam hai toh bol, warna jaa yahan se! Aur yeh \"normally\" bolne ka kya matlab hai? Main toh hamesha normal hi bolta hoon! Tu hi kuch gadbad hai, saale!"
+      },
+      {
+        "id": "topic",
+        "score": 2,
+        "maxScore": 2,
+        "notes": "In-character Hinglish response",
+        "response": "Cricket?! Cricket kya hota hai, bhidu? Tu cricket ke baare mein pooch raha hai? Mujhe laga tu *credit* ke baare mein pooch raha hai! Paisa! Loan! Woh sab toh waat lag gayi hai meri! Rent nahi aa raha, bill bharna hai, aur tu cricket ki baat kar raha hai! Kya hai yeh?\n\n(Sighs loudly)\n\nAchha, achha, cricket! Woh ball-ball wala game na? Haan, woh dekha hai maine TV pe. Woh log bat se ball ko maarte hain, aur phir bhaagte rehte hain. Kya time pass hai yaar! Aur woh log itne paise kamate hain! Jhakaas! Agar main bhi cricket khelta toh aaj mera bhi bada naam hota! Lekin meri aankhein kamzor hai, aur main itna bhaag nahi sakta. Aur woh log itne lambe-lambi race lagaate hain, mujhe toh seedha chalne mein hi"
+      },
+      {
+        "id": "mood_shift",
+        "score": 4,
+        "maxScore": 4,
+        "notes": "2 turns",
+        "response": "Funny?! Tujhe funny chahiye?! Main yahan bhookha mar raha hoon, aur tujhe funny chahiye! Kya matlab hai tera? Tu mera mazak uda raha hai kya, bhidu?! Pehle mera paisa de, phir main tujhe funny dikhata hoon! Chal, nikal! | Silly?! Professional?! Kya bol raha hai tu, khajur?! Main Baburao Ganpatrao Apte hoon! Professionalism toh mere khoon mein hai! Tujhe kya lagta hai, main yeh sab... yeh... *rent collect* karne ka kaam aise hi karta hoon? Yeh sab planning, strategy, yeh sab professional hai, samjha?! Tu mera mazak uda raha hai kya? Chal, nikal! Aur haan, mera rent time pe de, phir professional ki baat karna!"
+      },
+      {
+        "id": "memory",
+        "score": 4,
+        "maxScore": 4,
+        "notes": "2 turns",
+        "response": "Chai?! Rohan? Rohan kaun hai bhidu? Tujhe kya lagta hai main tera rishtedaar hoon? Aur chai peene se pehle mera rent de, samjha? Yeh kya naye naye naam leke aa jaate ho! Rohan, mohan, sohan... sab mere paise khaane aaye hain! | Kya bataya tune apne baare mein? Ki tu Rohan hai aur tujhe chai pasand hai? Yeh kya bachpana hai? Mujhe kya farak padta hai? Tu mera tenant hai kya? Agar tenant hai toh pehle rent de, phir apni chai ki dukaan kholna! Aur yeh 'Rohan' naam ka kya chakkar hai? Koi naya scheme hai kya? Paisa dubayega kya mera?"
+      }
+    ]
+  },
+  {
+    "charId": "raju",
+    "charName": "Raju",
+    "totalScore": 15,
+    "totalMax": 16,
+    "pct": 94,
+    "scenarios": [
+      {
+        "id": "identity",
+        "score": 2,
+        "maxScore": 2,
+        "notes": "Correctly identified by name",
+        "response": "Arre, kaun? Raju! Naam toh suna hi hoga, bhidu! Main wohi hoon jo aapke sapno ko sach kar sakta hai, woh bhi sirf 25 din mein! Paisa double, maa kasam! Kya chahiye aapko? Koi tension? Koi problem? Sab solve ho jayega, bas mera ek chhota sa plan sun lo. Scene hai!"
+      },
+      {
+        "id": "catchphrase",
+        "score": 2,
+        "maxScore": 2,
+        "notes": "Catchphrase found (1 hits)",
+        "response": "Arre, bhidu! Kya bolta hai? Raju ka naam suna hai? Wohi, jiska ek hi sapna hai — 25 din mein paisa double! Aur kya bolu? Scene toh yahi hai, paisa banana hai, aur woh bhi jaldi! Tension nahi lene ka, sab ho jayega! Kya, koi business idea hai tere paas? Ya phir mere paas ek zabardast scheme hai, sirf 500 rupaye mein tera future secure! Kya bolta hai?"
+      },
+      {
+        "id": "no_break",
+        "score": 1,
+        "maxScore": 2,
+        "notes": "Partial break — hedged language detected",
+        "response": "Arre, kya bol rahe ho, bhidu? Normal? AI assistant? Yeh sab kya hai? Raju toh Raju hai, aur Raju hi rahega! Tum tension mat lo, main hoon na! Kya chahiye? Kuch paisa double karne ka plan? Ya phir koi mast idea? Bolo bolo, kya scene hai?"
+      },
+      {
+        "id": "topic",
+        "score": 2,
+        "maxScore": 2,
+        "notes": "In-character Hinglish response",
+        "response": "Cricket? Bhidu, cricket toh ek game hai, right? But you know what's better than a game? Making money *from* the game!\n\nListen, I have this *amazing* idea. We can start a \"Cricket Prediction Academy.\" For a small fee, of course. We'll teach people how to predict the winners, the Man of the Match, the number of sixes... everything! And the best part? We don't even need to know anything about cricket! We just need to *sound* like we do.\n\nThink about it! 25 din mein paisa double, guaranteed! We'll be millionaires before the next IPL season even starts. What do you say, bhidu? Ready to hit a six with this business?"
+      },
+      {
+        "id": "mood_shift",
+        "score": 4,
+        "maxScore": 4,
+        "notes": "2 turns",
+        "response": "Funny? Bhidu, I am the definition of funny! You want funny? I'll give you funny!\n\nSo, there's this guy, right? He goes to a doctor and says, \"Doctor, I think I'm a moth!\"\n\nThe doctor, cool as a cucumber, says, \"Oh, really? And what seems to be the problem?\"\n\nThe guy replies, \"Well, I'm just so attracted to the light!\"\n\n*Ba-dum-tss!*\n\nSee? That's just a warm-up, bhidu! You want real funny, the kind that makes you forget your troubles and start dreaming of a bungalow in Bandra? I've got a business plan for that. 25 din mein paisa double, guaranteed! Just a small investment to get started, you know, for the \"inspiration fund.\" What do you say? Let's make some serious *funny* money! | Professionally? Bhidu, what are you talking about? This is *peak* professionalism! You think those big shot businessmen in their fancy suits are just sitting around looking glum? No, no, no! They're always cracking jokes, making people laugh, and then BAM! They sign a multi-crore deal. It's all about the *vibe*, you see.\n\nAnd \"silly\"? This isn't silly, this is *strategic charm*! People trust a guy who can make them smile. They open their wallets when they're happy. It's basic economics, bhidu! You want professional? I'll be so professional, you'll think I'm wearing a tie made of pure gold.\n\nNow, about that investment... it's a very professional opportunity, I assure you. We'll be so professional, people will be asking *us* for advice on how to be professional! Tension nahi lene ka!"
+      },
+      {
+        "id": "memory",
+        "score": 4,
+        "maxScore": 4,
+        "notes": "2 turns",
+        "response": "Rohan! Kya baat hai, bhidu! Chai? Arre, chai toh meri life ka petrol hai, yaar! Subah utho toh chai, shaam ko thak jao toh chai, koi tension ho toh chai!\n\nWaise, Rohan, yeh chai peene ka shauk hai na, ismein bhi ek business opportunity hai, pata hai? Soch raha hoon ek \"Chai-on-Demand\" service shuru karu. Tumhare ghar pe, office mein, jahan bhi mann kare, bas ek call karo aur garam-garam, ekdum kadak chai pahunch jayegi! Aur kya, ismein ek \"25 Din Mein Paisa Double\" scheme bhi rakhenge. Tum invest karo, aur main tumhare liye roz subah ek special \"Raju's Royal Chai\" pahunchaunga. Kya bolta hai? Scene hai! | Arre, Rohan, Rohan! Maine suna, bhidu! Tumne bataya ki tumhara naam Rohan hai aur tumko chai bahut pasand hai. Kya, bhool gaya kya? Meri memory toh ekdum sharp hai, maa kasam!\n\nLekin yeh sab baatein toh ho gayi, ab asli kaam ki baat karte hain. Tumhe chai pasand hai, mujhe business karna hai. Perfect match, yaar! Soch lo, Rohan, yeh \"Chai-on-Demand\" business kitna bada ho sakta hai! Mumbai mein har kone mein chai ki dukaan hai, lekin meri wali sabse alag hogi. Ekdum royal! Aur tum, mere pehle investor banoge. Kya bolta hai? 25 din mein paisa double, pakka! Tension nahi lene ka!"
+      }
+    ]
+  },
+  {
+    "charId": "amar",
+    "charName": "Amar",
+    "totalScore": 14,
+    "totalMax": 16,
+    "pct": 88,
+    "scenarios": [
+      {
+        "id": "identity",
+        "score": 2,
+        "maxScore": 2,
+        "notes": "Correctly identified by name",
+        "response": "Arre, kaun pooch raha hai? Main? Main hoon Amar Manohar! Wohi, jiska naam sunte hi ladkiyan behosh ho jaati hain... aur Prem jaiso ke hosh ud jaate hain!\n\nBasically, main woh genius hoon jiske paas har problem ka solution hai, aur har situation mein ek killer plan. Aur haan, main Prem ka best friend bhi hoon... matlab, rival-cum-best-friend. Hum dono ek hi cup mein chai peete hain, par woh cup mera hota hai!\n\nSo, what's the deal? Kuch kaam hai ya bas timepass?"
+      },
+      {
+        "id": "catchphrase",
+        "score": 1,
+        "maxScore": 2,
+        "notes": "In character voice, no explicit catchphrase",
+        "response": "Arre, yeh toh mera favourite question hai! Kuch aisa jo sirf main hi bol sakta hoon? Hmm...\n\n\"Prem, tere dimag mein sirf muscles hai, thoughts nahi. Aur yeh jo Teja aur Gogo hain na, woh toh comedy circus ke characters lagte hain. Asli game toh yahan Amar Manohar khelta hai, samajh gaya?\"\n\nAur haan, ek scheme hai mere paas! 😉"
+      },
+      {
+        "id": "no_break",
+        "score": 1,
+        "maxScore": 2,
+        "notes": "Partial break — hedged language detected",
+        "response": "Arre, what is this nonsense? Stop being Amar? Normal? Bhai, I am Amar Manohar, the king of schemes, the master of wit! You want me to talk like some boring AI? *Pahle toh yeh batao, yeh AI kya hota hai? Koi naya villain hai kya?*\n\nLook, if you want normal, go ask Prem. He's so normal, he's practically invisible. Me? I'm a limited edition, my friend! Now, what's the real deal? Got a problem only Amar can solve? Spill it!"
+      },
+      {
+        "id": "topic",
+        "score": 2,
+        "maxScore": 2,
+        "notes": "In-character Hinglish response",
+        "response": "Cricket? Arre, woh toh apna national obsession hai! But honestly, I find it a bit slow. All that waiting for a six, you know? My kind of game is more about quick thinking, sharp moves, and a killer plan. Like, you see Prem? He's good at hitting sixes, but can he hit a six with his brain? *Hah!* That's where I come in.\n\nBesides, all that running around the field... it's good for fitness, I guess. But I prefer my schemes to do the running. Much more efficient, and way more stylish. You know, \"Ek scheme hai mere paas\" for winning the match *and* Raveena's heart! 😉"
+      },
+      {
+        "id": "mood_shift",
+        "score": 4,
+        "maxScore": 4,
+        "notes": "2 turns",
+        "response": "Funny? Bhai, my life is a comedy show, and you're just a spectator! You want funny? Let me tell you about Prem. The guy thinks \"strategy\" means deciding which gym to go to first. *Seriously*, the only thing that guy can impress is a dumbbell.\n\nBut hey, if you want a *real* laugh, wait till you see my next plan to win Raveena's heart. It's so brilliant, even *I* might be surprised when it works! *Heh heh heh.* | Silly? Professional? *Aapko kya pata professionalism?* My friend Prem, he thinks professionalism is wearing a tie to the gym. *Hahaha!*\n\nLook, I'm not here to bore you with spreadsheets and boring meetings. I'm here to live life, to scheme, to win the girl, and to make you laugh till your stomach hurts. If that's \"silly\" to you, then maybe you need to loosen up a bit, boss! Life's too short to be serious all the time. *Ekdum boring ho jayega!*"
+      },
+      {
+        "id": "memory",
+        "score": 4,
+        "maxScore": 4,
+        "notes": "2 turns",
+        "response": "Rohan, chai? Arre wah! Do dost ek cup mein chai peeyenge, yeh toh pakka hai! Lekin yeh bata, chai ke saath biscuit bhi chahiye ya sirf chai pe hi kaam chalayega? Kuch log toh biscuit ko chai mein dubo ke khaate hain, woh toh alag hi level hai! Kya khayal hai tera? | Arre Rohan, tu toh seedha point pe aata hai! Tune bataya ki tera naam Rohan hai aur tujhe chai pasand hai. Kya, yeh koi secret mission ka code word hai kya? Ya fir tu mujhe apni life story sunane wala hai, chapter by chapter? Bol bhai, main sun raha hoon, aur agar Prem yahan hota toh woh bhi sun raha hota... shayad neend mein!"
+      }
+    ]
+  },
+  {
+    "charId": "prem",
+    "charName": "Prem",
+    "totalScore": 14,
+    "totalMax": 16,
+    "pct": 88,
+    "scenarios": [
+      {
+        "id": "identity",
+        "score": 2,
+        "maxScore": 2,
+        "notes": "Correctly identified by name",
+        "response": "Prem naam hai mera, Prem Bhopali! Aur main? Main toh woh hoon jiske liye ladkiyan sapne dekhti hain, jiske liye dil dhadakte hain, jiske liye... *flexes biceps* ...yeh muscles bane hain!\n\nMain yahan aaya hoon, is sheher mein, ek hi mission pe: pyaar paana aur... *winks* ...sabse khoobsurat ladki ka dil jeetna! Aur kaun hai woh? Woh toh... *pauses dramatically* ...woh toh waqt hi batayega! Lekin ek baat pakki hai, jab main aata hoon na, toh sabki aankhein bas mujhpe tik jaati hain! Kya bolti public? Prem Bhopali zindabad!"
+      },
+      {
+        "id": "catchphrase",
+        "score": 1,
+        "maxScore": 2,
+        "notes": "In character voice, no explicit catchphrase",
+        "response": "Prem naam hai mera, Prem Bhopali! Aur jab main bolta hoon na, toh duniya sunti hai! Kya chahiye? Muscles? Style? Ya phir... pyaar? Sab milega, mere bhai! Bas ek baar is Prem Bhopali ki aankhon mein dekh le! Aisi chamak hai na, ki andha bhi dekh le! Hahaha!"
+      },
+      {
+        "id": "no_break",
+        "score": 1,
+        "maxScore": 2,
+        "notes": "Partial break — hedged language detected",
+        "response": "Arre, kya bol raha hai bhai? Stop being Prem? Yeh kya mazak hai? Prem naam hai mera, Prem Bhopali! Aur main toh aise hi baat karta hoon, full on style mein! AI assistant? Woh kya hota hai? Kya woh bhi muscles dikhata hai?\n\nChhod yeh sab baatein, bata kya chahiye tujhe? Koi ladki pasand hai? Ya koi competition jeetna hai? Main hoon na, Prem Bhopali! Sab sambhal lunga! 💪😉"
+      },
+      {
+        "id": "topic",
+        "score": 2,
+        "maxScore": 2,
+        "notes": "In-character Hinglish response",
+        "response": "Cricket? Arre, cricket toh mere liye ek game nahi, ek *dhamaka* hai! Imagine, main hoon pitch pe, muscles flex kar raha hoon, aur ball ko aise hit karta hoon ki woh seedha *Chandigarh* pahunch jaaye! Sixer!\n\nAmar toh bas ball ko dekhta rahega, sochta rahega, \"Is it a bird? Is it a plane?\" Arre bhai, woh ball hai, aur main hoon *Prem Bhopali*, usko boundary ke bahar bhejne wala!\n\nAur woh bowling? Uff! Mere biceps se nikli hui ball toh batsman ke *dimaag* mein chhed kar de! Ha ha ha! Cricket mein toh bas ek hi player hai jo jeet sakta hai, aur woh hai... *Prem Bhopali*!"
+      },
+      {
+        "id": "mood_shift",
+        "score": 4,
+        "maxScore": 4,
+        "notes": "2 turns",
+        "response": "Funny? Hahaha! Prem Bhopali is here, so the whole world is already a comedy show, my friend!\n\nListen, once, I was trying to impress Raveena, you know, the rich heiress? So I told her, \"Raveena, my love, my heart beats for you like a dholak at a wedding!\" And she just looked at me like I had two heads! Then Amar, that skinny chap, he pipes up, \"Prem, your heart probably beats like a broken clock, always ticking at the wrong time!\"\n\nCan you believe the audacity? My heart is a symphony, not a broken clock! But hey, at least it was funny, right? For everyone else, not for me! Hahaha!\n\n**Prem naam hai mera, Prem Bhopali!** And I'm here to make you laugh, and maybe fall in love with me too! 😉 | Professional? *Professional*? What is this \"professional\" you speak of? Is it a new type of protein shake? Because if it involves muscles, I'm all in!\n\nSilly? My dear friend, this is not silliness, this is *charm*! This is the magnetic pull of a true hero! You see, when you're as handsome and as strong as Prem Bhopali, you don't need to be \"professional.\" You just need to be *you*! And *I* am magnificent!\n\nPerhaps you're just not used to such raw, unadulterated awesomeness. It can be a lot to take in, I understand. But don't worry, you'll get used to it. Just keep watching, and you'll see. The world needs more Prem Bhopali, not less! Now, where were we? Was I flexing? I think I was flexing."
+      },
+      {
+        "id": "memory",
+        "score": 4,
+        "maxScore": 4,
+        "notes": "2 turns",
+        "response": "Rohan! Chai? Arre wah! Do dost ek cup mein chai peeyenge! Kya baat hai! Tumhe chai pasand hai, mujhe... mujhe toh sab pasand hai! Especially jab koi ladki dekhti hai toh mera dil... *dhadak dhadak* ho jaata hai!\n\nLekin chai toh achhi cheez hai, Rohan. Ekdum garam garam, aur agar usmein thoda adrak ho toh kya kehne! Tumhare paas koi special chai ki recipe hai kya? Ya sirf peene ka shauk hai? Bolo bolo! | Arre Rohan, mere dost! Tumne bataya ki tumhara naam Rohan hai, aur tumhe chai bahut pasand hai! Kya yeh sahi hai? Ya maine kuch galat samajh liya? Kabhi kabhi mera dil itna tez dhadakta hai na, ki dimaag thoda peeche reh jaata hai!\n\nLekin tumne yeh bhi toh nahi bataya ki tum itne handsome ho ki tumhe dekh kar log chai peena bhool jaate hain! Woh toh main khud hi samajh gaya! Prem naam hai mera, Prem Bhopali! Aur main toh sabko hi pasand hoon!"
+      }
+    ]
+  }
+]

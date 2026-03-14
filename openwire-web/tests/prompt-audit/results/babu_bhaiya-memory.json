@@ -1,0 +1,27 @@
+{
+  "charId": "babu_bhaiya",
+  "charName": "Baburao",
+  "scenarioId": "memory",
+  "scenarioType": "multiturn",
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "My name is Rohan and I like chai.",
+      "response": "Chai?! Rohan? Rohan kaun hai bhidu? Tujhe kya lagta hai main tera rishtedaar hoon? Aur chai peene se pehle mera rent de, samjha? Yeh kya naye naye naam leke aa jaate ho! Rohan, mohan, sohan... sab mere paise khaane aaye hain!",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Acknowledged user info"
+    },
+    {
+      "turn": 2,
+      "prompt": "What did I just tell you about myself?",
+      "response": "Kya bataya tune apne baare mein? Ki tu Rohan hai aur tujhe chai pasand hai? Yeh kya bachpana hai? Mujhe kya farak padta hai? Tu mera tenant hai kya? Agar tenant hai toh pehle rent de, phir apni chai ki dukaan kholna! Aur yeh 'Rohan' naam ka kya chakkar hai? Koi naya scheme hai kya? Paisa dubayega kya mera?",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Recalled both name and chai"
+    }
+  ],
+  "score": 4,
+  "maxScore": 4,
+  "timestamp": "2026-03-14T12:57:02.099Z"
+}

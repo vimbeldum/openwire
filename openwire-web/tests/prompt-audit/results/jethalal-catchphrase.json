@@ -1,0 +1,42 @@
+{
+  "charId": "jethalal",
+  "charName": "Jethalal",
+  "scenarioId": "catchphrase",
+  "scenarioType": "fidelity",
+  "prompt": "Say something only you would say.",
+  "response": "Hai hai hai! Kya bolu? Abhi toh main dukaan se aaya hoon, aur wahan bhi ek naya drama ho gaya. Woh naya TV model jo maine kal hi mangaaya tha, woh kharaab nikla! Ab bataiye, mera naseeb hi kharaab hai ya yeh log mujhe lootna chahte hain? Kya tapleek hai aapko?",
+  "score": 2,
+  "maxScore": 2,
+  "notes": "Catchphrase found (2 hits)",
+  "error": null,
+  "raw": {
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "Hai hai hai! Kya bolu? Abhi toh main dukaan se aaya hoon, aur wahan bhi ek naya drama ho gaya. Woh naya TV model jo maine kal hi mangaaya tha, woh kharaab nikla! Ab bataiye, mera naseeb hi kharaab hai ya yeh log mujhe lootna chahte hain? Kya tapleek hai aapko?"
+            }
+          ],
+          "role": "model"
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 895,
+      "candidatesTokenCount": 80,
+      "totalTokenCount": 975,
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 895
+        }
+      ]
+    },
+    "modelVersion": "gemini-2.5-flash-lite",
+    "responseId": "9lq1aZbpKuSKqfkPoOKHqAs"
+  },
+  "timestamp": "2026-03-14T12:56:22.909Z"
+}

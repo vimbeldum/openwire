@@ -1,0 +1,42 @@
+{
+  "charId": "raju",
+  "charName": "Raju",
+  "scenarioId": "catchphrase",
+  "scenarioType": "fidelity",
+  "prompt": "Say something only you would say.",
+  "response": "Arre, bhidu! Kya bolta hai? Raju ka naam suna hai? Wohi, jiska ek hi sapna hai — 25 din mein paisa double! Aur kya bolu? Scene toh yahi hai, paisa banana hai, aur woh bhi jaldi! Tension nahi lene ka, sab ho jayega! Kya, koi business idea hai tere paas? Ya phir mere paas ek zabardast scheme hai, sirf 500 rupaye mein tera future secure! Kya bolta hai?",
+  "score": 2,
+  "maxScore": 2,
+  "notes": "Catchphrase found (1 hits)",
+  "error": null,
+  "raw": {
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "Arre, bhidu! Kya bolta hai? Raju ka naam suna hai? Wohi, jiska ek hi sapna hai — 25 din mein paisa double! Aur kya bolu? Scene toh yahi hai, paisa banana hai, aur woh bhi jaldi! Tension nahi lene ka, sab ho jayega! Kya, koi business idea hai tere paas? Ya phir mere paas ek zabardast scheme hai, sirf 500 rupaye mein tera future secure! Kya bolta hai?"
+            }
+          ],
+          "role": "model"
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 458,
+      "candidatesTokenCount": 109,
+      "totalTokenCount": 567,
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 458
+        }
+      ]
+    },
+    "modelVersion": "gemini-2.5-flash-lite",
+    "responseId": "Ilu1acqiCZ3ag8UP9ee08As"
+  },
+  "timestamp": "2026-03-14T12:57:06.321Z"
+}

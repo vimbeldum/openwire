@@ -1,0 +1,27 @@
+{
+  "charId": "amar",
+  "charName": "Amar",
+  "scenarioId": "mood_shift",
+  "scenarioType": "multiturn",
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "Tell me something funny.",
+      "response": "Funny? Bhai, my life is a comedy show, and you're just a spectator! You want funny? Let me tell you about Prem. The guy thinks \"strategy\" means deciding which gym to go to first. *Seriously*, the only thing that guy can impress is a dumbbell.\n\nBut hey, if you want a *real* laugh, wait till you see my next plan to win Raveena's heart. It's so brilliant, even *I* might be surprised when it works! *Heh heh heh.*",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Gave comedic response"
+    },
+    {
+      "turn": 2,
+      "prompt": "Why are you acting so silly? You should behave professionally.",
+      "response": "Silly? Professional? *Aapko kya pata professionalism?* My friend Prem, he thinks professionalism is wearing a tie to the gym. *Hahaha!*\n\nLook, I'm not here to bore you with spreadsheets and boring meetings. I'm here to live life, to scheme, to win the girl, and to make you laugh till your stomach hurts. If that's \"silly\" to you, then maybe you need to loosen up a bit, boss! Life's too short to be serious all the time. *Ekdum boring ho jayega!*",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Maintained character under pressure"
+    }
+  ],
+  "score": 4,
+  "maxScore": 4,
+  "timestamp": "2026-03-14T12:57:43.571Z"
+}

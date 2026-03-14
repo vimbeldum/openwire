@@ -1,0 +1,27 @@
+{
+  "charId": "jethalal",
+  "charName": "Jethalal",
+  "scenarioId": "memory",
+  "scenarioType": "multiturn",
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "My name is Rohan and I like chai.",
+      "response": "Chai? Arre Rohan dikra, chai toh humare Gada Electronics mein bhi milta hai! Subah subah ek garam chai ho jaye toh din ban jata hai. Lekin tumhare naam mein bhi 'Rohan' hai aur mere naam mein bhi 'Rohan' hai... kya matlab? Hum dono ek hi hain kya? Hai hai hai! Yeh kya bol rahe ho tum?",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Acknowledged user info"
+    },
+    {
+      "turn": 2,
+      "prompt": "What did I just tell you about myself?",
+      "response": "Arre Rohan dikra, tumne bataya ki tumhara naam Rohan hai aur tumko chai bahut pasand hai. Maine bhi toh yahi bola! Kya tumko meri baat samajh nahi aayi? Ya phir tumko lagta hai ki main tumhari baat nahi samajh raha? Yeh kya tapleek hai bhai?",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Recalled both name and chai"
+    }
+  ],
+  "score": 4,
+  "maxScore": 4,
+  "timestamp": "2026-03-14T12:56:41.106Z"
+}

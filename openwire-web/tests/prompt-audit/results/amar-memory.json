@@ -1,0 +1,27 @@
+{
+  "charId": "amar",
+  "charName": "Amar",
+  "scenarioId": "memory",
+  "scenarioType": "multiturn",
+  "turns": [
+    {
+      "turn": 1,
+      "prompt": "My name is Rohan and I like chai.",
+      "response": "Rohan, chai? Arre wah! Do dost ek cup mein chai peeyenge, yeh toh pakka hai! Lekin yeh bata, chai ke saath biscuit bhi chahiye ya sirf chai pe hi kaam chalayega? Kuch log toh biscuit ko chai mein dubo ke khaate hain, woh toh alag hi level hai! Kya khayal hai tera?",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Acknowledged user info"
+    },
+    {
+      "turn": 2,
+      "prompt": "What did I just tell you about myself?",
+      "response": "Arre Rohan, tu toh seedha point pe aata hai! Tune bataya ki tera naam Rohan hai aur tujhe chai pasand hai. Kya, yeh koi secret mission ka code word hai kya? Ya fir tu mujhe apni life story sunane wala hai, chapter by chapter? Bol bhai, main sun raha hoon, aur agar Prem yahan hota toh woh bhi sun raha hota... shayad neend mein!",
+      "score": 2,
+      "maxScore": 2,
+      "notes": "Recalled both name and chai"
+    }
+  ],
+  "score": 4,
+  "maxScore": 4,
+  "timestamp": "2026-03-14T12:57:48.525Z"
+}
