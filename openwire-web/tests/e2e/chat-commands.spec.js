@@ -188,11 +188,10 @@ test.describe('/clear Command', () => {
                 }));
             }
         });
-        await page.waitForTimeout(200);
 
-        // Verify messages exist
+        // Wait for all 5 peer messages to render before clearing
         const peerMsgs = page.locator('.messages-area .msg.peer');
-        await expect(peerMsgs).not.toHaveCount(0, { timeout: 3000 });
+        await expect(peerMsgs).toHaveCount(5, { timeout: 5000 });
 
         // Clear
         await sendCommand(page, '/clear');

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, memo } from 'react';
+import '../styles/roulette.css';
 import * as rl from '../lib/roulette';
 
 /* ── Constants ──────────────────────────────────── */

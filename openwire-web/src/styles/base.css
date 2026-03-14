@@ -1,0 +1,141 @@
+/* ═══════════════════════════════════════════════════════════
+   OpenWire Web — Design System
+   Liquid Glass aesthetic with Bento Box layout
+   Matching spec.md 2025/2026 design trends
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* Dark Mode Palette from spec */
+  --bg-void: #0A0A0A;
+  --bg-dark: #1A1A1A;
+  --bg-base: #242424;
+  --bg-surface: #1E1E1E;
+  --bg-elevated: #2D2D2D;
+  --bg-hover: #3D3D3D;
+
+  /* Primary Accent - Trust/Tech */
+  --accent: #66A1EE;
+  --accent-bright: #3080E8;
+  --accent-dark: #1663C7;
+  --accent-glow: rgba(102, 161, 238, 0.15);
+
+  /* Secondary Accent - Playful/Gamification */
+  --secondary: #A866EE;
+  --secondary-bright: #8930E8;
+  --secondary-glow: rgba(168, 102, 238, 0.15);
+
+  /* Semantic Colors */
+  --green: #16C72E;
+  --green-glow: rgba(22, 199, 46, 0.15);
+  --yellow: #E8B730;
+  --yellow-glow: rgba(232, 183, 48, 0.15);
+  --red: #E83A30;
+  --red-glow: rgba(232, 58, 48, 0.15);
+  --purple: #9B59B6;
+
+  /* Typography */
+  --text-primary: #FFFFFF;
+  --text-secondary: #F0F0F0;
+  --text-muted: #A0A0A0;
+  --text-dim: #707070;
+
+  /* Liquid Glass */
+  --glass-bg: rgba(30, 30, 30, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shine: rgba(255, 255, 255, 0.05);
+  --blur: 20px;
+
+  /* Spacing & Radius */
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-lg: 24px;
+  --shadow-soft: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 40px rgba(102, 161, 238, 0.1);
+  --shadow-elevated: 0 8px 40px rgba(0, 0, 0, 0.5);
+
+  /* Fonts */
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  font-family: var(--font);
+  background: var(--bg-void);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(102, 161, 238, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(168, 102, 238, 0.08) 0%, transparent 50%),
+    var(--bg-void);
+  background-attachment: fixed;
+}
+
+/* ── Scrollbar ─────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--glass-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* ── Shared @keyframes (used by multiple components) ── */
+
+@keyframes msgFade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes resultPop {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes overlayFade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

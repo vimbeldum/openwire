@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo, memo } from 'react';
+import '../styles/blackjack.css';
 import * as bj from '../lib/blackjack';
 
 /* ── Reusable Premium Card ────────────────────────── */

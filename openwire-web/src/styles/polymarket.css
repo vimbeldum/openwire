@@ -1,0 +1,591 @@
+/* ═══ Polymarket / Predictions (Polymarket-inspired) ═════════ */
+
+.pm-table {
+  background: #0f1118;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  width: min(98vw, 560px);
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ──────────────────────────────────────── */
+.pm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.pm-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pm-logo {
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pm-header-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+.pm-host-badge {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(139, 92, 246, 0.2);
+  color: #a78bfa;
+  font-weight: 600;
+}
+.pm-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pm-balance {
+  font-size: 0.8rem;
+  color: #888;
+  font-weight: 500;
+}
+.pm-help-btn, .pm-close-btn {
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: #888;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pm-help-btn:hover, .pm-close-btn:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+
+/* ── Content (scrollable) ─────────────────────────── */
+.pm-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem 0;
+}
+
+/* ── Market Header ────────────────────────────────── */
+.pm-market-header {
+  padding: 0.5rem 0.8rem 0.3rem;
+}
+.pm-market-question {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #f0f0f0;
+  line-height: 1.35;
+  margin-bottom: 0.4rem;
+}
+.pm-market-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.pm-phase-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.pm-phase-badge.open { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+.pm-phase-badge.locked { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.pm-phase-badge.resolved { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.pm-volume {
+  font-size: 0.7rem;
+  color: #666;
+}
+
+/* ── Outcome Cards ────────────────────────────────── */
+.pm-outcomes-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+}
+.pm-outcome-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 0.6rem;
+  transition: all 0.2s;
+}
+.pm-outcome-card:hover { background: rgba(255, 255, 255, 0.05); }
+.pm-outcome-card.winner {
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.06);
+}
+.pm-outcome-card.dimmed { opacity: 0.35; }
+.pm-oc-top {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.pm-oc-ring {
+  position: relative;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--ring-color) calc(var(--ring-pct) * 1%),
+    rgba(255,255,255,0.06) calc(var(--ring-pct) * 1%)
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.pm-oc-ring::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: #0f1118;
+}
+.pm-oc-pct {
+  position: relative;
+  z-index: 1;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #fff;
+}
+.pm-oc-pct small { font-size: 0.55rem; font-weight: 500; }
+.pm-oc-info { flex: 1; min-width: 0; }
+.pm-oc-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+.pm-oc-price {
+  font-size: 0.7rem;
+  color: #666;
+}
+.pm-oc-shares {
+  font-size: 0.7rem;
+  color: #a78bfa;
+  font-weight: 500;
+}
+.pm-oc-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+.pm-oc-buy, .pm-oc-sell {
+  flex: 1;
+  padding: 0.35rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.pm-oc-buy { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+.pm-oc-buy:hover { background: rgba(34, 197, 94, 0.3); }
+.pm-oc-sell { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.pm-oc-sell:hover { background: rgba(239, 68, 68, 0.3); }
+.pm-oc-winner-tag {
+  display: inline-block;
+  margin-top: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+/* ── Quick Trade ──────────────────────────────────── */
+.pm-quick-trade {
+  margin: 0.3rem 0.8rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 0.6rem;
+}
+.pm-qt-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.pm-qt-side {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.pm-qt-side[data-side="buy"] { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+.pm-qt-side[data-side="sell"] { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.pm-qt-outcome { font-size: 0.85rem; font-weight: 600; color: #e0e0e0; flex: 1; }
+.pm-qt-close {
+  width: 22px; height: 22px;
+  border: none; background: rgba(255,255,255,0.08);
+  border-radius: 4px; color: #888; cursor: pointer;
+  font-size: 0.9rem; display: flex; align-items: center; justify-content: center;
+}
+.pm-qt-presets {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 0.4rem;
+}
+.pm-qt-preset {
+  flex: 1;
+  padding: 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: transparent;
+  color: #999;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.pm-qt-preset.active {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+}
+.pm-qt-preset:hover { background: rgba(255, 255, 255, 0.05); }
+.pm-qt-custom {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+.pm-qt-adj {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pm-qt-adj:hover { background: rgba(255, 255, 255, 0.1); }
+.pm-qt-val {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+  min-width: 30px;
+  text-align: center;
+}
+.pm-qt-label { font-size: 0.75rem; color: #666; }
+.pm-qt-est {
+  text-align: center;
+  font-size: 0.8rem;
+  color: #888;
+  margin-bottom: 0.4rem;
+}
+.pm-qt-est strong { color: #fff; }
+.pm-qt-confirm {
+  width: 100%;
+  padding: 0.5rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.pm-qt-confirm.buy { background: #22c55e; color: #fff; }
+.pm-qt-confirm.buy:hover { background: #16a34a; }
+.pm-qt-confirm.sell { background: #ef4444; color: #fff; }
+.pm-qt-confirm.sell:hover { background: #dc2626; }
+.pm-qt-confirm:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Portfolio ────────────────────────────────────── */
+.pm-portfolio {
+  margin: 0.3rem 0.8rem;
+  background: rgba(139, 92, 246, 0.05);
+  border: 1px solid rgba(139, 92, 246, 0.12);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+}
+.pm-portfolio-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.3rem;
+}
+.pm-portfolio-title {
+  font-size: 0.7rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+.pm-portfolio-pnl {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.pm-portfolio-pnl.pos { color: #22c55e; }
+.pm-portfolio-pnl.neg { color: #ef4444; }
+.pm-portfolio-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.pm-portfolio-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+.pm-pi-name { color: #ccc; flex: 1; }
+.pm-pi-shares { color: #888; font-size: 0.75rem; }
+.pm-pi-value { color: #a78bfa; font-weight: 600; font-size: 0.75rem; }
+.pm-portfolio-footer {
+  font-size: 0.7rem;
+  color: #666;
+  margin-top: 0.2rem;
+  padding-top: 0.2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/* ── Activity Feed ────────────────────────────────── */
+.pm-activity {
+  padding: 0.3rem 0.8rem;
+}
+.pm-activity-title {
+  font-size: 0.7rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+.pm-activity-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+  font-size: 0.75rem;
+}
+.pm-act-badge {
+  width: 18px; height: 18px;
+  border-radius: 4px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.pm-act-badge.buy { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+.pm-act-badge.sell { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.pm-act-text { flex: 1; color: #999; }
+.pm-act-text strong { color: #ccc; }
+.pm-act-cost { color: #666; font-size: 0.7rem; }
+
+/* ── Host Controls ────────────────────────────────── */
+.pm-controls {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.5rem 0.8rem;
+  justify-content: center;
+}
+.pm-ctrl-btn {
+  padding: 0.45rem 1rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.pm-ctrl-btn.lock { background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+.pm-ctrl-btn.lock:hover { background: rgba(245, 158, 11, 0.3); }
+.pm-ctrl-btn.resolve { background: rgba(34, 197, 94, 0.2); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); }
+.pm-ctrl-btn.resolve:hover { background: rgba(34, 197, 94, 0.3); }
+.pm-ctrl-btn.resolve.confirm { background: #22c55e; color: #fff; }
+.pm-ctrl-btn.new-market { background: rgba(59, 130, 246, 0.2); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); }
+.pm-ctrl-btn.new-market:hover { background: rgba(59, 130, 246, 0.3); }
+.pm-resolve-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.pm-resolve-select {
+  padding: 0.4rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 0.8rem;
+}
+
+/* ── Resolved Banner ──────────────────────────────── */
+.pm-resolved-banner {
+  text-align: center;
+  padding: 0.6rem 0.8rem;
+  margin: 0 0.8rem;
+  background: rgba(34, 197, 94, 0.06);
+  border: 1px solid rgba(34, 197, 94, 0.15);
+  border-radius: 10px;
+}
+.pm-resolved-icon {
+  font-size: 1.5rem;
+  color: #22c55e;
+  margin-bottom: 0.2rem;
+}
+.pm-resolved-title {
+  font-size: 0.7rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.15rem;
+}
+.pm-resolved-winner {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #22c55e;
+}
+.pm-resolved-payout {
+  margin-top: 0.3rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.pm-resolved-payout.win { color: #22c55e; }
+.pm-resolved-payout.lose { color: #ef4444; }
+
+/* ── Create Market Form ───────────────────────────── */
+.pm-create-form {
+  padding: 1rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.pm-create-icon {
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2));
+  color: #3b82f6;
+  font-size: 1.5rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 0.3rem;
+}
+.pm-create-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #e0e0e0;
+  text-align: center;
+}
+.pm-create-subtitle {
+  font-size: 0.8rem;
+  color: #666;
+  text-align: center;
+  margin-bottom: 0.3rem;
+}
+.pm-form-label {
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+}
+.pm-form-input {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-size: 0.85rem;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.pm-form-input:focus { outline: none; border-color: #3b82f6; }
+.pm-form-input.seed { max-width: 120px; }
+.pm-outcome-input-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.pm-remove-btn {
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: #888;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pm-remove-btn:hover { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.pm-add-outcome-btn {
+  padding: 0.35rem 0.8rem;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  background: transparent;
+  color: #888;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.pm-add-outcome-btn:hover { border-color: #3b82f6; color: #3b82f6; }
+.pm-seed-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pm-seed-label { font-size: 0.8rem; color: #888; }
+.pm-create-btn {
+  padding: 0.6rem;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.pm-create-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.pm-create-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* ── Waiting State ────────────────────────────────── */
+.pm-waiting {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+  font-size: 0.85rem;
+}
+.pm-waiting-icon {
+  font-size: 2rem;
+  letter-spacing: 0.3em;
+  color: #444;
+  margin-bottom: 0.5rem;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.pm-participants {
+  padding: 0 1rem;
+  font-size: 0.75rem;
+  color: #666;
+}

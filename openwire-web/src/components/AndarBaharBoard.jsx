@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, memo } from 'react';
+import '../styles/andarbahar.css';
 import * as ab from '../lib/andarbahar';
 import * as bj from '../lib/blackjack';
 

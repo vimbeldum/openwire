@@ -1,4 +1,5 @@
 import { useState, memo } from 'react';
+import '../styles/polymarket.css';
 
 /* ── Outcome Card (Polymarket-style) ──────────── */
 function OutcomeCard({ name, price, idx, isOpen, isWinner, isResolved, dimmed, myShares, onBuy, onSell }) {

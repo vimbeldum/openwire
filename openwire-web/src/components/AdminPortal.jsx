@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
+import '../styles/admin.css';
 import { getTotalHousePnl } from '../lib/casinoState.js';
 import { loadStore, getCharactersDict, getGroupsDict, getGroupCharacters } from '../lib/agents/agentStore.js';
 import { formatModelLabel } from '../lib/agents/openrouter.js';

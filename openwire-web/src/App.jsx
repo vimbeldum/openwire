@@ -1,6 +1,7 @@
 import { useState, useEffect, Component } from 'react';
 import Landing from './components/Landing';
 import ChatRoom from './components/ChatRoom';
+import './styles/landing.css';
 
 const SESSION_KEY = 'openwire_session';
 
