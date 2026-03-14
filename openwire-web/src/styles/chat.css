@@ -1406,3 +1406,43 @@
     width: calc(100vw - 3rem);
   }
 }
+
+/* ── Vault Panel ────────────────────────────────────────────── */
+.vault-body { padding: 1rem; display: flex; flex-direction: column; gap: 1rem; }
+.vault-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.vault-stat { background: rgba(255,255,255,0.05); border-radius: 6px; padding: 0.5rem; text-align: center; }
+.vault-stat-label { display: block; font-size: 0.7rem; color: var(--text-muted); margin-bottom: 2px; }
+.vault-stat-val { font-size: 1rem; font-weight: 600; color: #FFD700; }
+.vault-form { display: flex; flex-direction: column; gap: 0.5rem; }
+.vault-form input[type=number] { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; padding: 0.4rem 0.6rem; font-size: 0.9rem; width: 100%; }
+.vault-form input[type=number]:focus { outline: none; border-color: var(--brand); }
+.vault-info { font-size: 0.72rem; color: var(--text-muted); }
+.vault-penalty { background: rgba(255,50,50,0.15); border: 1px solid rgba(255,50,50,0.4); border-radius: 6px; padding: 0.5rem; font-size: 0.8rem; color: #ff8080; }
+.vault-actions { display: flex; gap: 0.5rem; }
+.vault-actions .btn-primary { flex: 1; background: var(--brand); color: #000; border: none; border-radius: 6px; padding: 0.5rem; cursor: pointer; font-weight: 600; }
+.vault-actions .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.vault-actions .btn-secondary { flex: 1; background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 0.5rem; cursor: pointer; }
+.vault-empty { color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 1rem 0; }
+
+/* ── Dead Drops Panel ───────────────────────────────────────── */
+.dd-sort-tabs { display: flex; gap: 0.25rem; align-items: center; }
+.dd-sort-btn { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; color: var(--text-muted); font-size: 0.75rem; padding: 2px 8px; cursor: pointer; }
+.dd-sort-btn.active { background: var(--brand); color: #000; border-color: var(--brand); font-weight: 600; }
+.dd-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; }
+.dd-body { font-size: 0.9rem; line-height: 1.4; margin-bottom: 0.4rem; word-break: break-word; }
+.dd-meta { display: flex; align-items: center; gap: 0.75rem; font-size: 0.75rem; color: var(--text-muted); }
+.dd-vote-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0 2px; font-size: 0.8rem; }
+.dd-vote-btn:hover { color: #fff; }
+.dd-reactions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.dd-reaction-chip { background: rgba(255,255,255,0.08); border-radius: 12px; padding: 1px 6px; font-size: 0.75rem; }
+.dd-ai-reaction { font-size: 0.75rem; color: var(--brand); font-style: italic; margin-top: 4px; }
+.dd-compose { border-top: 1px solid rgba(255,255,255,0.1); padding: 0.75rem; flex-shrink: 0; }
+.dd-compose textarea { width: 100%; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; padding: 0.5rem; font-size: 0.85rem; resize: none; font-family: inherit; }
+.dd-compose textarea:focus { outline: none; border-color: var(--brand); }
+.dd-counter { font-size: 0.7rem; color: var(--text-muted); text-align: right; margin-top: 2px; }
+.dd-compose-row { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+.dd-error { font-size: 0.75rem; color: #ff8080; }
+.dd-drop-btn { background: var(--brand); color: #000; border: none; border-radius: 6px; padding: 0.35rem 1rem; font-weight: 600; cursor: pointer; font-size: 0.85rem; }
+.dd-drop-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.dd-gate { font-size: 0.82rem; color: var(--text-muted); padding: 0.75rem; text-align: center; }
+.dd-empty { color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 2rem 0; }

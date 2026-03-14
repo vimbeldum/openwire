@@ -1028,6 +1028,150 @@
   margin-top: 6px;
 }
 
+/* ── Cosmetics Shop ──────────────────────────────── */
+
+/* Panel width override — slightly narrower than AccountHistory */
+.cs-panel.ah-panel {
+  width: min(100vw, 560px);
+}
+
+.cs-balance-bar {
+  padding: 0.6rem 1.2rem;
+  font-size: 0.88rem;
+  color: var(--text-dim);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+.cs-balance-bar strong {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+/* Scrollable 2-column items grid */
+.cs-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  align-content: start;
+}
+.cs-grid > .ah-empty {
+  grid-column: 1 / -1;
+}
+
+.cs-item-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  transition: border-color 0.15s;
+}
+.cs-item-card:hover { border-color: rgba(255, 255, 255, 0.15); }
+.cs-item-card.cs-item-owned { border-color: rgba(34, 197, 94, 0.25); }
+
+.cs-item-top {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cs-item-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.cs-category-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+  align-self: flex-start;
+}
+
+.cs-item-css {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  font-family: monospace;
+  opacity: 0.7;
+}
+
+.cs-item-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+}
+
+.cs-item-price {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* Shared button base */
+.cs-btn {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.28rem 0.65rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.cs-btn-buy {
+  background: var(--accent, #6366f1);
+  color: #fff;
+}
+.cs-btn-buy:hover { opacity: 0.88; }
+.cs-btn-buy.cs-btn-disabled {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.cs-btn-equip {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.cs-btn-equip:hover { background: rgba(34, 197, 94, 0.25); }
+
+.cs-btn-equipped {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  border: 1px solid #22c55e;
+  cursor: default;
+}
+
+.cs-badge-sold {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  padding: 0.2rem 0.5rem;
+}
+
 /* ── Responsive ── */
 @media (max-width: 480px) {
   .game-card {

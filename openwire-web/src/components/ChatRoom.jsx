@@ -37,11 +37,20 @@ const HowToPlay = lazyRetry(() => import('./HowToPlay'));
 const PostSessionSummary = lazyRetry(() => import('./PostSessionSummary'));
 const AccountHistory = lazyRetry(() => import('./AccountHistory'));
 const AgentControlPanel = lazyRetry(() => import('./AgentControlPanel'));
+const VaultPanel = lazyRetry(() => import('./VaultPanel'));
+const DeadDropsPanel = lazyRetry(() => import('./DeadDropsPanel'));
+const CosmeticsShop = lazyRetry(() => import('./CosmeticsShop'));
+const TambolaBoard = lazyRetry(() => import('./TambolaBoard'));
 import LiveTicker from './chat/LiveTicker';
 import TypingBar from './chat/TypingBar';
 import * as ledger from '../lib/core/ledger.js';
 import { getRoomAlias } from '../lib/core/identity.js';
 import { loadStore, getCharactersDict } from '../lib/agents/agentStore.js';
+import { loadProfile, saveProfile, updateStreak } from '../lib/profile.js';
+import * as vaultLib from '../lib/vault.js';
+import { DEFAULT_CATALOG } from '../lib/cosmetics.js';
+import { purchaseItem, equipItem, unequipItem, isAvailable } from '../lib/cosmetics.js';
+import { createJackpotState, addRake } from '../lib/jackpot.js';
 
 const MENTION_REGEX = /(@\w+)/g;
 
@@ -109,6 +118,15 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const clearReadyPeers = useCallback((gameType) => {
         setReadyPeers(prev => ({ ...prev, [gameType]: new Set() }));
     }, []);
+
+    // New features: Vault, Dead Drops, Cosmetics, Tambola, Profile, Jackpot
+    const [showVault, setShowVault] = useState(false);
+    const [showDeadDrops, setShowDeadDrops] = useState(false);
+    const [showCosmetics, setShowCosmetics] = useState(false);
+    const [tambolaGame, setTambolaGame] = useState(false);
+    const [profile, setProfile] = useState(null);
+    const [catalog, setCatalog] = useState(DEFAULT_CATALOG);
+    const [jackpotPool, setJackpotPool] = useState(() => createJackpotState('general'));
 
     // Pop-Culture Agent Swarm
     const [showAgentPanel, setShowAgentPanel] = useState(false);
@@ -356,12 +374,17 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         }
     }, [currentRoom, cleanupGameState]);
 
-    // ── Wallet init ──────────────────────────────────────────
+    // ── Wallet + Profile init ─────────────────────────────────
     useEffect(() => {
         if (initialNick) {
             const w = wallet.loadWallet(initialNick);
             setMyWallet(w);
             walletRef.current = w;
+            // Load persistent profile (reputation, vault, cosmetics, streak)
+            const p = loadProfile(initialNick);
+            const pUpdated = updateStreak(p);
+            if (pUpdated !== p) saveProfile(pUpdated);
+            setProfile(pUpdated);
         }
     }, [initialNick]);
 
@@ -2089,6 +2112,29 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                                 Base: {myWallet.baseBalance} · Bonus: {myWallet.adminBonus}
                             </div>
                             <div className="wallet-resets">Resets at midnight IST</div>
+                            {profile && (
+                                <div className="wallet-sub" style={{ marginTop: '4px', color: 'var(--brand)' }}>
+                                    ⭐ Karma: {profile.reputation?.karma ?? 0} · {profile.reputation?.tier ?? 'newcomer'}
+                                    {profile.vault?.staked > 0 && (
+                                        <span style={{ marginLeft: '6px', color: '#FFD700' }}>
+                                            🏦 {profile.vault.staked.toLocaleString()} staked
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                            <button className="sidebar-btn" style={{ marginTop: '6px', fontSize: '0.75rem', padding: '3px 8px' }} onClick={() => setShowVault(true)}>
+                                🏦 Vault
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Jackpot Pool */}
+                {jackpotPool.pool > 0 && (
+                    <div className="sidebar-section">
+                        <div className="sidebar-title">🎰 Jackpot Pool</div>
+                        <div className="sidebar-wallet">
+                            <div className="wallet-balance" style={{ color: '#FFD700' }}>{jackpotPool.pool.toLocaleString()} <span className="wallet-unit">chips</span></div>
                         </div>
                     </div>
                 )}
@@ -2182,6 +2228,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                                 startPolymarket(roomId);
                             }}>📊 Predictions</button>
 
+                            <button className="sidebar-btn" onClick={() => setTambolaGame(true)}>
+                                🎱 Tambola
+                            </button>
+
                             <button className="sidebar-btn" onClick={() => {
                                 const nick = prompt('Invite nick:');
                                 const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
@@ -2193,6 +2243,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                             }}>✉ Invite to Room</button>
                         </>
                     )}
+
+                    <button className="sidebar-btn" onClick={() => setShowDeadDrops(true)}>
+                        💀 Dead Drops
+                    </button>
+                    <button className="sidebar-btn" onClick={() => setShowCosmetics(true)}>
+                        ✨ Cosmetics Shop
+                    </button>
 
                     {initialIsAdmin && (
                         <button className="sidebar-btn admin-btn-sidebar" onClick={() => setShowAdmin(true)}>
@@ -2281,6 +2338,89 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 <AgentControlPanel
                     swarm={swarmRef.current}
                     onClose={() => setShowAgentPanel(false)}
+                />
+            )}
+
+            {showVault && profile && (
+                <VaultPanel
+                    wallet={myWallet}
+                    vaultData={profile.vault || { staked: 0, stakedAt: null }}
+                    onClose={() => setShowVault(false)}
+                    onStake={(amount) => {
+                        const result = vaultLib.stake(profile, myWallet, amount);
+                        if (result.success) {
+                            setProfile(prev => { const p = { ...prev, vault: result.profile.vault }; saveProfile(p); return p; });
+                            updateWallet(result.wallet);
+                            addMsg('★', `🏦 Staked ${amount.toLocaleString()} chips in the Vault!`, 'system');
+                        } else {
+                            addMsg('★', `⚠ Stake failed: ${result.reason}`, 'system');
+                        }
+                        setShowVault(false);
+                    }}
+                    onWithdraw={() => {
+                        const result = vaultLib.withdraw(profile, myWallet);
+                        if (result.success) {
+                            setProfile(prev => { const p = { ...prev, vault: { staked: 0, stakedAt: null } }; saveProfile(p); return p; });
+                            updateWallet(result.wallet);
+                            addMsg('★', `🏦 Withdrew ${result.amount.toLocaleString()} chips from Vault${result.penaltyApplied ? ' (interest forfeited)' : ''}!`, 'system');
+                        } else {
+                            addMsg('★', `⚠ Withdraw failed: ${result.reason}`, 'system');
+                        }
+                        setShowVault(false);
+                    }}
+                />
+            )}
+
+            {showDeadDrops && (
+                <DeadDropsPanel
+                    roomId={currentRoom || 'general'}
+                    karma={profile?.reputation?.karma ?? 0}
+                    deviceId={wallet.getDeviceId()}
+                    onClose={() => setShowDeadDrops(false)}
+                />
+            )}
+
+            {showCosmetics && profile && (
+                <CosmeticsShop
+                    wallet={myWallet}
+                    profile={profile}
+                    catalog={catalog}
+                    deviceId={wallet.getDeviceId()}
+                    onClose={() => setShowCosmetics(false)}
+                    onPurchase={(itemId) => {
+                        const result = purchaseItem(catalog, myWallet, itemId, wallet.getDeviceId(), Date.now());
+                        if (result.success) {
+                            setCatalog(result.catalog);
+                            updateWallet(result.wallet);
+                            const owned = [...(profile.cosmetics?.owned || []), itemId];
+                            setProfile(prev => { const p = { ...prev, cosmetics: { ...prev.cosmetics, owned } }; saveProfile(p); return p; });
+                            addMsg('★', `✨ You bought ${result.item.name}!`, 'system');
+                        } else {
+                            addMsg('★', `⚠ Purchase failed: ${result.reason}`, 'system');
+                        }
+                    }}
+                    onEquip={(itemId) => {
+                        const result = equipItem(profile, itemId);
+                        if (result.success) { setProfile(prev => { saveProfile(result.profile); return result.profile; }); }
+                    }}
+                    onUnequip={(category) => {
+                        const updated = unequipItem(profile, category);
+                        setProfile(prev => { saveProfile(updated); return updated; });
+                    }}
+                />
+            )}
+
+            {tambolaGame && (
+                <TambolaBoard
+                    myId={myIdRef.current}
+                    myNick={nickRef.current}
+                    wallet={myWallet}
+                    onClose={() => setTambolaGame(false)}
+                    onWalletUpdate={(updatedWallet) => {
+                        updateWallet(updatedWallet);
+                        // Add rake to jackpot
+                        setJackpotPool(prev => addRake(prev, 'tambola', 100));
+                    }}
                 />
             )}
             </Suspense>
