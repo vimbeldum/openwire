@@ -80,6 +80,7 @@ export function createGame(roomId, dealerId) {
     return {
         type: 'blackjack',
         roomId,
+        hostPeerId: dealerId,
         deck: createDeck(),
         dealer: {
             peer_id: dealerId,
@@ -516,6 +517,7 @@ export function runDealerTurn(game) {
 export function newRound(game) {
     return {
         ...createGame(game.roomId, game.dealer.peer_id),
+        hostPeerId: game.hostPeerId ?? game.dealer.peer_id,
         deck: createDeck(),
         players: game.players.map(p => ({
             peer_id: p.peer_id,
@@ -524,6 +526,35 @@ export function newRound(game) {
             status: 'waiting',
             bet: 0,
         })),
+    };
+}
+
+// Migrate host when a peer departs.
+// - Removes departed player from players array.
+// - If departed peer was not the host, returns updated game (host unchanged).
+// - If departed peer was the host, promotes the next remaining player (by index)
+//   as the new host. Returns null if no players remain after removal.
+// Pure function — never mutates the input game.
+export function migrateHost(game, departedPeerId) {
+    const remainingPlayers = game.players.filter(p => p.peer_id !== departedPeerId);
+    const wasHost = game.hostPeerId === departedPeerId;
+
+    if (!wasHost) {
+        // Non-host departure: just remove the player
+        return { ...game, players: remainingPlayers };
+    }
+
+    // Host departed
+    if (remainingPlayers.length === 0) {
+        return null; // no players left — game destroyed
+    }
+
+    // Promote the first remaining player (lowest original index) to host
+    const newHostPeerId = remainingPlayers[0].peer_id;
+    return {
+        ...game,
+        hostPeerId: newHostPeerId,
+        players: remainingPlayers,
     };
 }
 

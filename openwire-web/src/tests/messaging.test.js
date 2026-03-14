@@ -469,24 +469,30 @@ describe('3. Chat Core — sessionStorage persistence helpers (ChatRoom.jsx)', (
 });
 
 describe('3. Chat Core — XSS prevention (message content)', () => {
-    // The relay sends raw text; the React layer renders via renderContent() which
-    // uses dangerouslySetInnerHTML only for @-mention highlights. We test that the
-    // socket layer itself does not inject HTML when parsing incoming messages.
+    // Defense-in-depth: stripDangerousTags() is applied at the socket layer before
+    // dispatch. The React render layer (renderContent) provides a second line of defense.
 
-    it('incoming message with HTML tags is treated as plain text (not evaluated)', () => {
+    it('incoming <script> tag is stripped at the socket layer (defense-in-depth)', () => {
         const { ws, onEvent } = connectAndOpen();
         const xssPayload = '<script>alert("XSS")</script>';
         ws._simulateMessage({ type: 'chat', text: xssPayload });
         const dispatched = onEvent.mock.calls.find(([m]) => m.type === 'chat');
-        // The text should arrive unchanged — the socket layer must NOT strip or execute it
-        expect(dispatched[0].text).toBe(xssPayload);
+        // stripDangerousTags removes <script>...</script> — result is empty string
+        expect(dispatched[0].text).toBe('');
     });
 
-    it('incoming message with angle-bracket content survives JSON round-trip', () => {
+    it('safe HTML like <b> survives socket-layer sanitization', () => {
         const { ws, onEvent } = connectAndOpen();
         ws._simulateMessage({ type: 'chat', text: '<b>bold</b>' });
         const dispatched = onEvent.mock.calls.find(([m]) => m.type === 'chat');
         expect(dispatched[0].text).toBe('<b>bold</b>');
+    });
+
+    it('inline event handler onerror is stripped from incoming messages', () => {
+        const { ws, onEvent } = connectAndOpen();
+        ws._simulateMessage({ type: 'chat', text: '<img onerror="alert(1)" src="x">' });
+        const dispatched = onEvent.mock.calls.find(([m]) => m.type === 'chat');
+        expect(dispatched[0].text).not.toContain('onerror');
     });
 });
 

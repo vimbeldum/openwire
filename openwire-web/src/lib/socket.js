@@ -56,6 +56,18 @@ function drainQueue() {
     }
 }
 
+export function stripDangerousTags(text) {
+    if (typeof text !== 'string') return text;
+    return text
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+        .replace(/<object[\s\S]*?<\/object>/gi, '')
+        .replace(/<embed[^>]*>/gi, '')
+        .replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '')
+        .replace(/\s+on\w+\s*=\s*[^\s>]*/gi, '')
+        .replace(/javascript\s*:/gi, 'nojavascript:');
+}
+
 /**
  * Returns the current connection mode.
  * @returns {'relay' | 'cli-node'}
@@ -117,6 +129,10 @@ function _openWebSocket(url, nick, onEvent, { isAdmin = false, adminSecret = '' 
                 console.warn('[OpenWire] Rate limited by server');
                 return;
             }
+            // Sanitize user-generated text fields before dispatching
+            if (msg.text !== undefined) msg.text = stripDangerousTags(msg.text);
+            if (msg.data !== undefined && typeof msg.data === 'string') msg.data = stripDangerousTags(msg.data);
+            if (msg.content !== undefined) msg.content = stripDangerousTags(msg.content);
             listeners.forEach((fn) => fn(msg));
         } catch { /* ignore */ }
     };

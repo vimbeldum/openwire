@@ -155,6 +155,9 @@ export class AgentSwarm {
 
         // Load initial config from store
         this._loadFromStore();
+
+        // Restore muted agents from previous session
+        this._loadMuteState();
     }
 
     // ── Config loading ────────────────────────────────────────
@@ -414,9 +417,26 @@ export class AgentSwarm {
 
     // ── Configuration ────────────────────────────────────────
 
+    _loadMuteState() {
+        const MUTED_KEY = 'openwire:muted-agents';
+        try {
+            const raw = localStorage.getItem(MUTED_KEY);
+            if (raw) {
+                const muted = JSON.parse(raw);
+                if (Array.isArray(muted)) {
+                    muted.forEach(id => { this._charEnabled[id] = false; });
+                }
+            }
+        } catch { /* ignore corrupt or missing data */ }
+    }
+
     setCharacterEnabled(characterId, enabled) {
         this._charEnabled[characterId] = enabled;
         this._log(`[Config] ${this._characters[characterId]?.name} ${enabled ? 'enabled' : 'disabled'}`);
+        // Persist mute state to localStorage
+        const MUTED_KEY = 'openwire:muted-agents';
+        const muted = [...Object.entries(this._charEnabled).filter(([, v]) => v === false).map(([k]) => k)];
+        localStorage.setItem(MUTED_KEY, JSON.stringify(muted));
     }
 
     setShowEnabled(showId, enabled) {

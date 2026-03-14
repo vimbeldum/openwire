@@ -186,6 +186,50 @@ export function adminAdjust(wallet, delta, reason = 'Admin adjustment') {
     return updated;
 }
 
+/* ── Tip: transfer from one wallet to another ─────────────── */
+export function tip(fromWallet, toWallet, amount) {
+    if (!Number.isFinite(amount) || amount <= 0) {
+        return { success: false, reason: 'invalid_amount' };
+    }
+    if (!canAfford(fromWallet, amount)) {
+        return { success: false, reason: 'insufficient_balance' };
+    }
+
+    // Deduct from sender (baseBalance first, then adminBonus)
+    let base = fromWallet.baseBalance;
+    let bonus = fromWallet.adminBonus;
+    if (amount <= base) {
+        base -= amount;
+    } else {
+        const fromBase = base;
+        base = 0;
+        bonus -= (amount - fromBase);
+    }
+    const newFromTotal = Math.max(0, base) + Math.max(0, bonus);
+    const updatedFrom = {
+        ...fromWallet,
+        baseBalance: Math.max(0, base),
+        adminBonus: Math.max(0, bonus),
+        history: [
+            ...(fromWallet.history || []).slice(-99),
+            { time: Date.now(), type: 'tip', reason: `Tip sent to ${toWallet.nick || toWallet.deviceId}`, amount: -amount, balance: newFromTotal },
+        ],
+    };
+
+    // Credit receiver (goes to baseBalance, same as game winnings)
+    const newToTotal = getTotalBalance(toWallet) + amount;
+    const updatedTo = {
+        ...toWallet,
+        baseBalance: toWallet.baseBalance + amount,
+        history: [
+            ...(toWallet.history || []).slice(-99),
+            { time: Date.now(), type: 'tip', reason: `Tip received from ${fromWallet.nick || fromWallet.deviceId}`, amount: +amount, balance: newToTotal },
+        ],
+    };
+
+    return { success: true, from: updatedFrom, to: updatedTo };
+}
+
 /* Flush pending wallet on page unload to prevent data loss */
 if (typeof window !== 'undefined') {
     window.addEventListener('beforeunload', () => {

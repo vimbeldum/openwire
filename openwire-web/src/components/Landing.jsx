@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AdminPasswordGate } from './AdminPortal';
+import { sanitizeNick } from '../lib/utils/sanitizeNick';
 
 const CLI_NODE_URL_KEY = 'openwire_cli_node_url';
 const DEFAULT_CLI_URL = import.meta.env.VITE_CLI_BRIDGE_URL || 'ws://localhost:18080';
@@ -14,7 +15,7 @@ export default function Landing({ onJoin }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        const nick = name.trim().replace(/[\x00-\x1f\x7f]/g, '').slice(0, 24) || 'Anonymous';
+        const nick = sanitizeNick(name);
         if (connectMode === 'cli-node') {
             const trimmed = cliUrl.trim() || DEFAULT_CLI_URL;
             localStorage.setItem(CLI_NODE_URL_KEY, trimmed);
@@ -26,7 +27,7 @@ export default function Landing({ onJoin }) {
 
     const handleAdminSuccess = () => {
         setShowAdminGate(false);
-        const nick = name.trim() || 'Admin';
+        const nick = sanitizeNick(name, 'Admin');
         onJoin(nick, true, { mode: 'relay' });
     };
 
