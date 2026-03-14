@@ -854,7 +854,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 const gt = action.gameType;
                 if (gt === 'blackjack' && amIHost(bjHostRef.current)) {
                     const current = blackjackRef.current;
-                    if (current && current.phase === 'ended') {
+                    if (current && current.phase !== 'betting' && current.phase !== 'playing') {
+                        if (bjTurnTimerRef.current) { clearTimeout(bjTurnTimerRef.current); bjTurnTimerRef.current = null; }
                         const newGame = bj.newRound(current);
                         setBlackjackGame(newGame);
                         clearReadyPeers('blackjack');
@@ -863,7 +864,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     }
                 } else if (gt === 'roulette' && amIHost(rouletteHostRef.current)) {
                     const current = rouletteRef.current;
-                    if (current && current.phase === 'results') {
+                    if (current && current.phase !== 'betting') {
+                        if (rouletteTimerRef.current) { clearInterval(rouletteTimerRef.current); rouletteTimerRef.current = null; }
+                        clearTimeout(rouletteSpinTimeoutRef.current);
                         clearTimeout(rouletteResultTimeoutRef.current);
                         const reset = rl.newRound(current);
                         setRouletteGame(reset);
@@ -872,8 +875,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     }
                 } else if (gt === 'andarbahar' && amIHost(abHostRef.current)) {
                     const current = andarBaharRef.current;
-                    if (current && current.phase === 'ended') {
+                    if (current && current.phase !== 'betting') {
                         if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
+                        if (abDealTimerRef.current) { clearInterval(abDealTimerRef.current); abDealTimerRef.current = null; }
+                        abGenRef.current++;
                         const reset = ab.newRound(current);
                         setAndarBaharGame(reset);
                         clearReadyPeers('andarbahar');
@@ -1376,7 +1381,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         const myId = myIdRef.current;
         if (gameType === 'blackjack' && amIHost(bjHostRef.current)) {
             const current = blackjackRef.current;
-            if (current && current.phase === 'ended') {
+            if (current && current.phase !== 'betting' && current.phase !== 'playing') {
+                if (bjTurnTimerRef.current) { clearTimeout(bjTurnTimerRef.current); bjTurnTimerRef.current = null; }
                 const newGame = bj.newRound(current);
                 setBlackjackGame(newGame);
                 clearReadyPeers('blackjack');
@@ -1385,17 +1391,22 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             }
         } else if (gameType === 'roulette' && amIHost(rouletteHostRef.current)) {
             const current = rouletteRef.current;
-            if (current && current.phase === 'results') {
+            if (current && current.phase !== 'betting') {
+                if (rouletteTimerRef.current) { clearInterval(rouletteTimerRef.current); rouletteTimerRef.current = null; }
+                clearTimeout(rouletteSpinTimeoutRef.current);
                 clearTimeout(rouletteResultTimeoutRef.current);
                 const reset = rl.newRound(current);
                 setRouletteGame(reset);
                 clearReadyPeers('roulette');
                 socket.sendRoomMessage(reset.roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(reset) }));
+                startRouletteTimer();
             }
         } else if (gameType === 'andarbahar' && amIHost(abHostRef.current)) {
             const current = andarBaharRef.current;
-            if (current && current.phase === 'ended') {
+            if (current && current.phase !== 'betting') {
                 if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
+                if (abDealTimerRef.current) { clearInterval(abDealTimerRef.current); abDealTimerRef.current = null; }
+                abGenRef.current++;
                 const reset = ab.newRound(current);
                 setAndarBaharGame(reset);
                 clearReadyPeers('andarbahar');
