@@ -584,8 +584,44 @@
 
 .gif-header {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.gif-tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.gif-tab {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.gif-tab.active {
+  background: rgba(102, 161, 238, 0.15);
+  border-color: rgba(102, 161, 238, 0.3);
+  color: var(--secondary);
+}
+
+.gif-tab:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.gif-search-row {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--glass-border);
 }
 
@@ -624,9 +660,6 @@
 }
 
 .gif-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
   padding: 6px;
   max-height: 280px;
   overflow-y: auto;
