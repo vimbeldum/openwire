@@ -58,7 +58,7 @@ import { loadProfile, saveProfile, updateStreak } from '../lib/profile.js';
 import { applyKarma, KARMA_EVENTS, getTier } from '../lib/reputation.js';
 import * as vaultLib from '../lib/vault.js';
 import { DEFAULT_CATALOG } from '../lib/cosmetics.js';
-import { purchaseItem, equipItem, unequipItem, isAvailable } from '../lib/cosmetics.js';
+import { purchaseItem, equipItem, unequipItem, isAvailable, getEquippedClasses } from '../lib/cosmetics.js';
 import { createJackpotState, addRake } from '../lib/jackpot.js';
 
 const MENTION_REGEX = /(@\w+)/g;
@@ -2016,6 +2016,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const myNick = nickRef.current;
     const currentRoomName = currentRoom ? rooms.find(r => r.room_id === currentRoom)?.name || 'Unknown Room' : null;
     const balance = myWallet ? wallet.getTotalBalance(myWallet) : 0;
+    const myCosmetics = useMemo(() => profile ? getEquippedClasses(profile) : null, [profile]);
     const anyGameActive = !!(activeGame || blackjackGame || rouletteGame || andarBaharGame || polymarketGame);
 
     // ── Stable callback props for memoized board components ──
@@ -2166,6 +2167,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                         onReact={handleReact}
                         onJoinInvite={joinGameFromInvite}
                         onDismissInvite={dismissInvite}
+                        myCosmetics={myCosmetics}
                     />
                 ))}
                 <div ref={messagesEnd} />

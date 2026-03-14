@@ -805,6 +805,57 @@
   border: 1px solid rgba(168, 102, 238, 0.15);
 }
 
+/* ── Cosmetic Bubble Styles ────────────────────── */
+.msg .msg-content.bubble-neon-green {
+  background: rgba(0, 255, 128, 0.12);
+  border: 1px solid rgba(0, 255, 128, 0.35);
+  box-shadow: 0 0 8px rgba(0, 255, 128, 0.15);
+}
+
+.msg .msg-content.bubble-cyberpunk-red {
+  background: rgba(255, 30, 60, 0.12);
+  border: 1px solid rgba(255, 30, 60, 0.35);
+  box-shadow: 0 0 8px rgba(255, 30, 60, 0.15);
+}
+
+.msg .msg-content.bubble-pastel-pink {
+  background: rgba(255, 182, 193, 0.15);
+  border: 1px solid rgba(255, 182, 193, 0.4);
+}
+
+/* ── Cosmetic Name Colors ─────────────────────── */
+.msg .msg-sender.name-gold {
+  color: #FFD700 !important;
+  text-shadow: 0 0 6px rgba(255, 215, 0, 0.3);
+}
+
+.msg .msg-sender.name-rainbow {
+  background: linear-gradient(90deg, #ff0000, #ff8800, #ffff00, #00ff00, #0088ff, #8800ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Cosmetic Chat Flairs ─────────────────────── */
+.msg .msg-content.flair-sparkle {
+  position: relative;
+}
+.msg .msg-content.flair-sparkle::after {
+  content: '✨';
+  margin-left: 0.3rem;
+}
+
+.msg .msg-content.flair-glitch {
+  animation: cosmeticGlitch 3s infinite;
+}
+
+@keyframes cosmeticGlitch {
+  0%, 95%, 100% { transform: none; opacity: 1; }
+  96% { transform: translateX(-2px); opacity: 0.8; }
+  97% { transform: translateX(2px) skewX(-1deg); opacity: 0.9; }
+  98% { transform: translateX(-1px); opacity: 0.85; }
+}
+
 /* Sidebar invite toast improvements */
 .invite-toasts {
   position: fixed;

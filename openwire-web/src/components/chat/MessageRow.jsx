@@ -3,7 +3,7 @@ import { memo, useState, useEffect } from 'react';
 const REACTION_EMOJIS = ['\u{1F525}', '\u{1F44F}', '\u{1F4B0}'];
 const INVITE_EXPIRE_MS = 60 * 1000; // 60s
 
-function MessageRow({ msg, renderContent, onReact, onJoinInvite, onDismissInvite }) {
+function MessageRow({ msg, renderContent, onReact, onJoinInvite, onDismissInvite, myCosmetics }) {
     // Invite expiry: re-check every second
     const [now, setNow] = useState(Date.now());
     useEffect(() => {
@@ -47,14 +47,23 @@ function MessageRow({ msg, renderContent, onReact, onJoinInvite, onDismissInvite
         );
     }
 
+    // Resolve cosmetic CSS classes for own messages
+    const isSelf = msg.type === 'self';
+    const cos = isSelf && myCosmetics ? myCosmetics : null;
+    const bubbleClass = cos?.bubbleStyle || '';
+    const nameClass = cos?.nameColor || '';
+    const flairClass = cos?.chatFlair || '';
+    const contentClasses = ['msg-content', bubbleClass, flairClass].filter(Boolean).join(' ');
+    const senderClasses = ['msg-sender', msg.type, nameClass].filter(Boolean).join(' ');
+
     return (
         <div className={`msg ${msg.type}${msg.type === 'whisper' ? ' whisper' : ''}`}>
             <span className="msg-time">[{msg.time}]</span>
-            {msg.sender && <span className={`msg-sender ${msg.type}`}>{msg.sender}:</span>}
+            {msg.sender && <span className={senderClasses}>{msg.sender}:</span>}
             {msg.gif ? (
                 <img src={msg.gif} alt="GIF" className="msg-gif" />
             ) : (
-                <span className="msg-content"> {renderContent(msg.content)}</span>
+                <span className={contentClasses}> {renderContent(msg.content)}</span>
             )}
             {/* Emoji reaction display */}
             {msg.reactions && Object.keys(msg.reactions).length > 0 && (
