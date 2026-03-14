@@ -414,6 +414,67 @@
   color: #DDD;
 }
 
+/* ── Quick-bet row (Bet Again / Double) ───────────────────── */
+.quick-bet-row {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.quick-bet-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.55rem 0.75rem;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.12s, filter 0.12s;
+  font-family: inherit;
+}
+
+.quick-bet-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.15);
+}
+
+.quick-bet-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.quick-bet-btn.repeat {
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  color: #fff;
+}
+
+.quick-bet-btn.double {
+  background: linear-gradient(135deg, #b45309, #d97706);
+  color: #fff;
+}
+
+.quick-bet-icon {
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.quick-bet-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1;
+}
+
+.quick-bet-amount {
+  font-size: 0.65rem;
+  opacity: 0.85;
+  line-height: 1;
+}
+
 /* Chip selector (shared) */
 .chip-selector {
   display: flex;

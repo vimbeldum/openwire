@@ -376,9 +376,17 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
 
                             {/* Bet Again / Double from last round */}
                             {game.phase === 'betting' && lastMyBets.length > 0 && myBets.length === 0 && (
-                                <div className="rl-quick-bet-row">
-                                    <button className="rl-bet-again-btn" onClick={handleBetAgain} disabled={lastMyBets.reduce((s,b) => s+b.amount,0) > balance}>↺ Bet Again</button>
-                                    <button className="rl-bet-again-btn double" onClick={handleDouble} disabled={lastMyBets.reduce((s,b) => s+b.amount*2,0) > balance}>✕2 Double</button>
+                                <div className="quick-bet-row">
+                                    <button className="quick-bet-btn repeat" onClick={handleBetAgain} disabled={lastMyBets.reduce((s,b) => s+b.amount,0) > balance}>
+                                        <span className="quick-bet-icon">↺</span>
+                                        <span className="quick-bet-label">Bet Again</span>
+                                        <span className="quick-bet-amount">{lastMyBets.reduce((s,b) => s+b.amount,0)} chips</span>
+                                    </button>
+                                    <button className="quick-bet-btn double" onClick={handleDouble} disabled={lastMyBets.reduce((s,b) => s+b.amount*2,0) > balance}>
+                                        <span className="quick-bet-icon">×2</span>
+                                        <span className="quick-bet-label">Double</span>
+                                        <span className="quick-bet-amount">{lastMyBets.reduce((s,b) => s+b.amount*2,0)} chips</span>
+                                    </button>
                                 </div>
                             )}
 
@@ -474,12 +482,6 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
                             )}
                             {game.phase === 'results' && (
                                 <div className="rl-new-round-row">
-                                    {lastMyBets.length > 0 && !betAgainQueued && (
-                                        <>
-                                            <button className="rl-bet-again-btn" onClick={() => handleQueueBetAgain(1)} disabled={lastMyBets.reduce((s,b) => s+b.amount,0) > balance}>↺ Bet Again</button>
-                                            <button className="rl-bet-again-btn double" onClick={() => handleQueueBetAgain(2)} disabled={lastMyBets.reduce((s,b) => s+b.amount*2,0) > balance}>✕2 Double</button>
-                                        </>
-                                    )}
                                     {betAgainQueued && <span className="rl-queued-badge">Bets queued ✓</span>}
                                     <button className="ready-btn" onClick={onNewRound}>Next Round</button>
                                 </div>

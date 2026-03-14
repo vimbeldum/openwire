@@ -308,12 +308,6 @@ export default memo(function AndarBaharBoard({ game, myId, myNick, wallet, onAct
                 )}
                 {game.phase === 'ended' && (
                     <div className="ab-new-round-row">
-                        {lastMyBets.length > 0 && (
-                            <>
-                                <button className="rl-bet-again-btn" onClick={handleBetAgain} disabled={lastMyBets.reduce((s,b)=>s+b.amount,0) > balance}>↺ Bet Again</button>
-                                <button className="rl-bet-again-btn double" onClick={handleDoubleDown} disabled={lastMyBets.reduce((s,b)=>s+b.amount*2,0) > balance}>✕2 Double</button>
-                            </>
-                        )}
                         <button className="ready-btn" onClick={onNewRound}>Next Round</button>
                     </div>
                 )}
@@ -323,9 +317,17 @@ export default memo(function AndarBaharBoard({ game, myId, myNick, wallet, onAct
                     <div className="ab-bet-controls">
                         {/* Bet Again / Double from last round */}
                         {lastMyBets.length > 0 && myBets.length === 0 && (
-                            <div className="rl-quick-bet-row" style={{ justifyContent: 'center', marginBottom: '0.5rem' }}>
-                                <button className="rl-bet-again-btn" onClick={handleBetAgain} disabled={lastMyBets.reduce((s,b)=>s+b.amount,0) > balance}>↺ Bet Again</button>
-                                <button className="rl-bet-again-btn double" onClick={handleDoubleDown} disabled={lastMyBets.reduce((s,b)=>s+b.amount*2,0) > balance}>✕2 Double</button>
+                            <div className="quick-bet-row">
+                                <button className="quick-bet-btn repeat" onClick={handleBetAgain} disabled={lastMyBets.reduce((s,b)=>s+b.amount,0) > balance}>
+                                    <span className="quick-bet-icon">↺</span>
+                                    <span className="quick-bet-label">Bet Again</span>
+                                    <span className="quick-bet-amount">{lastMyBets.reduce((s,b)=>s+b.amount,0)} chips</span>
+                                </button>
+                                <button className="quick-bet-btn double" onClick={handleDoubleDown} disabled={lastMyBets.reduce((s,b)=>s+b.amount*2,0) > balance}>
+                                    <span className="quick-bet-icon">×2</span>
+                                    <span className="quick-bet-label">Double</span>
+                                    <span className="quick-bet-amount">{lastMyBets.reduce((s,b)=>s+b.amount*2,0)} chips</span>
+                                </button>
                             </div>
                         )}
                         {/* Chip selector */}
