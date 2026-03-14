@@ -1409,12 +1409,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     useEffect(() => {
         const myId = myIdRef.current;
 
-        // Roulette: check if all bettors are ready
+        // Roulette: check if all bettors are ready (require 2+ bettors for instant-start)
         const rlGame = rouletteRef.current;
         if (rlGame && rlGame.phase === 'betting' && amIHost(rouletteHostRef.current)) {
             const bettorIds = [...new Set((rlGame.bets || []).map(b => b.peer_id))];
             const readySet = readyPeers.roulette;
-            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
+            if (bettorIds.length > 1 && bettorIds.every(id => readySet.has(id))) {
                 // All bettors ready — instant spin
                 clearReadyPeers('roulette');
                 if (rouletteTimerRef.current) clearInterval(rouletteTimerRef.current);
@@ -1448,12 +1448,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             }
         }
 
-        // Blackjack: check if all bettors are ready
+        // Blackjack: check if all bettors are ready (require 2+ for instant-start)
         const bjGame = blackjackRef.current;
         if (bjGame && bjGame.phase === 'betting' && amIHost(bjHostRef.current)) {
             const bettorIds = bjGame.players.filter(p => p.bet > 0).map(p => p.peer_id);
             const readySet = readyPeers.blackjack;
-            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
+            if (bettorIds.length > 1 && bettorIds.every(id => readySet.has(id))) {
                 clearReadyPeers('blackjack');
                 if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
                 const dealtGame = bj.dealInitialCards(bjGame);
@@ -1464,12 +1464,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             }
         }
 
-        // Andar Bahar: check if all bettors are ready
+        // Andar Bahar: check if all bettors are ready (require 2+ for instant-start)
         const abGame = andarBaharRef.current;
         if (abGame && abGame.phase === 'betting' && amIHost(abHostRef.current)) {
             const bettorIds = [...new Set((abGame.bets || []).map(b => b.peer_id))];
             const readySet = readyPeers.andarbahar;
-            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
+            if (bettorIds.length > 1 && bettorIds.every(id => readySet.has(id))) {
                 clearReadyPeers('andarbahar');
                 if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
                 abGenRef.current++;

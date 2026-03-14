@@ -32,7 +32,9 @@ function RouletteWheel({ spinning, result, showBall }) {
 
         const idx = WHEEL_ORDER.indexOf(result);
         const sectorAngle = 360 / 37;
-        const centerAngle = (idx + 0.5) * sectorAngle;
+        // Random offset within the sector (not always dead center)
+        const jitter = (Math.random() - 0.5) * sectorAngle * 0.7; // ±35% of sector width
+        const centerAngle = (idx + 0.5) * sectorAngle + jitter;
         const targetAngle = 360 - centerAngle;
         const spins = 5 + Math.floor(Math.random() * 3);
         const baseRot = prevRotation.current;
