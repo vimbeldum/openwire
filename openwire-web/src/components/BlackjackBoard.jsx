@@ -57,6 +57,8 @@ function Hand({ cards, label, value, hidden = false, status = '', isMyTurn = fal
     const hasSplit = splitCards && splitCards.length > 0;
     const mainActive = isMyTurn && hasSplit && !playingSplit;
     const splitActive = isMyTurn && hasSplit && playingSplit;
+    // Only show the score after all cards for this hand have been visually revealed
+    const allDealt = cards.length === 0 || revealCount >= cards.length;
     return (
         <div className={`bj-hand-zone ${isMyTurn ? 'active-turn' : ''} ${status === 'bust' ? 'bust' : ''}`}>
             <div className="bj-hand-header">
@@ -64,8 +66,8 @@ function Hand({ cards, label, value, hidden = false, status = '', isMyTurn = fal
                 {hasSplit && <span className="bj-hand-label-tag">Main Hand</span>}
                 {mainActive && <span className="bj-active-tag">ACTIVE</span>}
                 <span className="bj-hand-val">
-                    {hidden ? '?' : value}
-                    {status && <span className={`bj-status-badge ${status}`}>{status.replace('-', ' ').toUpperCase()}</span>}
+                    {hidden ? '?' : (allDealt ? value : '…')}
+                    {status && allDealt && <span className={`bj-status-badge ${status}`}>{status.replace('-', ' ').toUpperCase()}</span>}
                 </span>
             </div>
             <div className={`bj-cards-fan ${mainActive ? 'split-active' : ''}`}>

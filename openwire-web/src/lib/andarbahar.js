@@ -118,7 +118,7 @@ export function dealNext(game) {
     const isMatch = card.value === game.trumpCard.value;
     if (isMatch) {
         const result = side;
-        const newHistory = [...(game.trumpHistory || []), result].slice(-100);
+        const newHistory = [...(game.trumpHistory || []), { result, totalCards: andar.length + bahar.length }].slice(-100);
         saveHistory(game.roomId, newHistory);
 
         // Payout: Andar pays 0.9:1 if trump was first seen on Bahar side (standard rule)

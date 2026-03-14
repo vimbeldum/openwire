@@ -92,7 +92,17 @@ function HistoryStrip({ history }) {
     return (
         <div className="game-history-strip" ref={ref}>
             {history.map((entry, i) => {
-                // History entries can be strings ('andar'/'bahar') or card objects
+                // New format: { result: 'andar'|'bahar', totalCards: number }
+                if (entry && typeof entry === 'object' && entry.result) {
+                    const label = entry.result === 'andar' ? 'A' : 'B';
+                    const cls = entry.result === 'andar' ? 'blue' : 'orange';
+                    return (
+                        <span key={i} className={`history-pip ${cls}`} title={`${entry.totalCards} cards dealt`}>
+                            {label}<span style={{ fontSize: '0.55em', opacity: 0.75, marginLeft: '1px' }}>{entry.totalCards}</span>
+                        </span>
+                    );
+                }
+                // Legacy string format ('andar'/'bahar')
                 if (typeof entry === 'string') {
                     const label = entry === 'andar' ? 'A' : 'B';
                     const cls = entry === 'andar' ? 'blue' : 'orange';
@@ -102,6 +112,7 @@ function HistoryStrip({ history }) {
                         </span>
                     );
                 }
+                // Legacy card object format
                 const isRed = entry.suit === '\u2665' || entry.suit === '\u2666';
                 return (
                     <span key={i} className={`history-pip ${isRed ? 'red' : 'black'}`}>

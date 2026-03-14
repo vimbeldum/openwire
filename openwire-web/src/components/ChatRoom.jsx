@@ -51,6 +51,7 @@ import * as ledger from '../lib/core/ledger.js';
 import { getRoomAlias } from '../lib/core/identity.js';
 import { loadStore, getCharactersDict } from '../lib/agents/agentStore.js';
 import { loadProfile, saveProfile, updateStreak } from '../lib/profile.js';
+import { applyKarma, KARMA_EVENTS } from '../lib/reputation.js';
 import * as vaultLib from '../lib/vault.js';
 import { DEFAULT_CATALOG } from '../lib/cosmetics.js';
 import { purchaseItem, equipItem, unequipItem, isAvailable } from '../lib/cosmetics.js';
@@ -572,6 +573,20 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         if (net !== undefined && Math.abs(net) >= 50) {
             const sign = net > 0 ? '+' : '';
             addTicker(`${nickRef.current} ${sign}${net} — ${event.resultLabel}`, event.gameType);
+        }
+        // Award karma for game wins (net > 0 means the player profited)
+        if (net > 0) {
+            setProfile(prev => {
+                if (!prev) return prev;
+                const newRep = applyKarma(
+                    prev.reputation ?? { karma: 0, tier: 'newcomer', history: [] },
+                    KARMA_EVENTS.GAME_WIN,
+                    { gameType: event.gameType },
+                );
+                const updated = { ...prev, reputation: newRep };
+                saveProfile(updated);
+                return updated;
+            });
         }
         // Broadcast big wins to room ticker
         if (net >= 200 && currentRoomRef.current) {
