@@ -22,8 +22,8 @@ const PRIZE_KEYS = ['earlyFive', 'topLine', 'middleLine', 'bottomLine', 'fullHou
 
 /* ── Small helpers ─────────────────────────────────────── */
 
-// markedSet = Set of numbers the user has manually clicked to mark
-function TicketGrid({ ticket, calledSet, markedSet, onMark, interactive }) {
+// markedSet = Set of numbers the user has manually ticked (any number, regardless of whether called)
+function TicketGrid({ ticket, markedSet, onMark, interactive }) {
     return (
         <table style={styles.ticketTable}>
             <tbody>
@@ -31,28 +31,25 @@ function TicketGrid({ ticket, calledSet, markedSet, onMark, interactive }) {
                     <tr key={rIdx}>
                         {row.map((cell, cIdx) => {
                             const blank = cell === 0;
-                            const called = !blank && calledSet.has(cell);
                             const marked = !blank && markedSet && markedSet.has(cell);
                             return (
                                 <td
                                     key={cIdx}
-                                    onClick={() => interactive && called && !blank && onMark && onMark(cell)}
+                                    onClick={() => interactive && !blank && onMark && onMark(cell)}
                                     style={{
                                         ...styles.ticketCell,
                                         background: blank
                                             ? 'rgba(255,255,255,0.04)'
                                             : marked
                                             ? 'rgba(74,222,128,0.25)'
-                                            : called
-                                            ? 'rgba(251,191,36,0.18)'
                                             : 'rgba(255,255,255,0.08)',
-                                        color: blank ? 'transparent' : marked ? '#4ade80' : called ? '#fbbf24' : 'var(--text-primary, #e2e8f0)',
-                                        fontWeight: marked || called ? '700' : '500',
-                                        border: marked ? '1px solid rgba(74,222,128,0.5)' : called ? '1px solid rgba(251,191,36,0.4)' : '1px solid rgba(255,255,255,0.1)',
-                                        cursor: interactive && called && !blank ? 'pointer' : 'default',
+                                        color: blank ? 'transparent' : marked ? '#4ade80' : 'var(--text-primary, #e2e8f0)',
+                                        fontWeight: marked ? '700' : '500',
+                                        border: marked ? '1px solid rgba(74,222,128,0.5)' : '1px solid rgba(255,255,255,0.1)',
+                                        cursor: interactive && !blank ? 'pointer' : 'default',
                                         position: 'relative',
                                     }}
-                                    title={interactive && called && !blank ? 'Click to mark' : undefined}
+                                    title={interactive && !blank ? (marked ? 'Click to unmark' : 'Click to mark') : undefined}
                                 >
                                     {blank ? '' : cell}
                                     {marked && <span style={{ position: 'absolute', top: 0, right: 2, fontSize: '0.55rem', color: '#4ade80' }}>✓</span>}
@@ -177,10 +174,11 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
     }
 
     function handleMark(num) {
-        if (!calledSet.has(num)) return;
+        // Toggle: mark or unmark any number on the ticket
         setMarkedNumbers(prev => {
             const next = new Set(prev);
-            next.add(num);
+            if (next.has(num)) next.delete(num);
+            else next.add(num);
             return next;
         });
     }
@@ -195,30 +193,82 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
         setPhase('playing');
     }
 
+    function getRequiredNumbers(ticket, prizeKey) {
+        if (!ticket) return [];
+        switch (prizeKey) {
+            case 'earlyFive': {
+                // All non-zero numbers on the ticket — user needs any 5 marked
+                return ticket.flat().filter(n => n !== 0);
+            }
+            case 'topLine': return ticket[0].filter(n => n !== 0);
+            case 'middleLine': return ticket[1].filter(n => n !== 0);
+            case 'bottomLine': return ticket[2].filter(n => n !== 0);
+            case 'fullHouse': return ticket.flat().filter(n => n !== 0);
+            default: return [];
+        }
+    }
+
     function handleClaim(prizeKey) {
-        // Try each ticket — use the first one that wins
-        let winResult = null;
+        const penalty = gameState.prizes[prizeKey]?.amount ?? 0;
+
+        // Check user's marked numbers: find ticket where marks satisfy the prize
+        let validTicketIdx = -1;
         for (let tIdx = 0; tIdx < myTickets.length; tIdx++) {
-            const r = claimPrize(gameState, myId, prizeKey, tIdx);
-            if (r.success) { winResult = r; break; }
+            const required = getRequiredNumbers(myTickets[tIdx], prizeKey);
+
+            if (prizeKey === 'earlyFive') {
+                // Need at least 5 marks from this ticket's numbers
+                const markedOnTicket = required.filter(n => markedNumbers.has(n));
+                if (markedOnTicket.length >= 5) {
+                    // Check for bogus: any marked number not yet called
+                    const bogus = markedOnTicket.some(n => !calledSet.has(n));
+                    if (bogus) {
+                        const reason = penalty > 0 ? `Bogus Claim! −${penalty} chips` : 'Bogus Claim!';
+                        if (penalty > 0 && totalChips >= penalty) onWalletUpdate(debit(wallet, penalty, `Bogus ${PRIZES[prizeKey].name} claim`));
+                        showToast(reason, 'error');
+                        return;
+                    }
+                    validTicketIdx = tIdx;
+                    break;
+                }
+            } else {
+                // Need all required numbers marked
+                const allMarked = required.every(n => markedNumbers.has(n));
+                if (allMarked) {
+                    // Check for bogus: any required number not yet called
+                    const bogus = required.some(n => !calledSet.has(n));
+                    if (bogus) {
+                        const reason = penalty > 0 ? `Bogus Claim! −${penalty} chips` : 'Bogus Claim!';
+                        if (penalty > 0 && totalChips >= penalty) onWalletUpdate(debit(wallet, penalty, `Bogus ${PRIZES[prizeKey].name} claim`));
+                        showToast(reason, 'error');
+                        return;
+                    }
+                    validTicketIdx = tIdx;
+                    break;
+                }
+            }
         }
 
-        if (winResult) {
-            setGameState(winResult.state);
+        if (validTicketIdx === -1) {
+            showToast('Mark all required numbers first!', 'info');
+            return;
+        }
+
+        // Marks are valid — try the engine claim
+        const r = claimPrize(gameState, myId, prizeKey, validTicketIdx);
+        if (r.success) {
+            setGameState(r.state);
             setClaimedPrizes(prev => new Set(prev).add(prizeKey));
-            onWalletUpdate(credit(wallet, winResult.amount, `Tambola ${PRIZES[prizeKey].name}`));
-            showToast(`${PRIZES[prizeKey].name} — Won ${winResult.amount} chips!`, 'win');
-            if (winResult.state.status === 'ended') {
+            onWalletUpdate(credit(wallet, r.amount, `Tambola ${PRIZES[prizeKey].name}`));
+            showToast(`${PRIZES[prizeKey].name} — Won ${r.amount} chips!`, 'win');
+            if (r.state.status === 'ended') {
                 clearInterval(drawRef.current);
                 setPhase('ended');
             }
         } else {
-            // Bogus claim — penalise equal to the prize that would have been won
-            const penalty = gameState.prizes[prizeKey]?.amount ?? 0;
-            if (penalty > 0 && totalChips >= penalty) {
-                onWalletUpdate(debit(wallet, penalty, `Bogus ${PRIZES[prizeKey].name} claim`));
-            }
-            const reason = penalty > 0 ? `Bogus Claim! −${penalty} chips` : 'Bogus Claim!';
+            // Engine rejected (someone else claimed first or timing)
+            const reason = penalty > 0 ? `Bogus Claim! −${penalty} chips` : 'Already Claimed!';
+            if (penalty > 0 && totalChips >= penalty) onWalletUpdate(debit(wallet, penalty, `Bogus ${PRIZES[prizeKey].name} claim`));
             showToast(reason, 'error');
         }
     }
@@ -261,8 +311,8 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
                             </p>
                             <ul style={{ ...styles.rules, paddingLeft: '1.2rem', margin: 0 }}>
                                 <li>Each ticket costs <strong>{TICKET_PRICE} chips</strong> and has 15 numbers on a 3×9 grid.</li>
-                                <li>Numbers are drawn every 10 seconds. You <strong>won't see</strong> which number was called — check your ticket!</li>
-                                <li>Tap a <span style={{ color: '#fbbf24' }}>yellow</span> cell (called number) to mark it <span style={{ color: '#4ade80' }}>green</span>.</li>
+                                <li>Numbers are drawn every 10 seconds. The last called number is shown — check your ticket yourself!</li>
+                                <li>Tap any cell to mark it <span style={{ color: '#4ade80' }}>green</span>. Tap again to unmark. Wrong marks = bogus claim penalty!</li>
                                 <li>Claim prizes before anyone else does:</li>
                             </ul>
                             <div style={styles.rulesPrizeList}>
@@ -307,7 +357,7 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
                             {myTickets.length > 0 && (
                                 <div style={styles.ticketSection}>
                                     <p style={styles.subheading}>Your Ticket</p>
-                                    <TicketGrid ticket={myTickets[0]} calledSet={new Set()} />
+                                    <TicketGrid ticket={myTickets[0]} markedSet={new Set()} />
                                 </div>
                             )}
                         </div>
@@ -316,13 +366,13 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
                     {/* ── PLAYING ───────────────────────── */}
                     {phase === 'playing' && (
                         <div style={styles.section}>
-                            {/* Numbers called counter — the actual numbers are hidden, find them on your ticket */}
+                            {/* Last called number — find it on your ticket and mark it! */}
                             <div style={styles.lastNumWrapper}>
-                                <span style={styles.lastNumLabel}>Numbers Called</span>
-                                <span key={gameState.calledNumbers.length} style={styles.lastNum} className="tambola-pop">
-                                    {gameState.calledNumbers.length}
+                                <span style={styles.lastNumLabel}>Last Called</span>
+                                <span key={lastNumber} style={styles.lastNum} className="tambola-pop">
+                                    {lastNumber ?? '—'}
                                 </span>
-                                <span style={styles.calledCount}>out of 90</span>
+                                <span style={styles.calledCount}>{gameState.calledNumbers.length} / 90 called</span>
                             </div>
 
                             {/* Called numbers board — only shown once all prizes are claimed */}
@@ -339,12 +389,11 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
                                     <p style={styles.subheading}>
                                         Ticket {myTickets.length > 1 ? tIdx + 1 : ''}
                                         <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
-                                            — tap a yellow number to mark it
+                                            — tap any number to mark/unmark it
                                         </span>
                                     </p>
                                     <TicketGrid
                                         ticket={ticket}
-                                        calledSet={calledSet}
                                         markedSet={markedNumbers}
                                         onMark={handleMark}
                                         interactive={true}

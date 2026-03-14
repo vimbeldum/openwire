@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, memo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import '../styles/roulette.css';
 import * as rl from '../lib/roulette';
 
@@ -201,19 +201,47 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
     const [betAmount, setBetAmount] = useState(25);
     const [spinning, setSpinning] = useState(false);
     const [lastMyBets, setLastMyBets] = useState([]);
+    // Queued bets to place at start of next betting round (set from results phase)
+    const queuedBetsRef = useRef([]);
+    const [betAgainQueued, setBetAgainQueued] = useState(false);
+    const onActionRef = useRef(onAction);
+    const onReadyRef = useRef(onReady);
+    useEffect(() => { onActionRef.current = onAction; }, [onAction]);
+    useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
 
+    const prevPhaseRef = useRef(null);
     useEffect(() => {
-        if (game?.phase === 'spinning' && game?.result !== null && game?.result !== undefined) {
+        if (!game) return;
+        const prev = prevPhaseRef.current;
+        prevPhaseRef.current = game.phase;
+
+        if (game.phase === 'spinning' && prev !== 'spinning') {
             setSpinning(true);
-            // Save my bets before they disappear on new round
+            // Capture my bets before they're cleared on new round
             const myBetsNow = game.bets?.filter(b => b.peer_id === myId) || [];
-            if (myBetsNow.length > 0) setLastMyBets(myBetsNow);
-        } else if (game?.phase === 'results') {
+            if (myBetsNow.length > 0) {
+                setLastMyBets(myBetsNow);
+                queuedBetsRef.current = []; // fresh bets captured, discard any stale queue
+                setBetAgainQueued(false);
+            }
+        } else if (game.phase === 'results' && prev !== 'results') {
             setSpinning(false);
-        } else if (game?.phase === 'betting') {
+        } else if (game.phase === 'betting' && prev !== 'betting') {
             setSpinning(false);
+            // Apply queued bets from results phase
+            const queued = queuedBetsRef.current;
+            if (queued.length > 0) {
+                queuedBetsRef.current = [];
+                setBetAgainQueued(false);
+                setTimeout(() => {
+                    for (const b of queued) {
+                        onActionRef.current({ type: 'bet', betType: b.betType, betTarget: b.betTarget, amount: b.amount });
+                    }
+                    onReadyRef.current?.();
+                }, 50);
+            }
         }
-    }, [game?.phase, game?.result, myId]);
+    }, [game?.phase, myId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (!game) return null;
 
@@ -229,6 +257,7 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
         onAction({ type: 'bet', betType: type, betTarget: target, amount: betAmount });
     };
 
+    // Bet Again in betting phase: place immediately + auto-ready
     const handleBetAgain = () => {
         if (!lastMyBets.length) return;
         const total = lastMyBets.reduce((s, b) => s + b.amount, 0);
@@ -236,8 +265,10 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
         for (const b of lastMyBets) {
             onAction({ type: 'bet', betType: b.betType, betTarget: b.betTarget, amount: b.amount });
         }
+        if (!isReady) onReady?.();
     };
 
+    // Double in betting phase: place doubled bets + auto-ready
     const handleDouble = () => {
         if (!lastMyBets.length) return;
         const total = lastMyBets.reduce((s, b) => s + b.amount * 2, 0);
@@ -245,6 +276,16 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
         for (const b of lastMyBets) {
             onAction({ type: 'bet', betType: b.betType, betTarget: b.betTarget, amount: b.amount * 2 });
         }
+        if (!isReady) onReady?.();
+    };
+
+    // Queue bets to be placed when next betting round starts (called from results phase)
+    const handleQueueBetAgain = (multiplier = 1) => {
+        if (!lastMyBets.length) return;
+        const total = lastMyBets.reduce((s, b) => s + b.amount * multiplier, 0);
+        if (total > balance) return;
+        queuedBetsRef.current = lastMyBets.map(b => ({ ...b, amount: b.amount * multiplier }));
+        setBetAgainQueued(true);
     };
 
     const resultColor = game.result === null || game.result === undefined
@@ -439,12 +480,13 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
                             )}
                             {game.phase === 'results' && (
                                 <div className="rl-new-round-row">
-                                    {lastMyBets.length > 0 && (
+                                    {lastMyBets.length > 0 && !betAgainQueued && (
                                         <>
-                                            <button className="rl-bet-again-btn" onClick={handleBetAgain} disabled={lastMyBets.reduce((s,b) => s+b.amount,0) > balance}>Bet Again</button>
-                                            <button className="rl-bet-again-btn double" onClick={handleDouble} disabled={lastMyBets.reduce((s,b) => s+b.amount*2,0) > balance}>Double</button>
+                                            <button className="rl-bet-again-btn" onClick={() => handleQueueBetAgain(1)} disabled={lastMyBets.reduce((s,b) => s+b.amount,0) > balance}>↺ Bet Again</button>
+                                            <button className="rl-bet-again-btn double" onClick={() => handleQueueBetAgain(2)} disabled={lastMyBets.reduce((s,b) => s+b.amount*2,0) > balance}>✕2 Double</button>
                                         </>
                                     )}
+                                    {betAgainQueued && <span className="rl-queued-badge">Bets queued ✓</span>}
                                     <button className="ready-btn" onClick={onNewRound}>Next Round</button>
                                 </div>
                             )}

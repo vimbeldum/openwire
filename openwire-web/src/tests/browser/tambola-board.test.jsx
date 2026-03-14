@@ -203,19 +203,14 @@ describe('TambolaBoard', () => {
             expect(screen.queryByText('Called Numbers')).not.toBeInTheDocument();
         });
 
-        it('shows "Numbers Called" counter in playing phase', () => {
+        it('shows "Last Called" display in playing phase', () => {
             buyAndStart();
-            expect(screen.getByText('Numbers Called')).toBeInTheDocument();
-        });
-
-        it('does not reveal the specific called number to the player', () => {
-            buyAndStart();
-            expect(screen.queryByText('Last Called')).not.toBeInTheDocument();
+            expect(screen.getByText('Last Called')).toBeInTheDocument();
         });
 
         it('shows tap-to-mark hint on ticket', () => {
             buyAndStart();
-            expect(screen.getByText(/tap a yellow number to mark it/i)).toBeInTheDocument();
+            expect(screen.getByText(/tap any number to mark\/unmark it/i)).toBeInTheDocument();
         });
 
         it('shows "Early Five" prize claim button', () => {
@@ -236,36 +231,35 @@ describe('TambolaBoard', () => {
             });
         });
 
-        it('shows rejection toast with penalty when claim pattern is incomplete', () => {
+        it('shows "Mark all required numbers first" toast when claiming with no marks', () => {
             buyAndStart();
             act(() => {
                 fireEvent.click(screen.getByRole('button', { name: /Early Five/i }));
             });
-            // Toast includes "Bogus Claim!" and the chip penalty
-            expect(screen.getByText(/Bogus Claim!/i)).toBeInTheDocument();
+            expect(screen.getByText(/Mark all required numbers first/i)).toBeInTheDocument();
         });
 
-        it('deducts chips on bogus claim equal to the prize amount', () => {
+        it('deducts chips on bogus claim when marked numbers are not called', () => {
             const onWalletUpdate = vi.fn();
             renderBoard({ wallet: WALLET_1000, onWalletUpdate });
             act(() => { fireEvent.click(screen.getByRole('button', { name: /Buy Ticket/i })); });
             act(() => { fireEvent.click(screen.getByRole('button', { name: /Start Game/i })); });
+            // Mark 5 cells WITHOUT any numbers having been called yet (calledNumbers = [])
+            // SAMPLE_GRID has: [1,0,21,0,41,0,61,0,81],[2,0,22,0,42,0,62,0,82],[3,0,23,0,43,0,53,0,83]
+            // Mark cells 1,2,3,21,22 (all uncalled = bogus)
+            const cells = [1, 2, 3, 21, 22].map(n => screen.getByText(String(n)));
+            cells.forEach(cell => act(() => { fireEvent.click(cell); }));
             act(() => { fireEvent.click(screen.getByRole('button', { name: /Early Five/i })); });
-            // Second call is the bogus claim deduction (first was the ticket purchase)
+            // Should have called onWalletUpdate twice: once for ticket purchase, once for bogus penalty
             expect(onWalletUpdate).toHaveBeenCalledTimes(2);
-            // Penalty = earlyFive amount = 95 chips
             expect(onWalletUpdate).toHaveBeenLastCalledWith(
                 expect.objectContaining({ baseBalance: expect.any(Number) })
             );
         });
 
-        it('clicking a called cell marks it (green checkmark)', () => {
+        it('clicking any ticket cell marks it (green checkmark)', () => {
             buyAndStart();
-            // Advance timer so drawNumber fires and number 42 is called
-            act(() => {
-                vi.advanceTimersByTime(10100);
-            });
-            // Cell 42 is now called — only the ticket cell shows it (no big number display)
+            // Cell 42 is on the ticket — can mark at any time (no need to wait for it to be called)
             const ticketCell = screen.getByText('42');
             act(() => {
                 fireEvent.click(ticketCell);

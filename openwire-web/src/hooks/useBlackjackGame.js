@@ -33,25 +33,6 @@ export default function useBlackjackGame(deps) {
 
     useEffect(() => { blackjackRef.current = blackjackGame; }, [blackjackGame]);
 
-    // ── Blackjack Auto-deal timer ──────────────────────────
-    const startBlackjackTimer = useCallback((gameVal) => {
-        if (!gameVal || gameVal.phase !== 'betting') return;
-        if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
-
-        const msLeft = Math.max(0, gameVal.nextDealAt - Date.now());
-
-        bjDealerTimerRef.current = setTimeout(() => {
-            const currentGame = blackjackRef.current;
-            const hostId = bjHostRef.current;
-            if (!currentGame || !amIHost(hostId) || currentGame.phase !== 'betting') return;
-
-            // Auto-deal
-            const dealtGame = bj.dealInitialCards(currentGame);
-            setBlackjackGame(dealtGame);
-            socket.sendRoomMessage(currentGame.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(dealtGame) }));
-        }, msLeft);
-    }, [amIHost]);
-
     // Shared helper: after a BJ game update, check for dealer phase transition
     const bjCheckDealerTransition = useCallback((prevPhase, newGame) => {
         if (newGame.phase === 'dealer' && prevPhase !== 'dealer') {
@@ -72,6 +53,27 @@ export default function useBlackjackGame(deps) {
             }, 1000);
         }
     }, [amIHost, updateBankLedger, resolvePayoutEvent]);
+
+    // ── Blackjack Auto-deal timer ──────────────────────────
+    const startBlackjackTimer = useCallback((gameVal) => {
+        if (!gameVal || gameVal.phase !== 'betting') return;
+        if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
+
+        const msLeft = Math.max(0, gameVal.nextDealAt - Date.now());
+
+        bjDealerTimerRef.current = setTimeout(() => {
+            const currentGame = blackjackRef.current;
+            const hostId = bjHostRef.current;
+            if (!currentGame || !amIHost(hostId) || currentGame.phase !== 'betting') return;
+
+            // Auto-deal
+            const dealtGame = bj.dealInitialCards(currentGame);
+            setBlackjackGame(dealtGame);
+            socket.sendRoomMessage(currentGame.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(dealtGame) }));
+            // If all players got blackjack, game goes straight to dealer phase — run dealer turn
+            bjCheckDealerTransition('betting', dealtGame);
+        }, msLeft);
+    }, [amIHost, bjCheckDealerTransition]);
 
     // ── Blackjack message handler ────────────────────────────
     const handleBlackjackAction = useCallback((msg, action) => {
