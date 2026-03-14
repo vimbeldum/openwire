@@ -9,6 +9,18 @@ import { CHARACTERS as DEFAULT_CHARACTERS, SHOWS as DEFAULT_SHOWS } from './char
 
 const STORAGE_KEY = 'openwire_agent_store';
 
+let _saveTimer = null;
+
+function debouncedSave(data) {
+    if (_saveTimer) clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(() => {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        } catch { /* quota exceeded — silently fail */ }
+        _saveTimer = null;
+    }, 500);
+}
+
 /** Load the full store from localStorage, merging with defaults */
 function loadRaw() {
     try {
@@ -67,7 +79,7 @@ export function loadStore() {
 
 /** Save the complete store */
 export function saveStore(store) {
-    saveRaw(store);
+    debouncedSave(store);
 }
 
 /** Reset store to defaults (wipes localStorage) */

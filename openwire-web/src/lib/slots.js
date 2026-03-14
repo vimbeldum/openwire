@@ -11,6 +11,7 @@ import { GameEngine, registerGame } from './GameEngine.js';
 const SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '💎', '7️⃣'];
 // Weights must sum to 100; higher = more common
 const SYMBOL_WEIGHTS = [30, 25, 20, 15, 7, 3];
+const SYMBOL_WEIGHTS_TOTAL = SYMBOL_WEIGHTS.reduce((a, b) => a + b, 0);
 
 /* ── Payout table ─────────────────────────────────────────── */
 
@@ -32,10 +33,9 @@ export const SLOT_PAYOUTS = {
 /* ── Core logic ───────────────────────────────────────────── */
 
 function weightedSpin() {
-    const total = SYMBOL_WEIGHTS.reduce((a, b) => a + b, 0);
     const buf = new Uint32Array(1);
     crypto.getRandomValues(buf);
-    let r = (buf[0] / 0x100000000) * total;
+    let r = (buf[0] / 0x100000000) * SYMBOL_WEIGHTS_TOTAL;
     for (let i = 0; i < SYMBOLS.length; i++) {
         r -= SYMBOL_WEIGHTS[i];
         if (r <= 0) return SYMBOLS[i];

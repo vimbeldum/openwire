@@ -43,7 +43,7 @@ vi.mock('../lib/wallet.js', () => ({
     DAILY_BASE: 1000,
 }));
 
-import { record, getHistory, clearHistory, processEvent, getStats } from '../lib/core/ledger.js';
+import { record, getHistory, clearHistory, processEvent, getStats, _resetCache } from '../lib/core/ledger.js';
 import * as walletLib from '../lib/wallet.js';
 
 const DEVICE_ID = 'dev-001';
@@ -51,6 +51,7 @@ const LEDGER_KEY = `openwire_ledger_${DEVICE_ID}`;
 
 beforeEach(() => {
     Object.keys(mockStorage).forEach(k => delete mockStorage[k]);
+    _resetCache();
     vi.clearAllMocks();
 });
 

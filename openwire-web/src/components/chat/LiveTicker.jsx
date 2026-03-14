@@ -5,7 +5,7 @@
    Casino events NEVER appear in the main message feed.
    ═══════════════════════════════════════════════════════════ */
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, memo } from 'react';
 
 const GAME_ICONS = {
     roulette: '🎰',
@@ -15,7 +15,7 @@ const GAME_ICONS = {
     screenshot: '📸',
 };
 
-export default function LiveTicker({ items }) {
+function LiveTicker({ items }) {
     const scrollRef = useRef(null);
 
     // Auto-scroll to latest item
@@ -46,3 +46,5 @@ export default function LiveTicker({ items }) {
         </div>
     );
 }
+
+export default memo(LiveTicker);

@@ -1007,7 +1007,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     }, [addMsg]);
 
     // Shared helper: after a BJ game update, check for dealer phase transition
-    const bjCheckDealerTransition = (prevPhase, newGame) => {
+    const bjCheckDealerTransition = useCallback((prevPhase, newGame) => {
         if (newGame.phase === 'dealer' && prevPhase !== 'dealer') {
             setTimeout(() => {
                 const settled = bj.runDealerTurn(newGame);
@@ -1025,7 +1025,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 socket.sendRoomMessage(settled.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(settled) }));
             }, 1000);
         }
-    };
+    }, [amIHost, updateBankLedger, resolvePayoutEvent]);
 
     // ── Blackjack handler ────────────────────────────────────
     const handleBlackjackAction = useCallback((msg, action) => {
@@ -1702,8 +1702,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         startBlackjackTimer(newGame);
     };
 
-    const handleBjAction = (action) => {
-        if (!blackjackGame) return;
+    const handleBjAction = useCallback((action) => {
+        if (!blackjackRef.current) return;
+        const blackjackGame = blackjackRef.current;
         const myId = myIdRef.current;
         const myNick = nickRef.current;
 
@@ -1799,7 +1800,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         setBlackjackGame(newGame);
         socket.sendRoomMessage(newGame.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(newGame) }));
         bjCheckDealerTransition(blackjackGame.phase, newGame);
-    };
+    }, [amIHost, addMsg, updateWallet, startBlackjackTimer, bjCheckDealerTransition]);
 
     // ── Roulette handlers ────────────────────────────────────
     const startRoulette = (roomId) => {
@@ -1815,8 +1816,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         startRouletteTimer();
     };
 
-    const handleRlAction = (action) => {
-        if (!rouletteGame) return;
+    const handleRlAction = useCallback((action) => {
+        if (!rouletteRef.current) return;
+        const rouletteGame = rouletteRef.current;
         const myId = myIdRef.current;
         const myNick = nickRef.current;
 
@@ -1866,7 +1868,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
 
         setRouletteGame(newGame);
         socket.sendRoomMessage(newGame.roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(newGame) }));
-    };
+    }, [amIHost, addMsg, updateWallet]);
 
     // ── Andar Bahar handlers ───────────────────────────────────
     const startAndarBahar = (roomId) => {
@@ -1883,8 +1885,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         startAbCycle(newGame);
     };
 
-    const handleAbAction = (action) => {
-        if (!andarBaharGame) return;
+    const handleAbAction = useCallback((action) => {
+        if (!andarBaharRef.current) return;
+        const andarBaharGame = andarBaharRef.current;
         const myId = myIdRef.current;
         const myNick = nickRef.current;
 
@@ -1931,7 +1934,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         const newGame = ab.placeBet(andarBaharGame, myId, myNick, action.side, action.amount);
         setAndarBaharGame(newGame);
         socket.sendRoomMessage(newGame.roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(newGame) }));
-    };
+    }, [amIHost, addMsg, updateWallet]);
 
     // ── Polymarket handlers ───────────────────────────────────
     const startPolymarket = (roomId) => {
@@ -1946,8 +1949,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         socket.sendRoomMessage(roomId, pm.serializePolymarketAction({ type: 'pm_state', state: pm.serializeGame(newGame) }));
     };
 
-    const handlePmAction = (action) => {
-        if (!polymarketGame) return;
+    const handlePmAction = useCallback((action) => {
+        if (!polymarketRef.current) return;
+        const polymarketGame = polymarketRef.current;
         const myId = myIdRef.current;
         const myNick = nickRef.current;
         const roomId = polymarketGame.roomId;
@@ -2025,7 +2029,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 break;
             }
         }
-    };
+    }, [amIHost, addMsg, updateWallet, resolvePayoutEvent]);
 
     // ── Ready Up handler ────────────────────────────────────
     const handleReadyUp = useCallback((gameType) => {

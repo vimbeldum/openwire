@@ -11,6 +11,12 @@ import * as walletLib from '../wallet.js';
 const LEDGER_PREFIX = 'openwire_ledger_';
 const MAX_EVENTS = 500;
 
+// In-memory cache keyed by deviceId to avoid repeated localStorage reads
+let _cache = null;
+
+/** Reset the in-memory cache (for tests). */
+export function _resetCache() { _cache = null; }
+
 function ledgerKey(deviceId) {
     return `${LEDGER_PREFIX}${deviceId}`;
 }
@@ -24,11 +30,17 @@ function ledgerKey(deviceId) {
  */
 export function record(deviceId, event) {
     try {
-        const raw = localStorage.getItem(ledgerKey(deviceId));
-        const history = raw ? JSON.parse(raw) : [];
+        let history;
+        if (_cache && _cache._deviceId === deviceId) {
+            history = _cache.events;
+        } else {
+            const raw = localStorage.getItem(ledgerKey(deviceId));
+            history = raw ? JSON.parse(raw) : [];
+        }
         history.push(event);
         if (history.length > MAX_EVENTS) history.splice(0, history.length - MAX_EVENTS);
         localStorage.setItem(ledgerKey(deviceId), JSON.stringify(history));
+        _cache = { _deviceId: deviceId, events: history };
     } catch (e) {
         console.warn('[Ledger] Failed to record event:', e);
     }
@@ -41,9 +53,20 @@ export function record(deviceId, event) {
  */
 export function getHistory(deviceId) {
     try {
-        const raw = localStorage.getItem(ledgerKey(deviceId));
-        const events = raw ? JSON.parse(raw) : [];
-        return [...events].reverse();
+        let events;
+        if (_cache && _cache._deviceId === deviceId) {
+            events = _cache.events;
+        } else {
+            const raw = localStorage.getItem(ledgerKey(deviceId));
+            events = raw ? JSON.parse(raw) : [];
+            _cache = { _deviceId: deviceId, events };
+        }
+        // Reverse-iterate to avoid array copy
+        const reversed = new Array(events.length);
+        for (let i = events.length - 1, j = 0; i >= 0; i--, j++) {
+            reversed[j] = events[i];
+        }
+        return reversed;
     } catch {
         return [];
     }
@@ -55,6 +78,7 @@ export function getHistory(deviceId) {
  */
 export function clearHistory(deviceId) {
     try {
+        _cache = null;
         localStorage.removeItem(ledgerKey(deviceId));
     } catch { }
 }

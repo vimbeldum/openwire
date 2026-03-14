@@ -21,6 +21,7 @@ const BASE_RECONNECT_MS = 1000;
 const MAX_RECONNECT_MS = 30000;
 
 // Token bucket rate limiter
+const MAX_QUEUE_SIZE = 100;
 const RATE_LIMIT = { maxTokens: 40, refillRate: 30, refillMs: 1000 };
 let _rateTokens = RATE_LIMIT.maxTokens;
 let _rateLastRefill = Date.now();
@@ -247,6 +248,9 @@ export function send(msg) {
             ws.send(data);
             _rateTokens--;
         } else {
+            if (_messageQueue.length >= MAX_QUEUE_SIZE) {
+                _messageQueue.shift(); // drop oldest
+            }
             _messageQueue.push({ data, queuedAt: Date.now() });
             if (!_drainTimer) _drainTimer = setTimeout(drainQueue, 50);
         }

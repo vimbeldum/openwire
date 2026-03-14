@@ -6,7 +6,7 @@
      3. Model Tester — test ping, whitelist/blacklist
    ═══════════════════════════════════════════════════════════ */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import {
     loadStore, saveStore, addGroup, removeGroup,
     addCharacter, removeCharacter, getGroupCharacters,
@@ -18,7 +18,7 @@ import { formatModelLabel, generateMessage, fetchAllFreeModels } from '../lib/ag
 
 const PANEL_TABS = ['Swarm Controls', 'Manage Entities', 'Model Tester'];
 
-export default function AgentControlPanel({ swarm, onClose }) {
+function AgentControlPanel({ swarm, onClose }) {
     const [activeTab, setActiveTab] = useState('Swarm Controls');
     const [store, setStore] = useState(loadStore);
 
@@ -532,3 +532,5 @@ export default function AgentControlPanel({ swarm, onClose }) {
         </div>
     );
 }
+
+export default memo(AgentControlPanel);

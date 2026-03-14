@@ -5,7 +5,9 @@
    Appears between message list and input area.
    ═══════════════════════════════════════════════════════════ */
 
-export default function TypingBar({ typingPeers, agentTyping, myId }) {
+import { memo } from 'react';
+
+function TypingBar({ typingPeers, agentTyping, myId }) {
     const peerActive = Object.entries(typingPeers || {})
         .filter(([pid, v]) => pid !== myId && Date.now() - v.ts < 3000);
 
@@ -36,3 +38,5 @@ export default function TypingBar({ typingPeers, agentTyping, myId }) {
         </div>
     );
 }
+
+export default memo(TypingBar);

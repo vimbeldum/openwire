@@ -58,16 +58,33 @@ export function loadCasinoState() {
     return createCasinoState();
 }
 
+let _saveTimer = null;
+let _pendingState = null;
+
+function _flushSave() {
+    if (_pendingState) {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(_pendingState));
+        } catch (e) {
+            console.warn('[casinoState] Failed to save:', e);
+        }
+        _pendingState = null;
+    }
+}
+
 /**
- * Persist casino state to localStorage.
+ * Persist casino state to localStorage (debounced — 1s).
  * @param {object} state
  */
 export function saveCasinoState(state) {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch (e) {
-        console.warn('[casinoState] Failed to save:', e);
-    }
+    _pendingState = state;
+    if (_saveTimer) clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(_flushSave, 1000);
+}
+
+// Flush on page unload to prevent data loss
+if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', _flushSave);
 }
 
 /* ── LWW P2P Merge ────────────────────────────────────────── */

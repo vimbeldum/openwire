@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { getTotalHousePnl } from '../lib/casinoState.js';
 import { loadStore, getCharactersDict, getGroupsDict, getGroupCharacters } from '../lib/agents/agentStore.js';
 import { formatModelLabel } from '../lib/agents/openrouter.js';
@@ -10,7 +10,7 @@ const TABS = ['Players', 'Ban List', 'Activity Log', 'Stats', 'Agents'];
 const CHATTER_LABELS = { 0.25: 'Quiet', 0.5: 'Calm', 1: 'Normal', 1.5: 'Active', 2: 'Chaotic' };
 const GAME_LABELS = { roulette: '🎰 Roulette', blackjack: '🃏 Blackjack', andarbahar: '🎴 Andar Bahar', slots: '🎲 Slots' };
 
-export default function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, activityLog, bannedIps, bankLedger, casinoState, swarm, swarmLogs, onProviderChange, onClose }) {
+function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, activityLog, bannedIps, bankLedger, casinoState, swarm, swarmLogs, onProviderChange, onClose }) {
     const [tab, setTab] = useState('Players');
     const [adjustTarget, setAdjustTarget] = useState(null);
     const [adjustAmount, setAdjustAmount] = useState(100);
@@ -850,3 +850,5 @@ export function AdminPasswordGate({ onSuccess, onCancel }) {
         </div>
     );
 }
+
+export default memo(AdminPortal);

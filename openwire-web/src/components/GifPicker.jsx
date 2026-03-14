@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 
 const GIPHY_KEY = import.meta.env.VITE_GIPHY_KEY || 'dc6zaTOxFJmzC';
 const API = `https://api.giphy.com/v1/gifs`;
 
-export default function GifPicker({ onSelect, onClose }) {
+function GifPicker({ onSelect, onClose }) {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -70,3 +70,5 @@ export default function GifPicker({ onSelect, onClose }) {
         </div>
     );
 }
+
+export default memo(GifPicker);
