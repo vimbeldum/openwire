@@ -16,15 +16,19 @@ import MessageRow from './chat/MessageRow';
 
 // Retry wrapper: on chunk-not-found after deploy, reload once to get fresh HTML
 function lazyRetry(fn) {
-    return lazy(() => fn().catch((e) => {
+    return lazy(() => fn().then((mod) => {
+        // Successful load — clear retry flag so future deploys can also retry
+        sessionStorage.removeItem('openwire_chunk_reload');
+        return mod;
+    }).catch((e) => {
         const key = 'openwire_chunk_reload';
         if (!sessionStorage.getItem(key)) {
             sessionStorage.setItem(key, '1');
             window.location.reload();
-            // Hang until reload completes — calling fn() again would hit the same stale hash
             return new Promise(() => {});
         }
         // Already tried a reload — re-throw so React ErrorBoundary can render a fallback
+        sessionStorage.removeItem(key);
         throw e;
     }));
 }
