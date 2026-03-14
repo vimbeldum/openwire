@@ -1073,15 +1073,19 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (msgCustom) {
                     handleCustomAction(msg, msgCustom);
                 } else {
-                    addMsg(msg.nick, msg.data, 'peer', { peerCosmetics: peerCosmeticsRef.current[msg.peer_id] || null });
-                    // Process @mentions from remote peers — triggers agent responses
-                    // on the swarm host session (processMentions is a no-op if swarm isn't running)
-                    if (msg.data) processMentions(msg.data, msg.nick);
-                    // Check if we were @mentioned in the general chat message
-                    if (msg.data && nickRef.current && msg.data.toLowerCase().includes(`@${nickRef.current.toLowerCase()}`)) {
-                        const toastId = Date.now() + Math.random();
-                        setMentionToasts(prev => [...prev, { id: toastId, from: msg.nick, text: msg.data }]);
-                        setTimeout(() => setMentionToasts(prev => prev.filter(t => t.id !== toastId)), 5000);
+                    const cos = peerCosmeticsRef.current[msg.peer_id] || null;
+                    const gifMatch = msg.data?.match(/^\[GIF\](.+)$/);
+                    if (gifMatch) {
+                        addMsg(msg.nick, '', 'peer', { gif: gifMatch[1], peerCosmetics: cos });
+                    } else {
+                        addMsg(msg.nick, msg.data, 'peer', { peerCosmetics: cos });
+                        // Process @mentions from remote peers
+                        if (msg.data) processMentions(msg.data, msg.nick);
+                        if (msg.data && nickRef.current && msg.data.toLowerCase().includes(`@${nickRef.current.toLowerCase()}`)) {
+                            const toastId = Date.now() + Math.random();
+                            setMentionToasts(prev => [...prev, { id: toastId, from: msg.nick, text: msg.data }]);
+                            setTimeout(() => setMentionToasts(prev => prev.filter(t => t.id !== toastId)), 5000);
+                        }
                     }
                 }
                 break;
@@ -1574,9 +1578,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const handleGifSelect = (gifUrl) => {
         const myNick = nickRef.current;
         const activeRoom = currentRoomRef.current;
-        if (!activeRoom) { addMsg('★', '⚠ Switch to a room to send GIFs', 'system'); return; }
-        addMsg(myNick, '', 'self', { gif: gifUrl, roomId: activeRoom });
-        socket.sendRoomMessage(activeRoom, `[GIF]${gifUrl}`);
+        if (activeRoom) {
+            addMsg(myNick, '', 'self', { gif: gifUrl, roomId: activeRoom });
+            socket.sendRoomMessage(activeRoom, `[GIF]${gifUrl}`);
+        } else {
+            addMsg(myNick, '', 'self', { gif: gifUrl });
+            socket.sendChat(`[GIF]${gifUrl}`);
+        }
         setShowGifPicker(false);
     };
 
