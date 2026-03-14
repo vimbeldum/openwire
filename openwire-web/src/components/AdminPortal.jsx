@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, memo } from 'react';
 import '../styles/admin.css';
 import { getTotalHousePnl } from '../lib/casinoState.js';
 import { getMinKarmaToPost, setMinKarmaToPost } from '../lib/deaddrops.js';
+import { setDefaultProvider } from './GifPicker.jsx';
 import { loadStore, getCharactersDict, getGroupsDict, getGroupCharacters } from '../lib/agents/agentStore.js';
 import { formatModelLabel } from '../lib/agents/openrouter.js';
 import { formatGeminiLabel } from '../lib/agents/gemini.js';
@@ -32,6 +33,9 @@ const GAME_LABELS = { roulette: '🎰 Roulette', blackjack: '🃏 Blackjack', an
 function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, onAdjustKarma, activityLog, bannedIps, bankLedger, casinoState, swarm, swarmLogs, onProviderChange, onSettingChange, onClose }) {
     const [tab, setTab] = useState('Players');
     const [ddMinKarma, setDdMinKarma] = useState(getMinKarmaToPost);
+    const [gifProvider, setGifProvider] = useState(() => {
+        try { return localStorage.getItem('openwire:gif_provider') || 'giphy'; } catch { return 'giphy'; }
+    });
     const [adjustTarget, setAdjustTarget] = useState(null);
     const [adjustAmount, setAdjustAmount] = useState(100);
     const [adjustKarmaAmount, setAdjustKarmaAmount] = useState(10);
@@ -322,6 +326,26 @@ function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, onAdj
                                         }}
                                     />
                                     <span className="admin-setting-value">{ddMinKarma}</span>
+                                </div>
+                            </div>
+                            <div className="admin-settings-row">
+                                <label className="admin-setting-label">
+                                    Default GIF Provider
+                                </label>
+                                <div className="admin-setting-control">
+                                    <select
+                                        value={gifProvider}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setGifProvider(val);
+                                            setDefaultProvider(val);
+                                            onSettingChange?.('gif_provider', val);
+                                        }}
+                                        className="admin-setting-select"
+                                    >
+                                        <option value="giphy">GIPHY</option>
+                                        <option value="klipy">Klipy</option>
+                                    </select>
                                 </div>
                             </div>
 

@@ -618,6 +618,55 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+.gif-provider-toggle {
+  display: flex;
+  gap: 2px;
+  margin-right: 0.25rem;
+}
+
+.gif-provider-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: all 0.15s;
+}
+
+.gif-provider-btn.active {
+  background: rgba(232, 183, 48, 0.15);
+  border-color: rgba(232, 183, 48, 0.3);
+  color: #E8B730;
+}
+
+.gif-provider-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.klipy-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 2px;
+}
+
+.klipy-item {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.klipy-item:hover {
+  transform: scale(1.05);
+}
+
 .gif-search-row {
   display: flex;
   gap: 0.5rem;

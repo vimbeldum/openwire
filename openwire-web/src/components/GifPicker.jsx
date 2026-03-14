@@ -1,91 +1,177 @@
-import { useState, useCallback, memo } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { GiphyFetch } from '@giphy/js-fetch-api';
 import { Grid } from '@giphy/react-components';
 
 const GIPHY_KEY = import.meta.env.VITE_GIPHY_KEY || 'dc6zaTOxFJmzC';
+const KLIPY_KEY = import.meta.env.VITE_KLIPY_API_KEY || '';
+const KLIPY_API = 'https://api.klipy.com/v2';
 const gf = new GiphyFetch(GIPHY_KEY);
 
-const TABS = [
+const SETTINGS_KEY = 'openwire:gif_provider';
+
+function getDefaultProvider() {
+    try { return localStorage.getItem(SETTINGS_KEY) || 'giphy'; } catch { return 'giphy'; }
+}
+
+export function setDefaultProvider(provider) {
+    try { localStorage.setItem(SETTINGS_KEY, provider); } catch {}
+}
+
+const GIPHY_TABS = [
     { key: 'gifs', label: 'GIFs' },
     { key: 'stickers', label: 'Stickers' },
     { key: 'emoji', label: 'Emoji' },
 ];
 
+const KLIPY_TABS = [
+    { key: 'gifs', label: 'GIFs' },
+    { key: 'stickers', label: 'Stickers' },
+    { key: 'clips', label: 'Clips' },
+];
+
+/* ── Klipy REST grid ───────────────────────────── */
+function KlipyGrid({ query, tab, onSelect }) {
+    const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!KLIPY_KEY) { setResults([]); return; }
+        let cancelled = false;
+        setLoading(true);
+
+        const type = tab === 'stickers' ? 'stickers' : tab === 'clips' ? 'clips' : '';
+        const endpoint = query
+            ? `${KLIPY_API}/search?q=${encodeURIComponent(query)}&key=${KLIPY_KEY}&limit=24${type ? `&type=${type}` : ''}`
+            : `${KLIPY_API}/featured?key=${KLIPY_KEY}&limit=24${type ? `&type=${type}` : ''}`;
+
+        fetch(endpoint)
+            .then(r => r.json())
+            .then(json => {
+                if (cancelled) return;
+                const items = json.results || json.data?.data || [];
+                setResults(items);
+            })
+            .catch(() => { if (!cancelled) setResults([]); })
+            .finally(() => { if (!cancelled) setLoading(false); });
+
+        return () => { cancelled = true; };
+    }, [query, tab]);
+
+    if (!KLIPY_KEY) return <div className="gif-empty">Set VITE_KLIPY_API_KEY to enable Klipy</div>;
+
+    return (
+        <>
+            {loading && <div className="gif-loading">Loading...</div>}
+            {!loading && results.length === 0 && <div className="gif-empty">No results</div>}
+            {!loading && (
+                <div className="klipy-grid">
+                    {results.map(item => {
+                        const preview = item.media_formats?.tinygif?.url
+                            || item.media_formats?.gif?.url
+                            || item.media_formats?.tinymp4?.url
+                            || '';
+                        const full = item.media_formats?.gif?.url
+                            || item.media_formats?.mp4?.url
+                            || preview;
+                        if (!preview) return null;
+                        return (
+                            <img
+                                key={item.id}
+                                src={preview}
+                                alt={item.title || ''}
+                                className="klipy-item"
+                                onClick={() => onSelect(full)}
+                            />
+                        );
+                    })}
+                </div>
+            )}
+        </>
+    );
+}
+
+/* ── Main Picker ───────────────────────────────── */
 function GifPicker({ onSelect, onClose }) {
+    const [provider, setProvider] = useState(getDefaultProvider);
     const [query, setQuery] = useState('');
     const [activeTab, setActiveTab] = useState('gifs');
-    const [searchKey, setSearchKey] = useState(0); // force Grid remount on search
+    const [searchKey, setSearchKey] = useState(0);
+    const [submittedQuery, setSubmittedQuery] = useState('');
 
+    const hasKlipy = !!KLIPY_KEY;
+    const tabs = provider === 'klipy' ? KLIPY_TABS : GIPHY_TABS;
+
+    // GIPHY SDK fetch callback
     const fetchGifs = useCallback((offset) => {
-        if (activeTab === 'emoji') {
-            return gf.emoji({ offset, limit: 20 });
-        }
+        if (activeTab === 'emoji') return gf.emoji({ offset, limit: 20 });
         const type = activeTab === 'stickers' ? 'stickers' : 'gifs';
-        if (query) {
-            return gf.search(query, { offset, limit: 20, type, rating: 'g' });
-        }
+        if (query) return gf.search(query, { offset, limit: 20, type, rating: 'g' });
         return gf.trending({ offset, limit: 20, type, rating: 'g' });
     }, [query, activeTab]);
 
     const handleSearch = () => {
-        setSearchKey(prev => prev + 1); // remount Grid to reset pagination
+        setSubmittedQuery(query);
+        setSearchKey(prev => prev + 1);
     };
 
-    const handleKey = (e) => {
-        if (e.key === 'Enter') handleSearch();
-    };
+    const handleKey = (e) => { if (e.key === 'Enter') handleSearch(); };
 
     const handleGifClick = useCallback((gif, e) => {
         e.preventDefault();
         const url = gif.images?.fixed_height?.url || gif.images?.original?.url;
-        if (url) {
-            onSelect(url);
-            onClose();
-        }
+        if (url) { onSelect(url); onClose(); }
     }, [onSelect, onClose]);
+
+    const handleKlipySelect = useCallback((url) => {
+        onSelect(url); onClose();
+    }, [onSelect, onClose]);
+
+    const switchProvider = (p) => {
+        setProvider(p);
+        setDefaultProvider(p);
+        setActiveTab('gifs');
+        setSearchKey(prev => prev + 1);
+    };
 
     return (
         <div className="gif-picker">
             <div className="gif-header">
+                {/* Provider toggle */}
+                <div className="gif-provider-toggle">
+                    <button className={`gif-provider-btn ${provider === 'giphy' ? 'active' : ''}`} onClick={() => switchProvider('giphy')}>GIPHY</button>
+                    {hasKlipy && <button className={`gif-provider-btn ${provider === 'klipy' ? 'active' : ''}`} onClick={() => switchProvider('klipy')}>Klipy</button>}
+                </div>
                 <div className="gif-tabs">
-                    {TABS.map(t => (
-                        <button
-                            key={t.key}
-                            className={`gif-tab ${activeTab === t.key ? 'active' : ''}`}
-                            onClick={() => { setActiveTab(t.key); setSearchKey(prev => prev + 1); }}
-                        >
+                    {tabs.map(t => (
+                        <button key={t.key} className={`gif-tab ${activeTab === t.key ? 'active' : ''}`}
+                            onClick={() => { setActiveTab(t.key); setSearchKey(prev => prev + 1); }}>
                             {t.label}
                         </button>
                     ))}
                 </div>
                 <button className="gif-close" onClick={onClose}>✕</button>
             </div>
-            {activeTab !== 'emoji' && (
+
+            {!(provider === 'giphy' && activeTab === 'emoji') && (
                 <div className="gif-search-row">
-                    <input
-                        className="gif-search"
-                        placeholder={`Search ${activeTab}...`}
-                        value={query}
-                        onChange={e => setQuery(e.target.value)}
-                        onKeyDown={handleKey}
-                        autoFocus
-                    />
+                    <input className="gif-search" placeholder={`Search ${activeTab}...`}
+                        value={query} onChange={e => setQuery(e.target.value)} onKeyDown={handleKey} autoFocus />
                     <button className="gif-search-btn" onClick={handleSearch}>🔍</button>
                 </div>
             )}
+
             <div className="gif-grid" style={{ height: 250, overflowY: 'auto' }}>
-                <Grid
-                    key={`${activeTab}-${searchKey}`}
-                    width={320}
-                    columns={3}
-                    gutter={4}
-                    fetchGifs={fetchGifs}
-                    onGifClick={handleGifClick}
-                    noLink
-                />
+                {provider === 'giphy' ? (
+                    <Grid key={`giphy-${activeTab}-${searchKey}`} width={320} columns={3} gutter={4}
+                        fetchGifs={fetchGifs} onGifClick={handleGifClick} noLink />
+                ) : (
+                    <KlipyGrid key={`klipy-${activeTab}-${searchKey}`}
+                        query={submittedQuery} tab={activeTab} onSelect={handleKlipySelect} />
+                )}
             </div>
+
             <div className="gif-footer">
-                Powered by GIPHY
+                Powered by {provider === 'giphy' ? 'GIPHY' : 'Klipy'}
             </div>
         </div>
     );

@@ -925,6 +925,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 // Admin broadcast a setting change — apply locally
                 if (action.key === 'dead_drop_min_karma' && typeof action.value === 'number') {
                     setMinKarmaToPost(action.value);
+                } else if (action.key === 'gif_provider' && typeof action.value === 'string') {
+                    try { localStorage.setItem('openwire:gif_provider', action.value); } catch {}
                 }
                 break;
         }
