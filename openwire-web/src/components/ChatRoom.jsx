@@ -1473,8 +1473,19 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         addActivityLog(`Unbanned IP ${ip}`);
     };
     const handleAdminAdjustBalance = (peer_id, nick, delta) => {
-        socket.send({ type: 'admin_adjust_balance', peer_id, delta, reason: `Admin grant from ${nickRef.current}` });
+        const reason = `Admin grant from ${nickRef.current}`;
+        socket.send({ type: 'admin_adjust_balance', peer_id, delta, reason });
         addActivityLog(`Adjusted ${nick}'s balance by ${delta} chips`);
+        // If admin is adjusting their own balance, relay won't echo back — apply directly
+        if (peer_id === myIdRef.current && walletRef.current) {
+            const updated = wallet.adminAdjust(walletRef.current, delta, reason);
+            updateWallet(updated);
+            addMsg('★', `💰 Admin ${delta > 0 ? 'added' : 'deducted'} ${Math.abs(delta)} chips (${reason})`, 'system');
+        }
+        // Optimistically update peer balance in the sidebar so admin sees the change immediately
+        setPeers(prev => prev.map(p =>
+            p.peer_id === peer_id ? { ...p, balance: Math.max(0, (p.balance || 0) + delta) } : p
+        ));
     };
 
     // ── Paste handler for Images/GIFs ───────────────────────────────

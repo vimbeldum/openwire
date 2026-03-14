@@ -80,11 +80,14 @@ vi.mock('../../lib/wallet.js', () => ({
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
+const WALLET_1000 = { baseBalance: 1000, adminBonus: 0 };
+const WALLET_50   = { baseBalance: 50,   adminBonus: 0 };
+
 function renderBoard(props = {}) {
     const defaults = {
         myId: 'testId',
         myNick: 'Tester',
-        wallet: 1000,
+        wallet: WALLET_1000,
         onClose: vi.fn(),
         onWalletUpdate: vi.fn(),
     };
@@ -114,6 +117,11 @@ describe('TambolaBoard', () => {
             expect(screen.getByText('1,000 chips')).toBeInTheDocument();
         });
 
+        it('sums baseBalance + adminBonus in the header badge', () => {
+            renderBoard({ wallet: { baseBalance: 800, adminBonus: 200 } });
+            expect(screen.getByText('1,000 chips')).toBeInTheDocument();
+        });
+
         it('close button calls onClose', () => {
             const onClose = vi.fn();
             renderBoard({ onClose });
@@ -130,13 +138,11 @@ describe('TambolaBoard', () => {
 
         it('shows ticket price in the Buy button label', () => {
             renderBoard();
-            // The Buy Ticket button contains "100 chips"
             expect(screen.getByRole('button', { name: /Buy Ticket.*100 chips/i })).toBeInTheDocument();
         });
 
         it('shows ticket price in the rules text', () => {
             renderBoard();
-            // Rules paragraph references the ticket price
             expect(screen.getByText(/Each ticket costs/i)).toBeInTheDocument();
         });
 
@@ -146,13 +152,13 @@ describe('TambolaBoard', () => {
         });
 
         it('"Buy Ticket" is disabled when wallet < ticket price', () => {
-            renderBoard({ wallet: 50 }); // less than TICKET_PRICE (100)
+            renderBoard({ wallet: WALLET_50 });
             expect(screen.getByRole('button', { name: /Buy Ticket/i })).toBeDisabled();
         });
 
-        it('buying a ticket calls onWalletUpdate', () => {
+        it('buying a ticket calls onWalletUpdate with chips minus price', () => {
             const onWalletUpdate = vi.fn();
-            renderBoard({ wallet: 1000, onWalletUpdate });
+            renderBoard({ wallet: WALLET_1000, onWalletUpdate });
             act(() => {
                 fireEvent.click(screen.getByRole('button', { name: /Buy Ticket/i }));
             });
@@ -160,7 +166,7 @@ describe('TambolaBoard', () => {
         });
 
         it('ticket grid renders after buying a ticket', () => {
-            renderBoard({ wallet: 1000 });
+            renderBoard();
             act(() => {
                 fireEvent.click(screen.getByRole('button', { name: /Buy Ticket/i }));
             });
@@ -169,7 +175,7 @@ describe('TambolaBoard', () => {
         });
 
         it('"Start Game" button appears after buying a ticket', () => {
-            renderBoard({ wallet: 1000 });
+            renderBoard();
             act(() => {
                 fireEvent.click(screen.getByRole('button', { name: /Buy Ticket/i }));
             });
@@ -179,7 +185,7 @@ describe('TambolaBoard', () => {
 
     describe('playing phase', () => {
         function buyAndStart() {
-            renderBoard({ wallet: 1000 });
+            renderBoard();
             act(() => {
                 fireEvent.click(screen.getByRole('button', { name: /Buy Ticket/i }));
             });
@@ -188,14 +194,19 @@ describe('TambolaBoard', () => {
             });
         }
 
-        it('shows "Called Numbers" section heading in playing phase', () => {
+        it('does NOT show "Called Numbers" board during playing phase', () => {
             buyAndStart();
-            expect(screen.getByText('Called Numbers')).toBeInTheDocument();
+            expect(screen.queryByText('Called Numbers')).not.toBeInTheDocument();
         });
 
         it('shows "Last Called" label in playing phase', () => {
             buyAndStart();
             expect(screen.getByText('Last Called')).toBeInTheDocument();
+        });
+
+        it('shows tap-to-mark hint on ticket', () => {
+            buyAndStart();
+            expect(screen.getByText(/tap a yellow number to mark it/i)).toBeInTheDocument();
         });
 
         it('shows "Early Five" prize claim button', () => {
@@ -221,15 +232,29 @@ describe('TambolaBoard', () => {
             act(() => {
                 fireEvent.click(screen.getByRole('button', { name: /Early Five/i }));
             });
-            // claimPrize returns { success: false, reason: 'Claim pattern not complete' }
-            // Component shows 'Bogus Claim!' toast for that reason
             expect(screen.getByText('Bogus Claim!')).toBeInTheDocument();
+        });
+
+        it('clicking a called cell marks it (green checkmark)', () => {
+            buyAndStart();
+            // Advance timer so drawNumber fires and number 42 is called
+            act(() => {
+                vi.advanceTimersByTime(10100);
+            });
+            // Cell 42 is now called — find the td cell (not the lastNum display)
+            // getAllByText returns both the lastNum span and the ticket cell
+            const all42 = screen.getAllByText('42');
+            const ticketCell = all42.find(el => el.tagName === 'TD');
+            act(() => {
+                fireEvent.click(ticketCell);
+            });
+            // After marking, the checkmark ✓ should appear
+            expect(screen.getByText('✓')).toBeInTheDocument();
         });
     });
 
     describe('ended phase', () => {
         it('shows "Game Over" when all numbers have been drawn', () => {
-            // Make drawNumber signal end-of-game on first call
             vi.mocked(tambolaLib.drawNumber).mockReturnValueOnce({
                 success: false,
                 state: {
@@ -239,16 +264,16 @@ describe('TambolaBoard', () => {
                 },
             });
 
-            renderBoard({ wallet: 1000 });
+            renderBoard();
             act(() => {
                 fireEvent.click(screen.getByRole('button', { name: /Buy Ticket/i }));
             });
             act(() => {
                 fireEvent.click(screen.getByRole('button', { name: /Start Game/i }));
             });
-            // Advance the draw interval (3000ms)
+            // Advance the draw interval (10000ms)
             act(() => {
-                vi.advanceTimersByTime(3100);
+                vi.advanceTimersByTime(10100);
             });
 
             expect(screen.getByText('Game Over')).toBeInTheDocument();

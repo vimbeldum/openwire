@@ -15,13 +15,14 @@ import {
 } from '../lib/tambola.js';
 
 const TICKET_PRICE = 100;
-const DRAW_INTERVAL_MS = 3000;
+const DRAW_INTERVAL_MS = 10000;
 
 const PRIZE_KEYS = ['earlyFive', 'topLine', 'middleLine', 'bottomLine', 'fullHouse'];
 
 /* ── Small helpers ─────────────────────────────────────── */
 
-function TicketGrid({ ticket, calledSet }) {
+// markedSet = Set of numbers the user has manually clicked to mark
+function TicketGrid({ ticket, calledSet, markedSet, onMark, interactive }) {
     return (
         <table style={styles.ticketTable}>
             <tbody>
@@ -30,22 +31,30 @@ function TicketGrid({ ticket, calledSet }) {
                         {row.map((cell, cIdx) => {
                             const blank = cell === 0;
                             const called = !blank && calledSet.has(cell);
+                            const marked = !blank && markedSet && markedSet.has(cell);
                             return (
                                 <td
                                     key={cIdx}
+                                    onClick={() => interactive && called && !blank && onMark && onMark(cell)}
                                     style={{
                                         ...styles.ticketCell,
                                         background: blank
                                             ? 'rgba(255,255,255,0.04)'
-                                            : called
+                                            : marked
                                             ? 'rgba(74,222,128,0.25)'
+                                            : called
+                                            ? 'rgba(251,191,36,0.18)'
                                             : 'rgba(255,255,255,0.08)',
-                                        color: blank ? 'transparent' : called ? '#4ade80' : 'var(--text-primary, #e2e8f0)',
-                                        fontWeight: called ? '700' : '500',
-                                        border: called ? '1px solid rgba(74,222,128,0.5)' : '1px solid rgba(255,255,255,0.1)',
+                                        color: blank ? 'transparent' : marked ? '#4ade80' : called ? '#fbbf24' : 'var(--text-primary, #e2e8f0)',
+                                        fontWeight: marked || called ? '700' : '500',
+                                        border: marked ? '1px solid rgba(74,222,128,0.5)' : called ? '1px solid rgba(251,191,36,0.4)' : '1px solid rgba(255,255,255,0.1)',
+                                        cursor: interactive && called && !blank ? 'pointer' : 'default',
+                                        position: 'relative',
                                     }}
+                                    title={interactive && called && !blank ? 'Click to mark' : undefined}
                                 >
                                     {blank ? '' : cell}
+                                    {marked && <span style={{ position: 'absolute', top: 0, right: 2, fontSize: '0.55rem', color: '#4ade80' }}>✓</span>}
                                 </td>
                             );
                         })}
@@ -105,6 +114,7 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
     const [lastNumber, setLastNumber] = useState(null);
     const [toast, setToast] = useState({ message: '', type: '' });
     const [claimedPrizes, setClaimedPrizes] = useState(new Set());
+    const [markedNumbers, setMarkedNumbers] = useState(new Set());
 
     const drawRef = useRef(null);
     const toastRef = useRef(null);
@@ -147,8 +157,10 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
     }, []);
 
     /* ── Actions ───────────────────────────────────────── */
+    const totalChips = (wallet?.baseBalance ?? 0) + (wallet?.adminBonus ?? 0);
+
     function handleBuyTicket() {
-        if (wallet < TICKET_PRICE) {
+        if (totalChips < TICKET_PRICE) {
             showToast('Not enough chips!', 'error');
             return;
         }
@@ -159,8 +171,17 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
         }
         setGameState(result.state);
         setMyTickets(prev => [...prev, ...result.tickets]);
-        onWalletUpdate(wallet - TICKET_PRICE);
+        onWalletUpdate(totalChips - TICKET_PRICE);
         showToast('Ticket purchased!', 'info');
+    }
+
+    function handleMark(num) {
+        if (!calledSet.has(num)) return;
+        setMarkedNumbers(prev => {
+            const next = new Set(prev);
+            next.add(num);
+            return next;
+        });
     }
 
     function handleStartGame() {
@@ -178,7 +199,7 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
         if (result.success) {
             setGameState(result.state);
             setClaimedPrizes(prev => new Set(prev).add(prizeKey));
-            onWalletUpdate(wallet + result.amount);
+            onWalletUpdate(totalChips + result.amount);
             showToast(`${PRIZES[prizeKey].name} — Won ${result.amount} chips!`, 'win');
             if (result.state.status === 'ended') {
                 clearInterval(drawRef.current);
@@ -193,6 +214,7 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
 
     /* ── Derived ───────────────────────────────────────── */
     const calledSet = new Set(gameState.calledNumbers);
+    const allPrizesClaimed = PRIZE_KEYS.every(k => gameState.prizes[k].winner !== null);
 
     /* ── Render ────────────────────────────────────────── */
     return (
@@ -233,7 +255,7 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
                                 <button
                                     className="btn-primary"
                                     onClick={handleBuyTicket}
-                                    disabled={wallet < TICKET_PRICE}
+                                    disabled={totalChips < TICKET_PRICE}
                                     style={styles.actionBtn}
                                 >
                                     Buy Ticket ({TICKET_PRICE} chips)
@@ -277,17 +299,30 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
                                 </span>
                             </div>
 
-                            {/* Called numbers board */}
-                            <p style={styles.subheading}>Called Numbers</p>
-                            <CalledBoard calledNumbers={gameState.calledNumbers} />
+                            {/* Called numbers board — only shown once all prizes are claimed */}
+                            {allPrizesClaimed && (
+                                <>
+                                    <p style={styles.subheading}>Called Numbers</p>
+                                    <CalledBoard calledNumbers={gameState.calledNumbers} />
+                                </>
+                            )}
 
                             {/* Tickets */}
                             {myTickets.map((ticket, tIdx) => (
                                 <div key={tIdx} style={styles.ticketSection}>
                                     <p style={styles.subheading}>
                                         Ticket {myTickets.length > 1 ? tIdx + 1 : ''}
+                                        <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                                            — tap a yellow number to mark it
+                                        </span>
                                     </p>
-                                    <TicketGrid ticket={ticket} calledSet={calledSet} />
+                                    <TicketGrid
+                                        ticket={ticket}
+                                        calledSet={calledSet}
+                                        markedSet={markedNumbers}
+                                        onMark={handleMark}
+                                        interactive={true}
+                                    />
                                 </div>
                             ))}
 
