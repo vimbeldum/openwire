@@ -653,16 +653,25 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             case 'roulette':
                 hasJoinedRl.current = true;
                 rouletteHostRef.current = inviteData.host;
+                socket.sendRoomMessage(inviteData.room_id, JSON.stringify({
+                    type: 'game_join', gameType: 'roulette', peer_id: myId, nick: myNick,
+                }));
                 addMsg('★', '🎰 Joined Roulette room!', 'system');
                 break;
             case 'andarbahar':
                 hasJoinedAb.current = true;
                 abHostRef.current = inviteData.host;
+                socket.sendRoomMessage(inviteData.room_id, JSON.stringify({
+                    type: 'game_join', gameType: 'andarbahar', peer_id: myId, nick: myNick,
+                }));
                 addMsg('★', '🃏 Joined Andar Bahar table!', 'system');
                 break;
             case 'polymarket':
                 hasJoinedPm.current = true;
                 pmHostRef.current = inviteData.host;
+                socket.sendRoomMessage(inviteData.room_id, JSON.stringify({
+                    type: 'game_join', gameType: 'polymarket', peer_id: myId, nick: myNick,
+                }));
                 addMsg('★', '📊 Joined Predictions market!', 'system');
                 break;
             case 'tictactoe': {
@@ -869,6 +878,26 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 }
                 break;
             }
+            case 'game_join': {
+                // A peer joined a game — host broadcasts current state so they see the board
+                if (msg.peer_id === myIdRef.current) break;
+                addMsg('★', `🎮 ${action.nick} joined ${action.gameType}!`, 'system');
+                const gt = action.gameType;
+                if (gt === 'roulette' && amIHost(rouletteHostRef.current) && rouletteRef.current) {
+                    setTimeout(() => {
+                        socket.sendRoomMessage(rouletteRef.current.roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(rouletteRef.current) }));
+                    }, 100);
+                } else if (gt === 'andarbahar' && amIHost(abHostRef.current) && andarBaharRef.current) {
+                    setTimeout(() => {
+                        socket.sendRoomMessage(andarBaharRef.current.roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(andarBaharRef.current) }));
+                    }, 100);
+                } else if (gt === 'polymarket' && amIHost(pmHostRef.current) && polymarketRef.current) {
+                    setTimeout(() => {
+                        socket.sendRoomMessage(polymarketRef.current.roomId, pm.serializePolymarketAction({ type: 'pm_state', state: pm.serializeGame(polymarketRef.current) }));
+                    }, 100);
+                }
+                break;
+            }
             case 'swarm_config':
                 // Admin broadcast — apply provider/model changes to local swarm
                 if (msg.peer_id !== myIdRef.current && swarmRef.current) {
@@ -990,7 +1019,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'admin_adjust_balance', 'admin_adjust_karma'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma'];
                         if (CUSTOM.includes(parsed.type)) msgCustom = parsed;
                     } catch { /* not JSON */ }
                 }
@@ -1049,7 +1078,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (!isBjMsg && !isRlMsg && !isAbMsg && !isPmMsg && !isGameMsg && msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'admin_adjust_balance', 'admin_adjust_karma'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma'];
                         if (CUSTOM.includes(parsed.type)) customAction = parsed;
                     } catch { /* not JSON */ }
                 }
