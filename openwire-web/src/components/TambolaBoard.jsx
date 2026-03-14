@@ -209,7 +209,8 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
     }
 
     function handleClaim(prizeKey) {
-        const penalty = gameState.prizes[prizeKey]?.amount ?? 0;
+        // Penalty = same as the prize payout would have been
+        const penalty = Math.floor(gameState.prizePool * (PRIZES[prizeKey]?.pct ?? 0));
 
         // Check user's marked numbers: find ticket where marks satisfy the prize
         let validTicketIdx = -1;
@@ -266,10 +267,8 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
                 setPhase('ended');
             }
         } else {
-            // Engine rejected (someone else claimed first or timing)
-            const reason = penalty > 0 ? `Bogus Claim! −${penalty} chips` : 'Already Claimed!';
-            if (penalty > 0 && totalChips >= penalty) onWalletUpdate(debit(wallet, penalty, `Bogus ${PRIZES[prizeKey].name} claim`));
-            showToast(reason, 'error');
+            // Engine rejected — prize already claimed by someone else (no penalty)
+            showToast('Already Claimed!', 'error');
         }
     }
 

@@ -35,6 +35,7 @@ const INITIAL_STATE = {
 
 const STATE_WITH_TICKET = {
     ...INITIAL_STATE,
+    prizePool: 95, // after 5% rake on 100-chip ticket
     tickets: {
         testId: [{ ticketId: 't1', grid: SAMPLE_GRID, marked: [] }],
     },
