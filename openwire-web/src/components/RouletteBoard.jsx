@@ -234,9 +234,7 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
                 queuedBetsRef.current = [];
                 setBetAgainQueued(false);
                 setTimeout(() => {
-                    for (const b of queued) {
-                        onActionRef.current({ type: 'bet', betType: b.betType, betTarget: b.betTarget, amount: b.amount });
-                    }
+                    onActionRef.current({ type: 'bulkBet', bets: queued.map(b => ({ betType: b.betType, betTarget: b.betTarget, amount: b.amount })) });
                     onReadyRef.current?.();
                 }, 50);
             }
@@ -257,25 +255,21 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
         onAction({ type: 'bet', betType: type, betTarget: target, amount: betAmount });
     };
 
-    // Bet Again in betting phase: place immediately + auto-ready
+    // Bet Again in betting phase: place all bets atomically + auto-ready
     const handleBetAgain = () => {
         if (!lastMyBets.length) return;
         const total = lastMyBets.reduce((s, b) => s + b.amount, 0);
         if (total > balance) return;
-        for (const b of lastMyBets) {
-            onAction({ type: 'bet', betType: b.betType, betTarget: b.betTarget, amount: b.amount });
-        }
+        onAction({ type: 'bulkBet', bets: lastMyBets.map(b => ({ betType: b.betType, betTarget: b.betTarget, amount: b.amount })) });
         if (!isReady) onReady?.();
     };
 
-    // Double in betting phase: place doubled bets + auto-ready
+    // Double in betting phase: place doubled bets atomically + auto-ready
     const handleDouble = () => {
         if (!lastMyBets.length) return;
         const total = lastMyBets.reduce((s, b) => s + b.amount * 2, 0);
         if (total > balance) return;
-        for (const b of lastMyBets) {
-            onAction({ type: 'bet', betType: b.betType, betTarget: b.betTarget, amount: b.amount * 2 });
-        }
+        onAction({ type: 'bulkBet', bets: lastMyBets.map(b => ({ betType: b.betType, betTarget: b.betTarget, amount: b.amount * 2 })) });
         if (!isReady) onReady?.();
     };
 

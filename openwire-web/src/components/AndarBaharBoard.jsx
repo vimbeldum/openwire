@@ -97,8 +97,9 @@ function HistoryStrip({ history }) {
                     const label = entry.result === 'andar' ? 'A' : 'B';
                     const cls = entry.result === 'andar' ? 'blue' : 'orange';
                     return (
-                        <span key={i} className={`history-pip ${cls}`} title={`${entry.totalCards} cards dealt`}>
-                            {label}<span style={{ fontSize: '0.55em', opacity: 0.75, marginLeft: '1px' }}>{entry.totalCards}</span>
+                        <span key={i} className={`history-pip ${cls}`} style={{ flexDirection: 'column', lineHeight: 1.1, padding: '0.15rem 0.35rem' }} title={`${entry.totalCards} cards dealt`}>
+                            <span>{label}</span>
+                            <span style={{ fontSize: '0.7em', opacity: 0.8 }}>{entry.totalCards}</span>
                         </span>
                     );
                 }

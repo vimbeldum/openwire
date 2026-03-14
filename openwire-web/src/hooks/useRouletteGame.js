@@ -137,6 +137,22 @@ export default function useRouletteGame(deps) {
                 });
                 break;
             }
+            case 'rl_bulkBet': {
+                // Host processes remote player's multiple bets atomically
+                if (!amIHost(rouletteHostRef.current)) break;
+                setRouletteGame(prev => {
+                    if (!prev || prev.phase !== 'betting') return prev;
+                    const updated = action.bets.reduce(
+                        (g, b) => rl.placeBet(g, action.peer_id, action.nick, b.betType, b.betTarget, b.amount),
+                        prev
+                    );
+                    setTimeout(() => {
+                        socket.sendRoomMessage(updated.roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(updated) }));
+                    }, 0);
+                    return updated;
+                });
+                break;
+            }
             case 'rl_clearBets': {
                 if (!amIHost(rouletteHostRef.current)) break;
                 setRouletteGame(prev => {
@@ -182,6 +198,14 @@ export default function useRouletteGame(deps) {
                 socket.sendRoomMessage(rouletteGame.roomId, rl.serializeRouletteAction({
                     type: 'rl_bet', peer_id: myId, nick: myNick, betType: action.betType, betTarget: action.betTarget, amount: action.amount,
                 }));
+            } else if (action.type === 'bulkBet') {
+                const total = action.bets.reduce((s, b) => s + b.amount, 0);
+                const w = walletRef.current;
+                if (!w || !wallet.canAfford(w, total)) { addMsg('\u2605', `\u26A0 Insufficient chips.`, 'system'); return; }
+                updateWallet(wallet.debit(w, total, 'Roulette bets'));
+                socket.sendRoomMessage(rouletteGame.roomId, rl.serializeRouletteAction({
+                    type: 'rl_bulkBet', peer_id: myId, nick: myNick, bets: action.bets,
+                }));
             } else if (action.type === 'clearBets') {
                 const myBets = (rouletteGame.bets || []).filter(b => b.peer_id === myId);
                 const refund = myBets.reduce((s, b) => s + (b.amount || 0), 0);
@@ -204,6 +228,17 @@ export default function useRouletteGame(deps) {
                 if (!w || !wallet.canAfford(w, action.amount)) { addMsg('\u2605', `\u26A0 Insufficient chips.`, 'system'); return; }
                 updateWallet(wallet.debit(w, action.amount, 'Roulette bet'));
                 newGame = rl.placeBet(rouletteGame, myId, myNick, action.betType, action.betTarget, action.amount);
+                break;
+            }
+            case 'bulkBet': {
+                const total = action.bets.reduce((s, b) => s + b.amount, 0);
+                const w = walletRef.current;
+                if (!w || !wallet.canAfford(w, total)) { addMsg('\u2605', `\u26A0 Insufficient chips.`, 'system'); return; }
+                updateWallet(wallet.debit(w, total, 'Roulette bets'));
+                newGame = action.bets.reduce(
+                    (g, b) => rl.placeBet(g, myId, myNick, b.betType, b.betTarget, b.amount),
+                    rouletteGame
+                );
                 break;
             }
             case 'clearBets': {
