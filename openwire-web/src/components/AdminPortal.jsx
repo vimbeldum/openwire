@@ -141,7 +141,7 @@ function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, onAdj
                                             <span className="admin-chips">{(p.balance || 0).toLocaleString()} 💰</span>
                                         </td>
                                         <td>
-                                            <span className="admin-ip">{p.ip || 'unknown'}</span>
+                                            <span className="admin-ip">{p.ip || '—'}</span>
                                         </td>
                                         <td className="admin-actions-cell">
                                             <button className="admin-btn kick"
