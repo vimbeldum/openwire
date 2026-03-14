@@ -76,6 +76,8 @@ vi.mock('../../lib/tambola.js', () => ({
 vi.mock('../../lib/wallet.js', () => ({
     getTotalBalance: vi.fn(() => 1000),
     canAfford: vi.fn(() => true),
+    debit: vi.fn((w, amount) => ({ ...w, baseBalance: (w.baseBalance ?? 0) - amount })),
+    credit: vi.fn((w, amount) => ({ ...w, baseBalance: (w.baseBalance ?? 0) + amount })),
 }));
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -156,13 +158,15 @@ describe('TambolaBoard', () => {
             expect(screen.getByRole('button', { name: /Buy Ticket/i })).toBeDisabled();
         });
 
-        it('buying a ticket calls onWalletUpdate with chips minus price', () => {
+        it('buying a ticket calls onWalletUpdate with debited wallet object', () => {
             const onWalletUpdate = vi.fn();
             renderBoard({ wallet: WALLET_1000, onWalletUpdate });
             act(() => {
                 fireEvent.click(screen.getByRole('button', { name: /Buy Ticket/i }));
             });
-            expect(onWalletUpdate).toHaveBeenCalledWith(900);
+            expect(onWalletUpdate).toHaveBeenCalledWith(
+                expect.objectContaining({ baseBalance: 900 })
+            );
         });
 
         it('ticket grid renders after buying a ticket', () => {
@@ -199,9 +203,14 @@ describe('TambolaBoard', () => {
             expect(screen.queryByText('Called Numbers')).not.toBeInTheDocument();
         });
 
-        it('shows "Last Called" label in playing phase', () => {
+        it('shows "Numbers Called" counter in playing phase', () => {
             buyAndStart();
-            expect(screen.getByText('Last Called')).toBeInTheDocument();
+            expect(screen.getByText('Numbers Called')).toBeInTheDocument();
+        });
+
+        it('does not reveal the specific called number to the player', () => {
+            buyAndStart();
+            expect(screen.queryByText('Last Called')).not.toBeInTheDocument();
         });
 
         it('shows tap-to-mark hint on ticket', () => {
@@ -227,12 +236,27 @@ describe('TambolaBoard', () => {
             });
         });
 
-        it('shows rejection toast when claim pattern is incomplete', () => {
+        it('shows rejection toast with penalty when claim pattern is incomplete', () => {
             buyAndStart();
             act(() => {
                 fireEvent.click(screen.getByRole('button', { name: /Early Five/i }));
             });
-            expect(screen.getByText('Bogus Claim!')).toBeInTheDocument();
+            // Toast includes "Bogus Claim!" and the chip penalty
+            expect(screen.getByText(/Bogus Claim!/i)).toBeInTheDocument();
+        });
+
+        it('deducts chips on bogus claim equal to the prize amount', () => {
+            const onWalletUpdate = vi.fn();
+            renderBoard({ wallet: WALLET_1000, onWalletUpdate });
+            act(() => { fireEvent.click(screen.getByRole('button', { name: /Buy Ticket/i })); });
+            act(() => { fireEvent.click(screen.getByRole('button', { name: /Start Game/i })); });
+            act(() => { fireEvent.click(screen.getByRole('button', { name: /Early Five/i })); });
+            // Second call is the bogus claim deduction (first was the ticket purchase)
+            expect(onWalletUpdate).toHaveBeenCalledTimes(2);
+            // Penalty = earlyFive amount = 95 chips
+            expect(onWalletUpdate).toHaveBeenLastCalledWith(
+                expect.objectContaining({ baseBalance: expect.any(Number) })
+            );
         });
 
         it('clicking a called cell marks it (green checkmark)', () => {
@@ -241,10 +265,8 @@ describe('TambolaBoard', () => {
             act(() => {
                 vi.advanceTimersByTime(10100);
             });
-            // Cell 42 is now called — find the td cell (not the lastNum display)
-            // getAllByText returns both the lastNum span and the ticket cell
-            const all42 = screen.getAllByText('42');
-            const ticketCell = all42.find(el => el.tagName === 'TD');
+            // Cell 42 is now called — only the ticket cell shows it (no big number display)
+            const ticketCell = screen.getByText('42');
             act(() => {
                 fireEvent.click(ticketCell);
             });

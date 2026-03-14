@@ -13,6 +13,7 @@ import {
     claimPrize,
     PRIZES,
 } from '../lib/tambola.js';
+import { debit, credit } from '../lib/wallet.js';
 
 const TICKET_PRICE = 100;
 const DRAW_INTERVAL_MS = 10000;
@@ -171,7 +172,7 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
         }
         setGameState(result.state);
         setMyTickets(prev => [...prev, ...result.tickets]);
-        onWalletUpdate(totalChips - TICKET_PRICE);
+        onWalletUpdate(debit(wallet, TICKET_PRICE, 'Tambola ticket'));
         showToast('Ticket purchased!', 'info');
     }
 
@@ -194,21 +195,31 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
         setPhase('playing');
     }
 
-    function handleClaim(prizeKey, ticketIdx) {
-        const result = claimPrize(gameState, myId, prizeKey, ticketIdx);
-        if (result.success) {
-            setGameState(result.state);
+    function handleClaim(prizeKey) {
+        // Try each ticket — use the first one that wins
+        let winResult = null;
+        for (let tIdx = 0; tIdx < myTickets.length; tIdx++) {
+            const r = claimPrize(gameState, myId, prizeKey, tIdx);
+            if (r.success) { winResult = r; break; }
+        }
+
+        if (winResult) {
+            setGameState(winResult.state);
             setClaimedPrizes(prev => new Set(prev).add(prizeKey));
-            onWalletUpdate(totalChips + result.amount);
-            showToast(`${PRIZES[prizeKey].name} — Won ${result.amount} chips!`, 'win');
-            if (result.state.status === 'ended') {
+            onWalletUpdate(credit(wallet, winResult.amount, `Tambola ${PRIZES[prizeKey].name}`));
+            showToast(`${PRIZES[prizeKey].name} — Won ${winResult.amount} chips!`, 'win');
+            if (winResult.state.status === 'ended') {
                 clearInterval(drawRef.current);
                 setPhase('ended');
             }
         } else {
-            showToast(result.reason === 'Claim pattern not complete'
-                ? 'Bogus Claim!'
-                : result.reason, 'error');
+            // Bogus claim — penalise equal to the prize that would have been won
+            const penalty = gameState.prizes[prizeKey]?.amount ?? 0;
+            if (penalty > 0 && totalChips >= penalty) {
+                onWalletUpdate(debit(wallet, penalty, `Bogus ${PRIZES[prizeKey].name} claim`));
+            }
+            const reason = penalty > 0 ? `Bogus Claim! −${penalty} chips` : 'Bogus Claim!';
+            showToast(reason, 'error');
         }
     }
 
@@ -246,9 +257,30 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
                     {phase === 'lobby' && (
                         <div style={styles.section}>
                             <p style={styles.rules}>
-                                90-ball Housie. Each ticket costs <strong>{TICKET_PRICE} chips</strong>.
-                                Mark off numbers as they are called. Claim prizes: Early Five (5 marks),
-                                Top/Middle/Bottom Line (full row), or Full House (all 15 numbers).
+                                <strong style={{ color: 'rgba(255,255,255,0.8)' }}>How to Play</strong>
+                            </p>
+                            <ul style={{ ...styles.rules, paddingLeft: '1.2rem', margin: 0 }}>
+                                <li>Each ticket costs <strong>{TICKET_PRICE} chips</strong> and has 15 numbers on a 3×9 grid.</li>
+                                <li>Numbers are drawn every 10 seconds. You <strong>won't see</strong> which number was called — check your ticket!</li>
+                                <li>Tap a <span style={{ color: '#fbbf24' }}>yellow</span> cell (called number) to mark it <span style={{ color: '#4ade80' }}>green</span>.</li>
+                                <li>Claim prizes before anyone else does:</li>
+                            </ul>
+                            <div style={styles.rulesPrizeList}>
+                                {PRIZE_KEYS.map(key => (
+                                    <div key={key} style={styles.rulesPrizeRow}>
+                                        <span style={{ color: '#fbbf24', fontWeight: 600 }}>{PRIZES[key].name}</span>
+                                        <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.78rem' }}>
+                                            {key === 'earlyFive' && 'First to mark any 5 numbers'}
+                                            {key === 'topLine' && 'All 5 numbers in top row'}
+                                            {key === 'middleLine' && 'All 5 numbers in middle row'}
+                                            {key === 'bottomLine' && 'All 5 numbers in bottom row'}
+                                            {key === 'fullHouse' && 'All 15 numbers on your ticket'}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                            <p style={{ ...styles.rules, color: 'rgba(248,113,113,0.8)' }}>
+                                ⚠ Bogus claims are penalised — you lose the prize amount!
                             </p>
 
                             <div style={styles.lobbyActions}>
@@ -284,19 +316,13 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
                     {/* ── PLAYING ───────────────────────── */}
                     {phase === 'playing' && (
                         <div style={styles.section}>
-                            {/* Last called number */}
+                            {/* Numbers called counter — the actual numbers are hidden, find them on your ticket */}
                             <div style={styles.lastNumWrapper}>
-                                <span style={styles.lastNumLabel}>Last Called</span>
-                                <span
-                                    key={lastNumber}
-                                    style={styles.lastNum}
-                                    className="tambola-pop"
-                                >
-                                    {lastNumber ?? '—'}
+                                <span style={styles.lastNumLabel}>Numbers Called</span>
+                                <span key={gameState.calledNumbers.length} style={styles.lastNum} className="tambola-pop">
+                                    {gameState.calledNumbers.length}
                                 </span>
-                                <span style={styles.calledCount}>
-                                    {gameState.calledNumbers.length} / 90 called
-                                </span>
+                                <span style={styles.calledCount}>out of 90</span>
                             </div>
 
                             {/* Called numbers board — only shown once all prizes are claimed */}
@@ -335,7 +361,7 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
                                     return (
                                         <button
                                             key={key}
-                                            onClick={() => !alreadyClaimed && handleClaim(key, 0)}
+                                            onClick={() => !alreadyClaimed && handleClaim(key)}
                                             disabled={alreadyClaimed}
                                             style={{
                                                 ...styles.prizeBtn,
@@ -484,6 +510,21 @@ const styles = {
         color: 'rgba(255,255,255,0.55)',
         lineHeight: 1.5,
         margin: 0,
+    },
+    rulesPrizeList: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.3rem',
+        padding: '0.4rem 0.8rem',
+        background: 'rgba(255,255,255,0.04)',
+        borderRadius: '6px',
+    },
+    rulesPrizeRow: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '0.5rem',
+        fontSize: '0.82rem',
     },
     lobbyActions: {
         display: 'flex',
