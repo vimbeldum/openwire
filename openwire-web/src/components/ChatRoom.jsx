@@ -16,13 +16,16 @@ import MessageRow from './chat/MessageRow';
 
 // Retry wrapper: on chunk-not-found after deploy, reload once to get fresh HTML
 function lazyRetry(fn) {
-    return lazy(() => fn().catch(() => {
+    return lazy(() => fn().catch((e) => {
         const key = 'openwire_chunk_reload';
         if (!sessionStorage.getItem(key)) {
             sessionStorage.setItem(key, '1');
             window.location.reload();
+            // Hang until reload completes — calling fn() again would hit the same stale hash
+            return new Promise(() => {});
         }
-        return fn(); // second attempt after reload flag set
+        // Already tried a reload — re-throw so React ErrorBoundary can render a fallback
+        throw e;
     }));
 }
 
@@ -399,6 +402,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
 
     // ── Swarm host election: admin gets priority, otherwise oldest peer (lowest id) ──
     const shouldRunSwarm = useCallback(() => {
+        // Opt-in only — swarm is OFF by default; user must enable it via the agent panel
+        if (!localStorage.getItem('openwire:swarm_enabled')) return false;
         const peers = peersRef.current;
         const myId = myIdRef.current;
         if (!myId) return false;
@@ -767,6 +772,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     ));
                 }
                 break;
+            case 'admin_adjust_balance':
+                // Only apply if we are the target — sender applies it locally, others ignore
+                if (action.peer_id === myIdRef.current && msg.peer_id !== myIdRef.current && walletRef.current) {
+                    const updated = wallet.adminAdjust(walletRef.current, action.delta, action.reason);
+                    updateWallet(updated);
+                    addMsg('★', `💰 Admin ${action.delta > 0 ? 'added' : 'deducted'} ${Math.abs(action.delta)} chips (${action.reason})`, 'system');
+                }
+                break;
             case 'mention_notify':
                 if (action.to === myId) {
                     const toastId = Date.now() + Math.random();
@@ -942,7 +955,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'admin_adjust_balance'];
                         if (CUSTOM.includes(parsed.type)) msgCustom = parsed;
                     } catch { /* not JSON */ }
                 }
@@ -1001,7 +1014,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (!isBjMsg && !isRlMsg && !isAbMsg && !isPmMsg && !isGameMsg && msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'admin_adjust_balance'];
                         if (CUSTOM.includes(parsed.type)) customAction = parsed;
                     } catch { /* not JSON */ }
                 }
@@ -1201,16 +1214,6 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             case 'banned_ips':
                 setBannedIps(msg.ips || []);
                 break;
-            case 'admin_adjust_balance': {
-                const w = walletRef.current;
-                if (w) {
-                    const updated = wallet.adminAdjust(w, msg.delta, msg.reason);
-                    updateWallet(updated);
-                    addMsg('★', `💰 Admin ${msg.delta > 0 ? 'added' : 'deducted'} ${Math.abs(msg.delta)} chips (${msg.reason})`, 'system');
-                }
-                break;
-            }
-
             case 'rate_limited':
                 // Server told us we're sending too fast — silently throttle
                 break;
@@ -1474,9 +1477,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     };
     const handleAdminAdjustBalance = (peer_id, nick, delta) => {
         const reason = `Admin grant from ${nickRef.current}`;
-        socket.send({ type: 'admin_adjust_balance', peer_id, delta, reason });
+        // Broadcast via general chat so the relay forwards it to all peers.
+        // Each peer checks peer_id === myId before applying.
+        socket.sendChat(JSON.stringify({ type: 'admin_adjust_balance', peer_id, delta, reason }));
         addActivityLog(`Adjusted ${nick}'s balance by ${delta} chips`);
-        // If admin is adjusting their own balance, relay won't echo back — apply directly
+        // Apply locally if we are the target (relay echo won't reach sender)
         if (peer_id === myIdRef.current && walletRef.current) {
             const updated = wallet.adminAdjust(walletRef.current, delta, reason);
             updateWallet(updated);

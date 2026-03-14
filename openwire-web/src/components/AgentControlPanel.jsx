@@ -87,12 +87,14 @@ function AgentControlPanel({ swarm, onClose }) {
         if (running) {
             swarm.stop();
             setRunning(false);
+            localStorage.removeItem('openwire:swarm_enabled');
         } else {
             setLoading(true);
             setError(null);
             try {
                 await swarm.start();
                 setRunning(true);
+                localStorage.setItem('openwire:swarm_enabled', '1');
                 setModels(swarm.freeModels);
                 const map = {};
                 Object.keys(swarm.characters).forEach(id => { map[id] = swarm.getAssignedModel(id); });
