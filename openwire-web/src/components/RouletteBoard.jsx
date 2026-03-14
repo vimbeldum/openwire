@@ -293,7 +293,7 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
     ]);
 
     return (
-        <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && game.phase === 'betting' && onClose?.()}>
+        <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && game?.phase === 'betting' && onClose?.()}>
             <div className="rl-table">
 
                 {/* ── Header ── */}

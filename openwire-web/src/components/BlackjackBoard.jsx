@@ -279,7 +279,7 @@ export default memo(function BlackjackBoard({ game, myId, myNick, wallet, onActi
     const canDoubleNow = isMyTurn && bj.canDoubleDown(game, myId);
 
     return (
-        <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && game.phase === 'betting' && onClose?.()}>
+        <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && game?.phase === 'betting' && onClose?.()}>
             <div className="bj-table">
                 {/* ── Header ── */}
                 <div className="game-table-header">
@@ -354,9 +354,17 @@ export default memo(function BlackjackBoard({ game, myId, myNick, wallet, onActi
                             ) : myPlayer.status === 'waiting' ? (
                                 <div className="bj-bet-row">
                                     {lastBet > 0 && (
-                                        <div className="bj-quick-bet-row">
-                                            <button className="rl-bet-again-btn" onClick={handleBetAgain} disabled={lastBet > balance}>↺ {lastBet}</button>
-                                            <button className="rl-bet-again-btn double" onClick={handleDouble} disabled={lastBet * 2 > balance}>✕2 {lastBet * 2}</button>
+                                        <div className="quick-bet-row">
+                                            <button className="quick-bet-btn repeat" onClick={handleBetAgain} disabled={lastBet > balance}>
+                                                <span className="quick-bet-icon">↺</span>
+                                                <span className="quick-bet-label">Bet Again</span>
+                                                <span className="quick-bet-amount">{lastBet} chips</span>
+                                            </button>
+                                            <button className="quick-bet-btn double" onClick={handleDouble} disabled={lastBet * 2 > balance}>
+                                                <span className="quick-bet-icon">×2</span>
+                                                <span className="quick-bet-label">Double</span>
+                                                <span className="quick-bet-amount">{lastBet * 2} chips</span>
+                                            </button>
                                         </div>
                                     )}
                                     <div className="chip-selector">
@@ -425,12 +433,6 @@ export default memo(function BlackjackBoard({ game, myId, myNick, wallet, onActi
                                             </div>
                                         );
                                     })}
-                                </div>
-                            )}
-                            {lastBet > 0 && (
-                                <div className="bj-quick-bet-row">
-                                    <button className="rl-bet-again-btn" onClick={handleBetAgain} disabled={lastBet > balance}>↺ Bet Again ({lastBet})</button>
-                                    <button className="rl-bet-again-btn double" onClick={handleDouble} disabled={lastBet * 2 > balance}>✕2 Double ({lastBet * 2})</button>
                                 </div>
                             )}
                             <button className="bj-btn-primary deal" onClick={onNewRound}>

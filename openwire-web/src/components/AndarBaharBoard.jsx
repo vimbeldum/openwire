@@ -186,7 +186,7 @@ export default memo(function AndarBaharBoard({ game, myId, myNick, wallet, onAct
     const baharVisible = game.bahar.slice(-8);
 
     return (
-        <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && game.phase === 'betting' && onClose?.()}>
+        <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && game?.phase === 'betting' && onClose?.()}>
             <div className="ab-table">
                 {/* Header */}
                 <div className="game-table-header">
