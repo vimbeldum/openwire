@@ -48,6 +48,7 @@ const VaultPanel = lazyRetry(() => import('./VaultPanel'));
 const DeadDropsPanel = lazyRetry(() => import('./DeadDropsPanel'));
 const CosmeticsShop = lazyRetry(() => import('./CosmeticsShop'));
 const TambolaBoard = lazyRetry(() => import('./TambolaBoard'));
+const SlotsBoard = lazyRetry(() => import('./SlotsBoard'));
 const KarmaGuide   = lazyRetry(() => import('./KarmaGuide'));
 import LiveTicker from './chat/LiveTicker';
 import TypingBar from './chat/TypingBar';
@@ -134,6 +135,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const [showDeadDrops, setShowDeadDrops] = useState(false);
     const [showCosmetics, setShowCosmetics] = useState(false);
     const [tambolaGame, setTambolaGame] = useState(false);
+    const [showSlots, setShowSlots] = useState(false);
     const [showKarmaGuide, setShowKarmaGuide] = useState(false);
     const [profile, setProfile] = useState(null);
     const peerCosmeticsRef = useRef({}); // peer_id → { bubbleStyle, nameColor, chatFlair }
@@ -2435,6 +2437,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                                 🎱 Tambola
                             </button>
 
+                            <button className="sidebar-btn" onClick={() => setShowSlots(true)}>
+                                🍒 Slots
+                            </button>
+
                             <button className="sidebar-btn" onClick={() => {
                                 const nick = prompt('Invite nick:');
                                 const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
@@ -2631,6 +2637,17 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                         // Add rake to jackpot
                         setJackpotPool(prev => addRake(prev, 'tambola', 100));
                     }}
+                />
+            )}
+            {showSlots && (
+                <SlotsBoard
+                    wallet={myWallet}
+                    onWalletUpdate={(updatedWallet) => {
+                        updateWallet(updatedWallet);
+                        setJackpotPool(prev => addRake(prev, 'slots', 100));
+                    }}
+                    onClose={() => setShowSlots(false)}
+                    onHelp={() => openHelp('slots')}
                 />
             )}
             {showKarmaGuide && (

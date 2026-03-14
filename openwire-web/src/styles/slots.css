@@ -1,0 +1,248 @@
+/* ═══════════════════════════════════════════════════════════
+   SLOTS TABLE — Lucky Slots UI
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Keyframes ────────────────────────────────────────────── */
+
+@keyframes slotSpin {
+  0%   { transform: translateY(0);   filter: blur(0); }
+  10%  { transform: translateY(-20px); filter: blur(2px); }
+  50%  { transform: translateY(-60px); filter: blur(4px); }
+  80%  { transform: translateY(-10px); filter: blur(1px); }
+  100% { transform: translateY(0);   filter: blur(0); }
+}
+
+@keyframes slotBounce {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.08); }
+}
+
+@keyframes jackpotGlow {
+  0%, 100% { box-shadow: 0 0 10px rgba(255, 215, 0, 0.4); }
+  50%      { box-shadow: 0 0 30px rgba(255, 215, 0, 0.8), 0 0 60px rgba(255, 215, 0, 0.3); }
+}
+
+@keyframes winPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.85; transform: scale(1.04); }
+}
+
+/* ── Main Container ───────────────────────────────────────── */
+
+.slots-table {
+  position: relative;
+  width: min(460px, 96vw);
+  max-height: 96vh;
+  background: var(--glass-bg, rgba(20, 20, 35, 0.95));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: 18px;
+  padding: 1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  overflow: hidden;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+}
+
+/* ── Reels Area ───────────────────────────────────────────── */
+
+.slots-reels {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  padding: 0.8rem;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.slots-reel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(3rem, 8vmin, 4.5rem);
+  height: clamp(70px, 14vmin, 100px);
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  transition: border-color 0.3s;
+  line-height: 1;
+}
+
+.slots-reel.spinning {
+  animation: slotSpin 0.4s ease-in-out infinite;
+}
+
+.slots-reel.spinning:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.slots-reel.spinning:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.slots-reel.win {
+  border-color: rgba(255, 215, 0, 0.7);
+  animation: jackpotGlow 1.5s ease-in-out infinite;
+}
+
+/* ── Result Display ───────────────────────────────────────── */
+
+.slots-result {
+  text-align: center;
+  padding: 0.5rem;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  min-height: 2.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slots-result.win {
+  color: #4ecdc4;
+  background: rgba(78, 205, 196, 0.1);
+  border: 1px solid rgba(78, 205, 196, 0.25);
+  animation: winPulse 1.5s ease-in-out infinite;
+}
+
+.slots-result.lose {
+  color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.slots-result.idle {
+  color: rgba(255, 255, 255, 0.3);
+  font-weight: 400;
+  font-size: 0.9rem;
+}
+
+/* ── Spin Button ──────────────────────────────────────────── */
+
+.slots-spin-btn {
+  width: 100%;
+  padding: 0.8rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, #6c5ce7, #a855f7);
+  box-shadow: 0 4px 16px rgba(108, 92, 231, 0.35);
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+
+.slots-spin-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(108, 92, 231, 0.5);
+}
+
+.slots-spin-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.slots-spin-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.slots-spin-btn.spinning {
+  animation: slotBounce 0.8s ease-in-out infinite;
+  background: linear-gradient(135deg, #e17055, #fdcb6e);
+}
+
+/* ── Payout Table ─────────────────────────────────────────── */
+
+.slots-payout-table {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.15rem 0.8rem;
+  font-size: 0.78rem;
+  padding: 0.5rem 0.6rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.6);
+  max-height: 8rem;
+  overflow: hidden;
+}
+
+.slots-payout-table .payout-symbol {
+  text-align: left;
+}
+
+.slots-payout-table .payout-mult {
+  text-align: right;
+  color: #fdcb6e;
+  font-weight: 600;
+}
+
+/* ── History Strip ────────────────────────────────────────── */
+
+.slots-history {
+  display: flex;
+  gap: 0.3rem;
+  overflow-x: auto;
+  padding: 0.3rem 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.slots-history::-webkit-scrollbar {
+  display: none;
+}
+
+.slots-history-pip {
+  flex-shrink: 0;
+  display: flex;
+  gap: 0.1rem;
+  padding: 0.2rem 0.35rem;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.slots-history-pip.win {
+  background: rgba(78, 205, 196, 0.12);
+  border: 1px solid rgba(78, 205, 196, 0.2);
+}
+
+.slots-history-pip.lose {
+  opacity: 0.5;
+}
+
+/* ── Section Title ────────────────────────────────────────── */
+
+.slots-section-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.35);
+  margin: 0;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+
+@media (max-height: 650px) {
+  .slots-table {
+    padding: 0.6rem 0.8rem;
+    gap: 0.35rem;
+  }
+  .slots-reel {
+    font-size: 2.5rem;
+    height: 60px;
+  }
+  .slots-spin-btn {
+    padding: 0.6rem;
+    font-size: 1rem;
+  }
+  .slots-payout-table {
+    font-size: 0.7rem;
+    max-height: 6rem;
+  }
+}
