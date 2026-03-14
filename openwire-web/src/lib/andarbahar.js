@@ -102,11 +102,9 @@ export function dealTrump(game) {
 export function dealNext(game) {
     if (game.phase !== 'dealing' || !game.trumpCard) return game;
 
-    if (!game.deck || game.deck.length === 0) {
-        return { ...game, phase: 'ended', result: 'draw', payouts: {} };
-    }
-
-    const deck = [...game.deck];
+    // Reshuffle a fresh deck if the current one is exhausted mid-round
+    const sourceDeck = (!game.deck || game.deck.length === 0) ? createDeck() : game.deck;
+    const deck = [...sourceDeck];
     const card = deck.pop();
     if (!card) return game;
 
@@ -156,15 +154,12 @@ export const MIN_DECK_SIZE = 10; // reshuffle when fewer than this many cards re
 
 export function newRound(game) {
     const now = Date.now();
-    // Reuse existing deck if enough cards remain; otherwise reshuffle
-    const existingDeck = game.deck || [];
-    const needsReshuffle = existingDeck.length < MIN_DECK_SIZE;
-    const deck = needsReshuffle ? createDeck() : existingDeck;
+    // Always start each round with a fresh shuffled deck
     return {
         ...createGame(game.roomId),
         trumpHistory: game.trumpHistory || [],
-        deck,
-        reshuffled: needsReshuffle,
+        deck: createDeck(),
+        reshuffled: true,
         bettingEndsAt: now + BETTING_DURATION_MS,
         nextGameAt: now + GAME_INTERVAL_MS,
         startedAt: now,

@@ -137,9 +137,9 @@ export function dealInitialCards(game) {
     let players = game.players.map(p => ({ ...p, hand: [], status: 'playing' }));
     let dealer = { ...game.dealer, hand: [], revealed: false };
 
-    // Pre-check: enough cards for initial deal
+    // Reshuffle if not enough cards for initial deal
     const cardsNeeded = (players.length + 1) * 2;
-    if (deck.length < cardsNeeded) return game; // not enough cards
+    if (deck.length < cardsNeeded) deck = [...createDeck()];
 
     // Deal 2 cards to each player and dealer
     for (let round = 0; round < 2; round++) {
@@ -183,8 +183,8 @@ export function hit(game, peer_id) {
     if (playerIndex === -1 || game.phase !== 'playing') return game;
     if (game.currentPlayerIndex !== playerIndex) return game;
 
-    let deck = [...game.deck];
-    if (deck.length === 0) return game; // deck exhausted, can't hit
+    // Reshuffle a fresh deck if exhausted mid-round
+    let deck = [...(game.deck.length > 0 ? game.deck : createDeck())];
     const card = deck.pop();
 
     let players = [...game.players];
@@ -314,8 +314,7 @@ export function canSplit(game, peer_id) {
 export function split(game, peer_id) {
     if (!canSplit(game, peer_id)) return game;
     const playerIndex = game.players.findIndex(p => p.peer_id === peer_id);
-    let deck = [...game.deck];
-    if (deck.length < 2) return game; // need 2 cards for split
+    let deck = [...(game.deck.length >= 2 ? game.deck : createDeck())];
 
     let players = [...game.players];
     const player = { ...players[playerIndex] };
@@ -398,8 +397,7 @@ export function canDoubleDown(game, peer_id) {
 export function doubleDown(game, peer_id) {
     if (!canDoubleDown(game, peer_id)) return game;
     const playerIndex = game.players.findIndex(p => p.peer_id === peer_id);
-    let deck = [...game.deck];
-    if (deck.length === 0) return game;
+    let deck = [...(game.deck.length > 0 ? game.deck : createDeck())];
     const card = deck.pop();
 
     let players = [...game.players];
@@ -453,7 +451,7 @@ export function dealerPlay(game) {
 
     // Dealer hits on 16 or less, stands on 17+
     while (calculateHand(dealer.hand) < 17) {
-        if (deck.length === 0) break; // deck exhausted
+        if (deck.length === 0) deck = [...createDeck()]; // reshuffle if exhausted
         dealer.hand.push(deck.pop());
     }
 
@@ -514,16 +512,11 @@ export function runDealerTurn(game) {
     return settle(dealerPlay(game));
 }
 
-// Start a new round (keep players, reuse deck if enough cards remain)
+// Start a new round (keep players, always fresh deck)
 export function newRound(game) {
-    // Persist deck across rounds — only reshuffle when too few cards
-    let deck = game.deck && game.deck.length >= MIN_DECK_CARDS
-        ? game.deck
-        : createDeck();
-
     return {
         ...createGame(game.roomId, game.dealer.peer_id),
-        deck,
+        deck: createDeck(),
         players: game.players.map(p => ({
             peer_id: p.peer_id,
             nick: p.nick,
@@ -612,7 +605,7 @@ export function getPayouts(game) {
 
 export const BLACKJACK_RULES = {
     name: 'Blackjack',
-    description: 'Beat the dealer by getting closer to 21 without going over. Dealer hits on 16 or less, stands on 17+. Single deck — cards persist across rounds until reshuffled.',
+    description: 'Beat the dealer by getting closer to 21 without going over. Dealer hits on 16 or less, stands on 17+. Fresh shuffled deck every round.',
     bets: [
         { name: 'Win', odds: '1:1', description: 'Your hand beats the dealer — you win your bet.' },
         { name: 'Blackjack', odds: '3:2', description: 'Natural 21 on first two cards beats any non-blackjack dealer hand.' },

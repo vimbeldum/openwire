@@ -242,13 +242,13 @@ describe('newRound', () => {
         expect(next.deck).toHaveLength(52);
         expect(next.reshuffled).toBe(true);
     });
-    it('reuses deck when enough cards remain', () => {
+    it('always starts with fresh 52-card deck regardless of remaining cards', () => {
         let game = createGame('room-ab');
         const bigDeck = Array(20).fill({ value: '2', suit: '♠' });
         game = { ...game, deck: bigDeck };
         const next = newRound(game);
-        expect(next.deck).toHaveLength(20);
-        expect(next.reshuffled).toBe(false);
+        expect(next.deck).toHaveLength(52);
+        expect(next.reshuffled).toBe(true);
     });
 });
 

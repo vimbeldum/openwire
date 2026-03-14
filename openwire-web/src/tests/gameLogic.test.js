@@ -624,13 +624,14 @@ describe('Blackjack: dealInitialCards()', () => {
         expect(game.dealer.revealed).toBe(true);
     });
 
-    it('returns unchanged game if not enough cards', () => {
+    it('reshuffles fresh deck when not enough cards for initial deal', () => {
         let game = createGame('room1', 'dealer1');
         game = addPlayer(game, 'p1', 'Alice');
         game = bjPlaceBet(game, 'p1', 100);
         game.deck = [{ value: 'A', suit: '♠', id: 'A♠' }]; // only 1 card
         const result = dealInitialCards(game);
-        expect(result.players[0].hand).toEqual([]); // deal aborted
+        expect(result.players[0].hand).toHaveLength(2); // dealt from fresh deck
+        expect(result.dealer.hand).toHaveLength(2);
     });
 });
 
@@ -682,14 +683,14 @@ describe('Blackjack: hit()', () => {
         expect(result.players[0].status).toBe('stand');
     });
 
-    it('returns unchanged game if deck is empty', () => {
+    it('reshuffles fresh deck and deals card when deck is empty', () => {
         const game = setupPlayingGame(
             [{ value: '5', suit: '♠', id: '5♠' }, { value: '3', suit: '♥', id: '3♥' }],
             [{ value: '7', suit: '♠', id: '7♠' }, { value: '8', suit: '♦', id: '8♦' }],
-            [] // empty deck
+            [] // empty deck — triggers reshuffle
         );
         const result = hit(game, 'p1');
-        expect(result.players[0].hand).toHaveLength(2); // unchanged
+        expect(result.players[0].hand).toHaveLength(3); // got a card from fresh deck
     });
 
     it('ignores hit from wrong player', () => {
@@ -1181,15 +1182,15 @@ describe('Blackjack: settle() — split and insurance', () => {
 });
 
 describe('Blackjack: newRound()', () => {
-    it('reuses deck when enough cards remain', () => {
+    it('always starts with fresh 52-card deck', () => {
         let game = createGame('room1', 'dealer1');
         game = addPlayer(game, 'p1', 'Alice');
         game = bjPlaceBet(game, 'p1', 100);
-        // Ensure deck has enough cards
         expect(game.deck.length).toBe(52);
         const deckRef = game.deck;
         const result = bjNewRound(game);
-        expect(result.deck).toBe(deckRef); // same reference (reused)
+        expect(result.deck).not.toBe(deckRef); // new deck, not reused
+        expect(result.deck).toHaveLength(52);
         expect(result.phase).toBe('betting');
     });
 
