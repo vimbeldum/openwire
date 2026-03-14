@@ -293,7 +293,7 @@ export default memo(function PolymarketBoard({ game, myId, myNick, wallet, onAct
     };
 
     return (
-        <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
+        <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && game.phase === 'open' && onClose?.()}>
             <div className="pm-table">
                 {/* Header */}
                 <div className="pm-header">

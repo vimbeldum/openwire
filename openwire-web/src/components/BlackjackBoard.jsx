@@ -258,7 +258,7 @@ export default memo(function BlackjackBoard({ game, myId, myNick, wallet, onActi
     const canDoubleNow = isMyTurn && bj.canDoubleDown(game, myId);
 
     return (
-        <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
+        <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && game.phase === 'betting' && onClose?.()}>
             <div className="bj-table">
                 {/* ── Header ── */}
                 <div className="game-table-header">

@@ -1828,13 +1828,15 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (!w || !wallet.canAfford(w, amount)) { addMsg('★', '⚠ Insufficient chips.', 'system'); return; }
                 const updated = wallet.debit(w, amount, `Tip to ${targetNick}`);
                 updateWallet(updated);
-                const tipRoom = activeRoom || (currentRooms[0]?.room_id);
-                if (tipRoom) {
-                    socket.sendRoomMessage(tipRoom, JSON.stringify({
-                        type: 'tip', to: target.peer_id, from_nick: myNick, amount,
-                    }));
-                }
+                // Send via global chat so recipient gets the tip regardless of room
+                socket.sendChat(JSON.stringify({
+                    type: 'tip', to: target.peer_id, from_nick: myNick, amount,
+                }));
                 addMsg('💸', `Tipped ${amount} chips to ${targetNick}!`, 'system');
+                // Optimistic display update for sender's peer sidebar
+                setPeers(prev => prev.map(p =>
+                    p.peer_id === target.peer_id ? { ...p, balance: (p.balance || 0) + amount } : p
+                ));
             }
             return;
         }
@@ -1970,10 +1972,33 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const anyGameActive = !!(activeGame || blackjackGame || rouletteGame || andarBaharGame || polymarketGame);
 
     // ── Stable callback props for memoized board components ──
-    const closeBj = useCallback(() => setBlackjackGame(null), []);
-    const closeRl = useCallback(() => setRouletteGame(null), []);
-    const closeAb = useCallback(() => setAndarBaharGame(null), []);
-    const closePm = useCallback(() => setPolymarketGame(null), []);
+    const closeBj = useCallback(() => {
+        setBlackjackGame(null);
+        bjHostRef.current = null;
+        hasJoinedBj.current = false;
+        if (bjDealerTimerRef.current) { clearTimeout(bjDealerTimerRef.current); bjDealerTimerRef.current = null; }
+    }, []);
+    const closeRl = useCallback(() => {
+        setRouletteGame(null);
+        rouletteHostRef.current = null;
+        hasJoinedRl.current = false;
+        if (rouletteTimerRef.current) { clearInterval(rouletteTimerRef.current); rouletteTimerRef.current = null; }
+        clearTimeout(rouletteSpinTimeoutRef.current);
+        clearTimeout(rouletteResultTimeoutRef.current);
+    }, []);
+    const closeAb = useCallback(() => {
+        setAndarBaharGame(null);
+        abHostRef.current = null;
+        hasJoinedAb.current = false;
+        if (abDealTimerRef.current) { clearInterval(abDealTimerRef.current); abDealTimerRef.current = null; }
+        if (abCycleTimerRef.current) { clearTimeout(abCycleTimerRef.current); abCycleTimerRef.current = null; }
+        abGenRef.current++;
+    }, []);
+    const closePm = useCallback(() => {
+        setPolymarketGame(null);
+        pmHostRef.current = null;
+        hasJoinedPm.current = false;
+    }, []);
     const closeTtt = useCallback(() => setActiveGame(null), []);
     const helpBj = useCallback(() => openHelp('blackjack'), []);
     const helpRl = useCallback(() => openHelp('roulette'), []);
@@ -2240,13 +2265,15 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                                     if (!w || !wallet.canAfford(w, amount)) { addMsg('★', '⚠ Insufficient chips.', 'system'); return; }
                                     const updated = wallet.debit(w, amount, `Tip to ${p.nick}`);
                                     updateWallet(updated);
-                                    const tipRoom = currentRoomRef.current || roomsRef.current[0]?.room_id;
-                                    if (tipRoom) {
-                                        socket.sendRoomMessage(tipRoom, JSON.stringify({
-                                            type: 'tip', to: p.peer_id, from_nick: nickRef.current, amount,
-                                        }));
-                                    }
+                                    // Send via global chat so recipient gets it regardless of room
+                                    socket.sendChat(JSON.stringify({
+                                        type: 'tip', to: p.peer_id, from_nick: nickRef.current, amount,
+                                    }));
                                     addMsg('💸', `Tipped ${amount} chips to ${p.nick}!`, 'system');
+                                    // Optimistic display update
+                                    setPeers(prev => prev.map(pp =>
+                                        pp.peer_id === p.peer_id ? { ...pp, balance: (pp.balance || 0) + amount } : pp
+                                    ));
                                 }}
                             >💰</button>
                         </div>
