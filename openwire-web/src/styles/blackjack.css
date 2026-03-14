@@ -587,6 +587,45 @@
   border-top: 1px dashed rgba(255,255,255,0.15);
 }
 
+/* Active hand indicator during split play */
+.bj-cards-fan.split-active,
+.bj-split-hand.split-active {
+  border: 2px solid rgba(232, 183, 48, 0.6);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem;
+  background: rgba(232, 183, 48, 0.06);
+  box-shadow: 0 0 12px rgba(232, 183, 48, 0.15);
+}
+
+.bj-hand-label-tag {
+  font-size: 0.6rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 100px;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-dim);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bj-active-tag {
+  font-size: 0.55rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: 100px;
+  background: rgba(232, 183, 48, 0.2);
+  border: 1px solid rgba(232, 183, 48, 0.5);
+  color: #E8B730;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  animation: activeTagPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes activeTagPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .bj-table {

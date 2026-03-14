@@ -53,17 +53,22 @@ function Card({ card, hidden = false, index = 0, placeholder = false, revealed =
 }
 
 /* ── Player / Dealer Hand ─────────────────────────── */
-function Hand({ cards, label, value, hidden = false, status = '', isMyTurn = false, revealCount = 999, splitCards, splitValue, splitStatus }) {
+function Hand({ cards, label, value, hidden = false, status = '', isMyTurn = false, revealCount = 999, splitCards, splitValue, splitStatus, playingSplit }) {
+    const hasSplit = splitCards && splitCards.length > 0;
+    const mainActive = isMyTurn && hasSplit && !playingSplit;
+    const splitActive = isMyTurn && hasSplit && playingSplit;
     return (
         <div className={`bj-hand-zone ${isMyTurn ? 'active-turn' : ''} ${status === 'bust' ? 'bust' : ''}`}>
             <div className="bj-hand-header">
                 <span className="bj-hand-name">{label}</span>
+                {hasSplit && <span className="bj-hand-label-tag">Main Hand</span>}
+                {mainActive && <span className="bj-active-tag">ACTIVE</span>}
                 <span className="bj-hand-val">
                     {hidden ? '?' : value}
                     {status && <span className={`bj-status-badge ${status}`}>{status.replace('-', ' ').toUpperCase()}</span>}
                 </span>
             </div>
-            <div className="bj-cards-fan">
+            <div className={`bj-cards-fan ${mainActive ? 'split-active' : ''}`}>
                 {cards.length === 0 ? (
                     <>
                         <Card placeholder index={0} />
@@ -82,10 +87,11 @@ function Hand({ cards, label, value, hidden = false, status = '', isMyTurn = fal
                 )}
             </div>
             {/* Split hand display */}
-            {splitCards && splitCards.length > 0 && (
-                <div className="bj-split-hand">
+            {hasSplit && (
+                <div className={`bj-split-hand ${splitActive ? 'split-active' : ''}`}>
                     <div className="bj-hand-header">
-                        <span className="bj-hand-name">Split</span>
+                        <span className="bj-hand-name">Split Hand</span>
+                        {splitActive && <span className="bj-active-tag">ACTIVE</span>}
                         <span className="bj-hand-val">
                             {splitValue}
                             {splitStatus && <span className={`bj-status-badge ${splitStatus}`}>{splitStatus.replace('-', ' ').toUpperCase()}</span>}
@@ -294,6 +300,7 @@ export default memo(function BlackjackBoard({ game, myId, myNick, wallet, onActi
                             splitCards={player.splitHand}
                             splitValue={player.splitHand ? bj.calculateHand(player.splitHand) : null}
                             splitStatus={showResults ? player.splitStatus : ''}
+                            playingSplit={player.playingSplit}
                         />
                     ))}
                     {game.players.length === 0 && <div className="bj-empty-msg">Waiting for players to join...</div>}

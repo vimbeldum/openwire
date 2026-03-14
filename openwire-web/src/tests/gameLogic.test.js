@@ -865,6 +865,203 @@ describe('Blackjack: canSplit() / split()', () => {
     });
 });
 
+describe('Blackjack: split active hand tracking (playingSplit)', () => {
+    function setupSplitGame(card1, card2, deckCards) {
+        let game = createGame('room1', 'dealer1');
+        game = addPlayer(game, 'p1', 'Alice');
+        game = bjPlaceBet(game, 'p1', 100);
+        return {
+            ...game,
+            phase: 'playing',
+            currentPlayerIndex: 0,
+            deck: deckCards || [
+                { value: '2', suit: '♣', id: '2♣' },
+                { value: '3', suit: '♣', id: '3♣' },
+                { value: '4', suit: '♣', id: '4♣' },
+                { value: '5', suit: '♣', id: '5♣' },
+                { value: '6', suit: '♣', id: '6♣' },
+                { value: '7', suit: '♣', id: '7♣' },
+            ],
+            dealer: { ...game.dealer, hand: [{ value: '7', suit: '♠', id: '7♠' }, { value: '8', suit: '♦', id: '8♦' }] },
+            players: [{ ...game.players[0], hand: [card1, card2], status: 'playing' }],
+        };
+    }
+
+    it('after split, playingSplit starts as false (main hand active)', () => {
+        const game = setupSplitGame(
+            { value: '4', suit: '♠', id: '4♠' },
+            { value: '4', suit: '♥', id: '4♥' },
+        );
+        const result = split(game, 'p1');
+        expect(result.players[0].playingSplit).toBe(false);
+        expect(result.players[0].splitStatus).toBe('playing');
+    });
+
+    it('hit on main hand adds card to main hand, not split', () => {
+        const game = setupSplitGame(
+            { value: '4', suit: '♠', id: '4♠' },
+            { value: '4', suit: '♥', id: '4♥' },
+        );
+        const afterSplit = split(game, 'p1');
+        expect(afterSplit.players[0].playingSplit).toBe(false);
+        const mainLen = afterSplit.players[0].hand.length;
+        const splitLen = afterSplit.players[0].splitHand.length;
+        const afterHit = hit(afterSplit, 'p1');
+        expect(afterHit.players[0].hand.length).toBe(mainLen + 1);
+        expect(afterHit.players[0].splitHand.length).toBe(splitLen);
+    });
+
+    it('stand on main hand switches to split hand (playingSplit becomes true)', () => {
+        const game = setupSplitGame(
+            { value: '4', suit: '♠', id: '4♠' },
+            { value: '4', suit: '♥', id: '4♥' },
+        );
+        const afterSplit = split(game, 'p1');
+        expect(afterSplit.players[0].playingSplit).toBe(false);
+        const afterStand = stand(afterSplit, 'p1');
+        expect(afterStand.players[0].playingSplit).toBe(true);
+        expect(afterStand.players[0].status).toBe('stand');
+        expect(afterStand.players[0].splitStatus).toBe('playing');
+    });
+
+    it('hit busts main hand switches to split hand', () => {
+        // Main hand: K + K = 20, hit with K = bust (30)
+        const game = setupSplitGame(
+            { value: 'K', suit: '♠', id: 'K♠' },
+            { value: 'K', suit: '♥', id: 'K♥' },
+            [
+                { value: '2', suit: '♣', id: '2♣_dd' },
+                { value: '3', suit: '♣', id: '3♣_dd' },
+                { value: 'K', suit: '♦', id: 'K♦_h' },  // hit card (busts main)
+                { value: '5', suit: '♣', id: '5♣_s' },   // split new card
+                { value: '6', suit: '♣', id: '6♣_m' },   // main new card
+            ],
+        );
+        const afterSplit = split(game, 'p1');
+        // Main hand: K + new card, split hand: K + new card
+        // Main hand first (playingSplit=false)
+        const afterHit = hit(afterSplit, 'p1');
+        // Main hand busted, should switch to split hand
+        expect(afterHit.players[0].status).toBe('bust');
+        expect(afterHit.players[0].playingSplit).toBe(true);
+    });
+
+    it('hit on split hand adds card to split hand, not main', () => {
+        const game = setupSplitGame(
+            { value: '4', suit: '♠', id: '4♠' },
+            { value: '4', suit: '♥', id: '4♥' },
+        );
+        const afterSplit = split(game, 'p1');
+        const afterStand = stand(afterSplit, 'p1'); // stand on main, switch to split
+        expect(afterStand.players[0].playingSplit).toBe(true);
+        const mainLen = afterStand.players[0].hand.length;
+        const splitLen = afterStand.players[0].splitHand.length;
+        const afterHit = hit(afterStand, 'p1');
+        expect(afterHit.players[0].hand.length).toBe(mainLen); // main unchanged
+        expect(afterHit.players[0].splitHand.length).toBe(splitLen + 1);
+    });
+
+    it('stand on split hand ends player turn entirely', () => {
+        const game = setupSplitGame(
+            { value: '4', suit: '♠', id: '4♠' },
+            { value: '4', suit: '♥', id: '4♥' },
+        );
+        const afterSplit = split(game, 'p1');
+        const afterStandMain = stand(afterSplit, 'p1'); // stand main → switch to split
+        const afterStandSplit = stand(afterStandMain, 'p1'); // stand split → done
+        expect(afterStandSplit.players[0].status).toBe('stand');
+        expect(afterStandSplit.players[0].splitStatus).toBe('stand');
+        // With single player, should transition to dealer phase
+        expect(afterStandSplit.phase).toBe('dealer');
+    });
+
+    it('auto-21 on main hand during split moves to split hand', () => {
+        // Split two Aces, main gets A + 10 = 21 (auto-stand)
+        const game = setupSplitGame(
+            { value: 'A', suit: '♠', id: 'A♠' },
+            { value: 'A', suit: '♥', id: 'A♥' },
+            [
+                { value: '4', suit: '♣', id: '4♣' },
+                { value: '3', suit: '♣', id: '3♣' },
+                { value: '2', suit: '♣', id: '2♣' },
+                { value: '5', suit: '♣', id: '5♣' },
+                { value: 'K', suit: '♣', id: 'K♣' },  // split new card
+                { value: '10', suit: '♣', id: '10♣' }, // main new card → A + 10 = 21
+            ],
+        );
+        const afterSplit = split(game, 'p1');
+        // Main hand: A + 10 = 21, auto-stand, moves to split
+        expect(afterSplit.players[0].status).toBe('stand');
+        expect(afterSplit.players[0].playingSplit).toBe(true);
+    });
+});
+
+describe('Blackjack: insurance payout calculation', () => {
+    it('insurance pays 2:1 when dealer has blackjack', () => {
+        const game = {
+            phase: 'ended',
+            roomId: 'room1',
+            dealer: {
+                hand: [{ value: 'A', suit: '♠', id: 'A♠' }, { value: 'K', suit: '♥', id: 'K♥' }],
+                revealed: true,
+            },
+            players: [{
+                peer_id: 'p1', nick: 'Alice', bet: 200,
+                hand: [{ value: 'K', suit: '♦', id: 'K♦' }, { value: '9', suit: '♣', id: '9♣' }],
+                status: 'lose', // lost main bet (dealer blackjack beats 19)
+                insured: true, insuranceBet: 100,
+                insuranceWon: true,
+            }],
+        };
+        const engine = new BlackjackEngine(game);
+        const event = engine.calculateResults(game);
+        // Main bet: -200 (lose), Insurance: +200 (2:1 on 100), net = 0
+        expect(event.totals['p1']).toBe(0);
+    });
+
+    it('insurance loses when dealer does not have blackjack', () => {
+        const game = {
+            phase: 'ended',
+            roomId: 'room1',
+            dealer: {
+                hand: [{ value: 'A', suit: '♠', id: 'A♠' }, { value: '7', suit: '♥', id: '7♥' }],
+                revealed: true,
+            },
+            players: [{
+                peer_id: 'p1', nick: 'Alice', bet: 200,
+                hand: [{ value: 'K', suit: '♦', id: 'K♦' }, { value: '9', suit: '♣', id: '9♣' }],
+                status: 'win', // 19 > 18
+                insured: true, insuranceBet: 100,
+                insuranceWon: false,
+            }],
+        };
+        const engine = new BlackjackEngine(game);
+        const event = engine.calculateResults(game);
+        // Main bet: +200 (win), Insurance: -100 (lose), net = 100
+        expect(event.totals['p1']).toBe(100);
+    });
+
+    it('getPayouts includes insurance in net calculation', () => {
+        const game = {
+            phase: 'ended',
+            roomId: 'room1',
+            dealer: {
+                hand: [{ value: 'A', suit: '♠', id: 'A♠' }, { value: 'K', suit: '♥', id: 'K♥' }],
+                revealed: true,
+            },
+            players: [{
+                peer_id: 'p1', nick: 'Alice', bet: 200,
+                hand: [{ value: 'K', suit: '♦', id: 'K♦' }, { value: '9', suit: '♣', id: '9♣' }],
+                status: 'lose',
+                insured: true, insuranceBet: 100,
+                insuranceWon: true,
+            }],
+        };
+        const payouts = getPayouts(game);
+        expect(payouts['p1']).toBe(0); // -200 + 200 = 0
+    });
+});
+
 describe('Blackjack: canInsure() / takeInsurance()', () => {
     function setupInsuranceGame(dealerUpCard) {
         let game = createGame('room1', 'dealer1');
