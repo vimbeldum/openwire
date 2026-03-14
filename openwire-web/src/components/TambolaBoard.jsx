@@ -203,7 +203,7 @@ export default function TambolaBoard({ myId, myNick, wallet, onClose, onWalletUp
                 <div style={styles.header}>
                     <span style={styles.title}>Tambola</span>
                     <div style={styles.headerRight}>
-                        <span style={styles.walletBadge}>{wallet} chips</span>
+                        <span style={styles.walletBadge}>{((wallet?.baseBalance ?? 0) + (wallet?.adminBonus ?? 0)).toLocaleString()} chips</span>
                         <button
                             className="btn-icon-close"
                             onClick={() => { clearInterval(drawRef.current); onClose(); }}
