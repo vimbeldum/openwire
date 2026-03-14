@@ -19,7 +19,7 @@ function getColor(n) {
 const COLORS = { red: '#CC1111', black: '#111', green: '#1A6B3C' };
 
 /* ── Animated Roulette Wheel (CSS + SVG) ────────── */
-function RouletteWheel({ spinning, result }) {
+function RouletteWheel({ spinning, result, showBall }) {
     const wheelRef = useRef(null);
     const [rotation, setRotation] = useState(0);
     const prevRotation = useRef(0);
@@ -112,7 +112,7 @@ function RouletteWheel({ spinning, result }) {
                 <circle cx={cx} cy={cy} r="7" fill="#1A1A1A" stroke="#FFD700" strokeWidth="1.2" />
                 <circle cx={cx} cy={cy} r="3.5" fill="#FFD700" />
             </svg>
-            {(spinning || game?.phase === 'results') && (
+            {(spinning || showBall) && (
                 <div className={`rl-ball${!spinning ? ' rl-ball-stopped' : ''}`} />
             )}
         </div>
@@ -316,7 +316,7 @@ export default memo(function RouletteBoard({ game, myId, myNick, wallet, onActio
                     {/* Left Column: Wheel + Info + History + Live Bets + Payouts */}
                     <div className="rl-left-col">
                         <div className="rl-wheel-section">
-                            <RouletteWheel spinning={spinning} result={game.result} />
+                            <RouletteWheel spinning={spinning} result={game.result} showBall={game.phase === 'results'} />
                             <div className="rl-wheel-info">
                                 {game.phase === 'spinning' && (
                                     <div className="rl-spinning-text">Spinning…</div>

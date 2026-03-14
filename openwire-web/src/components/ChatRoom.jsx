@@ -291,6 +291,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             return [...capped, {
                 time: timeStr(), sender, content, type,
                 id: Date.now() + Math.random(),
+                ts: Date.now(),
                 roomId: currentRoomRef.current || null,
                 reactions: {},
                 ...extra,

@@ -1,9 +1,29 @@
-import { memo } from 'react';
+import { memo, useState, useEffect } from 'react';
 
 const REACTION_EMOJIS = ['\u{1F525}', '\u{1F44F}', '\u{1F4B0}'];
+const INVITE_EXPIRE_MS = 60 * 1000; // 60s
 
 function MessageRow({ msg, renderContent, onReact, onJoinInvite, onDismissInvite }) {
+    // Invite expiry: re-check every second
+    const [now, setNow] = useState(Date.now());
+    useEffect(() => {
+        if (msg.type !== 'game_invite' || msg.inviteUsed) return;
+        const t = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(t);
+    }, [msg.type, msg.inviteUsed]);
+
     if (msg.type === 'game_invite' && !msg.inviteUsed) {
+        const expired = msg.ts && (now - msg.ts > INVITE_EXPIRE_MS);
+        if (expired) {
+            return (
+                <div className={`msg ${msg.type}`}>
+                    <div className="game-invite-inline used">
+                        <span className="game-invite-icon">{msg.sender}</span>
+                        <span className="game-invite-text">{msg.content} <em>(expired)</em></span>
+                    </div>
+                </div>
+            );
+        }
         return (
             <div className={`msg ${msg.type}`}>
                 <div className="game-invite-inline">
