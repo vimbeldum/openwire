@@ -46,16 +46,18 @@ export default function useMysteryGame(deps) {
             if (!currentGame) return null;
             const result = await generateSuspectResponse(
                 suspect, question, currentGame,
-                { swarm: deps.swarmRef?.current, playerNick },
+                {
+                    swarm: deps.swarmRef?.current,
+                    playerNick,
+                    provider: currentGame._aiProvider || undefined,
+                    model: currentGame._aiModel || undefined,
+                },
             );
             return result;
         } catch (err) {
             console.warn('[Mystery] AI generation failed:', err?.message);
-            return {
-                text: `*${suspect?.name || 'The suspect'} pauses* I'd rather not discuss that right now.`,
-                isRevised: false,
-                clue: null,
-            };
+            // Use template system instead of hardcoded fallback
+            return null;
         }
     }, [deps.swarmRef]);
 
@@ -272,6 +274,9 @@ export default function useMysteryGame(deps) {
             case 'start': {
                 // Generate the mystery from templates
                 const generated = mystery.generateMystery(game, action.templateId);
+                // Store AI config so generateAIResponse can use it
+                generated._aiProvider = action.aiProvider || '';
+                generated._aiModel = action.aiModel || '';
                 newGame = generated;
                 addActivityLog(`Mystery started: ${generated.mystery?.title || 'Unknown'}`);
                 break;
@@ -288,8 +293,16 @@ export default function useMysteryGame(deps) {
                 const interrogateSuspect = newGame.suspects?.find(s => s.id === action.suspectId);
                 if (interrogateSuspect) {
                     (async () => {
-                        const result = await generateAIResponse(interrogateSuspect, action.content, myNick);
-                        if (!result) return;
+                        let result = await generateAIResponse(interrogateSuspect, action.content, myNick);
+                        // If AI failed, use template system directly
+                        if (!result || !result.text) {
+                            const { MysterySwarm } = await import('../lib/agents/mysterySwarm.js');
+                            const ms = new MysterySwarm();
+                            ms.init(newGame, null, null);
+                            const tmpl = await ms.generateResponse(interrogateSuspect.id, action.content, myNick);
+                            ms.destroy();
+                            result = { text: tmpl?.text || `*${interrogateSuspect.name} shakes their head* I have nothing more to say.`, isRevised: false, clue: null };
+                        }
                         setMysteryGame(prev => {
                             if (!prev) return prev;
                             const updated = mystery.addInterrogation(

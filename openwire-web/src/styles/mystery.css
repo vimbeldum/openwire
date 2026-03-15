@@ -332,3 +332,48 @@
   .mystery-sidebar { border-left: none; border-top: 1px solid rgba(139,0,0,0.15); max-height: 25vh; }
 }
 @media (max-width: 480px) { .mystery-table { border-radius: 0; } }
+
+/* ── AI Model Selector in Lobby ──────────────── */
+.mystery-ai-select {
+  margin: 1rem 0;
+  text-align: center;
+}
+
+.mystery-ai-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gold, #E8B730);
+  margin-bottom: 0.5rem;
+}
+
+.mystery-ai-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 280px;
+  margin: 0 auto;
+}
+
+.mystery-ai-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mystery-ai-btn.active {
+  background: rgba(212, 175, 55, 0.12);
+  border-color: rgba(212, 175, 55, 0.4);
+  color: var(--gold, #d4af37);
+}
+
+.mystery-ai-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.08);
+}

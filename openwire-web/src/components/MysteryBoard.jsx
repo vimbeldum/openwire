@@ -235,6 +235,13 @@ export default memo(function MysteryBoard({ game, myId, myNick, onAction, onClos
     }, [onAction]);
 
     // ── Lobby phase ──────────────────────────────────
+    const AI_MODELS = [
+        { id: 'gemini', model: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', provider: 'gemini' },
+        { id: 'haimaker', model: 'minimax/minimax-m2.5', label: 'Minimax M2.5', provider: 'haimaker' },
+        { id: 'none', model: '', label: 'No AI (template responses)', provider: '' },
+    ];
+    const [selectedAI, setSelectedAI] = useState('gemini');
+
     if (phase === 'lobby') {
         return (
             <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
@@ -253,13 +260,32 @@ export default memo(function MysteryBoard({ game, myId, myNick, onAction, onClos
                             </div>
                         ))}
                         {isHost && (
-                            <button
-                                className="mystery-start-btn"
-                                disabled={players.length < 2}
-                                onClick={handleStart}
-                            >
-                                Start Mystery
-                            </button>
+                            <>
+                                <div className="mystery-ai-select">
+                                    <div className="mystery-ai-label">AI Suspect Model</div>
+                                    <div className="mystery-ai-options">
+                                        {AI_MODELS.map(m => (
+                                            <button
+                                                key={m.id}
+                                                className={`mystery-ai-btn ${selectedAI === m.id ? 'active' : ''}`}
+                                                onClick={() => setSelectedAI(m.id)}
+                                            >
+                                                {m.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <button
+                                    className="mystery-start-btn"
+                                    disabled={players.length < 1}
+                                    onClick={() => {
+                                        const aiConfig = AI_MODELS.find(m => m.id === selectedAI);
+                                        onAction({ type: 'start', aiProvider: aiConfig?.provider, aiModel: aiConfig?.model });
+                                    }}
+                                >
+                                    Start Mystery
+                                </button>
+                            </>
                         )}
                         {!isHost && (
                             <div className="mystery-lobby-sub">Waiting for host to start...</div>
