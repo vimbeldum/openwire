@@ -806,7 +806,6 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             case 'poke':
                 if (action.to === myId) {
                     setActivePoke({ from_nick: action.from_nick, poke_type: action.poke_type });
-                    setTimeout(() => setActivePoke(null), 2500);
                     addMsg('👊', `${action.from_nick} poked you with ${POKE_TYPES_MAP[action.poke_type] || '👋'}!`, 'system');
                 }
                 break;

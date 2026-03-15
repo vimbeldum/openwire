@@ -166,6 +166,9 @@ export class MysterySwarm {
                 { role: 'user', content: `${playerNick}: ${playerQuestion}` },
                 { role: 'assistant', content: response },
             );
+            if (suspect.conversationHistory.length > MAX_HISTORY * 2) {
+                suspect.conversationHistory = suspect.conversationHistory.slice(-MAX_HISTORY);
+            }
 
             // Step 5: Check if any clues were revealed
             const clueCheck = getClueForPlayer(suspect.config, playerQuestion);
@@ -483,9 +486,6 @@ async function _initGenerators() {
         _cachedGenerators.haimaker = hm.generateHaimakerMessage;
     } catch { /* proxy not configured */ }
 }
-
-// Auto-initialize on module load
-_initGenerators();
 
 /* ── Custom Scenario Generation ──────────────────────────── */
 

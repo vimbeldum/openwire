@@ -3,7 +3,7 @@ import { SCORING } from '../lib/mystery/scoring.js';
 import '../styles/mystery.css';
 
 /* ── Phase Timer ──────────────────────────────────── */
-function PhaseTimer({ phaseStartedAt, phaseDuration }) {
+const PhaseTimer = memo(function PhaseTimer({ phaseStartedAt, phaseDuration }) {
     const [now, setNow] = useState(Date.now());
 
     useEffect(() => {
@@ -26,10 +26,10 @@ function PhaseTimer({ phaseStartedAt, phaseDuration }) {
             {mins}:{String(s).padStart(2, '0')}
         </span>
     );
-}
+});
 
 /* ── Suspect Card ─────────────────────────────────── */
-function SuspectCard({ suspect, isActive, isReveal, onClick }) {
+const SuspectCard = memo(function SuspectCard({ suspect, isActive, isReveal, onClick }) {
     const isCulprit = isReveal && suspect.isCulprit;
     let cls = 'suspect-card';
     if (isActive) cls += ' active';
@@ -47,7 +47,7 @@ function SuspectCard({ suspect, isActive, isReveal, onClick }) {
             )}
         </div>
     );
-}
+});
 
 /* ── Clue Notebook ────────────────────────────────── */
 function ClueNotebook({ gameId }) {
@@ -57,7 +57,10 @@ function ClueNotebook({ gameId }) {
     });
 
     useEffect(() => {
-        try { localStorage.setItem(storageKey, notes); } catch { /* quota */ }
+        const timer = setTimeout(() => {
+            try { localStorage.setItem(storageKey, notes); } catch { /* quota */ }
+        }, 500);
+        return () => clearTimeout(timer);
     }, [notes, storageKey]);
 
     return (
@@ -233,6 +236,13 @@ function HowToPlay() {
     );
 }
 
+/* ── AI model options (module-scope constant) ────── */
+const AI_MODELS = [
+    { id: 'gemini', model: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', provider: 'gemini' },
+    { id: 'haimaker', model: 'minimax/minimax-m2.5', label: 'Minimax M2.5', provider: 'haimaker' },
+    { id: 'none', model: '', label: 'No AI (template responses)', provider: '' },
+];
+
 /* ── Main Board ───────────────────────────────────── */
 export default memo(function MysteryBoard({ game, myId, myNick, onAction, onClose, isHost }) {
     const [inputVal, setInputVal] = useState('');
@@ -316,11 +326,6 @@ export default memo(function MysteryBoard({ game, myId, myNick, onAction, onClos
     }, [onAction]);
 
     // ── Lobby phase ──────────────────────────────────
-    const AI_MODELS = [
-        { id: 'gemini', model: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', provider: 'gemini' },
-        { id: 'haimaker', model: 'minimax/minimax-m2.5', label: 'Minimax M2.5', provider: 'haimaker' },
-        { id: 'none', model: '', label: 'No AI (template responses)', provider: '' },
-    ];
     const [selectedAI, setSelectedAI] = useState('gemini');
     const [showCustom, setShowCustom] = useState(false);
     const [customSetting, setCustomSetting] = useState('');

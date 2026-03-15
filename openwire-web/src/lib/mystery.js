@@ -287,7 +287,7 @@ export function addInterrogation(game, sender, suspectId, content, senderType, i
     return {
         ...game,
         interrogations: [
-            ...game.interrogations,
+            ...game.interrogations.slice(-199),
             {
                 id: uid(),
                 timestamp: Date.now(),

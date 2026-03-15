@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import * as mystery from '../lib/mystery';
 import * as socket from '../lib/socket';
-import { generateSuspectResponse, generateCustomScenario } from '../lib/agents/mysterySwarm';
+import { generateSuspectResponse, generateCustomScenario, MysterySwarm } from '../lib/agents/mysterySwarm';
 
 /**
  * Custom hook encapsulating all Murder Mystery game state, refs, and handlers.
@@ -350,7 +350,6 @@ export default function useMysteryGame(deps) {
                         let result = await generateAIResponse(interrogateSuspect, action.content, myNick);
                         // If AI failed, use template system directly
                         if (!result || !result.text) {
-                            const { MysterySwarm } = await import('../lib/agents/mysterySwarm.js');
                             const ms = new MysterySwarm();
                             ms.init(newGame, null, null);
                             const tmpl = await ms.generateResponse(interrogateSuspect.id, action.content, myNick);
