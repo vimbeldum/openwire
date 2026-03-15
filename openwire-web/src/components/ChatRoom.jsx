@@ -1083,6 +1083,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     peerCosmeticsRef.current = { ...peerCosmeticsRef.current, [msg.peer_id]: msg.cosmetics };
                 }
                 break;
+            case 'admin_adjust_balance':
+                // Direct message from relay (admin adjusted our balance)
+                if (msg.delta !== undefined && walletRef.current) {
+                    const updated = wallet.adminAdjust(walletRef.current, msg.delta, msg.reason || 'Admin adjustment');
+                    updateWallet(updated);
+                    addMsg('★', `💰 Admin ${msg.delta > 0 ? 'added' : 'deducted'} ${Math.abs(msg.delta)} chips (${msg.reason || 'Admin adjustment'})`, 'system');
+                }
+                break;
             case 'peer_joined':
                 setPeers(prev => [...prev.filter(p => p.peer_id !== msg.peer_id), { peer_id: msg.peer_id, nick: msg.nick, is_admin: msg.is_admin || false, is_bridge: msg.is_bridge || false, ip: msg.ip || null, geo: msg.geo || null }]);
                 addMsg('★', `${msg.nick} joined`, 'system');

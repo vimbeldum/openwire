@@ -373,15 +373,19 @@ export class RelayRoom {
                 case "admin_adjust_balance": {
                     if (!peerInfo || !peerInfo.is_admin) return;
                     if (typeof msg.delta !== 'number' || !isFinite(msg.delta)) return;
-                    // Relay the adjustment to the target peer
+                    // Relay the adjustment to the target peer AND update relay-side balance
                     for (const [clientWs, info] of this.peers) {
                         if (info.peer_id === msg.peer_id) {
+                            // Update relay-stored balance so it persists across refreshes
+                            info.balance = Math.max(0, (info.balance || 0) + msg.delta);
                             this.send(clientWs, {
                                 type: 'admin_adjust_balance',
                                 delta: msg.delta,
                                 reason: msg.reason || 'Admin adjustment',
                                 from_nick: peerInfo.nick,
                             });
+                            // Broadcast updated balance to all peers (including admin)
+                            this.broadcast({ type: "peer_balance_update", peer_id: info.peer_id, balance: info.balance });
                             break;
                         }
                     }
