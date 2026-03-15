@@ -952,9 +952,22 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                         socket.sendRoomMessage(polymarketRef.current.roomId, pm.serializePolymarketAction({ type: 'pm_state', state: pm.serializeGame(polymarketRef.current) }));
                     }, 100);
                 } else if (gt === 'mystery' && amIHost(mysteryHostRef.current) && mysteryRef.current) {
-                    setTimeout(() => {
-                        socket.sendRoomMessage(mysteryRef.current.roomId, mystery.serializeMysteryAction({ type: 'mm_state', state: mystery.serializeGame(mysteryRef.current) }));
-                    }, 100);
+                    // Add the player directly (belt-and-suspenders with mm_join)
+                    setMysteryGame(prev => {
+                        if (!prev) return prev;
+                        if (prev.players.some(p => p.peer_id === action.peer_id)) {
+                            // Already joined — just broadcast current state
+                            setTimeout(() => {
+                                socket.sendRoomMessage(prev.roomId, mystery.serializeMysteryAction({ type: 'mm_state', state: mystery.serializeGame(prev) }));
+                            }, 100);
+                            return prev;
+                        }
+                        const updated = mystery.addPlayer(prev, action.peer_id, action.nick);
+                        setTimeout(() => {
+                            socket.sendRoomMessage(updated.roomId, mystery.serializeMysteryAction({ type: 'mm_state', state: mystery.serializeGame(updated) }));
+                        }, 100);
+                        return updated;
+                    });
                 }
                 break;
             }
