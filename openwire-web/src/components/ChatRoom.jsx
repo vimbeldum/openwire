@@ -2135,6 +2135,21 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const myCosmetics = useMemo(() => profile ? getEquippedClasses(profile) : null, [profile]);
     const anyGameActive = !!(activeGame || blackjackGame || rouletteGame || andarBaharGame || polymarketGame || mysteryGame);
 
+    // Safe room leave — don't leave if an active game is using the room
+    const safeLeaveRoom = useCallback((roomId) => {
+        if (!roomId) return;
+        const gameRooms = [
+            blackjackRef.current?.roomId, rouletteRef.current?.roomId,
+            andarBaharRef.current?.roomId, polymarketRef.current?.roomId,
+            mysteryRef.current?.roomId,
+        ];
+        if (gameRooms.includes(roomId)) {
+            // Game active in this room — just switch view, don't leave the relay room
+            return;
+        }
+        socket.leaveRoom(roomId);
+    }, []);
+
     // ── Stable callback props for memoized board components ──
     const closeBj = useCallback(() => {
         setBlackjackGame(null);
@@ -2194,7 +2209,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                         <span className="current-room-indicator">
                             <span className="room-icon">🏠</span>
                             <span className="room-name">{currentRoomName}</span>
-                            <button className="leave-room-btn" onClick={() => { socket.leaveRoom(currentRoom); setCurrentRoom(null); }} title="Leave Room">✕</button>
+                            <button className="leave-room-btn" onClick={() => { safeLeaveRoom(currentRoom); setCurrentRoom(null); }} title="Leave Room">✕</button>
                         </span>
                     ) : (
                         <span className="general-chat-indicator">💬 General Chat</span>
@@ -2387,7 +2402,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar">✕</button>
                 <div className="sidebar-section">
                     <div className="sidebar-title">Channels</div>
-                    <div className={`room-item ${!currentRoom ? 'active' : ''}`} onClick={() => { if (currentRoom) socket.leaveRoom(currentRoom); setCurrentRoom(null); setSidebarOpen(false); }} style={{ cursor: 'pointer' }}>
+                    <div className={`room-item ${!currentRoom ? 'active' : ''}`} onClick={() => { if (currentRoom) safeLeaveRoom(currentRoom); setCurrentRoom(null); setSidebarOpen(false); }} style={{ cursor: 'pointer' }}>
                         <span className="room-icon">💬</span>
                         <span className="room-name">General Chat {!currentRoom && <span style={{ fontSize: '0.7em', color: 'var(--brand)', marginLeft: '4px' }}>(Joined)</span>}</span>
                     </div>
@@ -2481,7 +2496,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 <div className="sidebar-section">
                     <div className="sidebar-title">Rooms ({rooms.length})</div>
                     {rooms.map((r) => (
-                        <div key={r.room_id} className={`room-item ${currentRoom === r.room_id ? 'active' : ''}`} onClick={() => { if (currentRoom && currentRoom !== r.room_id) socket.leaveRoom(currentRoom); if (currentRoom !== r.room_id) socket.joinRoom(r.room_id); setCurrentRoom(r.room_id); setSidebarOpen(false); }} style={{ cursor: 'pointer' }}>
+                        <div key={r.room_id} className={`room-item ${currentRoom === r.room_id ? 'active' : ''}`} onClick={() => { if (currentRoom && currentRoom !== r.room_id) safeLeaveRoom(currentRoom); if (currentRoom !== r.room_id) socket.joinRoom(r.room_id); setCurrentRoom(r.room_id); setSidebarOpen(false); }} style={{ cursor: 'pointer' }}>
                             <span className="room-icon">🏠</span>
                             <span className="room-name">{r.name} {currentRoom === r.room_id && <span style={{ fontSize: '0.7em', color: 'var(--brand)', marginLeft: '4px' }}>(Joined)</span>}</span>
                         </div>
