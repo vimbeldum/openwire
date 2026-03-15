@@ -38,18 +38,26 @@ export default function useMysteryGame(deps) {
         );
     }, []);
 
-    /* ── Helper: mock AI suspect response ──────────────────── */
+    /* ── Helper: generate AI suspect response (async) ───────── */
 
-    const generateMockResponse = useCallback((suspect, _question) => {
-        // In future, this calls a real AI endpoint. For now, return in-character mock.
-        const deflections = [
-            `I assure you, I had nothing to do with it. ${suspect?.alibi || 'I was elsewhere.'}`,
-            `How dare you imply such a thing! ${suspect?.alibi || 'I have a perfectly good alibi.'}`,
-            `Interesting question... Perhaps you should ask someone else about that.`,
-            `I would never! ${suspect?.backstory ? 'I have been loyal for years.' : 'You have no evidence.'}`,
-        ];
-        return deflections[Math.floor(Math.random() * deflections.length)];
-    }, []);
+    const generateAIResponse = useCallback(async (suspect, question, playerNick) => {
+        try {
+            const currentGame = mysteryRef.current;
+            if (!currentGame) return null;
+            const result = await generateSuspectResponse(
+                suspect, question, currentGame,
+                { swarm: deps.swarmRef?.current, playerNick },
+            );
+            return result;
+        } catch (err) {
+            console.warn('[Mystery] AI generation failed:', err?.message);
+            return {
+                text: `*${suspect?.name || 'The suspect'} pauses* I'd rather not discuss that right now.`,
+                isRevised: false,
+                clue: null,
+            };
+        }
+    }, [deps.swarmRef]);
 
     /* ── Message Handler: process MM: prefixed relay messages ─ */
 
@@ -110,46 +118,62 @@ export default function useMysteryGame(deps) {
             case 'mm_player_action': {
                 // Non-host player sent an action — only the host processes it
                 if (!amIHost(mysteryHostRef.current)) break;
-                setMysteryGame(prev => {
-                    if (!prev) return prev;
-                    let updated = prev;
 
-                    if (action.action === 'interrogate') {
-                        // Add player question
-                        updated = mystery.addInterrogation(
-                            updated, action.nick, action.suspectId, action.content, 'player',
+                if (action.action === 'interrogate') {
+                    // Step 1: Add player question immediately
+                    setMysteryGame(prev => {
+                        if (!prev) return prev;
+                        const updated = mystery.addInterrogation(
+                            prev, action.nick, action.suspectId, action.content, 'player',
                         );
-                        // Generate AI response (host-only) and broadcast
-                        const suspect = updated.suspects?.find(s => s.id === action.suspectId);
-                        if (suspect) {
-                            const response = generateMockResponse(suspect, action.content);
-                            updated = mystery.addInterrogation(
-                                updated, suspect.name, action.suspectId, response, 'suspect',
+                        setTimeout(() => broadcastState(updated), 0);
+                        return updated;
+                    });
+                    // Step 2: Generate AI response asynchronously
+                    (async () => {
+                        const currentGame = mysteryRef.current;
+                        const suspect = currentGame?.suspects?.find(s => s.id === action.suspectId);
+                        if (!suspect) return;
+                        const result = await generateAIResponse(suspect, action.content, action.nick);
+                        if (!result) return;
+                        setMysteryGame(prev => {
+                            if (!prev) return prev;
+                            const updated = mystery.addInterrogation(
+                                prev, suspect.name, action.suspectId, result.text, 'suspect', result.isRevised,
                             );
-                        }
-                    } else if (action.action === 'deliberate') {
-                        updated = mystery.addInterrogation(
-                            updated, action.nick, null, action.content, 'player',
-                        );
-                    } else if (action.action === 'vote') {
-                        updated = mystery.castVote(updated, action.peer_id, action.suspectId);
-                    } else if (action.action === 'advancePhase') {
-                        if (updated.phase === 'investigation') {
-                            updated = mystery.advanceToDeliberation(updated);
-                        } else if (updated.phase === 'deliberation') {
-                            updated = mystery.advanceToAccusation(updated);
-                        }
-                    } else {
-                        return prev;
-                    }
+                            setTimeout(() => broadcastState(updated), 0);
+                            return updated;
+                        });
+                    })();
+                } else {
+                    setMysteryGame(prev => {
+                        if (!prev) return prev;
+                        let updated = prev;
 
-                    setTimeout(() => broadcastState(updated), 0);
-                    return updated;
-                });
+                        if (action.action === 'deliberate') {
+                            updated = mystery.addInterrogation(
+                                updated, action.nick, null, action.content, 'player',
+                            );
+                        } else if (action.action === 'vote') {
+                            updated = mystery.castVote(updated, action.peer_id, action.suspectId);
+                        } else if (action.action === 'advancePhase') {
+                            if (updated.phase === 'investigation') {
+                                updated = mystery.advanceToDeliberation(updated);
+                            } else if (updated.phase === 'deliberation') {
+                                updated = mystery.advanceToAccusation(updated);
+                            }
+                        } else {
+                            return prev;
+                        }
+
+                        setTimeout(() => broadcastState(updated), 0);
+                        return updated;
+                    });
+                }
                 break;
             }
         }
-    }, [addMsg, addActivityLog, amIHost, broadcastState, generateMockResponse]);
+    }, [addMsg, addActivityLog, amIHost, broadcastState, generateAIResponse]);
 
     /* ── Start Mystery: host creates and broadcasts ────────── */
 
@@ -254,19 +278,30 @@ export default function useMysteryGame(deps) {
             }
 
             case 'interrogate': {
-                // Add player question
+                // Add player question immediately and broadcast
                 newGame = mystery.addInterrogation(
                     game, myNick, action.suspectId, action.content, 'player',
                 );
-                // Generate AI response (host has suspect prompts)
-                const suspect = newGame.suspects?.find(s => s.id === action.suspectId);
-                if (suspect) {
-                    const response = generateMockResponse(suspect, action.content);
-                    newGame = mystery.addInterrogation(
-                        newGame, suspect.name, action.suspectId, response, 'suspect',
-                    );
+                setMysteryGame(newGame);
+                broadcastState(newGame);
+                // Generate AI response asynchronously
+                const interrogateSuspect = newGame.suspects?.find(s => s.id === action.suspectId);
+                if (interrogateSuspect) {
+                    (async () => {
+                        const result = await generateAIResponse(interrogateSuspect, action.content, myNick);
+                        if (!result) return;
+                        setMysteryGame(prev => {
+                            if (!prev) return prev;
+                            const updated = mystery.addInterrogation(
+                                prev, interrogateSuspect.name, action.suspectId,
+                                result.text, 'suspect', result.isRevised,
+                            );
+                            setTimeout(() => broadcastState(updated), 0);
+                            return updated;
+                        });
+                    })();
                 }
-                break;
+                return; // skip the setMysteryGame/broadcastState at the end (already done above)
             }
 
             case 'deliberate':
@@ -304,7 +339,7 @@ export default function useMysteryGame(deps) {
 
         setMysteryGame(newGame);
         broadcastState(newGame);
-    }, [amIHost, addMsg, addActivityLog, broadcastState, generateMockResponse]);
+    }, [amIHost, addMsg, addActivityLog, broadcastState, generateAIResponse]);
 
     return {
         mysteryGame, setMysteryGame,
