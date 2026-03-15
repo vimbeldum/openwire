@@ -712,6 +712,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 socket.sendRoomMessage(inviteData.room_id, mystery.serializeMysteryAction({
                     type: 'mm_join', peer_id: myId, nick: myNick,
                 }));
+                socket.sendRoomMessage(inviteData.room_id, JSON.stringify({
+                    type: 'game_join', gameType: 'mystery', peer_id: myId, nick: myNick,
+                }));
                 addMsg('\u2605', '\uD83D\uDD0D Joined Murder Mystery!', 'system');
                 break;
             case 'tictactoe': {
@@ -932,7 +935,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             }
             case 'game_join': {
                 // A peer joined a game — host broadcasts current state so they see the board
-                if (msg.peer_id === myIdRef.current) break;
+                const joinSenderId = msg.peer_id || msg.from;
+                if (joinSenderId === myIdRef.current) break;
                 addMsg('★', `🎮 ${action.nick} joined ${action.gameType}!`, 'system');
                 const gt = action.gameType;
                 if (gt === 'roulette' && amIHost(rouletteHostRef.current) && rouletteRef.current) {
@@ -946,6 +950,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 } else if (gt === 'polymarket' && amIHost(pmHostRef.current) && polymarketRef.current) {
                     setTimeout(() => {
                         socket.sendRoomMessage(polymarketRef.current.roomId, pm.serializePolymarketAction({ type: 'pm_state', state: pm.serializeGame(polymarketRef.current) }));
+                    }, 100);
+                } else if (gt === 'mystery' && amIHost(mysteryHostRef.current) && mysteryRef.current) {
+                    setTimeout(() => {
+                        socket.sendRoomMessage(mysteryRef.current.roomId, mystery.serializeMysteryAction({ type: 'mm_state', state: mystery.serializeGame(mysteryRef.current) }));
                     }, 100);
                 }
                 break;
