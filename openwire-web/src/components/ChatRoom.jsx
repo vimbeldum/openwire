@@ -49,6 +49,7 @@ const DeadDropsPanel = lazyRetry(() => import('./DeadDropsPanel'));
 const CosmeticsShop = lazyRetry(() => import('./CosmeticsShop'));
 const TambolaBoard = lazyRetry(() => import('./TambolaBoard'));
 const SlotsBoard = lazyRetry(() => import('./SlotsBoard'));
+const MysteryBoard = lazyRetry(() => import('./MysteryBoard'));
 const KarmaGuide   = lazyRetry(() => import('./KarmaGuide'));
 const PokeOverlay  = lazyRetry(() => import('./chat/PokeOverlay'));
 import LiveTicker from './chat/LiveTicker';
@@ -142,6 +143,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const [showCosmetics, setShowCosmetics] = useState(false);
     const [tambolaGame, setTambolaGame] = useState(false);
     const [showSlots, setShowSlots] = useState(false);
+    const [mysteryGame, setMysteryGame] = useState(null);
     const [showKarmaGuide, setShowKarmaGuide] = useState(false);
     const [profile, setProfile] = useState(null);
     const peerCosmeticsRef = useRef({}); // peer_id → { bubbleStyle, nameColor, chatFlair }
@@ -373,6 +375,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         setAndarBaharGame(null);
         setPolymarketGame(null);
         setActiveGame(null);
+        setMysteryGame(null);
         // Reset host refs
         bjHostRef.current = null;
         rouletteHostRef.current = null;
@@ -2096,7 +2099,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const currentRoomName = currentRoom ? rooms.find(r => r.room_id === currentRoom)?.name || 'Unknown Room' : null;
     const balance = myWallet ? wallet.getTotalBalance(myWallet) : 0;
     const myCosmetics = useMemo(() => profile ? getEquippedClasses(profile) : null, [profile]);
-    const anyGameActive = !!(activeGame || blackjackGame || rouletteGame || andarBaharGame || polymarketGame);
+    const anyGameActive = !!(activeGame || blackjackGame || rouletteGame || andarBaharGame || polymarketGame || mysteryGame);
 
     // ── Stable callback props for memoized board components ──
     const closeBj = useCallback(() => {
@@ -2477,6 +2480,29 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                             </button>
 
                             <button className="sidebar-btn" onClick={() => {
+                                const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
+                                if (!roomId) { addMsg('★', '⚠ Select or create a room first', 'system'); return; }
+                                if (mysteryGame) { return; }
+                                const myPeerId = myIdRef.current;
+                                const nick = nickRef.current;
+                                setMysteryGame({
+                                    type: 'mystery',
+                                    roomId,
+                                    hostPeerId: myPeerId,
+                                    phase: 'lobby',
+                                    mystery: null,
+                                    suspects: [],
+                                    players: [{ peer_id: myPeerId, nick, joinedAt: Date.now(), score: 0, vote: null }],
+                                    phaseStartedAt: null,
+                                    phaseDuration: null,
+                                    interrogations: [],
+                                    results: null,
+                                    createdAt: Date.now(),
+                                });
+                                addMsg('★', 'Murder Mystery lobby created!', 'system');
+                            }}>🔍 Mystery</button>
+
+                            <button className="sidebar-btn" onClick={() => {
                                 const nick = prompt('Invite nick:');
                                 const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
                                 if (nick && roomId) {
@@ -2690,6 +2716,93 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     currentKarma={profile?.reputation?.karma ?? 0}
                     currentTier={profile?.reputation?.tier ?? 'newcomer'}
                     onClose={() => setShowKarmaGuide(false)}
+                />
+            )}
+            {mysteryGame && (
+                <MysteryBoard
+                    game={mysteryGame}
+                    myId={myIdRef.current}
+                    myNick={nickRef.current}
+                    onAction={(action) => {
+                        if (action.type === 'start') {
+                            setMysteryGame(prev => prev ? { ...prev, phase: 'generating' } : prev);
+                            setTimeout(() => {
+                                setMysteryGame(prev => {
+                                    if (!prev) return prev;
+                                    return {
+                                        ...prev,
+                                        phase: 'investigation',
+                                        phaseStartedAt: Date.now(),
+                                        phaseDuration: prev.investigationDurationMs || 600000,
+                                        mystery: {
+                                            id: 'mm_' + Date.now(),
+                                            title: 'The Vanishing at Vineyard Manor',
+                                            setting: 'A grand estate in the countryside during a stormy evening.',
+                                            victim: { name: 'Lord Ashworth', role: 'the host of the party', description: 'A wealthy collector' },
+                                            weapon: 'poisoned wine glass',
+                                            motive: 'Inheritance dispute over the family fortune',
+                                            culpritId: 'suspect_chef',
+                                        },
+                                        suspects: [
+                                            { id: 'suspect_chef', name: 'Chef Renard', role: 'Personal Chef', avatar: '\uD83D\uDC68\u200D\uD83C\uDF73', personality: 'Nervous, meticulous', backstory: 'Has worked for the family for 10 years', alibi: 'Was in the kitchen all evening', isCulprit: true },
+                                            { id: 'suspect_butler', name: 'Butler Morrison', role: 'Head Butler', avatar: '\uD83E\uDDD4', personality: 'Stoic, observant', backstory: 'Served three generations of Ashworths', alibi: 'Was attending to guests in the drawing room', isCulprit: false },
+                                            { id: 'suspect_gardener', name: 'Gardener Marcel', role: 'Estate Groundskeeper', avatar: '\uD83D\uDC68\u200D\uD83C\uDF3E', personality: 'Quiet, strong', backstory: 'Recently hired, mysterious past', alibi: 'Claims to have been in the greenhouse', isCulprit: false },
+                                            { id: 'suspect_guest', name: 'Lady Pemberton', role: 'Dinner Guest', avatar: '\uD83D\uDC69\u200D\uD83E\uDDB3', personality: 'Sharp-tongued, wealthy', backstory: 'Old friend of the victim with a complicated history', alibi: 'Was in the library reading', isCulprit: false },
+                                        ],
+                                    };
+                                });
+                            }, 2000);
+                        } else if (action.type === 'interrogate') {
+                            const msg = {
+                                id: 'msg_' + Date.now() + '_q',
+                                timestamp: Date.now(),
+                                sender: nickRef.current,
+                                senderType: 'player',
+                                suspectId: action.suspectId,
+                                content: action.content,
+                                isRevised: false,
+                            };
+                            setMysteryGame(prev => prev ? { ...prev, interrogations: [...prev.interrogations, msg] } : prev);
+                            // Mock AI response
+                            setTimeout(() => {
+                                setMysteryGame(prev => {
+                                    if (!prev) return prev;
+                                    const suspect = prev.suspects.find(s => s.id === action.suspectId);
+                                    const reply = {
+                                        id: 'msg_' + Date.now() + '_a',
+                                        timestamp: Date.now(),
+                                        sender: suspect?.name || 'Suspect',
+                                        senderType: 'suspect',
+                                        suspectId: action.suspectId,
+                                        content: `I assure you, I had nothing to do with it. ${suspect?.alibi || 'I was elsewhere.'}`,
+                                        isRevised: false,
+                                    };
+                                    return { ...prev, interrogations: [...prev.interrogations, reply] };
+                                });
+                            }, 1500);
+                        } else if (action.type === 'deliberate') {
+                            const msg = {
+                                id: 'msg_' + Date.now(),
+                                timestamp: Date.now(),
+                                sender: nickRef.current,
+                                senderType: 'player',
+                                suspectId: null,
+                                content: action.content,
+                                isRevised: false,
+                            };
+                            setMysteryGame(prev => prev ? { ...prev, interrogations: [...prev.interrogations, msg] } : prev);
+                        } else if (action.type === 'vote') {
+                            setMysteryGame(prev => {
+                                if (!prev) return prev;
+                                const players = prev.players.map(p =>
+                                    p.peer_id === myIdRef.current ? { ...p, vote: action.suspectId } : p
+                                );
+                                return { ...prev, players };
+                            });
+                        }
+                    }}
+                    onClose={() => setMysteryGame(null)}
+                    isHost={mysteryGame?.hostPeerId === myIdRef.current}
                 />
             )}
             </Suspense>
