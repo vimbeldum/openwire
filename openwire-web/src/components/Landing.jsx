@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AdminPasswordGate } from './AdminPortal';
+import { AdminPasswordGate } from './AdminPasswordGate';
 import { sanitizeNick } from '../lib/utils/sanitizeNick';
 
 const CLI_NODE_URL_KEY = 'openwire_cli_node_url';

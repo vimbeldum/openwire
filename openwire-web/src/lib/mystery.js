@@ -7,7 +7,12 @@
 
 import { GameEngine, registerGame } from './GameEngine.js';
 import { createNonFinancialEvent } from './core/PayoutEvent.js';
-import { pickRandomTemplate, getTemplateById } from './mystery/templates.js';
+// Lazy-load templates (~850 lines) — only fetched when starting a game
+let _templatesMod = null;
+async function _loadTemplates() {
+    if (!_templatesMod) _templatesMod = await import('./mystery/templates.js');
+    return _templatesMod;
+}
 import { buildSuspectPrompt, sanitizeSuspects } from './mystery/suspects.js';
 import { distributeClues } from './mystery/clues.js';
 import { calculateScores, SCORING } from './mystery/scoring.js';
@@ -113,9 +118,10 @@ export function removePlayer(game, peer_id) {
  * @param {string}  [templateId]  Optional specific template id
  * @returns {object}  Game state in 'investigation' phase
  */
-export function generateMystery(game, templateId) {
+export async function generateMystery(game, templateId) {
     if (game.phase !== 'lobby') return game;
 
+    const { pickRandomTemplate, getTemplateById } = await _loadTemplates();
     const template = templateId
         ? getTemplateById(templateId) || pickRandomTemplate()
         : pickRandomTemplate();
@@ -175,7 +181,7 @@ export function generateMystery(game, templateId) {
  * @param {object}  scenario  Custom scenario from generateCustomScenario()
  * @returns {object}  Game state in 'investigation' phase
  */
-export function generateMysteryFromScenario(game, scenario) {
+export async function generateMysteryFromScenario(game, scenario) {
     if (game.phase !== 'lobby') return game;
 
     // Treat the scenario exactly like a template for clue distribution

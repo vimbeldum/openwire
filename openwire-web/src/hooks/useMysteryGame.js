@@ -305,13 +305,13 @@ export default function useMysteryGame(deps) {
 
                         let generated;
                         if (scenario) {
-                            generated = mystery.generateMysteryFromScenario(
+                            generated = await mystery.generateMysteryFromScenario(
                                 { ...currentGame, phase: 'lobby' },
                                 scenario,
                             );
                         } else {
                             // Fallback to random template if LLM failed
-                            generated = mystery.generateMystery(
+                            generated = await mystery.generateMystery(
                                 { ...currentGame, phase: 'lobby' },
                             );
                         }
@@ -326,14 +326,17 @@ export default function useMysteryGame(deps) {
                     return; // skip the setMysteryGame/broadcastState at the end
                 }
 
-                // Standard template-based generation
-                const generated = mystery.generateMystery(game, action.templateId);
-                // Store AI config so generateAIResponse can use it
-                generated._aiProvider = action.aiProvider || '';
-                generated._aiModel = action.aiModel || '';
-                newGame = generated;
-                addActivityLog(`Mystery started: ${generated.mystery?.title || 'Unknown'}`);
-                break;
+                // Standard template-based generation (async due to lazy template loading)
+                (async () => {
+                    const generated = await mystery.generateMystery(game, action.templateId);
+                    // Store AI config so generateAIResponse can use it
+                    generated._aiProvider = action.aiProvider || '';
+                    generated._aiModel = action.aiModel || '';
+                    setMysteryGame(generated);
+                    broadcastState(generated);
+                    addActivityLog(`Mystery started: ${generated.mystery?.title || 'Unknown'}`);
+                })();
+                return; // skip the setMysteryGame/broadcastState at the end
             }
 
             case 'interrogate': {

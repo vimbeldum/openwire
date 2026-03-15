@@ -35,6 +35,11 @@ vi.mock('../../components/GifPicker.jsx', () => ({
     default: () => null,
 }));
 
+vi.mock('../../lib/gifSettings.js', () => ({
+    setDefaultProvider: vi.fn(),
+    getDefaultProvider: vi.fn(() => 'giphy'),
+}));
+
 vi.mock('../../lib/agents/agentStore.js', () => ({
     loadStore: vi.fn(() => ({
         characters: [],

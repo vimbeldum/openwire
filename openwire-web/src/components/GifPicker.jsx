@@ -1,21 +1,13 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { GiphyFetch } from '@giphy/js-fetch-api';
 import { Grid } from '@giphy/react-components';
+import { getDefaultProvider, setDefaultProvider } from '../lib/gifSettings.js';
+export { setDefaultProvider };
 
 const GIPHY_KEY = import.meta.env.VITE_GIPHY_KEY || 'dc6zaTOxFJmzC';
 const KLIPY_KEY = import.meta.env.VITE_KLIPY_API_KEY || '';
 const KLIPY_API = 'https://api.klipy.com/v2';
 const gf = new GiphyFetch(GIPHY_KEY);
-
-const SETTINGS_KEY = 'openwire:gif_provider';
-
-function getDefaultProvider() {
-    try { return localStorage.getItem(SETTINGS_KEY) || 'giphy'; } catch { return 'giphy'; }
-}
-
-export function setDefaultProvider(provider) {
-    try { localStorage.setItem(SETTINGS_KEY, provider); } catch {}
-}
 
 const GIPHY_TABS = [
     { key: 'gifs', label: 'GIFs' },
