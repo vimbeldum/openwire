@@ -342,7 +342,7 @@ export async function generateSuspectResponse(suspect, playerMessage, mystery, o
     const swarm = options.swarm; // AgentSwarm instance if available
 
     // Resolve LLM generation function and model from the active provider
-    const { generateFn, modelId } = _resolveGenerateFn(swarm, options);
+    const { generateFn, modelId } = await _resolveGenerateFn(swarm, options);
 
     // Build a temporary MysterySwarm instance initialized with just enough state
     const ms = new MysterySwarm();
@@ -395,7 +395,7 @@ export function isAIAvailable(swarm) {
  * @param {object} [options]  { provider, model }
  * @returns {{ generateFn: Function|null, modelId: string }}
  */
-function _resolveGenerateFn(swarm, options = {}) {
+async function _resolveGenerateFn(swarm, options = {}) {
     // Allow explicit override
     if (options.generateFn && options.model) {
         return { generateFn: options.generateFn, modelId: options.model };
@@ -410,22 +410,29 @@ function _resolveGenerateFn(swarm, options = {}) {
         || (swarm && swarm._defaultModel)
         || FALLBACK_MODEL;
 
-    // Import lookup — these are already imported at the top of swarm.js
-    // but we need to dynamically resolve since mysterySwarm is standalone
-    let generateFn = null;
+    // Ensure generators are loaded (async init may not have completed)
+    if (!_cachedGenerators[provider]) {
+        await _initGenerators();
+    }
 
-    try {
-        // The provider-specific generate functions follow the same signature:
-        // (modelId, systemPrompt, contextMessages, maxTokens) => Promise<string|null>
-        const generators = {
-            openrouter: _getOpenRouterGen,
-            gemini:     _getGeminiGen,
-            qwen:       _getQwenGen,
-            haimaker:   _getHaimakerGen,
-        };
-        generateFn = generators[provider] ? generators[provider]() : null;
-    } catch {
-        // Provider module not available — generateFn stays null (template fallback)
+    // Direct import fallback if cached generator is still null
+    let generateFn = _cachedGenerators[provider] || null;
+    if (!generateFn) {
+        try {
+            if (provider === 'gemini') {
+                const mod = await import('./gemini.js');
+                generateFn = mod.generateGeminiMessage;
+            } else if (provider === 'haimaker') {
+                const mod = await import('./haimaker.js');
+                generateFn = mod.generateHaimakerMessage;
+            } else if (provider === 'openrouter') {
+                const mod = await import('./openrouter.js');
+                generateFn = mod.generateMessage;
+            } else if (provider === 'qwen') {
+                const mod = await import('./qwen.js');
+                generateFn = mod.generateQwenMessage;
+            }
+        } catch { /* provider not available */ }
     }
 
     return { generateFn, modelId: model };
