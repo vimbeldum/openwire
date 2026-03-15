@@ -50,6 +50,7 @@ const CosmeticsShop = lazyRetry(() => import('./CosmeticsShop'));
 const TambolaBoard = lazyRetry(() => import('./TambolaBoard'));
 const SlotsBoard = lazyRetry(() => import('./SlotsBoard'));
 const KarmaGuide   = lazyRetry(() => import('./KarmaGuide'));
+const PokeOverlay  = lazyRetry(() => import('./chat/PokeOverlay'));
 import LiveTicker from './chat/LiveTicker';
 import TypingBar from './chat/TypingBar';
 import * as ledger from '../lib/core/ledger.js';
@@ -64,6 +65,11 @@ import { createJackpotState, addRake } from '../lib/jackpot.js';
 import { setMinKarmaToPost } from '../lib/deaddrops.js';
 
 const MENTION_REGEX = /(@\w+)/g;
+
+const POKE_TYPES_MAP = {
+    snowball: '\u2744\uFE0F', siren: '\uD83D\uDEA8', wave: '\uD83D\uDC4B', heart: '\uD83D\uDC96', thunder: '\u26A1', confetti: '\uD83C\uDF89',
+};
+const POKE_COOLDOWN_MS = 10_000;
 
 function timeStr() {
     const d = new Date();
@@ -146,6 +152,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const [showAgentPanel, setShowAgentPanel] = useState(false);
     const [agentRunning, setAgentRunning] = useState(false);
     const [mentionToasts, setMentionToasts] = useState([]);
+    const [activePoke, setActivePoke] = useState(null);
+    const pokeCooldownsRef = useRef({});
     const [agentTyping, setAgentTyping] = useState({});   // { characterId: { nick, avatar, ts } }
     const swarmLogsRef = useRef([]);
     const swarmRef = useRef(null);
@@ -769,6 +777,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     addMsg('💸', `${action.from_nick} sent you ${action.amount} chips!`, 'system');
                 }
                 break;
+            case 'poke':
+                if (action.to === myId) {
+                    setActivePoke({ from_nick: action.from_nick, poke_type: action.poke_type });
+                    setTimeout(() => setActivePoke(null), 2500);
+                    addMsg('👊', `${action.from_nick} poked you with ${POKE_TYPES_MAP[action.poke_type] || '👋'}!`, 'system');
+                }
+                break;
             case 'screenshot_alert':
                 addMsg('📸', `${action.nick} took a screenshot!`, 'system');
                 break;
@@ -1070,7 +1085,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma', 'admin_setting'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'poke', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma', 'admin_setting'];
                         if (CUSTOM.includes(parsed.type)) msgCustom = parsed;
                     } catch { /* not JSON */ }
                 }
@@ -1133,7 +1148,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (!isBjMsg && !isRlMsg && !isAbMsg && !isPmMsg && !isGameMsg && msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
-                        const CUSTOM = ['typing', 'react', 'tip', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma', 'admin_setting'];
+                        const CUSTOM = ['typing', 'react', 'tip', 'poke', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma', 'admin_setting'];
                         if (CUSTOM.includes(parsed.type)) customAction = parsed;
                     } catch { /* not JSON */ }
                 }
@@ -1591,6 +1606,21 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         }
         setShowGifPicker(false);
     };
+
+    // ── Poke handler ──────────────────────────────────────────
+    const handlePoke = useCallback((peerId, peerNick, pokeType = 'snowball') => {
+        const now = Date.now();
+        const last = pokeCooldownsRef.current[peerId] || 0;
+        if (now - last < POKE_COOLDOWN_MS) {
+            addMsg('★', `⚠ Wait ${Math.ceil((POKE_COOLDOWN_MS - (now - last)) / 1000)}s before poking ${peerNick} again.`, 'system');
+            return;
+        }
+        pokeCooldownsRef.current[peerId] = now;
+        socket.sendChat(JSON.stringify({
+            type: 'poke', to: peerId, from_nick: nickRef.current, poke_type: pokeType,
+        }));
+        addMsg('👊', `You poked ${peerNick} with ${POKE_TYPES_MAP[pokeType]}!`, 'system');
+    }, [addMsg]);
 
     // ── Admin handlers ───────────────────────────────────────
     const handleAdminKick = (peer_id) => {
@@ -2192,6 +2222,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 </div>
             )}
 
+            {/* Poke overlay */}
+            {activePoke && <Suspense fallback={null}><PokeOverlay poke={activePoke} onDone={() => setActivePoke(null)} /></Suspense>}
+
             {/* @mention toasts */}
             {mentionToasts.length > 0 && (
                 <div className="mention-toasts">
@@ -2376,6 +2409,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                                     ));
                                 }}
                             >💰</button>
+                            <button className="poke-btn" title={`Poke ${p.nick}`}
+                                onClick={() => handlePoke(p.peer_id, p.nick, 'snowball')}>👊</button>
                         </div>
                     ))}
                     {peers.filter(p => p.peer_id !== myIdRef.current).length === 0 && (
