@@ -1235,9 +1235,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 } else if (isCurrentRoom) {
                     const gifMatch = msg.data.match(/^\[GIF\](.+)$/);
                     if (gifMatch) {
-                        addMsg(msg.nick, '', 'peer', { gif: gifMatch[1], roomId: msg.room_id, peerCosmetics: peerCosmeticsRef.current[msg.peer_id] || null });
+                        const roomSenderId = msg.peer_id || msg.from;
+                        addMsg(msg.nick, '', 'peer', { gif: gifMatch[1], roomId: msg.room_id, peerCosmetics: peerCosmeticsRef.current[roomSenderId] || null });
                     } else if (msg.data) {
-                        addMsg(msg.nick, msg.data, 'peer', { roomId: msg.room_id, peerCosmetics: peerCosmeticsRef.current[msg.peer_id] || null });
+                        const roomSenderId = msg.peer_id || msg.from;
+                        addMsg(msg.nick, msg.data, 'peer', { roomId: msg.room_id, peerCosmetics: peerCosmeticsRef.current[roomSenderId] || null });
                         // Process @mentions from remote peers in rooms too
                         processMentions(msg.data, msg.nick);
                         // Check if we were @mentioned

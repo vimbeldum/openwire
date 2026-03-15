@@ -60,7 +60,7 @@ function MessageRow({ msg, renderContent, onReact, onJoinInvite, onDismissInvite
     return (
         <div className={`msg ${msg.type}${msg.type === 'whisper' ? ' whisper' : ''}`}>
             <span className="msg-time">[{msg.time}]</span>
-            {msg.sender && <span className={senderClasses}>{msg.sender}:</span>}
+            {msg.sender && <span className={senderClasses}>{isSelf ? 'You' : msg.sender}:</span>}
             {msg.gif ? (
                 <img src={msg.gif} alt="GIF" className="msg-gif" />
             ) : (
