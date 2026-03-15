@@ -503,10 +503,17 @@ function Header({ game, onClose, isHost }) {
             <div className="game-table-meta">
                 <span className="mystery-phase-badge">{phaseLabels[phase] || phase}</span>
                 {(phase === 'investigation' || phase === 'deliberation' || phase === 'accusation') && (
-                    <PhaseTimer
-                        phaseStartedAt={game.phaseStartedAt}
-                        phaseDuration={game.phaseDuration}
-                    />
+                    <>
+                        <PhaseTimer
+                            phaseStartedAt={game.phaseStartedAt}
+                            phaseDuration={game.phaseDuration}
+                        />
+                        {isHost && (
+                            <button className="mystery-advance-btn" onClick={() => onAction({ type: 'advancePhase' })}>
+                                Skip
+                            </button>
+                        )}
+                    </>
                 )}
             </div>
             <button className="btn-icon-close" onClick={onClose}>X</button>

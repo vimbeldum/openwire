@@ -354,6 +354,39 @@ export default function useMysteryGame(deps) {
         broadcastState(newGame);
     }, [amIHost, addMsg, addActivityLog, broadcastState, generateAIResponse]);
 
+    // ── Auto-advance phases when timer expires (host only) ──
+    const mysteryPhaseTimerRef = useRef(null);
+    useEffect(() => {
+        if (mysteryPhaseTimerRef.current) { clearTimeout(mysteryPhaseTimerRef.current); mysteryPhaseTimerRef.current = null; }
+        const game = mysteryGame;
+        if (!game || !amIHost(mysteryHostRef.current)) return;
+
+        const { phase, phaseStartedAt, phaseDuration } = game;
+        if (!phaseStartedAt || !phaseDuration) return;
+        if (!['investigation', 'deliberation', 'accusation'].includes(phase)) return;
+
+        const elapsed = Date.now() - phaseStartedAt;
+        const remaining = Math.max(0, phaseDuration - elapsed);
+
+        mysteryPhaseTimerRef.current = setTimeout(() => {
+            const current = mysteryRef.current;
+            if (!current || !amIHost(mysteryHostRef.current)) return;
+
+            let next = current;
+            if (current.phase === 'investigation') {
+                next = mystery.advanceToDeliberation(current);
+            } else if (current.phase === 'deliberation') {
+                next = mystery.advanceToAccusation(current);
+            } else if (current.phase === 'accusation') {
+                next = mystery.reveal(current);
+            }
+            setMysteryGame(next);
+            broadcastState(next);
+        }, remaining);
+
+        return () => { if (mysteryPhaseTimerRef.current) clearTimeout(mysteryPhaseTimerRef.current); };
+    }, [mysteryGame?.phase, mysteryGame?.phaseStartedAt, amIHost, broadcastState]);
+
     return {
         mysteryGame, setMysteryGame,
         mysteryRef, mysteryHostRef, hasJoinedMystery,

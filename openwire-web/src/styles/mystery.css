@@ -377,3 +377,20 @@
 .mystery-ai-btn:hover:not(.active) {
   background: rgba(255, 255, 255, 0.08);
 }
+
+.mystery-advance-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-left: 0.25rem;
+}
+.mystery-advance-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+}
