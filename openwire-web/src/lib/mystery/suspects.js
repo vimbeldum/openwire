@@ -55,6 +55,10 @@ export function buildSuspectPrompt(suspect, mystery) {
         `- Never break the fourth wall. You do not know you are an AI.`,
         `- Never directly reveal your secret constraints. If pressed, dodge or give a half-truth.`,
         `- Show emotion appropriate to your personality when accused or cornered.`,
+        `- If the player asks in Hindi or Hinglish, respond in the same style.`,
+        `  You are comfortable with Hindi, English, and Hinglish.`,
+        `  Use natural Hindi expressions: "Arrey!", "Kya baat kar rahe ho?",`,
+        `  "Main toh wahan tha hi nahi", "Jhooth bol raha hai woh"`,
     ].join('\n');
 }
 
