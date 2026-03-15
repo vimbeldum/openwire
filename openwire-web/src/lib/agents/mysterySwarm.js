@@ -487,6 +487,107 @@ async function _initGenerators() {
 // Auto-initialize on module load
 _initGenerators();
 
+/* ── Custom Scenario Generation ──────────────────────────── */
+
+/**
+ * Generate a custom murder mystery scenario via LLM based on user inputs.
+ * Returns a parsed scenario object matching the template format, or null on failure.
+ *
+ * @param {string} setting    User-provided setting description
+ * @param {string} victim     User-provided victim name/role
+ * @param {string} theme      User-provided theme/mood
+ * @param {string} provider   AI provider (gemini, haimaker, openrouter, qwen)
+ * @param {string} model      Model ID to use
+ * @returns {Promise<object|null>}  Scenario object or null
+ */
+export async function generateCustomScenario(setting, victim, theme, provider, model) {
+    const { generateFn, modelId } = await _resolveGenerateFn(null, { provider, model });
+    if (!generateFn) return null;
+
+    const prompt = `You are a murder mystery game designer. Create a murder mystery scenario.
+
+Setting: ${setting || 'A mysterious location'}
+Victim: ${victim || 'An important person'}
+Theme: ${theme || 'Classic noir'}
+
+Generate EXACTLY this JSON structure (no markdown, no explanation, just valid JSON):
+{
+    "title": "Mystery Title",
+    "setting": "A vivid description of the setting (2-3 sentences)",
+    "victim": { "name": "Victim Name", "role": "their role", "description": "brief description" },
+    "weapon": "the murder weapon",
+    "motive": "the culprit's motive",
+    "culpritIndex": 0,
+    "suspects": [
+        {
+            "name": "Suspect Name",
+            "role": "their role/title",
+            "avatar": "single emoji",
+            "personality": "2-3 personality traits",
+            "backstory": "2-3 sentence backstory",
+            "alibi": "what they claim they were doing",
+            "secret": "what they are hiding",
+            "secretConstraints": ["keyword1", "keyword2"],
+            "relationshipToVictim": "how they knew the victim"
+        }
+    ],
+    "crossClues": [
+        ["Clue text about suspect Y that suspect X knows", 0, 1]
+    ]
+}
+
+Create exactly 5 suspects. The suspect at culpritIndex is the actual killer.
+Create at least 6 crossClues as [text, fromSuspectIndex, aboutSuspectIndex].
+Make alibis believable but the culprit's alibi should have a subtle weakness.
+If the theme mentions Hindi/Hinglish, make dialogue and names Indian.`;
+
+    try {
+        const response = await generateFn(modelId, prompt, [], 2000);
+        if (!response) return null;
+
+        // Parse JSON from response (handle markdown code blocks)
+        const responseText = typeof response === 'string' ? response : (response.content || response.text || '');
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) return null;
+
+        const scenario = JSON.parse(jsonMatch[0]);
+
+        // Validate required fields
+        if (!scenario.suspects || scenario.suspects.length < 3) return null;
+        if (!scenario.title || !scenario.victim) return null;
+
+        // Ensure culpritIndex is valid
+        if (typeof scenario.culpritIndex !== 'number' ||
+            scenario.culpritIndex < 0 ||
+            scenario.culpritIndex >= scenario.suspects.length) {
+            scenario.culpritIndex = 0;
+        }
+
+        // Ensure crossClues is an array
+        if (!Array.isArray(scenario.crossClues)) {
+            scenario.crossClues = [];
+        }
+
+        // Ensure each suspect has required fields with defaults
+        scenario.suspects = scenario.suspects.map(s => ({
+            name: s.name || 'Unknown',
+            role: s.role || 'unknown role',
+            avatar: s.avatar || '?',
+            personality: s.personality || 'quiet and reserved',
+            backstory: s.backstory || 'Not much is known about them.',
+            alibi: s.alibi || 'I was somewhere else.',
+            secret: s.secret || 'They have something to hide.',
+            secretConstraints: Array.isArray(s.secretConstraints) ? s.secretConstraints : [],
+            relationshipToVictim: s.relationshipToVictim || 'acquaintance',
+        }));
+
+        return scenario;
+    } catch (err) {
+        console.warn('[Mystery] Custom scenario generation failed:', err);
+        return null;
+    }
+}
+
 /* ── Utility ──────────────────────────────────────────────── */
 
 /** Pick a random item from an array. */

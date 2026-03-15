@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { SCORING } from '../lib/mystery/scoring.js';
 import '../styles/mystery.css';
 
 /* ── Phase Timer ──────────────────────────────────── */
@@ -110,6 +111,43 @@ function RevealOverlay({ game, onClose }) {
     const culprit = (game.suspects || []).find(s => s.isCulprit);
     const scores = game.results?.scores || {};
     const correctVoters = game.results?.correctVoters || [];
+    const culpritId = game.mystery?.culpritId ?? null;
+    const interrogations = game.interrogations || [];
+
+    // Compute per-player score breakdown
+    function getBreakdown(player) {
+        const parts = [];
+        const isCorrect = player.vote && player.vote === culpritId;
+        if (isCorrect) {
+            parts.push(`+${SCORING.correctAccusation} Correct accusation`);
+        } else if (player.vote) {
+            parts.push('+0 Wrong accusation');
+        }
+
+        const playerQuestions = interrogations.filter(
+            m => m.senderType === 'player' && m.sender === player.nick,
+        );
+        const uniqueSuspects = new Set(
+            playerQuestions.map(m => m.suspectId).filter(Boolean),
+        );
+        if (uniqueSuspects.size > 0) {
+            parts.push(`+${SCORING.uniqueSuspectsBonus} x ${uniqueSuspects.size} suspects interrogated`);
+        }
+        if (playerQuestions.length > 0) {
+            parts.push(`+${SCORING.questionsAskedBonus} x ${playerQuestions.length} questions asked`);
+        }
+
+        // Early vote bonus
+        if (isCorrect && game.accusationDurationMs && game.phaseStartedAt) {
+            const elapsed = (player.votedAt || Date.now()) - game.phaseStartedAt;
+            const halfDuration = game.accusationDurationMs / 2;
+            if (elapsed < halfDuration) {
+                parts.push(`+${SCORING.earlyVoteBonus} Early vote bonus`);
+            }
+        }
+
+        return parts;
+    }
 
     return (
         <div className="reveal-overlay">
@@ -124,15 +162,25 @@ function RevealOverlay({ game, onClose }) {
             )}
             {Object.keys(scores).length > 0 && (
                 <div className="reveal-scores">
-                    {(game.players || []).map(p => (
-                        <div
-                            key={p.peer_id}
-                            className={`reveal-score-chip ${correctVoters.includes(p.peer_id) ? 'correct' : ''}`}
-                        >
-                            <span className="score-nick">{p.nick}</span>
-                            <span className="score-val">{scores[p.peer_id] ?? 0} pts</span>
-                        </div>
-                    ))}
+                    {(game.players || []).map(p => {
+                        const breakdown = getBreakdown(p);
+                        return (
+                            <div
+                                key={p.peer_id}
+                                className={`reveal-score-chip ${correctVoters.includes(p.peer_id) ? 'correct' : ''}`}
+                            >
+                                <span className="score-nick">{p.nick}</span>
+                                <span className="score-val">{scores[p.peer_id] ?? 0} pts</span>
+                                {breakdown.length > 0 && (
+                                    <div className="score-breakdown">
+                                        {breakdown.map((line, i) => (
+                                            <div key={i} className="score-breakdown-line">{line}</div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             )}
             <button className="reveal-close-btn" onClick={onClose}>Close</button>
@@ -150,6 +198,39 @@ function useAutoComplete(suspects, inputValue) {
         s.name.toLowerCase().includes(query)
     );
     return { suggestions: filtered, prefix: atMatch[0] };
+}
+
+/* ── How to Play Guide ────────────────────────────── */
+function HowToPlay() {
+    const [open, setOpen] = useState(true);
+
+    return (
+        <div className="mystery-howto">
+            <button
+                className="mystery-howto-toggle"
+                onClick={() => setOpen(o => !o)}
+            >
+                {open ? 'Hide' : 'Show'} How to Play
+            </button>
+            {open && (
+                <div className="mystery-howto-body">
+                    <div className="mystery-howto-tip">Use <strong>@SuspectName</strong> to ask a suspect questions</div>
+                    <div className="mystery-howto-tip">Ask about their <strong>alibi, motive, relationships</strong></div>
+                    <div className="mystery-howto-tip"><strong>Cross-reference</strong> -- ask suspects about each other</div>
+                    <div className="mystery-howto-tip">Take notes in the <strong>Clue Notebook</strong> on the right</div>
+                    <div className="mystery-howto-phases">
+                        <span className="mystery-howto-phase">Investigation</span>
+                        <span className="mystery-howto-arrow">&rarr;</span>
+                        <span className="mystery-howto-phase">Deliberation</span>
+                        <span className="mystery-howto-arrow">&rarr;</span>
+                        <span className="mystery-howto-phase">Accusation</span>
+                        <span className="mystery-howto-arrow">&rarr;</span>
+                        <span className="mystery-howto-phase">Reveal</span>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 }
 
 /* ── Main Board ───────────────────────────────────── */
@@ -241,12 +322,16 @@ export default memo(function MysteryBoard({ game, myId, myNick, onAction, onClos
         { id: 'none', model: '', label: 'No AI (template responses)', provider: '' },
     ];
     const [selectedAI, setSelectedAI] = useState('gemini');
+    const [showCustom, setShowCustom] = useState(false);
+    const [customSetting, setCustomSetting] = useState('');
+    const [customVictim, setCustomVictim] = useState('');
+    const [customTheme, setCustomTheme] = useState('');
 
     if (phase === 'lobby') {
         return (
             <div className="game-overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
                 <div className="mystery-table">
-                    <Header game={game} onClose={onClose} isHost={isHost} />
+                    <Header game={game} onClose={onClose} isHost={isHost} onAction={onAction} />
                     <div className="mystery-lobby">
                         <div className="mystery-lobby-title">Murder Mystery</div>
                         <div className="mystery-lobby-sub">
@@ -275,16 +360,64 @@ export default memo(function MysteryBoard({ game, myId, myNick, onAction, onClos
                                         ))}
                                     </div>
                                 </div>
+                                <div className="mystery-custom-section">
+                                    <button
+                                        className="mystery-custom-toggle"
+                                        onClick={() => setShowCustom(!showCustom)}
+                                    >
+                                        {showCustom ? 'Use Template' : 'Create Custom Scenario'}
+                                    </button>
+                                    {showCustom && (
+                                        <div className="mystery-custom-form">
+                                            <input
+                                                placeholder="Setting (e.g., 'Bollywood party in Mumbai')"
+                                                value={customSetting}
+                                                onChange={e => setCustomSetting(e.target.value)}
+                                            />
+                                            <input
+                                                placeholder="Victim name & role (e.g., 'Director Sharma')"
+                                                value={customVictim}
+                                                onChange={e => setCustomVictim(e.target.value)}
+                                            />
+                                            <input
+                                                placeholder="Theme/mood (e.g., 'dark comedy', 'noir', 'Hinglish')"
+                                                value={customTheme}
+                                                onChange={e => setCustomTheme(e.target.value)}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
                                 <button
                                     className="mystery-start-btn"
-                                    disabled={players.length < 1}
+                                    disabled={players.length < 1 || (showCustom && selectedAI === 'none')}
                                     onClick={() => {
                                         const aiConfig = AI_MODELS.find(m => m.id === selectedAI);
-                                        onAction({ type: 'start', aiProvider: aiConfig?.provider, aiModel: aiConfig?.model });
+                                        if (showCustom) {
+                                            onAction({
+                                                type: 'start',
+                                                aiProvider: aiConfig?.provider,
+                                                aiModel: aiConfig?.model,
+                                                custom: true,
+                                                customSetting,
+                                                customVictim,
+                                                customTheme,
+                                            });
+                                        } else {
+                                            onAction({
+                                                type: 'start',
+                                                aiProvider: aiConfig?.provider,
+                                                aiModel: aiConfig?.model,
+                                            });
+                                        }
                                     }}
                                 >
-                                    Start Mystery
+                                    {showCustom ? 'Generate Custom Mystery' : 'Start Mystery'}
                                 </button>
+                                {showCustom && selectedAI === 'none' && (
+                                    <div className="mystery-lobby-sub">
+                                        Custom scenarios require an AI model
+                                    </div>
+                                )}
                             </>
                         )}
                         {!isHost && (
@@ -301,10 +434,14 @@ export default memo(function MysteryBoard({ game, myId, myNick, onAction, onClos
         return (
             <div className="game-overlay">
                 <div className="mystery-table">
-                    <Header game={game} onClose={onClose} isHost={isHost} />
+                    <Header game={game} onClose={onClose} isHost={isHost} onAction={onAction} />
                     <div className="mystery-generating">
                         <div className="mystery-spinner" />
-                        <div className="mystery-generating-text">Generating mystery...</div>
+                        <div className="mystery-generating-text">
+                            {game._customGenerating
+                                ? 'AI is crafting your custom mystery...'
+                                : 'Generating mystery...'}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -319,7 +456,7 @@ export default memo(function MysteryBoard({ game, myId, myNick, onAction, onClos
     return (
         <div className="game-overlay">
             <div className="mystery-table">
-                <Header game={game} onClose={onClose} isHost={isHost} />
+                <Header game={game} onClose={onClose} isHost={isHost} onAction={onAction} />
 
                 <div className="mystery-layout">
                     {/* ── Left: Suspects ── */}
@@ -365,6 +502,9 @@ export default memo(function MysteryBoard({ game, myId, myNick, onAction, onClos
                             />
                         ) : (
                             <div className="mystery-messages">
+                                {phase === 'investigation' && interrogations.length === 0 && (
+                                    <HowToPlay />
+                                )}
                                 {phase === 'deliberation' && (
                                     <div className="mystery-banner">
                                         Suspects have gone silent. Discuss with other players.
@@ -482,7 +622,7 @@ export default memo(function MysteryBoard({ game, myId, myNick, onAction, onClos
 });
 
 /* ── Header bar ───────────────────────────────────── */
-function Header({ game, onClose, isHost }) {
+function Header({ game, onClose, isHost, onAction }) {
     const phase = game?.phase || 'lobby';
     const phaseLabels = {
         lobby: 'Lobby',

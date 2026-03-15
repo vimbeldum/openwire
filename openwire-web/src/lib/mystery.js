@@ -166,6 +166,63 @@ export function generateMystery(game, templateId) {
     };
 }
 
+/**
+ * Generate a mystery from a custom AI-generated scenario.
+ * Converts the LLM output into proper game state, same as generateMystery
+ * but uses the custom scenario object instead of a built-in template.
+ *
+ * @param {object}  game      Current game state (must be in 'lobby' phase)
+ * @param {object}  scenario  Custom scenario from generateCustomScenario()
+ * @returns {object}  Game state in 'investigation' phase
+ */
+export function generateMysteryFromScenario(game, scenario) {
+    if (game.phase !== 'lobby') return game;
+
+    // Treat the scenario exactly like a template for clue distribution
+    const suspectsWithClues = distributeClues(scenario);
+
+    // Build suspect IDs and mark culprit
+    const culpritIndex = scenario.culpritIndex;
+    const suspects = suspectsWithClues.map((s, idx) => {
+        const isCulprit = idx === culpritIndex;
+        return {
+            id: `suspect_${idx}`,
+            ...s,
+            isCulprit,
+            _systemPrompt: '',
+            _secretConstraints: s.secretConstraints || [],
+            _conversationHistory: [],
+        };
+    });
+
+    const mysteryDef = {
+        id: uid(),
+        title: scenario.title,
+        setting: scenario.setting,
+        victim: { ...scenario.victim },
+        weapon: scenario.weapon,
+        motive: scenario.motive,
+        culpritId: `suspect_${culpritIndex}`,
+    };
+
+    // Build system prompts
+    const suspectsWithPrompts = suspects.map(s => ({
+        ...s,
+        _systemPrompt: buildSuspectPrompt(s, mysteryDef),
+    }));
+
+    return {
+        ...game,
+        phase: 'investigation',
+        mystery: mysteryDef,
+        suspects: suspectsWithPrompts,
+        phaseStartedAt: Date.now(),
+        phaseDuration: game.investigationDurationMs,
+        interrogations: [],
+        results: null,
+    };
+}
+
 /* ── Phase Transitions ────────────────────────────────────── */
 
 /**
@@ -226,7 +283,7 @@ export function advanceToAccusation(game) {
  * @returns {object}
  */
 export function addInterrogation(game, sender, suspectId, content, senderType, isRevised = false) {
-    if (game.phase !== 'investigation') return game;
+    if (game.phase !== 'investigation' && game.phase !== 'deliberation') return game;
     return {
         ...game,
         interrogations: [

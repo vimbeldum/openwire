@@ -394,3 +394,61 @@
   background: rgba(255, 255, 255, 0.15);
   color: white;
 }
+
+/* ── How to Play Guide ──────────────── */
+.mystery-howto {
+  margin: 0.4rem 0; padding: 0; flex-shrink: 0;
+}
+.mystery-howto-toggle {
+  background: rgba(212,175,55,0.1); border: 1px solid rgba(212,175,55,0.25);
+  border-radius: var(--radius-sm); color: var(--noir-gold);
+  font-size: 0.72rem; font-weight: 700; padding: 0.3rem 0.65rem;
+  cursor: pointer; width: 100%; text-align: left; transition: background 0.15s;
+}
+.mystery-howto-toggle:hover { background: rgba(212,175,55,0.18); }
+.mystery-howto-body {
+  padding: 0.5rem 0.65rem; font-size: 0.75rem; color: var(--noir-muted);
+  line-height: 1.5; display: flex; flex-direction: column; gap: 0.25rem;
+}
+.mystery-howto-tip { color: var(--noir-text); font-size: 0.73rem; }
+.mystery-howto-tip strong { color: var(--noir-gold); }
+.mystery-howto-phases {
+  display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap;
+  margin-top: 0.35rem; font-size: 0.68rem;
+}
+.mystery-howto-phase {
+  background: rgba(107,33,168,0.2); border: 1px solid rgba(139,92,246,0.25);
+  border-radius: 4px; padding: 0.15rem 0.4rem; color: #a78bfa; font-weight: 600;
+}
+.mystery-howto-arrow { color: var(--noir-dim); }
+
+/* ── Custom Scenario Form ─────────── */
+.mystery-custom-section { margin: 0.75rem 0; text-align: center; }
+.mystery-custom-toggle {
+  background: transparent; border: 1px dashed rgba(212,175,55,0.4);
+  color: var(--noir-gold); border-radius: 6px; padding: 0.4rem 1rem;
+  font-size: 0.78rem; cursor: pointer; transition: all 0.15s;
+}
+.mystery-custom-toggle:hover { background: rgba(212,175,55,0.1); }
+.mystery-custom-form {
+  display: flex; flex-direction: column; gap: 0.4rem;
+  max-width: 300px; margin: 0.5rem auto 0;
+}
+.mystery-custom-form input {
+  background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px; color: white; padding: 0.4rem 0.6rem;
+  font-size: 0.8rem; font-family: inherit;
+}
+.mystery-custom-form input:focus {
+  outline: none; border-color: var(--noir-gold);
+}
+.mystery-custom-form input::placeholder { color: var(--noir-dim); }
+
+/* ── Score Breakdown in Reveal ──────── */
+.score-breakdown {
+  margin-top: 0.25rem; display: flex; flex-direction: column; gap: 0.1rem;
+}
+.score-breakdown-line {
+  font-size: 0.6rem; color: var(--noir-muted); font-family: var(--font-mono);
+  white-space: nowrap;
+}

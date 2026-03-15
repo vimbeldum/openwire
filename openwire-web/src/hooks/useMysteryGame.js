@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import * as mystery from '../lib/mystery';
 import * as socket from '../lib/socket';
-import { generateSuspectResponse } from '../lib/agents/mysterySwarm';
+import { generateSuspectResponse, generateCustomScenario } from '../lib/agents/mysterySwarm';
 
 /**
  * Custom hook encapsulating all Murder Mystery game state, refs, and handlers.
@@ -158,11 +158,17 @@ export default function useMysteryGame(deps) {
                             );
                         } else if (action.action === 'vote') {
                             updated = mystery.castVote(updated, action.peer_id, action.suspectId);
+                            // Auto-reveal if all players voted
+                            if (mystery.allPlayersVoted(updated)) {
+                                updated = mystery.reveal(updated);
+                            }
                         } else if (action.action === 'advancePhase') {
                             if (updated.phase === 'investigation') {
                                 updated = mystery.advanceToDeliberation(updated);
                             } else if (updated.phase === 'deliberation') {
                                 updated = mystery.advanceToAccusation(updated);
+                            } else if (updated.phase === 'accusation') {
+                                updated = mystery.reveal(updated);
                             }
                         } else {
                             return prev;
@@ -272,7 +278,55 @@ export default function useMysteryGame(deps) {
                 break;
 
             case 'start': {
-                // Generate the mystery from templates
+                if (action.custom) {
+                    // Custom scenario: show generating phase, then call LLM
+                    const generating = {
+                        ...game,
+                        phase: 'generating',
+                        _customGenerating: true,
+                        _aiProvider: action.aiProvider || '',
+                        _aiModel: action.aiModel || '',
+                    };
+                    setMysteryGame(generating);
+                    broadcastState(generating);
+
+                    // Generate scenario asynchronously via LLM
+                    (async () => {
+                        const scenario = await generateCustomScenario(
+                            action.customSetting,
+                            action.customVictim,
+                            action.customTheme,
+                            action.aiProvider,
+                            action.aiModel,
+                        );
+
+                        const currentGame = mysteryRef.current;
+                        if (!currentGame) return;
+
+                        let generated;
+                        if (scenario) {
+                            generated = mystery.generateMysteryFromScenario(
+                                { ...currentGame, phase: 'lobby' },
+                                scenario,
+                            );
+                        } else {
+                            // Fallback to random template if LLM failed
+                            generated = mystery.generateMystery(
+                                { ...currentGame, phase: 'lobby' },
+                            );
+                        }
+
+                        generated._aiProvider = action.aiProvider || '';
+                        generated._aiModel = action.aiModel || '';
+
+                        setMysteryGame(generated);
+                        broadcastState(generated);
+                        addActivityLog(`Mystery started: ${generated.mystery?.title || 'Unknown'}`);
+                    })();
+                    return; // skip the setMysteryGame/broadcastState at the end
+                }
+
+                // Standard template-based generation
                 const generated = mystery.generateMystery(game, action.templateId);
                 // Store AI config so generateAIResponse can use it
                 generated._aiProvider = action.aiProvider || '';
@@ -328,6 +382,8 @@ export default function useMysteryGame(deps) {
                     newGame = mystery.advanceToDeliberation(game);
                 } else if (game.phase === 'deliberation') {
                     newGame = mystery.advanceToAccusation(game);
+                } else if (game.phase === 'accusation') {
+                    newGame = mystery.reveal(game);
                 }
                 break;
 
