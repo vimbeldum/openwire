@@ -1091,6 +1091,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     peerCosmeticsRef.current = { ...peerCosmeticsRef.current, [msg.peer_id]: msg.cosmetics };
                 }
                 break;
+            case 'tip_received':
+                // Direct message from relay (someone tipped us)
+                if (msg.amount && walletRef.current) {
+                    const updated = wallet.credit(walletRef.current, msg.amount, `Tip from ${msg.from_nick}`);
+                    updateWallet(updated);
+                    addMsg('💸', `${msg.from_nick} sent you ${msg.amount} chips!`, 'system');
+                }
+                break;
             case 'admin_adjust_balance':
                 // Direct message from relay (admin adjusted our balance)
                 if (msg.delta !== undefined && walletRef.current) {
@@ -1999,15 +2007,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 if (!w || !wallet.canAfford(w, amount)) { addMsg('★', '⚠ Insufficient chips.', 'system'); return; }
                 const updated = wallet.debit(w, amount, `Tip to ${targetNick}`);
                 updateWallet(updated);
-                // Send via global chat so recipient gets the tip regardless of room
-                socket.sendChat(JSON.stringify({
-                    type: 'tip', to: target.peer_id, from_nick: myNick, amount,
-                }));
+                // Send via dedicated relay handler (updates both balances server-side)
+                socket.send({ type: 'tip', to: target.peer_id, amount });
                 addMsg('💸', `Tipped ${amount} chips to ${targetNick}!`, 'system');
-                // Optimistic display update for sender's peer sidebar
-                setPeers(prev => prev.map(p =>
-                    p.peer_id === target.peer_id ? { ...p, balance: (p.balance || 0) + amount } : p
-                ));
             }
             return;
         }
@@ -2481,15 +2483,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                                     if (!w || !wallet.canAfford(w, amount)) { addMsg('★', '⚠ Insufficient chips.', 'system'); return; }
                                     const updated = wallet.debit(w, amount, `Tip to ${p.nick}`);
                                     updateWallet(updated);
-                                    // Send via global chat so recipient gets it regardless of room
-                                    socket.sendChat(JSON.stringify({
-                                        type: 'tip', to: p.peer_id, from_nick: nickRef.current, amount,
-                                    }));
+                                    // Send via dedicated relay handler (updates both balances server-side)
+                                    socket.send({ type: 'tip', to: p.peer_id, amount });
                                     addMsg('💸', `Tipped ${amount} chips to ${p.nick}!`, 'system');
-                                    // Optimistic display update
-                                    setPeers(prev => prev.map(pp =>
-                                        pp.peer_id === p.peer_id ? { ...pp, balance: (pp.balance || 0) + amount } : pp
-                                    ));
                                 }}
                             >💰</button>
                             <button className="poke-btn" title={`Poke ${p.nick}`}

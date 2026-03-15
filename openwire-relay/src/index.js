@@ -203,6 +203,32 @@ export class RelayRoom {
                     break;
                 }
 
+                case "tip": {
+                    if (!peerInfo) return;
+                    if (typeof msg.amount !== 'number' || !isFinite(msg.amount) || msg.amount <= 0) return;
+                    if (!msg.to) return;
+
+                    // Deduct from sender
+                    if (peerInfo.balance < msg.amount) return; // insufficient
+                    peerInfo.balance = Math.max(0, peerInfo.balance - msg.amount);
+                    this.broadcast({ type: "peer_balance_update", peer_id: peerInfo.peer_id, balance: peerInfo.balance });
+
+                    // Credit to recipient + deliver tip notification
+                    for (const [clientWs, info] of this.peers) {
+                        if (info.peer_id === msg.to) {
+                            info.balance = (info.balance || 0) + msg.amount;
+                            this.send(clientWs, {
+                                type: 'tip_received',
+                                amount: msg.amount,
+                                from_nick: peerInfo.nick,
+                            });
+                            this.broadcast({ type: "peer_balance_update", peer_id: info.peer_id, balance: info.balance });
+                            break;
+                        }
+                    }
+                    break;
+                }
+
                 case "cosmetics_update": {
                     if (!peerInfo) return;
                     if (!msg.cosmetics || typeof msg.cosmetics !== 'object') return;
