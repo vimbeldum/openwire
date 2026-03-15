@@ -630,7 +630,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     }, []);
 
     // ── Game hooks (extracted from ChatRoom) ─────────────────
-    const gameDeps = useMemo(() => ({ myIdRef, nickRef, walletRef, addMsg, updateWallet, amIHost, updateBankLedger, resolvePayoutEvent, addActivityLog }), [addMsg, updateWallet, amIHost, updateBankLedger, resolvePayoutEvent, addActivityLog]);
+    const gameDeps = useMemo(() => ({ myIdRef, nickRef, walletRef, swarmRef, addMsg, updateWallet, amIHost, updateBankLedger, resolvePayoutEvent, addActivityLog }), [addMsg, updateWallet, amIHost, updateBankLedger, resolvePayoutEvent, addActivityLog]);
 
     const {
         blackjackGame, setBlackjackGame,
