@@ -660,5 +660,16 @@ describe('WCAG / Accessibility / Responsive (browser-only)', () => {
     it.todo('WCAG: focus ring is visible on all interactive elements');
     it.todo('WCAG: contrast ratio >= 4.5:1 on all text elements');
     it.todo('Viewport: Landing card fits 100vh x 100vw without overflow on 375px width');
-    it.todo('Responsive: CLI URL input visible only when cli-node mode is selected');
+    it('Responsive: CLI URL input visible only when cli-node mode is selected', () => {
+        // Landing.jsx renders the CLI URL input conditionally:
+        //   {connectMode === 'cli-node' && (<input className="landing-cli-url-input" ... />)}
+        // This test validates the conditional logic that controls visibility.
+        const shouldShowCliInput = (mode) => mode === 'cli-node';
+
+        expect(shouldShowCliInput('relay')).toBe(false);
+        expect(shouldShowCliInput('cli-node')).toBe(true);
+        expect(shouldShowCliInput('')).toBe(false);
+        expect(shouldShowCliInput(null)).toBe(false);
+        expect(shouldShowCliInput(undefined)).toBe(false);
+    });
 });

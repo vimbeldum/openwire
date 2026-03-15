@@ -482,13 +482,133 @@ describe('AgentSwarm — configuration getters and setters', () => {
 // ── Browser-only / integration stubs ─────────────────────────────────────
 
 describe('AgentSwarm — browser-only / integration tests', () => {
-    it.todo('start() fetches free models from OpenRouter and calls _assignModels()');
-    it.todo('stop() clears all timers, drains the message queue, and resets _running to false');
-    it.todo('retry logic: 429 response triggers exponential backoff and re-queues the task');
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('start() fetches free models from OpenRouter and calls _assignModels()', async () => {
+        const { fetchFreeModels } = await import('../../lib/agents/openrouter.js');
+        vi.mocked(fetchFreeModels).mockClear();
+
+        const onModelLoad = vi.fn();
+        const swarm = new AgentSwarm({
+            onMessage: vi.fn(),
+            onError: vi.fn(),
+            onModelLoad,
+            onLog: vi.fn(),
+            onTyping: vi.fn(),
+        });
+
+        await swarm.start();
+
+        expect(fetchFreeModels).toHaveBeenCalled();
+        expect(onModelLoad).toHaveBeenCalled();
+        expect(Object.keys(swarm._assignedModels).length).toBeGreaterThan(0);
+
+        swarm.stop();
+    });
+
+    it('stop() clears all timers, drains the message queue, and resets _running to false', async () => {
+        const swarm = new AgentSwarm({
+            onMessage: vi.fn(),
+            onError: vi.fn(),
+            onModelLoad: vi.fn(),
+            onLog: vi.fn(),
+            onTyping: vi.fn(),
+        });
+
+        await swarm.start();
+        expect(swarm.running).toBe(true);
+
+        swarm._messageQueue.push({ characterId: 'jethalal', retries: 0, force: false, chainDepth: 0 });
+
+        swarm.stop();
+
+        expect(swarm.running).toBe(false);
+        expect(swarm.queueLength).toBe(0);
+        expect(Object.keys(swarm._timers).length).toBe(0);
+    });
+
+    it('retry logic: 429 response triggers exponential backoff and re-queues the task', async () => {
+        const swarm = makeRunningSwarm();
+        swarm.addContext('User1', 'Hello everyone!');
+
+        let callCount = 0;
+        vi.mocked(generateMessage).mockImplementation(async () => {
+            callCount++;
+            if (callCount === 1) {
+                const err = new Error('429 Too Many Requests');
+                err.status = 429;
+                throw err;
+            }
+            return 'recovered response';
+        });
+
+        await triggerAndDrain(swarm, 'jethalal');
+
+        expect(callCount).toBeGreaterThanOrEqual(2);
+        expect(swarm._stats.rateLimitHits).toBeGreaterThanOrEqual(1);
+    });
+
     it.todo('crossover: agent_triggers fires a second character when the first one responds');
-    it.todo('context compaction: _compactContext called when context reaches COMPACT_THRESHOLD (50)');
-    it.todo('P2P summary sync: loadSummary() is reflected in summaryBlock of system prompt');
-    it.todo('guardrails=false: unfiltered room_rules block replaces the SFW version');
-    it.todo('session facts: _extractFact stores human messages and they appear in factsBlock');
-    it.todo('triple prompt repetition: non-thinking models get systemPrompt repeated 3× in generateMessage');
+
+    it('context compaction: _compactContext called when context reaches COMPACT_THRESHOLD (50)', () => {
+        const swarm = makeRunningSwarm();
+
+        const spy = vi.spyOn(swarm, '_compactContext').mockImplementation(async () => {});
+
+        for (let i = 0; i < 50; i++) {
+            swarm.addContext(`User${i}`, `Test message number ${i} for compaction threshold`);
+        }
+
+        expect(spy).toHaveBeenCalled();
+        spy.mockRestore();
+    });
+
+    it('P2P summary sync: loadSummary() is reflected in summaryBlock of system prompt', async () => {
+        const swarm = makeRunningSwarm();
+        swarm.loadSummary('- Jethalal argued with Bhide about rent');
+        swarm.addContext('User1', 'kya chal raha hai?');
+
+        await triggerAndDrain(swarm, 'jethalal');
+
+        expect(generateMessage).toHaveBeenCalledOnce();
+        const [, systemPrompt] = generateMessage.mock.calls[0];
+        expect(systemPrompt).toContain('<conversation_history>');
+        expect(systemPrompt).toContain('Jethalal argued with Bhide about rent');
+    });
+
+    it('guardrails=false: unfiltered room_rules block replaces the SFW version', async () => {
+        const swarm = makeRunningSwarm();
+        swarm._guardrails = false;
+        swarm.addContext('User1', 'test message');
+
+        await triggerAndDrain(swarm, 'jethalal');
+
+        expect(generateMessage).toHaveBeenCalledOnce();
+        const [, systemPrompt] = generateMessage.mock.calls[0];
+        expect(systemPrompt).toContain('<room_rules>');
+        expect(systemPrompt).toContain('savage');
+        expect(systemPrompt).not.toContain('family-friendly');
+    });
+
+    it('session facts: _extractFact stores human messages and they appear in factsBlock', async () => {
+        const swarm = makeRunningSwarm();
+
+        // Use messages without reactive_tags to avoid triggering extra generations
+        swarm.addContext('Alice', 'This is a really interesting conversation about something fun');
+        swarm.addContext('Bob', 'I totally agree with what you are saying about that topic');
+
+        expect(swarm.sessionFacts.length).toBeGreaterThan(0);
+
+        await triggerAndDrain(swarm, 'jethalal');
+
+        // generateMessage may have been called multiple times due to reactive triggers;
+        // check the first call's system prompt for session_memory
+        expect(generateMessage).toHaveBeenCalled();
+        const [, systemPrompt] = generateMessage.mock.calls[0];
+        expect(systemPrompt).toContain('<session_memory>');
+    });
+
+    it.todo('triple prompt repetition: non-thinking models get systemPrompt repeated 3x in generateMessage');
 });

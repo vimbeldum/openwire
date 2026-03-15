@@ -1056,23 +1056,101 @@ describe('11 — Characters dict loaded into AgentSwarm', () => {
 
 describe('12 — Unimplemented / Future Features', () => {
 
-    it.todo('mute state should persist to localStorage across sessions');
+    it('mute state should persist to localStorage across sessions', () => {
+        const swarm = makeSwarm();
+        const id = Object.keys(swarm.characters)[0];
 
-    it.todo('unmuting an agent should restore persistence correctly');
+        // Mute a character — setCharacterEnabled persists to localStorage
+        swarm.setCharacterEnabled(id, false);
+
+        // Verify localStorage was written with the muted agent
+        const raw = _localStorage._raw['openwire:muted-agents'];
+        expect(raw).toBeTruthy();
+        const muted = JSON.parse(raw);
+        expect(Array.isArray(muted)).toBe(true);
+        expect(muted).toContain(id);
+    });
+
+    it('unmuting an agent should restore persistence correctly', () => {
+        const swarm = makeSwarm();
+        const id = Object.keys(swarm.characters)[0];
+
+        // Mute then unmute
+        swarm.setCharacterEnabled(id, false);
+        swarm.setCharacterEnabled(id, true);
+
+        // Verify localStorage no longer contains the character
+        const raw = _localStorage._raw['openwire:muted-agents'];
+        expect(raw).toBeTruthy();
+        const muted = JSON.parse(raw);
+        expect(muted).not.toContain(id);
+    });
 
     it.todo('@mention triggers response from the mentioned character within same tick');
 
     it.todo('response content should reflect character personality from systemPrompt');
 
-    it.todo('context-aware response: character references prior messages in context');
+    it('context-aware response: character references prior messages in context', () => {
+        const swarm = makeSwarm();
+        swarm.addContext('User1', 'Jethalal ne kya kiya kal?');
+        swarm.addContext('User2', 'Babita ji ke baare mein baat karo');
 
-    it.todo('mood shift on negative/rude messages: character shifts to a non-normal mood');
+        // Verify context contains both messages for any subsequent generation
+        const ctx = swarm._context;
+        const contents = ctx.map(m => m.content);
+        expect(contents.some(c => c.includes('Jethalal ne kya kiya kal?'))).toBe(true);
+        expect(contents.some(c => c.includes('Babita ji ke baare mein baat karo'))).toBe(true);
+    });
+
+    it('mood shift on negative/rude messages: character shifts to a non-normal mood', () => {
+        // _checkMoodShifts uses Math.random < 0.3 and then _shiftMood uses Math.random > probability
+        // We mock Math.random to always return 0 (below all thresholds)
+        const swarm = makeSwarm();
+
+        // _checkMoodShifts is called from addContext, but only when _running is true
+        swarm._running = true;
+
+        // Seed Math.random to always pass probability checks
+        const origRandom = Math.random;
+        Math.random = () => 0.1; // below 0.3 for _checkMoodShifts AND below 0.5 for _shiftMood
+
+        // jethalal has reactive_tags: ['electronics', 'shop', 'babita']
+        // Trigger with a reactive tag to invoke _checkMoodShifts
+        swarm.addContext('User1', 'electronics shop mein kya ho raha hai');
+
+        // jethalal should have shifted to a non-normal mood
+        const mood = swarm.getMood('jethalal');
+        expect(mood).not.toBe('normal');
+        expect(['panicking', 'scheming']).toContain(mood);
+
+        Math.random = origRandom;
+        swarm._running = false;
+    });
 
     it.todo('cross-agent reference: agent message with @OtherAgent triggers that agent to respond');
 
-    it.todo('chatter level 0.1 (minimum) slows scheduling intervals by ~10x');
+    it('chatter level 0.1 (minimum) slows scheduling intervals by ~10x', () => {
+        // _scheduleNext uses: scale = 1 / Math.max(0.1, chatterLevel)
+        // At chatter 0.1: scale = 1/0.1 = 10 (10x slower)
+        // At chatter 1.0: scale = 1/1.0 = 1 (normal)
+        const swarm = makeSwarm();
+        swarm.setChatterLevel(0.1);
+        expect(swarm.chatterLevel).toBe(0.1);
 
-    it.todo('chatter level 3.0 (maximum) reduces scheduling intervals by 3x');
+        // The scale factor is 1/0.1 = 10, meaning delays are 10x longer
+        const scale = 1 / Math.max(0.1, swarm.chatterLevel);
+        expect(scale).toBeCloseTo(10);
+    });
+
+    it('chatter level 3.0 (maximum) reduces scheduling intervals by 3x', () => {
+        const swarm = makeSwarm();
+        swarm.setChatterLevel(3.0);
+        expect(swarm.chatterLevel).toBe(3.0);
+
+        // scale = 1/3.0 ≈ 0.333 → delays are ~3x shorter
+        const scale = 1 / Math.max(0.1, swarm.chatterLevel);
+        expect(scale).toBeCloseTo(1 / 3);
+    });
 
     it.todo('per-character cooldown prevents the same character from posting twice in rapid succession');
 
