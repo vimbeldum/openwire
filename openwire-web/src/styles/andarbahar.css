@@ -146,8 +146,8 @@
 
 .ab-phase-badge.result.orange {
   background: rgba(232, 183, 48, 0.2);
-  border-color: #E8B730;
-  color: #E8B730;
+  border-color: var(--gold);
+  color: var(--gold);
 }
 
 @keyframes resultPulse {
@@ -234,7 +234,7 @@
   background: rgba(232, 183, 48, 0.2);
   border: 1px solid rgba(232, 183, 48, 0.4);
   border-radius: 100px;
-  color: #E8B730;
+  color: var(--gold);
   font-weight: 700;
   font-family: var(--font-mono);
 }
@@ -461,8 +461,8 @@
 
 .ab-side-btn-small.active {
   background: rgba(232, 183, 48, 0.2);
-  border-color: #E8B730;
-  color: #E8B730;
+  border-color: var(--gold);
+  color: var(--gold);
 }
 
 .ab-side-btn-small:disabled {
@@ -523,7 +523,7 @@
 }
 
 .ab-countdown-label strong {
-  color: #E8B730;
+  color: var(--gold);
 }
 
 .ab-countdown-bar {

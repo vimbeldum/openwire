@@ -36,12 +36,24 @@
   --red: #E83A30;
   --red-glow: rgba(232, 58, 48, 0.15);
   --purple: #9B59B6;
+  --gold: #E8B730;
+  --gold-glow: rgba(232, 183, 48, 0.15);
+  --agent: #a78bfa;
+  --agent-glow: rgba(167, 139, 250, 0.15);
 
   /* Typography */
   --text-primary: #FFFFFF;
-  --text-secondary: #F0F0F0;
+  --text-secondary: #D0D0D0;
   --text-muted: #A0A0A0;
   --text-dim: #707070;
+
+  /* Typography Scale */
+  --text-xs: 0.7rem;
+  --text-sm: 0.78rem;
+  --text-base: 0.85rem;
+  --text-md: 0.95rem;
+  --text-lg: 1.1rem;
+  --text-xl: 1.3rem;
 
   /* Liquid Glass */
   --glass-bg: rgba(30, 30, 30, 0.7);
@@ -142,4 +154,20 @@ body {
   to {
     opacity: 1;
   }
+}
+
+/* ── Reduced Motion ──────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Universal Active Feedback ─────────────────── */
+button:active, .sidebar-btn:active, .chip-btn:active {
+  transform: scale(0.97);
 }

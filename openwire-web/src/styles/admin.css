@@ -225,7 +225,7 @@
 .admin-chips {
   font-family: var(--font-mono);
   font-weight: 700;
-  color: #E8B730;
+  color: var(--gold);
 }
 
 .admin-ip {
@@ -282,7 +282,7 @@
   font-size: 0.6rem;
   font-weight: 800;
   background: rgba(232, 183, 48, 0.25);
-  color: #E8B730;
+  color: var(--gold);
   vertical-align: middle;
 }
 
@@ -332,14 +332,14 @@
 
 .admin-setting-control input[type="range"] {
   width: 120px;
-  accent-color: #E8B730;
+  accent-color: var(--gold);
 }
 
 .admin-setting-value {
   font-family: var(--font-mono);
   font-size: 0.85rem;
   font-weight: 800;
-  color: #E8B730;
+  color: var(--gold);
   min-width: 2rem;
   text-align: center;
 }
@@ -371,7 +371,7 @@
 
 .admin-btn.kick {
   border-color: rgba(232, 183, 48, 0.4);
-  color: #E8B730;
+  color: var(--gold);
 }
 
 .admin-btn.kick:hover {
@@ -668,7 +668,7 @@
 .admin-filter-btn.active {
   background: rgba(232, 183, 48, 0.15);
   border-color: rgba(232, 183, 48, 0.4);
-  color: #E8B730;
+  color: var(--gold);
 }
 
 /* ── Agent Control Panel ─────────────────────────────────────── */

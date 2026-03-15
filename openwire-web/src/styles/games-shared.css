@@ -323,7 +323,7 @@
 .chip-display {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #E8B730;
+  color: var(--gold);
   font-family: var(--font-mono);
   padding: 0.35rem 0.85rem;
   background: rgba(232, 183, 48, 0.1);
@@ -656,7 +656,7 @@
 
 .howtoplay-bet-odds {
   font-weight: 700;
-  color: #E8B730;
+  color: var(--gold);
   font-family: var(--font-mono);
   text-align: center;
 }
