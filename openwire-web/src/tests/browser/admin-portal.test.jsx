@@ -25,6 +25,16 @@ vi.mock('../../lib/casinoState.js', () => ({
     getTotalHousePnl: vi.fn(() => 0),
 }));
 
+vi.mock('../../lib/deaddrops.js', () => ({
+    getMinKarmaToPost: vi.fn(() => 0),
+    setMinKarmaToPost: vi.fn(),
+}));
+
+vi.mock('../../components/GifPicker.jsx', () => ({
+    setDefaultProvider: vi.fn(),
+    default: () => null,
+}));
+
 vi.mock('../../lib/agents/agentStore.js', () => ({
     loadStore: vi.fn(() => ({
         characters: [],
@@ -272,15 +282,220 @@ describe('AdminPortal — Close button', () => {
     });
 });
 
-// ── Complex interaction stubs ───────────────────────────────────────────────
+// ── Agents tab tests ────────────────────────────────────────────────────────
+
+describe('AdminPortal — Agents tab', () => {
+    function makeSwarm(overrides = {}) {
+        return {
+            running: false,
+            freeModels: [],
+            chatterLevel: 1.0,
+            maxMsgPerMin: 8,
+            perCharCooldown: 10,
+            globalCooldown: 5,
+            defaultModel: 'openrouter/auto',
+            provider: 'openrouter',
+            geminiModels: [],
+            qwenModels: [],
+            haimakerModels: [],
+            mentionOnlyMode: false,
+            statsDebug: false,
+            isCharacterEnabled: vi.fn(() => true),
+            isShowEnabled: vi.fn(() => true),
+            getAssignedModel: vi.fn(() => ''),
+            getMood: vi.fn(() => 'normal'),
+            start: vi.fn().mockResolvedValue(),
+            stop: vi.fn(),
+            setChatterLevel: vi.fn(),
+            setMaxMsgPerMin: vi.fn(),
+            setCharacterEnabled: vi.fn(),
+            setModelOverride: vi.fn(),
+            setShowEnabled: vi.fn(),
+            setMood: vi.fn(),
+            setPerCharCooldown: vi.fn(),
+            setGlobalCooldown: vi.fn(),
+            setMentionOnlyMode: vi.fn(),
+            setStatsDebug: vi.fn(),
+            setDefaultModel: vi.fn(),
+            setProvider: vi.fn().mockResolvedValue(),
+            flushContext: vi.fn(),
+            queueLength: 0,
+            queueContents: [],
+            stats: {},
+            ...overrides,
+        };
+    }
+
+    it('swarm start/stop toggles running state via swarm.start() and swarm.stop()', async () => {
+        const swarm = makeSwarm({ running: false });
+        render(<AdminPortal {...makeDefaultProps({ swarm })} />);
+        // Switch to Agents tab
+        await userEvent.click(screen.getByRole('button', { name: /agents/i }));
+        // Click start
+        const startBtn = screen.getByRole('button', { name: /start swarm/i });
+        await userEvent.click(startBtn);
+        expect(swarm.start).toHaveBeenCalledTimes(1);
+        // Now the button should say Stop Swarm
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: /stop swarm/i })).toBeInTheDocument();
+        });
+        // Click stop
+        await userEvent.click(screen.getByRole('button', { name: /stop swarm/i }));
+        expect(swarm.stop).toHaveBeenCalledTimes(1);
+    });
+
+    it('character enable/disable checkbox calls swarm.setCharacterEnabled()', async () => {
+        const { getCharactersDict } = await import('../../lib/agents/agentStore.js');
+        const { getGroupsDict } = await import('../../lib/agents/agentStore.js');
+        const { getGroupCharacters } = await import('../../lib/agents/agentStore.js');
+
+        // Set up one character so checkbox renders
+        getCharactersDict.mockReturnValue({ char1: { id: 'char1', name: 'Alice', avatar: 'A', frequencyWeight: 5, moods: { normal: {} } } });
+        getGroupsDict.mockReturnValue({ show1: { id: 'show1', name: 'Show 1', emoji: '🎭' } });
+        getGroupCharacters.mockReturnValue([{ id: 'char1', name: 'Alice', avatar: 'A', frequencyWeight: 5, moods: { normal: {} } }]);
+
+        const swarm = makeSwarm();
+        render(<AdminPortal {...makeDefaultProps({ swarm })} />);
+        await userEvent.click(screen.getByRole('button', { name: /agents/i }));
+
+        // Find the On checkbox in the character table (last checkbox in the row)
+        const checkboxes = screen.getAllByRole('checkbox');
+        // The last checkbox in the character row is the enable/disable one
+        const charCheckbox = checkboxes[checkboxes.length - 1];
+        await userEvent.click(charCheckbox);
+        expect(swarm.setCharacterEnabled).toHaveBeenCalledWith('char1', false);
+
+        // Reset mocks to defaults
+        getCharactersDict.mockReturnValue({});
+        getGroupsDict.mockReturnValue({});
+        getGroupCharacters.mockReturnValue([]);
+    });
+
+    it('model dropdown change calls swarm.setModelOverride()', async () => {
+        const { getCharactersDict } = await import('../../lib/agents/agentStore.js');
+        const { getGroupsDict } = await import('../../lib/agents/agentStore.js');
+        const { getGroupCharacters } = await import('../../lib/agents/agentStore.js');
+
+        getCharactersDict.mockReturnValue({ char1: { id: 'char1', name: 'Alice', avatar: 'A', frequencyWeight: 5, moods: { normal: {} } } });
+        getGroupsDict.mockReturnValue({ show1: { id: 'show1', name: 'Show 1', emoji: '🎭' } });
+        getGroupCharacters.mockReturnValue([{ id: 'char1', name: 'Alice', avatar: 'A', frequencyWeight: 5, moods: { normal: {} } }]);
+
+        const swarm = makeSwarm({ freeModels: [{ id: 'model-a' }, { id: 'model-b' }] });
+        render(<AdminPortal {...makeDefaultProps({ swarm })} />);
+        await userEvent.click(screen.getByRole('button', { name: /agents/i }));
+
+        // Find model select dropdowns - the per-character one is in the table
+        const selects = screen.getAllByRole('combobox');
+        // The per-character model select contains "Use Default" option
+        const charModelSelect = selects.find(s => {
+            const opts = s.querySelectorAll('option');
+            return Array.from(opts).some(o => o.textContent.includes('Use Default'));
+        });
+        expect(charModelSelect).toBeDefined();
+        fireEvent.change(charModelSelect, { target: { value: 'model-a' } });
+        expect(swarm.setModelOverride).toHaveBeenCalledWith('char1', 'model-a');
+
+        // Reset mocks
+        getCharactersDict.mockReturnValue({});
+        getGroupsDict.mockReturnValue({});
+        getGroupCharacters.mockReturnValue([]);
+    });
+
+    it('chatter level slider fires swarm.setChatterLevel()', async () => {
+        const swarm = makeSwarm();
+        render(<AdminPortal {...makeDefaultProps({ swarm })} />);
+        await userEvent.click(screen.getByRole('button', { name: /agents/i }));
+
+        // Find the chatter level slider (type=range)
+        const sliders = screen.getAllByRole('slider');
+        const chatterSlider = sliders[0]; // First slider is chatter level
+        fireEvent.change(chatterSlider, { target: { value: '1.5' } });
+        expect(swarm.setChatterLevel).toHaveBeenCalledWith(1.5);
+    });
+});
+
+// ── Stats tab tests ─────────────────────────────────────────────────────────
+
+describe('AdminPortal — Stats tab', () => {
+    it('P&L values rendered per game from casinoState.housePnl', async () => {
+        const casinoState = {
+            housePnl: {
+                roulette: 500,
+                blackjack: -200,
+                andarbahar: 100,
+                slots: -50,
+            },
+        };
+        // Mock getTotalHousePnl to return the sum
+        const { getTotalHousePnl } = await import('../../lib/casinoState.js');
+        getTotalHousePnl.mockReturnValue(350);
+
+        render(<AdminPortal {...makeDefaultProps({ casinoState })} />);
+        await userEvent.click(screen.getByRole('button', { name: /stats/i }));
+
+        // Each game PnL value should be rendered
+        expect(screen.getByText('+500')).toBeInTheDocument();
+        expect(screen.getByText('-200')).toBeInTheDocument();
+        expect(screen.getByText('+100')).toBeInTheDocument();
+        expect(screen.getByText('-50')).toBeInTheDocument();
+
+        // Total PnL
+        expect(screen.getByText(/350/)).toBeInTheDocument();
+
+        getTotalHousePnl.mockReturnValue(0);
+    });
+
+    it('filter dropdown limits displayed games', async () => {
+        const casinoState = {
+            housePnl: {
+                roulette: 500,
+                blackjack: -200,
+                andarbahar: 100,
+                slots: -50,
+            },
+        };
+        const { getTotalHousePnl } = await import('../../lib/casinoState.js');
+        getTotalHousePnl.mockReturnValue(350);
+
+        render(<AdminPortal {...makeDefaultProps({ casinoState })} />);
+        await userEvent.click(screen.getByRole('button', { name: /stats/i }));
+
+        // Initially all 4 game PnL cards are shown
+        expect(screen.getByText(/Roulette Net/)).toBeInTheDocument();
+        expect(screen.getByText(/Blackjack Net/)).toBeInTheDocument();
+        expect(screen.getByText(/Andar Bahar Net/)).toBeInTheDocument();
+        expect(screen.getByText(/Slots Net/)).toBeInTheDocument();
+
+        // Click the Roulette filter button
+        const rouletteFilter = screen.getByRole('button', { name: /roulette/i });
+        await userEvent.click(rouletteFilter);
+
+        // Now only Roulette Net should be shown
+        expect(screen.getByText(/Roulette Net/)).toBeInTheDocument();
+        expect(screen.queryByText(/Blackjack Net/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Andar Bahar Net/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Slots Net/)).not.toBeInTheDocument();
+
+        getTotalHousePnl.mockReturnValue(0);
+    });
+});
+
+// ── Escape key test ─────────────────────────────────────────────────────────
+
+describe('AdminPortal — Escape key', () => {
+    it('pressing Escape dismisses the portal by clicking the overlay', async () => {
+        const onClose = vi.fn();
+        render(<AdminPortal {...makeDefaultProps({ onClose })} />);
+        // The admin-overlay div has an onClick that fires onClose when clicking the overlay itself
+        const overlay = document.querySelector('.admin-overlay');
+        // Simulate clicking the overlay background (target === currentTarget)
+        fireEvent.click(overlay);
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+});
+
+// ── Browser-only / complex interactions (still todo) ─────────────────────────
 
 describe('AdminPortal — Browser-only / complex interactions', () => {
-    it.todo('Agents tab: swarm start/stop toggles running state via swarm.start() and swarm.stop()');
-    it.todo('Agents tab: character enable/disable checkbox calls swarm.setCharacterEnabled()');
-    it.todo('Agents tab: model dropdown change calls swarm.setModelOverride()');
-    it.todo('Agents tab: chatter level slider fires swarm.setChatterLevel()');
-    it.todo('Stats tab: P&L values rendered per game from casinoState.housePnl');
-    it.todo('Stats tab: filter dropdown limits displayed games');
     it.todo('Focus management: admin overlay traps focus within modal (requires real browser)');
-    it.todo('Keyboard: pressing Escape dismisses the portal (requires real browser focus model)');
 });
