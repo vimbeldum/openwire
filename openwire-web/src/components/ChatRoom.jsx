@@ -2194,7 +2194,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                         <span className="current-room-indicator">
                             <span className="room-icon">🏠</span>
                             <span className="room-name">{currentRoomName}</span>
-                            <button className="leave-room-btn" onClick={() => setCurrentRoom(null)} title="Back to General Chat">✕</button>
+                            <button className="leave-room-btn" onClick={() => { socket.leaveRoom(currentRoom); setCurrentRoom(null); }} title="Leave Room">✕</button>
                         </span>
                     ) : (
                         <span className="general-chat-indicator">💬 General Chat</span>
@@ -2387,7 +2387,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar">✕</button>
                 <div className="sidebar-section">
                     <div className="sidebar-title">Channels</div>
-                    <div className={`room-item ${!currentRoom ? 'active' : ''}`} onClick={() => { setCurrentRoom(null); setSidebarOpen(false); }} style={{ cursor: 'pointer' }}>
+                    <div className={`room-item ${!currentRoom ? 'active' : ''}`} onClick={() => { if (currentRoom) socket.leaveRoom(currentRoom); setCurrentRoom(null); setSidebarOpen(false); }} style={{ cursor: 'pointer' }}>
                         <span className="room-icon">💬</span>
                         <span className="room-name">General Chat {!currentRoom && <span style={{ fontSize: '0.7em', color: 'var(--brand)', marginLeft: '4px' }}>(Joined)</span>}</span>
                     </div>
@@ -2481,7 +2481,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 <div className="sidebar-section">
                     <div className="sidebar-title">Rooms ({rooms.length})</div>
                     {rooms.map((r) => (
-                        <div key={r.room_id} className={`room-item ${currentRoom === r.room_id ? 'active' : ''}`} onClick={() => { setCurrentRoom(r.room_id); setSidebarOpen(false); }} style={{ cursor: 'pointer' }}>
+                        <div key={r.room_id} className={`room-item ${currentRoom === r.room_id ? 'active' : ''}`} onClick={() => { if (currentRoom && currentRoom !== r.room_id) socket.leaveRoom(currentRoom); if (currentRoom !== r.room_id) socket.joinRoom(r.room_id); setCurrentRoom(r.room_id); setSidebarOpen(false); }} style={{ cursor: 'pointer' }}>
                             <span className="room-icon">🏠</span>
                             <span className="room-name">{r.name} {currentRoom === r.room_id && <span style={{ fontSize: '0.7em', color: 'var(--brand)', marginLeft: '4px' }}>(Joined)</span>}</span>
                         </div>
