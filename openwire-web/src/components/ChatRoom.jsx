@@ -97,7 +97,7 @@ function saveMessages(messages) {
     } catch { }
 }
 
-export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, connectionConfig = { mode: 'relay' } }) {
+export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, connectionConfig = { mode: 'relay' }, onLogout, isCliMode, cliHost }) {
     // Dynamic agent characters from store (for @mention matching) — memoized to avoid rebuild every render
     const CHARACTERS = useMemo(() => getCharactersDict(loadStore()), []);
 
@@ -170,6 +170,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     });
     const [showMuteMenu, setShowMuteMenu] = useState(false);
     const muteMenuRef = useRef(null);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const allAgentsMuted = Object.keys(CHARACTERS).length > 0 && Object.keys(CHARACTERS).every(id => mutedAgents[id]);
 
     // Close mute menu on outside click
@@ -2178,6 +2179,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     return (
         <div className="chat-layout">
             <header className="chat-header">
+                <button className="hamburger-btn" onClick={() => setSidebarOpen(v => !v)} aria-label="Toggle sidebar">☰</button>
                 <h1>⚡ OpenWire</h1>
                 <div className="header-context">
                     {currentRoomName ? (
@@ -2191,6 +2193,15 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     )}
                 </div>
                 <div className="header-status">
+                    <span className="header-nick">{myNick}</span>
+                    {isCliMode
+                        ? <span className="connection-mode-badge connection-mode-cli" title={connectionConfig.cliUrl}>
+                            <span className="connection-mode-lock">&#128274;</span> CLI ({cliHost})
+                          </span>
+                        : <span className="connection-mode-badge connection-mode-relay">Relay</span>
+                    }
+                    <span className={`status-dot ${connected ? '' : 'offline'}`} />
+                    <span className="header-online-count">{connected ? `${peers.length} online` : 'Connecting...'}</span>
                     {myWallet && (
                         <>
                             <button
@@ -2235,8 +2246,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                             </div>
                         )}
                     </div>
-                    <span className={`status-dot ${connected ? '' : 'offline'}`} />
-                    <span>{connected ? `${myNick} — ${peers.length} online` : 'Connecting...'}</span>
+                    {onLogout && <button className="btn-logout" onClick={onLogout}>Logout</button>}
                 </div>
             </header>
 
@@ -2276,6 +2286,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             <LiveTicker items={tickerItems} />
 
             <div className="messages-area">
+                {filteredMessages.length === 0 && (
+                    <div className="empty-state">
+                        <div className="empty-state-icon">⚡</div>
+                        <div className="empty-state-title">Welcome to OpenWire</div>
+                        <div className="empty-state-hint">Type a message below or open a game from the sidebar</div>
+                    </div>
+                )}
                 {filteredMessages.map((m) => (
                     <MessageRow
                         key={m.id}
@@ -2358,10 +2375,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 <button type="submit">Send</button>
             </form>
 
-            <div className="sidebar">
+            <div className={`sidebar${sidebarOpen ? ' mobile-open' : ''}`}>
+                <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar">✕</button>
                 <div className="sidebar-section">
                     <div className="sidebar-title">Channels</div>
-                    <div className={`room-item ${!currentRoom ? 'active' : ''}`} onClick={() => setCurrentRoom(null)} style={{ cursor: 'pointer' }}>
+                    <div className={`room-item ${!currentRoom ? 'active' : ''}`} onClick={() => { setCurrentRoom(null); setSidebarOpen(false); }} style={{ cursor: 'pointer' }}>
                         <span className="room-icon">💬</span>
                         <span className="room-name">General Chat {!currentRoom && <span style={{ fontSize: '0.7em', color: 'var(--brand)', marginLeft: '4px' }}>(Joined)</span>}</span>
                     </div>
@@ -2392,7 +2410,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                                     )}
                                 </div>
                             )}
-                            <button className="sidebar-btn" style={{ marginTop: '6px', fontSize: '0.75rem', padding: '3px 8px' }} onClick={() => setShowVault(true)}>
+                            <button className="sidebar-btn" style={{ marginTop: '6px', fontSize: '0.75rem', padding: '3px 8px' }} onClick={() => { setShowVault(true); setSidebarOpen(false); }}>
                                 🏦 Vault
                             </button>
                         </div>
@@ -2420,7 +2438,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                             <button
                                 className="whisper-btn"
                                 title={`Whisper to ${p.nick}`}
-                                onClick={() => setWhisperTarget({ peer_id: p.peer_id, nick: p.nick })}
+                                onClick={() => { setWhisperTarget({ peer_id: p.peer_id, nick: p.nick }); setSidebarOpen(false); }}
                             >🤫</button>
                             <button
                                 className="tip-btn"
@@ -2455,7 +2473,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 <div className="sidebar-section">
                     <div className="sidebar-title">Rooms ({rooms.length})</div>
                     {rooms.map((r) => (
-                        <div key={r.room_id} className={`room-item ${currentRoom === r.room_id ? 'active' : ''}`} onClick={() => setCurrentRoom(r.room_id)} style={{ cursor: 'pointer' }}>
+                        <div key={r.room_id} className={`room-item ${currentRoom === r.room_id ? 'active' : ''}`} onClick={() => { setCurrentRoom(r.room_id); setSidebarOpen(false); }} style={{ cursor: 'pointer' }}>
                             <span className="room-icon">🏠</span>
                             <span className="room-name">{r.name} {currentRoom === r.room_id && <span style={{ fontSize: '0.7em', color: 'var(--brand)', marginLeft: '4px' }}>(Joined)</span>}</span>
                         </div>
@@ -2467,77 +2485,103 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
 
                     {rooms.length > 0 && (
                         <>
-                            <button className="sidebar-btn" onClick={() => {
-                                const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
-                                if (!roomId) { addMsg('★', '⚠ Select or create a room first', 'system'); return; }
-                                socket.sendRoomMessage(roomId, game.serializeGameAction({ type: 'Challenge', challenger: myIdRef.current, challenger_nick: nickRef.current, room_id: roomId }));
-                                addMsg('★', '🎮 Game challenge sent!', 'system');
-                            }}>🎮 Tic-Tac-Toe</button>
+                            <div className="sidebar-group">
+                                <div className="sidebar-group-title">Casino Games</div>
+                                <button className="sidebar-btn" onClick={() => {
+                                    const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
+                                    if (!roomId) { addMsg('★', '⚠ Select or create a room first', 'system'); return; }
+                                    if (blackjackRef.current) { addMsg('★', '⚠ Blackjack already in progress', 'system'); return; }
+                                    startBlackjack(roomId);
+                                    setSidebarOpen(false);
+                                }}>🃏 Blackjack</button>
 
-                            <button className="sidebar-btn" onClick={() => {
-                                const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
-                                if (!roomId) { addMsg('★', '⚠ Select or create a room first', 'system'); return; }
-                                if (blackjackRef.current) { addMsg('★', '⚠ Blackjack already in progress', 'system'); return; }
-                                startBlackjack(roomId);
-                            }}>🃏 Blackjack</button>
+                                <button className="sidebar-btn" onClick={() => {
+                                    const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
+                                    if (!roomId) { addMsg('★', '⚠ Select or create a room first', 'system'); return; }
+                                    if (rouletteRef.current) { setRouletteGame(rouletteRef.current); setSidebarOpen(false); return; }
+                                    startRoulette(roomId);
+                                    setSidebarOpen(false);
+                                }}>🎰 Roulette</button>
 
-                            <button className="sidebar-btn" onClick={() => {
-                                const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
-                                if (!roomId) { addMsg('★', '⚠ Select or create a room first', 'system'); return; }
-                                if (rouletteRef.current) { setRouletteGame(rouletteRef.current); return; }
-                                startRoulette(roomId);
-                            }}>🎰 Roulette</button>
+                                <button className="sidebar-btn" onClick={() => {
+                                    const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
+                                    if (!roomId) { addMsg('★', '⚠ Select or create a room first', 'system'); return; }
+                                    if (andarBaharRef.current) { setAndarBaharGame(andarBaharRef.current); setSidebarOpen(false); return; }
+                                    startAndarBahar(roomId);
+                                    setSidebarOpen(false);
+                                }}>🃏 Andar Bahar</button>
 
-                            <button className="sidebar-btn" onClick={() => {
-                                const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
-                                if (!roomId) { addMsg('★', '⚠ Select or create a room first', 'system'); return; }
-                                if (andarBaharRef.current) { setAndarBaharGame(andarBaharRef.current); return; }
-                                startAndarBahar(roomId);
-                            }}>🃏 Andar Bahar</button>
+                                <button className="sidebar-btn" onClick={() => { setShowSlots(true); setSidebarOpen(false); }}>
+                                    🍒 Slots
+                                </button>
 
-                            <button className="sidebar-btn" onClick={() => {
-                                const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
-                                if (!roomId) { addMsg('★', '⚠ Select or create a room first', 'system'); return; }
-                                if (polymarketRef.current) { setPolymarketGame(polymarketRef.current); return; }
-                                startPolymarket(roomId);
-                            }}>📊 Predictions</button>
+                                <button className="sidebar-btn" onClick={() => { setTambolaGame(true); setSidebarOpen(false); }}>
+                                    🎱 Tambola
+                                </button>
+                            </div>
 
-                            <button className="sidebar-btn" onClick={() => setTambolaGame(true)}>
-                                🎱 Tambola
-                            </button>
+                            <div className="sidebar-group">
+                                <div className="sidebar-group-title">Social</div>
+                                <button className="sidebar-btn" onClick={() => {
+                                    const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
+                                    if (!roomId) { addMsg('★', '⚠ Select or create a room first', 'system'); return; }
+                                    socket.sendRoomMessage(roomId, game.serializeGameAction({ type: 'Challenge', challenger: myIdRef.current, challenger_nick: nickRef.current, room_id: roomId }));
+                                    addMsg('★', '🎮 Game challenge sent!', 'system');
+                                    setSidebarOpen(false);
+                                }}>🎮 Tic-Tac-Toe</button>
 
-                            <button className="sidebar-btn" onClick={() => setShowSlots(true)}>
-                                🍒 Slots
-                            </button>
+                                <button className="sidebar-btn" onClick={() => {
+                                    const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
+                                    if (!roomId) { addMsg('\u2605', '\u26A0 Select or create a room first', 'system'); return; }
+                                    if (mysteryRef.current) { setSidebarOpen(false); return; }
+                                    startMystery(roomId);
+                                    setSidebarOpen(false);
+                                }}>{'\uD83D\uDD0D'} Mystery</button>
 
-                            <button className="sidebar-btn" onClick={() => {
-                                const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
-                                if (!roomId) { addMsg('\u2605', '\u26A0 Select or create a room first', 'system'); return; }
-                                if (mysteryRef.current) { return; }
-                                startMystery(roomId);
-                            }}>{'\uD83D\uDD0D'} Mystery</button>
+                                <button className="sidebar-btn" onClick={() => {
+                                    const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
+                                    if (!roomId) { addMsg('★', '⚠ Select or create a room first', 'system'); return; }
+                                    if (polymarketRef.current) { setPolymarketGame(polymarketRef.current); setSidebarOpen(false); return; }
+                                    startPolymarket(roomId);
+                                    setSidebarOpen(false);
+                                }}>📊 Predictions</button>
+                            </div>
 
-                            <button className="sidebar-btn" onClick={() => {
-                                const nick = prompt('Invite nick:');
-                                const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
-                                if (nick && roomId) {
-                                    const target = peersRef.current.find(p => p.nick === nick);
-                                    if (target) { socket.inviteToRoom(roomId, target.peer_id); addMsg('★', `🏠 Invited ${target.nick} to room.`, 'system'); }
-                                    else addMsg('★', `⚠ Peer "${nick}" not found.`, 'system');
-                                }
-                            }}>✉ Invite to Room</button>
+                            <div className="sidebar-group">
+                                <div className="sidebar-group-title">Community</div>
+                                <button className="sidebar-btn" onClick={() => { setShowDeadDrops(true); setSidebarOpen(false); }}>
+                                    💀 Dead Drops
+                                </button>
+                                <button className="sidebar-btn" onClick={() => { setShowCosmetics(true); setSidebarOpen(false); }}>
+                                    ✨ Cosmetics Shop
+                                </button>
+                                <button className="sidebar-btn" onClick={() => {
+                                    const nick = prompt('Invite nick:');
+                                    const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
+                                    if (nick && roomId) {
+                                        const target = peersRef.current.find(p => p.nick === nick);
+                                        if (target) { socket.inviteToRoom(roomId, target.peer_id); addMsg('★', `🏠 Invited ${target.nick} to room.`, 'system'); }
+                                        else addMsg('★', `⚠ Peer "${nick}" not found.`, 'system');
+                                    }
+                                    setSidebarOpen(false);
+                                }}>✉ Invite to Room</button>
+                            </div>
                         </>
                     )}
 
-                    <button className="sidebar-btn" onClick={() => setShowDeadDrops(true)}>
-                        💀 Dead Drops
-                    </button>
-                    <button className="sidebar-btn" onClick={() => setShowCosmetics(true)}>
-                        ✨ Cosmetics Shop
-                    </button>
+                    {rooms.length === 0 && (
+                        <>
+                            <button className="sidebar-btn" onClick={() => { setShowDeadDrops(true); setSidebarOpen(false); }}>
+                                💀 Dead Drops
+                            </button>
+                            <button className="sidebar-btn" onClick={() => { setShowCosmetics(true); setSidebarOpen(false); }}>
+                                ✨ Cosmetics Shop
+                            </button>
+                        </>
+                    )}
 
                     {initialIsAdmin && (
-                        <button className="sidebar-btn admin-btn-sidebar" onClick={() => setShowAdmin(true)}>
+                        <button className="sidebar-btn admin-btn-sidebar" onClick={() => { setShowAdmin(true); setSidebarOpen(false); }}>
                             🔐 Admin Portal
                         </button>
                     )}

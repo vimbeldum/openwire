@@ -25,12 +25,7 @@ function LiveTicker({ items }) {
         }
     }, [items.length]);
 
-    if (!items.length) return (
-        <div className="live-ticker live-ticker-empty">
-            <span className="ticker-label">LIVE</span>
-            <span className="ticker-idle">Waiting for game activity…</span>
-        </div>
-    );
+    if (!items.length) return null;
 
     return (
         <div className="live-ticker">

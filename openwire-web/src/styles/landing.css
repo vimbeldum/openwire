@@ -26,7 +26,7 @@
 
   0%,
   100% {
-    opacity: 0.7;
+    opacity: 0.9;
   }
 
   50% {
@@ -154,24 +154,46 @@
 
 .landing-connect-via-options {
   display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
+  gap: 0;
+  flex-wrap: nowrap;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
 }
 
 .landing-radio-option {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  justify-content: center;
+  gap: 0;
   cursor: pointer;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
+  font-size: 0.85rem;
+  color: var(--text-muted);
   user-select: none;
+  padding: 0.55rem 1rem;
+  flex: 1;
+  text-align: center;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.landing-radio-option:not(:last-child) {
+  border-right: 1px solid var(--glass-border);
+}
+
+.landing-radio-option:has(input:checked) {
+  background: linear-gradient(135deg, rgba(102, 161, 238, 0.2), rgba(168, 102, 238, 0.15));
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .landing-radio-option input[type="radio"] {
-  accent-color: var(--accent);
-  width: auto;
-  cursor: pointer;
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
 }
 
 .landing-cli-url-input {

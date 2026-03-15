@@ -59,21 +59,13 @@ export default function App() {
     return (
         <ErrorBoundary>
         <div className="app-container">
-            {/* Minimal top bar for logout */}
-            <div className="global-header">
-                <span>Logged in as <strong>{session.nick}</strong></span>
-                {isCliMode
-                    ? <span className="connection-mode-badge connection-mode-cli" title={connectionConfig.cliUrl}>
-                        <span className="connection-mode-lock">&#128274;</span> CLI Node ({cliHost})
-                      </span>
-                    : <span className="connection-mode-badge connection-mode-relay">OpenWire Relay</span>
-                }
-                <button className="btn-logout" onClick={handleLogout}>Logout</button>
-            </div>
             <ChatRoom
                 nick={session.nick}
                 isAdmin={session.isAdmin}
                 connectionConfig={connectionConfig}
+                onLogout={handleLogout}
+                isCliMode={isCliMode}
+                cliHost={cliHost}
             />
         </div>
         </ErrorBoundary>
