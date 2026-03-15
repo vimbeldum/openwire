@@ -1533,12 +1533,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     useEffect(() => {
         const myId = myIdRef.current;
 
-        // Roulette: check if all bettors are ready (require 2+ bettors for instant-start)
+        // Roulette: check if all bettors are ready
         const rlGame = rouletteRef.current;
         if (rlGame && rlGame.phase === 'betting' && amIHost(rouletteHostRef.current)) {
             const bettorIds = [...new Set((rlGame.bets || []).map(b => b.peer_id))];
             const readySet = readyPeers.roulette;
-            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
+            // Grace period: don't instant-start within 10s of round start (let all players bet)
+            const rlRoundAge = rlGame.nextSpinAt ? Date.now() - (rlGame.nextSpinAt - rl.SPIN_INTERVAL_MS) : Infinity;
+            if (bettorIds.length > 0 && rlRoundAge > 10000 && bettorIds.every(id => readySet.has(id))) {
                 // All bettors ready — instant spin
                 clearReadyPeers('roulette');
                 if (rouletteTimerRef.current) clearInterval(rouletteTimerRef.current);
@@ -1572,12 +1574,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             }
         }
 
-        // Blackjack: check if all bettors are ready (require 2+ for instant-start)
+        // Blackjack: check if all bettors are ready
         const bjGame = blackjackRef.current;
         if (bjGame && bjGame.phase === 'betting' && amIHost(bjHostRef.current)) {
             const bettorIds = bjGame.players.filter(p => p.bet > 0).map(p => p.peer_id);
             const readySet = readyPeers.blackjack;
-            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
+            // Grace period: don't instant-start within 10s of round start
+            const bjRoundAge = bjGame.nextDealAt ? Date.now() - (bjGame.nextDealAt - bj.BETTING_DURATION_MS) : Infinity;
+            if (bettorIds.length > 0 && bjRoundAge > 10000 && bettorIds.every(id => readySet.has(id))) {
                 clearReadyPeers('blackjack');
                 if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
                 const dealtGame = bj.dealInitialCards(bjGame);
@@ -1588,12 +1592,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             }
         }
 
-        // Andar Bahar: check if all bettors are ready (require 2+ for instant-start)
+        // Andar Bahar: check if all bettors are ready
         const abGame = andarBaharRef.current;
         if (abGame && abGame.phase === 'betting' && amIHost(abHostRef.current)) {
             const bettorIds = [...new Set((abGame.bets || []).map(b => b.peer_id))];
             const readySet = readyPeers.andarbahar;
-            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
+            // Grace period: don't instant-start within 10s of round start
+            const abRoundAge = abGame.bettingEndsAt ? Date.now() - (abGame.bettingEndsAt - ab.BETTING_DURATION_MS) : Infinity;
+            if (bettorIds.length > 0 && abRoundAge > 10000 && bettorIds.every(id => readySet.has(id))) {
                 clearReadyPeers('andarbahar');
                 if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
                 abGenRef.current++;
