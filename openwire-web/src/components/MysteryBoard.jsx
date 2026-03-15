@@ -165,6 +165,10 @@ export default memo(function MysteryBoard({ game, myId, myNick, onAction, onClos
     const interrogations = game?.interrogations || [];
     const phase = game?.phase || 'lobby';
 
+    // Typing indicator: derived from game._typingSuspect set by ChatRoom
+    const typingSuspectId = game?._typingSuspect || null;
+    const typingSuspect = typingSuspectId ? suspects.find(s => s.id === typingSuspectId) : null;
+
     // Scroll chat to bottom on new messages
     useEffect(() => {
         messagesEnd.current?.scrollIntoView({ behavior: 'smooth' });
@@ -343,12 +347,22 @@ export default memo(function MysteryBoard({ game, myId, myNick, onAction, onClos
                                 {interrogations.map((msg) => (
                                     <div
                                         key={msg.id}
-                                        className={`mystery-msg ${msg.senderType === 'player' ? 'player' : 'suspect'}`}
+                                        className={`mystery-msg ${msg.senderType === 'player' ? 'player' : msg.senderType === 'system' ? 'system' : 'suspect'}`}
                                     >
                                         <div className="mystery-msg-sender">{msg.sender}</div>
                                         <span className="mystery-msg-text">{msg.content}</span>
                                     </div>
                                 ))}
+                                {typingSuspect && (
+                                    <div className="mystery-msg suspect typing">
+                                        <div className="mystery-msg-sender">{typingSuspect.name}</div>
+                                        <span className="mystery-msg-text mystery-typing-indicator">
+                                            <span className="mystery-typing-dot" />
+                                            <span className="mystery-typing-dot" />
+                                            <span className="mystery-typing-dot" />
+                                        </span>
+                                    </div>
+                                )}
                                 <div ref={messagesEnd} />
                             </div>
                         )}

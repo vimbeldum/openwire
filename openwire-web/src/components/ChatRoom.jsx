@@ -7,11 +7,13 @@ import * as bj from '../lib/blackjack';
 import * as rl from '../lib/roulette';
 import * as ab from '../lib/andarbahar';
 import * as pm from '../lib/polymarket';
+import * as mystery from '../lib/mystery';
 import * as wallet from '../lib/wallet';
 import useBlackjackGame from '../hooks/useBlackjackGame';
 import useRouletteGame from '../hooks/useRouletteGame';
 import useAndarBaharGame from '../hooks/useAndarBaharGame';
 import usePolymarketGame from '../hooks/usePolymarketGame';
+import useMysteryGame from '../hooks/useMysteryGame';
 import MessageRow from './chat/MessageRow';
 
 // Retry wrapper: on chunk-not-found after deploy, reload once to get fresh HTML
@@ -143,7 +145,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const [showCosmetics, setShowCosmetics] = useState(false);
     const [tambolaGame, setTambolaGame] = useState(false);
     const [showSlots, setShowSlots] = useState(false);
-    const [mysteryGame, setMysteryGame] = useState(null);
+    // mysteryGame state is now managed by useMysteryGame hook
     const [showKarmaGuide, setShowKarmaGuide] = useState(false);
     const [profile, setProfile] = useState(null);
     const peerCosmeticsRef = useRef({}); // peer_id → { bubbleStyle, nameColor, chatFlair }
@@ -159,6 +161,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const [agentTyping, setAgentTyping] = useState({});   // { characterId: { nick, avatar, ts } }
     const swarmLogsRef = useRef([]);
     const swarmRef = useRef(null);
+    const mysterySwarmRef = useRef(null); // MysterySwarm instance for active mystery game
 
     // Per-user muted agents (localStorage-backed)
     const [mutedAgents, setMutedAgents] = useState(() => {
@@ -381,11 +384,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         rouletteHostRef.current = null;
         abHostRef.current = null;
         pmHostRef.current = null;
+        mysteryHostRef.current = null;
         // Reset consent flags
         hasJoinedBj.current = false;
         hasJoinedRl.current = false;
         hasJoinedAb.current = false;
         hasJoinedPm.current = false;
+        hasJoinedMystery.current = false;
         // Clear ready peers
         setReadyPeers({ roulette: new Set(), blackjack: new Set(), andarbahar: new Set() });
     }, []);
@@ -656,6 +661,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         handlePolymarketAction, startPolymarket, handlePmAction,
     } = usePolymarketGame(gameDeps);
 
+    const {
+        mysteryGame, setMysteryGame,
+        mysteryRef, mysteryHostRef, hasJoinedMystery,
+        handleMysteryAction, startMystery, handleMysteryLocalAction,
+    } = useMysteryGame(gameDeps);
+
     // ── Game invite from chat message ────────────────────────
     const joinGameFromInvite = useCallback((msg) => {
         const { gameType, inviteData } = msg;
@@ -694,6 +705,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 }));
                 addMsg('★', '📊 Joined Predictions market!', 'system');
                 break;
+            case 'mystery':
+                hasJoinedMystery.current = true;
+                mysteryHostRef.current = inviteData.host;
+                socket.sendRoomMessage(inviteData.room_id, mystery.serializeMysteryAction({
+                    type: 'mm_join', peer_id: myId, nick: myNick,
+                }));
+                addMsg('\u2605', '\uD83D\uDD0D Joined Murder Mystery!', 'system');
+                break;
             case 'tictactoe': {
                 const newTTT = game.createGame(
                     { peer_id: inviteData.challenger, nick: inviteData.challenger_nick },
@@ -704,7 +723,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 socket.sendRoomMessage(inviteData.room_id, game.serializeGameAction({
                     type: 'Accept', accepter: myId, accepter_nick: myNick, room_id: inviteData.room_id,
                 }));
-                addMsg('★', '🎮 Game accepted!', 'system');
+                addMsg('\u2605', '\uD83C\uDFAE Game accepted!', 'system');
                 break;
             }
         }
@@ -1144,11 +1163,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 const isRlMsg = rl.isRouletteMessage(msg.data);
                 const isAbMsg = ab.isAndarBaharMessage(msg.data);
                 const isPmMsg = pm.isPolymarketMessage(msg.data);
+                const isMmMsg = mystery.isMysteryMessage(msg.data);
                 const isGameMsg = game.isGameMessage(msg.data);
 
                 // Try custom JSON action first (typing, react, tip, whisper, ticker, screenshot)
                 let customAction = null;
-                if (!isBjMsg && !isRlMsg && !isAbMsg && !isPmMsg && !isGameMsg && msg.data?.startsWith('{')) {
+                if (!isBjMsg && !isRlMsg && !isAbMsg && !isPmMsg && !isMmMsg && !isGameMsg && msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
                         const CUSTOM = ['typing', 'react', 'tip', 'poke', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma', 'admin_setting'];
@@ -1181,6 +1201,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     const action = pm.parsePolymarketAction(msg.data);
                     if (action && (action.type === 'pm_start' || !polymarketRef.current || polymarketRef.current.roomId === msg.room_id)) {
                         handlePolymarketAction(msg, action);
+                    }
+                } else if (isMmMsg) {
+                    const action = mystery.parseMysteryAction(msg.data);
+                    if (action && (action.type === 'mm_start' || !mysteryRef.current || mysteryRef.current.roomId === msg.room_id)) {
+                        handleMysteryAction(msg, action);
                     }
                 } else if (isCurrentRoom) {
                     const gifMatch = msg.data.match(/^\[GIF\](.+)$/);
@@ -2131,11 +2156,17 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         pmHostRef.current = null;
         hasJoinedPm.current = false;
     }, []);
+    const closeMystery = useCallback(() => {
+        setMysteryGame(null);
+        mysteryHostRef.current = null;
+        hasJoinedMystery.current = false;
+    }, []);
     const closeTtt = useCallback(() => setActiveGame(null), []);
     const helpBj = useCallback(() => openHelp('blackjack'), []);
     const helpRl = useCallback(() => openHelp('roulette'), []);
     const helpAb = useCallback(() => openHelp('andarbahar'), []);
     const helpPm = useCallback(() => openHelp('polymarket'), []);
+    const helpMm = useCallback(() => openHelp('mystery'), []);
     const helpTtt = useCallback(() => openHelp('tictactoe'), []);
     const readyBj = useCallback(() => handleReadyUp('blackjack'), [handleReadyUp]);
     const readyRl = useCallback(() => handleReadyUp('roulette'), [handleReadyUp]);
@@ -2481,26 +2512,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
 
                             <button className="sidebar-btn" onClick={() => {
                                 const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
-                                if (!roomId) { addMsg('★', '⚠ Select or create a room first', 'system'); return; }
-                                if (mysteryGame) { return; }
-                                const myPeerId = myIdRef.current;
-                                const nick = nickRef.current;
-                                setMysteryGame({
-                                    type: 'mystery',
-                                    roomId,
-                                    hostPeerId: myPeerId,
-                                    phase: 'lobby',
-                                    mystery: null,
-                                    suspects: [],
-                                    players: [{ peer_id: myPeerId, nick, joinedAt: Date.now(), score: 0, vote: null }],
-                                    phaseStartedAt: null,
-                                    phaseDuration: null,
-                                    interrogations: [],
-                                    results: null,
-                                    createdAt: Date.now(),
-                                });
-                                addMsg('★', 'Murder Mystery lobby created!', 'system');
-                            }}>🔍 Mystery</button>
+                                if (!roomId) { addMsg('\u2605', '\u26A0 Select or create a room first', 'system'); return; }
+                                if (mysteryRef.current) { return; }
+                                startMystery(roomId);
+                            }}>{'\uD83D\uDD0D'} Mystery</button>
 
                             <button className="sidebar-btn" onClick={() => {
                                 const nick = prompt('Invite nick:');
@@ -2723,86 +2738,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     game={mysteryGame}
                     myId={myIdRef.current}
                     myNick={nickRef.current}
-                    onAction={(action) => {
-                        if (action.type === 'start') {
-                            setMysteryGame(prev => prev ? { ...prev, phase: 'generating' } : prev);
-                            setTimeout(() => {
-                                setMysteryGame(prev => {
-                                    if (!prev) return prev;
-                                    return {
-                                        ...prev,
-                                        phase: 'investigation',
-                                        phaseStartedAt: Date.now(),
-                                        phaseDuration: prev.investigationDurationMs || 600000,
-                                        mystery: {
-                                            id: 'mm_' + Date.now(),
-                                            title: 'The Vanishing at Vineyard Manor',
-                                            setting: 'A grand estate in the countryside during a stormy evening.',
-                                            victim: { name: 'Lord Ashworth', role: 'the host of the party', description: 'A wealthy collector' },
-                                            weapon: 'poisoned wine glass',
-                                            motive: 'Inheritance dispute over the family fortune',
-                                            culpritId: 'suspect_chef',
-                                        },
-                                        suspects: [
-                                            { id: 'suspect_chef', name: 'Chef Renard', role: 'Personal Chef', avatar: '\uD83D\uDC68\u200D\uD83C\uDF73', personality: 'Nervous, meticulous', backstory: 'Has worked for the family for 10 years', alibi: 'Was in the kitchen all evening', isCulprit: true },
-                                            { id: 'suspect_butler', name: 'Butler Morrison', role: 'Head Butler', avatar: '\uD83E\uDDD4', personality: 'Stoic, observant', backstory: 'Served three generations of Ashworths', alibi: 'Was attending to guests in the drawing room', isCulprit: false },
-                                            { id: 'suspect_gardener', name: 'Gardener Marcel', role: 'Estate Groundskeeper', avatar: '\uD83D\uDC68\u200D\uD83C\uDF3E', personality: 'Quiet, strong', backstory: 'Recently hired, mysterious past', alibi: 'Claims to have been in the greenhouse', isCulprit: false },
-                                            { id: 'suspect_guest', name: 'Lady Pemberton', role: 'Dinner Guest', avatar: '\uD83D\uDC69\u200D\uD83E\uDDB3', personality: 'Sharp-tongued, wealthy', backstory: 'Old friend of the victim with a complicated history', alibi: 'Was in the library reading', isCulprit: false },
-                                        ],
-                                    };
-                                });
-                            }, 2000);
-                        } else if (action.type === 'interrogate') {
-                            const msg = {
-                                id: 'msg_' + Date.now() + '_q',
-                                timestamp: Date.now(),
-                                sender: nickRef.current,
-                                senderType: 'player',
-                                suspectId: action.suspectId,
-                                content: action.content,
-                                isRevised: false,
-                            };
-                            setMysteryGame(prev => prev ? { ...prev, interrogations: [...prev.interrogations, msg] } : prev);
-                            // Mock AI response
-                            setTimeout(() => {
-                                setMysteryGame(prev => {
-                                    if (!prev) return prev;
-                                    const suspect = prev.suspects.find(s => s.id === action.suspectId);
-                                    const reply = {
-                                        id: 'msg_' + Date.now() + '_a',
-                                        timestamp: Date.now(),
-                                        sender: suspect?.name || 'Suspect',
-                                        senderType: 'suspect',
-                                        suspectId: action.suspectId,
-                                        content: `I assure you, I had nothing to do with it. ${suspect?.alibi || 'I was elsewhere.'}`,
-                                        isRevised: false,
-                                    };
-                                    return { ...prev, interrogations: [...prev.interrogations, reply] };
-                                });
-                            }, 1500);
-                        } else if (action.type === 'deliberate') {
-                            const msg = {
-                                id: 'msg_' + Date.now(),
-                                timestamp: Date.now(),
-                                sender: nickRef.current,
-                                senderType: 'player',
-                                suspectId: null,
-                                content: action.content,
-                                isRevised: false,
-                            };
-                            setMysteryGame(prev => prev ? { ...prev, interrogations: [...prev.interrogations, msg] } : prev);
-                        } else if (action.type === 'vote') {
-                            setMysteryGame(prev => {
-                                if (!prev) return prev;
-                                const players = prev.players.map(p =>
-                                    p.peer_id === myIdRef.current ? { ...p, vote: action.suspectId } : p
-                                );
-                                return { ...prev, players };
-                            });
-                        }
-                    }}
-                    onClose={() => setMysteryGame(null)}
-                    isHost={mysteryGame?.hostPeerId === myIdRef.current}
+                    onAction={handleMysteryLocalAction}
+                    onClose={closeMystery}
+                    isHost={mysteryHostRef.current === myIdRef.current}
                 />
             )}
             </Suspense>
