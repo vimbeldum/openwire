@@ -3,6 +3,11 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
     plugins: [react()],
+    define: {
+        'console.log': 'undefined',
+        'console.warn': 'undefined',
+        'console.debug': 'undefined',
+    },
     build: {
         target: 'esnext',
         modulePreload: false,

@@ -165,8 +165,6 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const [agentTyping, setAgentTyping] = useState({});   // { characterId: { nick, avatar, ts } }
     const swarmLogsRef = useRef([]);
     const swarmRef = useRef(null);
-    const mysterySwarmRef = useRef(null); // MysterySwarm instance for active mystery game
-
     // Per-user muted agents (localStorage-backed)
     const [mutedAgents, setMutedAgents] = useState(() => {
         try { return JSON.parse(localStorage.getItem('openwire_muted_agents')) || {}; }
@@ -259,7 +257,6 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const [mentionIndex, setMentionIndex] = useState(0);
     const [mentionSuggestions, setMentionSuggestions] = useState([]);
     const inputRef = useRef(null);
-    const floatingInputRef = useRef(null);
 
     // Debug mode
     const [debugMode, setDebugMode] = useState(() => localStorage.getItem('openwire_debug') === 'true');
@@ -767,12 +764,6 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
 
     const dismissInvite = useCallback((msgId) => {
         setMessages(prev => prev.map(m => m.id === msgId ? { ...m, inviteUsed: true } : m));
-    }, []);
-
-    const electNewHostFromPeers = useCallback((peerIds) => {
-        // Deterministic: return the lowest peer_id alphabetically
-        const sorted = [...peerIds].filter(Boolean).sort();
-        return sorted[0] || null;
     }, []);
 
     // ── Timer cleanup on unmount ──
