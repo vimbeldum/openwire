@@ -13,9 +13,8 @@
         "test:all": "vitest run && playwright test",
         "test:prompt-audit": "node --experimental-vm-modules tests/prompt-audit/run.js"
     },
+    "sideEffects": ["*.css"],
     "dependencies": {
-        "@giphy/js-fetch-api": "^5.7.0",
-        "@giphy/react-components": "^10.1.1",
         "react": "^19.1.0",
         "react-dom": "^19.1.0"
     },
