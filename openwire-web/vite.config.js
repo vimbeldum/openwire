@@ -11,6 +11,10 @@ export default defineConfig({
             output: {
                 compact: true,
             },
+            treeshake: {
+                moduleSideEffects: false,
+                propertyReadSideEffects: false,
+            },
         },
     },
     server: {
