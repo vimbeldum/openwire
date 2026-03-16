@@ -3,6 +3,16 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
     plugins: [react()],
+    build: {
+        target: 'esnext',
+        modulePreload: false,
+        cssCodeSplit: true,
+        rollupOptions: {
+            output: {
+                compact: true,
+            },
+        },
+    },
     server: {
         port: 5173,
     },
