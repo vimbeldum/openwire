@@ -1,8 +1,14 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { resolve } from 'path';
 
 export default defineConfig({
     plugins: [react()],
+    resolve: {
+        alias: {
+            './characters.js': resolve(__dirname, 'src/lib/agents/characters-light.js'),
+        },
+    },
     define: {
         'console.log': 'undefined',
         'console.warn': 'undefined',
