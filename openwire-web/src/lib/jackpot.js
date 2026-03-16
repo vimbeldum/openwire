@@ -9,6 +9,7 @@ export const RAKE = {
   roulette: 0.01,
   andar_bahar: 0.02,
   tambola: 0.05,
+  slots: 0.02,
 };
 
 const VALID_GAMES = new Set(Object.keys(RAKE));
