@@ -1753,3 +1753,100 @@
 .dd-drop-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .dd-gate { font-size: 0.82rem; color: var(--text-muted); padding: 0.75rem; text-align: center; }
 .dd-empty { color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 2rem 0; }
+
+/* ── Chaos Agent & Room Constraints ────────────────────────── */
+.constraint-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(255, 165, 0, 0.2);
+  border: 1px solid rgba(255, 165, 0, 0.4);
+  color: #ffa500;
+  white-space: nowrap;
+  margin-left: 0.4rem;
+}
+
+.constraint-badge.chaos-badge {
+  background: rgba(255, 60, 60, 0.2);
+  border-color: rgba(255, 60, 60, 0.4);
+  color: #ff6b6b;
+}
+
+.constraint-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 0;
+}
+
+.constraint-btn {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.constraint-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.constraint-btn.active {
+  background: var(--brand);
+  color: #000;
+  border-color: var(--brand);
+  font-weight: 600;
+}
+
+.sidebar-btn-sub {
+  font-size: 0.7rem !important;
+  padding: 2px 8px !important;
+  opacity: 0.85;
+  margin-left: 8px;
+}
+
+/* Word count badge on 5-word mode */
+.word-count-badge {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: rgba(102, 161, 238, 0.2);
+  color: var(--brand);
+  pointer-events: none;
+}
+
+.word-count-badge.over-limit {
+  background: rgba(255, 60, 60, 0.25);
+  color: #ff6b6b;
+  animation: pulse-badge 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-badge {
+  0% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+/* Emoji-only input: larger font for emoji */
+.constraint-emoji-input {
+  font-size: 1.3rem !important;
+  letter-spacing: 0.1em;
+}
+
+/* No-backspace input: danger border */
+.constraint-nobackspace-input {
+  border-color: rgba(255, 60, 60, 0.5) !important;
+  box-shadow: 0 0 0 1px rgba(255, 60, 60, 0.15) inset;
+}

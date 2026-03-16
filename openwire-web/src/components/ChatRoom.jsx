@@ -66,6 +66,10 @@ import { DEFAULT_CATALOG } from '../lib/cosmetics.js';
 import { purchaseItem, equipItem, unequipItem, isAvailable, getEquippedClasses } from '../lib/cosmetics.js';
 import { createJackpotState, addRake } from '../lib/jackpot.js';
 import { setMinKarmaToPost } from '../lib/deaddrops.js';
+import {
+    CHAOS_PERSONALITIES, SILENCE_TIMEOUT_MS, pickChaosMessage,
+    nextPersonality, ROOM_CONSTRAINTS, validateConstraint, filterEmojiOnly,
+} from '../lib/chaosAgent.js';
 
 const MENTION_REGEX = /(@\w+)/g;
 
@@ -171,6 +175,16 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const [showMuteMenu, setShowMuteMenu] = useState(false);
     const muteMenuRef = useRef(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+
+    // ── Chaos Agent ───────────────────────────────────────────
+    const [chaosEnabled, setChaosEnabled] = useState(false);
+    const [chaosPersonality, setChaosPersonality] = useState('instigator');
+    const chaosTimerRef = useRef(null);
+    const lastMessageTimeRef = useRef(Date.now());
+
+    // ── Room Constraints ──────────────────────────────────────
+    const [roomConstraint, setRoomConstraint] = useState(null); // '5word' | 'emoji' | 'nobackspace' | null
+
     const allAgentsMuted = Object.keys(CHARACTERS).length > 0 && Object.keys(CHARACTERS).every(id => mutedAgents[id]);
 
     // Close mute menu on outside click
@@ -315,6 +329,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 ...extra,
             }];
         });
+        // Reset chaos agent silence timer on every message
+        lastMessageTimeRef.current = Date.now();
         // Feed real chat messages into swarm context (only general chat, not rooms or game messages)
         if ((type === 'self' || type === 'peer') && content && !extra?.isAgent && !extra?.roomId) {
             swarmRef.current?.addContext(sender, content);
@@ -340,6 +356,21 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         window.addEventListener('keydown', detect);
         return () => window.removeEventListener('keydown', detect);
     }, [addMsg]);
+
+    // ── Chaos Agent silence timer ──────────────────────────────
+    useEffect(() => {
+        if (!chaosEnabled) { clearInterval(chaosTimerRef.current); return; }
+        chaosTimerRef.current = setInterval(() => {
+            const elapsed = Date.now() - lastMessageTimeRef.current;
+            if (elapsed >= SILENCE_TIMEOUT_MS) {
+                const msg = pickChaosMessage(chaosPersonality);
+                const p = CHAOS_PERSONALITIES[chaosPersonality];
+                addMsg(`${p.emoji} ${p.name}`, msg, 'system');
+                lastMessageTimeRef.current = Date.now(); // reset after posting
+            }
+        }, 5000); // check every 5s
+        return () => clearInterval(chaosTimerRef.current);
+    }, [chaosEnabled, chaosPersonality, addMsg]);
 
     // ── TTT game-over → NonFinancialEvent ledger record ──────
     useEffect(() => {
@@ -1833,9 +1864,15 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         setMentionIndex(0);
     }, [mentionQuery, allMentionables]);
 
-    // Handle input changes to detect @mention trigger
+    // Handle input changes to detect @mention trigger + room constraints
     const handleInputChange = useCallback((e) => {
-        const val = e.target.value;
+        let val = e.target.value;
+
+        // Emoji-only constraint: strip non-emoji characters
+        if (roomConstraint === 'emoji') {
+            val = filterEmojiOnly(val);
+        }
+
         setInput(val);
 
         // Detect @mention: find the last '@' before the cursor
@@ -1856,10 +1893,18 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             }
         }
         setMentionQuery(null);
-    }, []);
+    }, [roomConstraint]);
 
-    // Handle keyboard navigation in mention dropdown
+    // Handle keyboard navigation in mention dropdown + room constraints
     const handleInputKeyDown = useCallback((e) => {
+        // No-backspace constraint: obliterate entire draft on Backspace
+        if (roomConstraint === 'nobackspace' && e.key === 'Backspace') {
+            e.preventDefault();
+            setInput('');
+            addMsg('\u2605', '\uD83D\uDCA5 Backspace detected! Draft obliterated!', 'system');
+            return;
+        }
+
         if (mentionQuery === null || mentionSuggestions.length === 0) return;
 
         if (e.key === 'Tab' || e.key === 'Enter') {
@@ -1903,7 +1948,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             setMentionQuery(null);
             return;
         }
-    }, [mentionQuery, mentionSuggestions, mentionIndex, input]);
+    }, [mentionQuery, mentionSuggestions, mentionIndex, input, roomConstraint, addMsg]);
 
     const processMentions = useCallback((text, senderNick) => {
         const mentions = text.match(/@(\w+)/g);
@@ -1961,6 +2006,16 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         e.preventDefault();
         const text = input.trim();
         if (!text) return;
+
+        // 5-word constraint: block if over limit
+        if (roomConstraint === '5word') {
+            const wc = text.split(/\s+/).filter(Boolean).length;
+            if (wc > 5) {
+                addMsg('\u2605', `\u26D4 Too many words! (${wc}/5) \u2014 trim it down.`, 'system');
+                return;
+            }
+        }
+
         setInput('');
         setShowGifPicker(false);
 
@@ -2244,6 +2299,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     ) : (
                         <span className="general-chat-indicator">💬 General Chat</span>
                     )}
+                    {roomConstraint && (
+                        <span className="constraint-badge">{ROOM_CONSTRAINTS[roomConstraint].badge}</span>
+                    )}
+                    {chaosEnabled && (
+                        <span className="constraint-badge chaos-badge">{CHAOS_PERSONALITIES[chaosPersonality].emoji} Chaos ON</span>
+                    )}
                 </div>
                 <div className="header-status">
                     <span className="header-nick">{myNick}</span>
@@ -2406,7 +2467,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     <input
                         ref={inputRef}
                         type="text"
-                        placeholder={currentRoom ? `Message #${rooms.find(r => r.room_id === currentRoom)?.name || 'room'}...` : 'Message General Chat... (or /help)'}
+                        className={roomConstraint === 'emoji' ? 'constraint-emoji-input' : roomConstraint === 'nobackspace' ? 'constraint-nobackspace-input' : ''}
+                        placeholder={
+                            roomConstraint === 'emoji' ? 'Emoji only...'
+                            : roomConstraint === '5word' ? 'Max 5 words...'
+                            : roomConstraint === 'nobackspace' ? 'Type carefully...'
+                            : currentRoom ? `Message #${rooms.find(r => r.room_id === currentRoom)?.name || 'room'}...` : 'Message General Chat... (or /help)'
+                        }
                         value={input}
                         onChange={(e) => {
                             handleInputChange(e);
@@ -2422,10 +2489,18 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                         onPaste={handlePaste}
                         autoFocus
                     />
+                    {roomConstraint === '5word' && input.trim().length > 0 && (
+                        <span className={`word-count-badge ${input.trim().split(/\s+/).filter(Boolean).length > 5 ? 'over-limit' : ''}`}>
+                            {input.trim().split(/\s+/).filter(Boolean).length}/5
+                        </span>
+                    )}
                     {showGifPicker && <Suspense fallback={null}><GifPicker onSelect={handleGifSelect} onClose={() => setShowGifPicker(false)} /></Suspense>}
                 </div>
                 <button type="button" className="gif-btn" onClick={() => setShowGifPicker(!showGifPicker)}>GIF</button>
-                <button type="submit">Send</button>
+                <button
+                    type="submit"
+                    disabled={roomConstraint === '5word' && input.trim().split(/\s+/).filter(Boolean).length > 5}
+                >Send</button>
             </form>
 
             <div className={`sidebar${sidebarOpen ? ' mobile-open' : ''}`}>
@@ -2612,6 +2687,31 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                                     }
                                     setSidebarOpen(false);
                                 }}>✉ Invite to Room</button>
+                                <button className="sidebar-btn" onClick={() => {
+                                    setChaosEnabled(v => !v);
+                                    if (!chaosEnabled) {
+                                        addMsg('\u2605', `${CHAOS_PERSONALITIES[chaosPersonality].emoji} Chaos Agent activated! (${CHAOS_PERSONALITIES[chaosPersonality].name})`, 'system');
+                                    }
+                                    setSidebarOpen(false);
+                                }}>{chaosEnabled ? '\uD83E\uDD16 Chaos Agent ON' : '\uD83E\uDD16 Chaos Agent'}</button>
+                                {chaosEnabled && (
+                                    <button className="sidebar-btn sidebar-btn-sub" onClick={() => {
+                                        const next = nextPersonality(chaosPersonality);
+                                        setChaosPersonality(next);
+                                        addMsg('\u2605', `${CHAOS_PERSONALITIES[next].emoji} Switched to ${CHAOS_PERSONALITIES[next].name}`, 'system');
+                                        setSidebarOpen(false);
+                                    }}>{CHAOS_PERSONALITIES[chaosPersonality].emoji} {CHAOS_PERSONALITIES[chaosPersonality].name} (tap to switch)</button>
+                                )}
+                            </div>
+
+                            <div className="sidebar-group">
+                                <div className="sidebar-group-title">Room Mode</div>
+                                <div className="constraint-selector">
+                                    <button className={`constraint-btn${!roomConstraint ? ' active' : ''}`} onClick={() => { setRoomConstraint(null); setSidebarOpen(false); }}>Normal</button>
+                                    <button className={`constraint-btn${roomConstraint === '5word' ? ' active' : ''}`} onClick={() => { setRoomConstraint('5word'); addMsg('\u2605', '\uD83E\uDD10 5-Word Mode activated! Keep it short.', 'system'); setSidebarOpen(false); }}>5 Words</button>
+                                    <button className={`constraint-btn${roomConstraint === 'emoji' ? ' active' : ''}`} onClick={() => { setRoomConstraint('emoji'); addMsg('\u2605', '\uD83D\uDE00 Emoji Only mode activated!', 'system'); setSidebarOpen(false); }}>Emoji Only</button>
+                                    <button className={`constraint-btn${roomConstraint === 'nobackspace' ? ' active' : ''}`} onClick={() => { setRoomConstraint('nobackspace'); addMsg('\u2605', '\u26A0\uFE0F No Backspace mode activated! Type carefully...', 'system'); setSidebarOpen(false); }}>No Backspace</button>
+                                </div>
                             </div>
                         </>
                     )}
