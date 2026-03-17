@@ -331,6 +331,35 @@ describe('withdraw', () => {
         const lastEntry = w.history[w.history.length - 1];
         expect(lastEntry.reason).toContain('early');
     });
+
+    it('handles profile with no vault object (nullish coalescing)', () => {
+        const profile = { vault: undefined };
+        const result = withdraw(profile, makeWallet());
+        expect(result.success).toBe(false);
+        expect(result.reason).toBe('nothing_staked');
+    });
+
+    it('handles vault with undefined staked/stakedAt', () => {
+        const profile = { vault: { staked: undefined, stakedAt: undefined } };
+        const result = withdraw(profile, makeWallet());
+        expect(result.success).toBe(false);
+    });
+
+    it('handles wallet with missing baseBalance (nullish coalescing)', () => {
+        const stakedAt = NOW - 24 * 3_600_000;
+        const profile  = makeProfile({ staked: 100, stakedAt });
+        const wallet = { history: [] }; // no baseBalance
+        const { wallet: w } = withdraw(profile, wallet);
+        expect(w.baseBalance).toBeGreaterThan(0);
+    });
+
+    it('handles wallet with missing history (nullish coalescing)', () => {
+        const stakedAt = NOW - 24 * 3_600_000;
+        const profile  = makeProfile({ staked: 100, stakedAt });
+        const wallet = { baseBalance: 500 }; // no history
+        const { wallet: w } = withdraw(profile, wallet);
+        expect(w.history.length).toBe(1);
+    });
 });
 
 /* ═══════════════════════════════════════════════════════════
