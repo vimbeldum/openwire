@@ -1018,6 +1018,17 @@ describe('E0b — generateMysteryFromScenario (async)', () => {
     });
 });
 
+describe('E0c — getTemplates', () => {
+    it('returns an array of templates', async () => {
+        const { getTemplates } = await import('../lib/mystery/templates.js');
+        const templates = getTemplates();
+        expect(Array.isArray(templates)).toBe(true);
+        expect(templates.length).toBeGreaterThan(0);
+        expect(templates[0]).toHaveProperty('id');
+        expect(templates[0]).toHaveProperty('title');
+    });
+});
+
 describe('E1 — MYSTERY_RULES', () => {
     it('has name "Murder Mystery"', () => {
         expect(MYSTERY_RULES.name).toBe('Murder Mystery');
