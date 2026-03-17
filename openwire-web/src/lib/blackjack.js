@@ -504,6 +504,7 @@ export function settle(game) {
     const dealerBlackjack = isBlackjack(game.dealer.hand);
 
     let players = game.players.map(p => {
+        if (p.status === 'sitting_out') return p;
         const mainResult = settleHand(p.hand, p.status, dealerTotal, dealerBust, dealerBlackjack);
         let updated = { ...p, status: mainResult };
 
