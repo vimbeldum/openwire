@@ -1581,6 +1581,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     };
 
     // ── Ready Up handler ────────────────────────────────────
+    // Inlines the instant-start check directly using only refs (no closures, no effects).
     const handleReadyUp = useCallback((gameType) => {
         const myId = myIdRef.current;
         // Build the updated ready set locally (don't wait for React state)
@@ -1598,8 +1599,64 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 type: 'ready_up', gameType, peer_id: myId,
             }));
         }
-        // Check immediately using refs (always current)
-        tryInstantStartRef.current?.(gameType, updatedSet);
+        // ── Inline instant-start: check and start game directly ──
+        const hostRef = gameType === 'roulette' ? rouletteHostRef
+            : gameType === 'blackjack' ? bjHostRef
+            : abHostRef;
+        const isHost = myId && myId === hostRef.current;
+        if (!isHost) return; // only host can trigger instant-start
+
+        if (gameType === 'andarbahar') {
+            const g = andarBaharRef.current;
+            if (!g || g.phase !== 'betting') return;
+            const bettorCount = new Set((g.bets || []).map(b => b.peer_id)).size;
+            if (bettorCount > 0 && updatedSet.size >= bettorCount) {
+                setReadyPeers(prev => ({ ...prev, andarbahar: new Set() }));
+                readyPeersRef.current = { ...readyPeersRef.current, andarbahar: new Set() };
+                if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
+                if (abDealTimerRef.current) clearInterval(abDealTimerRef.current);
+                abGenRef.current++;
+                const gen = abGenRef.current;
+                const withTrump = ab.dealTrump(g);
+                setAndarBaharGame(withTrump);
+                const abRoomId = g.roomId;
+                socket.sendRoomMessage(abRoomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(withTrump) }));
+                // Start dealing cards immediately (skip the betting timeout)
+                abDealTimerRef.current = setInterval(() => {
+                    if (gen !== abGenRef.current) { clearInterval(abDealTimerRef.current); return; }
+                    const cur = andarBaharRef.current;
+                    if (!cur || cur.phase !== 'dealing') { clearInterval(abDealTimerRef.current); return; }
+                    if (myIdRef.current !== abHostRef.current) { clearInterval(abDealTimerRef.current); return; }
+                    const next = ab.dealNext(cur);
+                    setAndarBaharGame(next);
+                    socket.sendRoomMessage(abRoomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(next) }));
+                    if (next.phase === 'ended') {
+                        clearInterval(abDealTimerRef.current);
+                        // Settle payouts
+                        if (myIdRef.current === abHostRef.current && next.payouts) {
+                            updateBankLedger('andarbahar', next.payouts);
+                        }
+                        const myNet = next.payouts?.[myIdRef.current];
+                        if (myNet !== undefined && walletRef.current) {
+                            const event = new ab.AndarBaharEngine(next).calculateResults(next);
+                            resolvePayoutEvent(event, myIdRef.current, walletRef.current);
+                        }
+                        // New round after results display
+                        abCycleTimerRef.current = setTimeout(() => {
+                            if (gen !== abGenRef.current) return;
+                            if (myIdRef.current !== abHostRef.current) return;
+                            const reset = ab.newRound(andarBaharRef.current || next);
+                            setAndarBaharGame(reset);
+                            socket.sendRoomMessage(abRoomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(reset) }));
+                            startAbCycleRef.current?.(reset);
+                        }, ab.RESULTS_DISPLAY_MS);
+                    }
+                }, ab.DEAL_INTERVAL_MS);
+            }
+        } else if (gameType === 'roulette' || gameType === 'blackjack') {
+            // Roulette and Blackjack use tryInstantStartRef (assigned during render)
+            tryInstantStartRef.current?.(gameType, updatedSet);
+        }
     }, []);
 
     const handleGameNewRound = useCallback((gameType) => {
