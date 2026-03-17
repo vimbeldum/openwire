@@ -579,4 +579,35 @@ describe('TambolaEngine', () => {
         const total = Object.values(PRIZES).reduce((s, p) => s + p.pct, 0);
         expect(total).toBeCloseTo(1.0);
     });
+
+    it('calculateResults returns financial event with breakdown', () => {
+        const gameState = {
+            id: 'game-1',
+            prizes: {
+                earlyFive:  { winner: 'p1', amount: 100 },
+                topLine:    { winner: null, amount: 150 },
+                middleLine: { winner: 'p2', amount: 150 },
+                bottomLine: { winner: null, amount: 150 },
+                fullHouse:  { winner: 'p1', amount: 450 },
+            },
+            prizePool: 1000,
+        };
+        const result = engine.calculateResults(gameState);
+        expect(result.financial).toBe(true);
+        expect(result.gameType).toBe('tambola');
+        expect(result.breakdown).toHaveLength(5);
+        expect(result.breakdown[0].prize).toBe('Early Five');
+        expect(result.breakdown[0].winner).toBe('p1');
+        expect(result.breakdown[1].winner).toBe('unclaimed');
+    });
+
+    it('calculateResults handles empty prizes', () => {
+        const gameState = {
+            id: 'game-2',
+            prizes: {},
+            prizePool: 0,
+        };
+        const result = engine.calculateResults(gameState);
+        expect(result.breakdown).toEqual([]);
+    });
 });
