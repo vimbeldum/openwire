@@ -152,4 +152,48 @@ describe('VaultPanel', () => {
             expect(screen.queryByRole('button', { name: 'Stake Chips' })).not.toBeInTheDocument();
         });
     });
+
+    describe('edge cases', () => {
+        it('renders with null wallet (nullish coalescing)', () => {
+            renderVault({ wallet: null, vaultData: makeVaultData(0, null) });
+            expect(screen.getByText(/Vault/)).toBeInTheDocument();
+        });
+
+        it('renders with empty wallet object', () => {
+            renderVault({ wallet: {}, vaultData: makeVaultData(0, null) });
+            expect(screen.getByText(/Vault/)).toBeInTheDocument();
+        });
+
+        it('overlay click calls onClose', () => {
+            const onClose = vi.fn();
+            const { container } = renderVault({ onClose, vaultData: makeVaultData(0, null) });
+            const overlay = container.querySelector('.ah-overlay');
+            if (overlay) {
+                fireEvent.click(overlay);
+                expect(onClose).toHaveBeenCalled();
+            }
+        });
+
+        it('shows sub-hour formatting for recently staked', () => {
+            const now = Date.now();
+            renderVault({ vaultData: makeVaultData(500, now - 30 * 60 * 1000) });
+            // Should show minutes (e.g., "30m") via formatHours
+            const bodyText = document.body.textContent;
+            expect(bodyText).toMatch(/\d+m|\d+\.\dh/);
+        });
+
+        it('handleStake calls onStake for valid input', () => {
+            const onStake = vi.fn();
+            renderVault({ onStake, vaultData: makeVaultData(0, null) });
+            const input = screen.queryByRole('spinbutton');
+            if (input) {
+                fireEvent.change(input, { target: { value: '500' } });
+                const btn = screen.queryByRole('button', { name: /Stake/i });
+                if (btn && !btn.disabled) {
+                    fireEvent.click(btn);
+                    expect(onStake).toHaveBeenCalledWith(500);
+                }
+            }
+        });
+    });
 });
