@@ -1445,6 +1445,14 @@ describe('17 — _loadTasks persistence', () => {
         swarm._running = false;
     });
 
+    it('_persistTasks handles localStorage errors gracefully', () => {
+        const swarm = makeSwarm();
+        const origSetItem = localStorage.setItem;
+        localStorage.setItem = vi.fn(() => { throw new Error('QuotaExceeded'); });
+        expect(() => swarm._persistTasks()).not.toThrow();
+        localStorage.setItem = origSetItem;
+    });
+
     it('_loadTasks prunes completed tasks older than 24h', () => {
         // Store a completed task with old timestamp
         const oldTask = [['old-task-id', {
@@ -1460,5 +1468,109 @@ describe('17 — _loadTasks persistence', () => {
 
         const swarm = makeSwarm();
         expect(swarm.getActiveTasks().length).toBe(0);
+    });
+});
+
+/* ════════════════════════════════════════════════════════════════
+   Section 18 — _generate throttle/cooldown/queue paths
+   ════════════════════════════════════════════════════════════════ */
+
+describe('18 — _generate guards', () => {
+    it('_generate returns early when not running', async () => {
+        const swarm = makeSwarm();
+        swarm._running = false;
+        await swarm._generate('jethalal');
+        expect(swarm._messageQueue.length).toBe(0);
+    });
+
+    it('_generate blocks when messagesThisMinute exceeds maxMsgPerMin', async () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm._messagesThisMinute = 999;
+        swarm._maxMsgPerMin = 10;
+        await swarm._generate('jethalal');
+        expect(swarm._messageQueue.length).toBe(0);
+        swarm._running = false;
+    });
+
+    it('_generate blocks on per-character cooldown', async () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm._lastMsgByChar.jethalal = Date.now(); // just posted
+        swarm._perCharCooldown = 10000;
+        await swarm._generate('jethalal');
+        expect(swarm._messageQueue.length).toBe(0);
+        swarm._running = false;
+    });
+
+    it('_generate force=true bypasses throttle and cooldown (sets mention state)', async () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm._messagesThisMinute = 999;
+        swarm._maxMsgPerMin = 10;
+        swarm._lastMsgByChar.jethalal = Date.now();
+        await swarm._generate('jethalal', { force: true });
+        // Queue may have been processed already (mock resolves instantly)
+        // but mentionTargets should have been set
+        expect(swarm._mentionTargets.has('jethalal')).toBe(true);
+        swarm._running = false;
+    });
+
+    it('_generate skips duplicate character in queue', async () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm._messageQueue = [{ characterId: 'jethalal', retries: 0 }];
+        await swarm._generate('jethalal');
+        expect(swarm._messageQueue.length).toBe(1); // no duplicate added
+        swarm._running = false;
+    });
+
+    it('_generate caps queue size for normal tasks', async () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        // Fill queue to max
+        for (let i = 0; i < 32; i++) {
+            swarm._messageQueue.push({ characterId: `char-${i}`, retries: 0 });
+        }
+        await swarm._generate('jethalal');
+        expect(swarm._messageQueue.length).toBe(32); // not 33
+        swarm._running = false;
+    });
+
+    it('_generate for unknown character returns early', async () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        await swarm._generate('nonexistent-character');
+        expect(swarm._messageQueue.length).toBe(0);
+        swarm._running = false;
+    });
+
+    it('_generate force sets mentionTargets even when queue processes instantly', async () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        await swarm._generate('jethalal', { force: true });
+        // Verify mention state was set regardless of queue processing speed
+        expect(swarm._mentionTargets.has('jethalal')).toBe(true);
+        expect(swarm._mentionActiveUntil).toBeGreaterThan(Date.now() - 1000);
+        swarm._running = false;
+    });
+
+    it('_generate sets mention cooldown for force=true', async () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        const before = swarm._mentionActiveUntil || 0;
+        await swarm._generate('jethalal', { force: true });
+        expect(swarm._mentionActiveUntil).toBeGreaterThan(before);
+        expect(swarm._mentionTargets.has('jethalal')).toBe(true);
+        swarm._running = false;
+    });
+
+    it('_generate activates mention-only window for force=true in mentionOnlyMode', async () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm._mentionOnlyMode = true;
+        await swarm._generate('jethalal', { force: true });
+        expect(swarm._charActiveUntil.jethalal).toBeGreaterThan(Date.now());
+        swarm._running = false;
     });
 });
