@@ -621,4 +621,81 @@ describe('AdminPortal — Players tab: peers rendering', () => {
         })} />);
         expect(screen.getByText('Alice')).toBeInTheDocument();
     });
+
+    it('renders full geo data, browser, mobile icon for a peer', () => {
+        const fullPeer = makePeer({
+            peer_id: 'p-full',
+            nick: 'GeoUser',
+            balance: 2500,
+            ip: '10.0.0.1',
+            is_admin: true,
+            geo: {
+                country: 'IN',
+                city: 'Mumbai',
+                region: 'MH',
+                timezone: 'Asia/Kolkata',
+                asOrganization: 'Airtel',
+                userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+            },
+        });
+        const { container } = render(<AdminPortal {...makeDefaultProps({ peers: [fullPeer] })} />);
+        expect(screen.getByText('GeoUser')).toBeInTheDocument();
+        expect(container.querySelector('.admin-geo-loc')?.textContent).toContain('Mumbai');
+        expect(container.querySelector('.admin-browser')?.textContent).toBe('Safari');
+        // Mobile icon should be present
+        expect(container.textContent).toContain('📱');
+    });
+
+    it('renders desktop icon for Chrome desktop user', () => {
+        const peer = makePeer({
+            geo: { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36' },
+        });
+        const { container } = render(<AdminPortal {...makeDefaultProps({ peers: [peer] })} />);
+        expect(container.textContent).toContain('💻');
+    });
+
+    it('renders "No players online" when peers is empty', () => {
+        render(<AdminPortal {...makeDefaultProps({ peers: [] })} />);
+        expect(screen.getByText('No players online')).toBeInTheDocument();
+    });
+
+    it('kick button calls onKick', async () => {
+        const onKick = vi.fn();
+        render(<AdminPortal {...makeDefaultProps({
+            peers: [makePeer({ peer_id: 'p1', nick: 'BadActor' })],
+            onKick,
+        })} />);
+        await userEvent.click(screen.getByText(/Kick/));
+        expect(onKick).toHaveBeenCalledWith('p1');
+    });
+
+    it('adjust button opens modal', async () => {
+        render(<AdminPortal {...makeDefaultProps({
+            peers: [makePeer({ peer_id: 'p1', nick: 'Rich', balance: 9999 })],
+        })} />);
+        await userEvent.click(screen.getByText(/Adjust/));
+        expect(screen.getByText(/Adjust — Rich/)).toBeInTheDocument();
+    });
+
+    it('+ Chips button calls onAdjustBalance with positive amount', async () => {
+        const onAdjustBalance = vi.fn();
+        render(<AdminPortal {...makeDefaultProps({
+            peers: [makePeer({ peer_id: 'p1', nick: 'Rich' })],
+            onAdjustBalance,
+        })} />);
+        await userEvent.click(screen.getByText(/Adjust/));
+        await userEvent.click(screen.getByText('+ Chips'));
+        expect(onAdjustBalance).toHaveBeenCalledWith('p1', 'Rich', 100);
+    });
+
+    it('− Chips button calls onAdjustBalance with negative amount', async () => {
+        const onAdjustBalance = vi.fn();
+        render(<AdminPortal {...makeDefaultProps({
+            peers: [makePeer({ peer_id: 'p1', nick: 'Rich' })],
+            onAdjustBalance,
+        })} />);
+        await userEvent.click(screen.getByText(/Adjust/));
+        await userEvent.click(screen.getByText('− Chips'));
+        expect(onAdjustBalance).toHaveBeenCalledWith('p1', 'Rich', -100);
+    });
 });
