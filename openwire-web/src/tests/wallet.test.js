@@ -40,6 +40,7 @@ import {
     getDeviceId,
     saveWallet,
     saveWalletSync,
+    tip,
 } from '../lib/wallet.js';
 
 beforeEach(() => {
@@ -372,5 +373,111 @@ describe('Composite wallet operations', () => {
         wallet = credit(wallet, 200, 'Win');
         wallet = adminAdjust(wallet, 50, 'Bonus');
         expect(wallet.history).toHaveLength(3);
+    });
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   10 -- tip() — wallet-to-wallet transfer
+   ═══════════════════════════════════════════════════════════════ */
+
+describe('tip()', () => {
+    it('transfers amount from sender to receiver', () => {
+        const from = makeWallet({ baseBalance: 500, adminBonus: 0, nick: 'Alice' });
+        const to = makeWallet({ baseBalance: 200, adminBonus: 0, nick: 'Bob', deviceId: 'device-bob' });
+        const result = tip(from, to, 100);
+        expect(result.success).toBe(true);
+        expect(result.from.baseBalance).toBe(400);
+        expect(result.to.baseBalance).toBe(300);
+    });
+
+    it('fails with invalid_amount for 0', () => {
+        const from = makeWallet();
+        const to = makeWallet({ deviceId: 'bob' });
+        const result = tip(from, to, 0);
+        expect(result.success).toBe(false);
+        expect(result.reason).toBe('invalid_amount');
+    });
+
+    it('fails with invalid_amount for negative', () => {
+        const from = makeWallet();
+        const to = makeWallet({ deviceId: 'bob' });
+        const result = tip(from, to, -50);
+        expect(result.success).toBe(false);
+        expect(result.reason).toBe('invalid_amount');
+    });
+
+    it('fails with invalid_amount for NaN', () => {
+        const from = makeWallet();
+        const to = makeWallet({ deviceId: 'bob' });
+        const result = tip(from, to, NaN);
+        expect(result.success).toBe(false);
+        expect(result.reason).toBe('invalid_amount');
+    });
+
+    it('fails with invalid_amount for Infinity', () => {
+        const from = makeWallet();
+        const to = makeWallet({ deviceId: 'bob' });
+        const result = tip(from, to, Infinity);
+        expect(result.success).toBe(false);
+        expect(result.reason).toBe('invalid_amount');
+    });
+
+    it('fails with insufficient_balance when sender cannot afford', () => {
+        const from = makeWallet({ baseBalance: 50, adminBonus: 0 });
+        const to = makeWallet({ deviceId: 'bob' });
+        const result = tip(from, to, 100);
+        expect(result.success).toBe(false);
+        expect(result.reason).toBe('insufficient_balance');
+    });
+
+    it('deducts from adminBonus when baseBalance is insufficient', () => {
+        const from = makeWallet({ baseBalance: 30, adminBonus: 100, nick: 'Alice' });
+        const to = makeWallet({ baseBalance: 200, adminBonus: 0, nick: 'Bob', deviceId: 'bob' });
+        const result = tip(from, to, 80);
+        expect(result.success).toBe(true);
+        expect(result.from.baseBalance).toBe(0);
+        expect(result.from.adminBonus).toBe(50); // 100 - 50 (80-30 taken from adminBonus)
+    });
+
+    it('adds tip history to both sender and receiver', () => {
+        const from = makeWallet({ baseBalance: 500, nick: 'Alice', history: [] });
+        const to = makeWallet({ baseBalance: 200, nick: 'Bob', deviceId: 'bob', history: [] });
+        const result = tip(from, to, 100);
+        expect(result.from.history[0].type).toBe('tip');
+        expect(result.from.history[0].amount).toBe(-100);
+        expect(result.to.history[0].type).toBe('tip');
+        expect(result.to.history[0].amount).toBe(100);
+    });
+
+    it('uses deviceId in history when nick is not set', () => {
+        const from = makeWallet({ baseBalance: 500, nick: undefined, deviceId: 'dev-from', history: [] });
+        const to = makeWallet({ baseBalance: 200, nick: undefined, deviceId: 'dev-to', history: [] });
+        const result = tip(from, to, 50);
+        expect(result.from.history[0].reason).toContain('dev-to');
+        expect(result.to.history[0].reason).toContain('dev-from');
+    });
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   11 -- saveWallet debounce and beforeunload flush
+   ═══════════════════════════════════════════════════════════════ */
+
+describe('saveWalletSync() — immediate save', () => {
+    it('writes to localStorage immediately', () => {
+        vi.clearAllMocks();
+        const w = makeWallet({ deviceId: 'test-device-uuid' });
+        saveWalletSync(w);
+        expect(localStorage.setItem).toHaveBeenCalledWith(
+            'openwire_wallet_dev_test-device-uuid',
+            JSON.stringify(w),
+        );
+    });
+
+    it('does not throw when localStorage throws', () => {
+        const origSetItem = localStorage.setItem;
+        localStorage.setItem = vi.fn(() => { throw new Error('QuotaExceeded'); });
+        const w = makeWallet({ deviceId: 'test-device-uuid' });
+        expect(() => saveWalletSync(w)).not.toThrow();
+        localStorage.setItem = origSetItem;
     });
 });
