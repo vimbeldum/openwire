@@ -36,7 +36,7 @@ describe('createJackpotState', () => {
 
   it('initialises all contribution buckets to 0', () => {
     const j = createJackpotState('room-42');
-    expect(j.contributions).toEqual({ blackjack: 0, roulette: 0, andar_bahar: 0, tambola: 0 });
+    expect(j.contributions).toEqual({ blackjack: 0, roulette: 0, andar_bahar: 0, tambola: 0, slots: 0 });
   });
 });
 

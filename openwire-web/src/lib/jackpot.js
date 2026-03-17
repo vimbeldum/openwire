@@ -27,7 +27,7 @@ export function createJackpotState(roomId) {
     roomId,
     pool: 0,
     lastPayout: null,
-    contributions: { blackjack: 0, roulette: 0, andar_bahar: 0, tambola: 0 },
+    contributions: { blackjack: 0, roulette: 0, andar_bahar: 0, tambola: 0, slots: 0 },
   };
 }
 
