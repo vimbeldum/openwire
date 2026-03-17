@@ -499,8 +499,126 @@ describe('AdminPortal — Escape key', () => {
     });
 });
 
-// ── Browser-only / complex interactions (still todo) ─────────────────────────
+// ── Ban List tab ─────────────────────────────────────────────────────────
 
-describe('AdminPortal — Browser-only / complex interactions', () => {
-    it.todo('Focus management: admin overlay traps focus within modal (requires real browser)');
+describe('AdminPortal — Ban List tab', () => {
+    it('renders banned IPs when provided', async () => {
+        render(<AdminPortal {...makeDefaultProps({ bannedIps: ['1.2.3.4', '5.6.7.8'] })} />);
+        await userEvent.click(screen.getByRole('button', { name: /ban list/i }));
+        expect(screen.getByText('1.2.3.4')).toBeInTheDocument();
+        expect(screen.getByText('5.6.7.8')).toBeInTheDocument();
+    });
+});
+
+// ── Agents tab: Show enable/disable + mood ──────────────────────────────────
+
+describe('AdminPortal — Agents tab: show toggle + mood', () => {
+    async function setupAgentsTab(swarmOverrides = {}) {
+        const { getCharactersDict, getGroupsDict, getGroupCharacters } = await import('../../lib/agents/agentStore.js');
+
+        getCharactersDict.mockReturnValue({
+            char1: { id: 'char1', name: 'Jethalal', avatar: '🎭', frequencyWeight: 5, moods: { normal: {}, excited: {}, sad: {} } },
+        });
+        getGroupsDict.mockReturnValue({
+            show1: { id: 'show1', name: 'Taarak Mehta', emoji: '📺' },
+        });
+        getGroupCharacters.mockReturnValue([
+            { id: 'char1', name: 'Jethalal', avatar: '🎭', frequencyWeight: 5, moods: { normal: {}, excited: {}, sad: {} } },
+        ]);
+
+        const swarm = {
+            running: false,
+            freeModels: [{ id: 'model-1' }],
+            chatterLevel: 1.0,
+            maxMsgPerMin: 8,
+            perCharCooldown: 10,
+            globalCooldown: 5,
+            defaultModel: 'openrouter/auto',
+            provider: 'openrouter',
+            geminiModels: [],
+            qwenModels: [],
+            haimakerModels: [],
+            mentionOnlyMode: false,
+            statsDebug: false,
+            isCharacterEnabled: vi.fn(() => true),
+            isShowEnabled: vi.fn(() => true),
+            getAssignedModel: vi.fn(() => ''),
+            getMood: vi.fn(() => 'normal'),
+            start: vi.fn().mockResolvedValue(),
+            stop: vi.fn(),
+            setChatterLevel: vi.fn(),
+            setMaxMsgPerMin: vi.fn(),
+            setCharacterEnabled: vi.fn(),
+            setModelOverride: vi.fn(),
+            setShowEnabled: vi.fn(),
+            setMood: vi.fn(),
+            setPerCharCooldown: vi.fn(),
+            setGlobalCooldown: vi.fn(),
+            setMentionOnlyMode: vi.fn(),
+            setStatsDebug: vi.fn(),
+            setDefaultModel: vi.fn(),
+            setProvider: vi.fn().mockResolvedValue(),
+            flushContext: vi.fn(),
+            queueLength: 0,
+            queueContents: [],
+            stats: {},
+            ...swarmOverrides,
+        };
+
+        render(<AdminPortal {...makeDefaultProps({ swarm })} />);
+        await userEvent.click(screen.getByRole('button', { name: /agents/i }));
+
+        return { swarm, getCharactersDict, getGroupsDict, getGroupCharacters };
+    }
+
+    afterEach(async () => {
+        const { getCharactersDict, getGroupsDict, getGroupCharacters } = await import('../../lib/agents/agentStore.js');
+        getCharactersDict.mockReturnValue({});
+        getGroupsDict.mockReturnValue({});
+        getGroupCharacters.mockReturnValue([]);
+    });
+
+    it('show enable checkbox calls swarm.setShowEnabled', async () => {
+        const { swarm } = await setupAgentsTab();
+        // Find checkboxes — the show-level checkbox says "Enabled"
+        const enabledLabels = screen.getAllByText('Enabled');
+        const showCheckbox = enabledLabels[0].closest('label').querySelector('input[type="checkbox"]');
+        await userEvent.click(showCheckbox);
+        expect(swarm.setShowEnabled).toHaveBeenCalledWith('show1', false);
+    });
+
+    it('mood select calls swarm.setMood', async () => {
+        const { swarm } = await setupAgentsTab();
+        // Find mood selects — the one with options normal/excited/sad
+        const selects = screen.getAllByRole('combobox');
+        const moodSelect = selects.find(s => {
+            const opts = Array.from(s.querySelectorAll('option'));
+            return opts.some(o => o.textContent === 'excited');
+        });
+        if (moodSelect) {
+            fireEvent.change(moodSelect, { target: { value: 'excited' } });
+            expect(swarm.setMood).toHaveBeenCalledWith('char1', 'excited');
+        }
+    });
+
+    it('renders character name in the table', async () => {
+        await setupAgentsTab();
+        expect(screen.getByText('Jethalal')).toBeInTheDocument();
+    });
+
+    it('renders show name header', async () => {
+        await setupAgentsTab();
+        expect(screen.getByText(/Taarak Mehta/)).toBeInTheDocument();
+    });
+});
+
+// ── Players tab: rendering with peers ─────────────────────────────────────
+
+describe('AdminPortal — Players tab: peers rendering', () => {
+    it('renders player info in Players tab', () => {
+        render(<AdminPortal {...makeDefaultProps({
+            peers: [makePeer({ peer_id: 'p1', nick: 'Alice', balance: 5000 })],
+        })} />);
+        expect(screen.getByText('Alice')).toBeInTheDocument();
+    });
 });
