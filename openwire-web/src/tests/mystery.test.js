@@ -927,6 +927,97 @@ describe('D2 — sanitizeSuspects', () => {
    SECTION E — MYSTERY_RULES shape
    ═══════════════════════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════════════════════
+   SECTION E — ASYNC: generateMystery / generateMysteryFromScenario
+   ═══════════════════════════════════════════════════════════════ */
+
+import { generateMystery, generateMysteryFromScenario } from '../lib/mystery.js';
+
+describe('E0 — generateMystery (async)', () => {
+    it('generates a mystery from random template', async () => {
+        const lobby = makeLobbyGame();
+        const result = await generateMystery(lobby);
+        expect(result.phase).toBe('investigation');
+        expect(result.mystery).toBeDefined();
+        expect(result.mystery.title).toBeTruthy();
+        expect(result.suspects.length).toBeGreaterThan(0);
+        expect(result.suspects[0]._systemPrompt).toBeTruthy();
+    });
+
+    it('generates a mystery from specific template ID', async () => {
+        const lobby = makeLobbyGame();
+        const result = await generateMystery(lobby, 'vineyard_manor');
+        expect(result.phase).toBe('investigation');
+        expect(result.mystery.title).toContain('Vineyard');
+    });
+
+    it('falls back to random template for invalid template ID', async () => {
+        const lobby = makeLobbyGame();
+        const result = await generateMystery(lobby, 'nonexistent_template_xyz');
+        expect(result.phase).toBe('investigation');
+        expect(result.mystery).toBeDefined();
+    });
+
+    it('returns game unchanged if not in lobby phase', async () => {
+        const investigation = makeInvestigationGame();
+        const result = await generateMystery(investigation);
+        expect(result).toBe(investigation);
+    });
+
+    it('sets correct culprit in suspects', async () => {
+        const lobby = makeLobbyGame();
+        const result = await generateMystery(lobby);
+        const culprit = result.suspects.find(s => s.isCulprit);
+        expect(culprit).toBeDefined();
+        expect(culprit.id).toBe(result.mystery.culpritId);
+    });
+
+    it('distributes cross-clues to suspects', async () => {
+        const lobby = makeLobbyGame();
+        const result = await generateMystery(lobby);
+        // At least some suspects should have cross-clues
+        const withClues = result.suspects.filter(s => s._crossClues && s._crossClues.length > 0);
+        expect(withClues.length).toBeGreaterThan(0);
+    });
+});
+
+describe('E0b — generateMysteryFromScenario (async)', () => {
+    const mockScenario = {
+        title: 'Custom Mystery',
+        setting: 'A dark alley',
+        victim: { name: 'John' },
+        weapon: 'knife',
+        motive: 'revenge',
+        culpritIndex: 0,
+        suspects: [
+            { name: 'Suspect A', role: 'thief', personality: 'sneaky', backstory: 'came from nowhere', alibi: 'was sleeping', secret: 'stole money', relationshipToVictim: 'enemy' },
+            { name: 'Suspect B', role: 'guard', personality: 'stoic', backstory: 'long career', alibi: 'on patrol', secret: 'saw something', relationshipToVictim: 'colleague' },
+        ],
+        crossClues: [['heard screaming', 0, 1]],
+    };
+
+    it('generates mystery from custom scenario', async () => {
+        const lobby = makeLobbyGame();
+        const result = await generateMysteryFromScenario(lobby, mockScenario);
+        expect(result.phase).toBe('investigation');
+        expect(result.mystery.title).toBe('Custom Mystery');
+        expect(result.suspects.length).toBe(2);
+    });
+
+    it('returns game unchanged if not in lobby', async () => {
+        const investigation = makeInvestigationGame();
+        const result = await generateMysteryFromScenario(investigation, mockScenario);
+        expect(result).toBe(investigation);
+    });
+
+    it('marks correct culprit from scenario', async () => {
+        const lobby = makeLobbyGame();
+        const result = await generateMysteryFromScenario(lobby, mockScenario);
+        expect(result.suspects[0].isCulprit).toBe(true);
+        expect(result.suspects[1].isCulprit).toBe(false);
+    });
+});
+
 describe('E1 — MYSTERY_RULES', () => {
     it('has name "Murder Mystery"', () => {
         expect(MYSTERY_RULES.name).toBe('Murder Mystery');
