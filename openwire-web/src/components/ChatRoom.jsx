@@ -905,12 +905,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             case 'ready_up': {
                 const gameType = action.gameType; // 'roulette' | 'blackjack' | 'andarbahar'
                 const peerId = action.peer_id || msg.peer_id;
-                setReadyPeers(prev => {
-                    const next = { ...prev };
-                    next[gameType] = new Set(prev[gameType]);
-                    next[gameType].add(peerId);
-                    return next;
-                });
+                const updatedSet = new Set(readyPeersRef.current[gameType]);
+                updatedSet.add(peerId);
+                setReadyPeers(prev => ({ ...prev, [gameType]: updatedSet }));
+                readyPeersRef.current = { ...readyPeersRef.current, [gameType]: updatedSet };
+                // Trigger instant-start check immediately (don't wait for useEffect)
+                tryInstantStartRef.current?.(gameType, updatedSet);
                 break;
             }
             case 'game_new_round': {
@@ -1496,16 +1496,100 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     // startAndarBahar, handleAbAction — useAndarBaharGame
     // startPolymarket, handlePmAction — usePolymarketGame
 
+    // ── Instant start check (called directly, not via useEffect) ──
+    const tryInstantStartRef = useRef(null);
+    tryInstantStartRef.current = (gameType, readySet) => {
+        const myId = myIdRef.current;
+        if (gameType === 'roulette') {
+            const rlGame = rouletteRef.current;
+            if (!rlGame || rlGame.phase !== 'betting' || !amIHost(rouletteHostRef.current)) return;
+            const bettorIds = [...new Set((rlGame.bets || []).map(b => b.peer_id))];
+            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
+                clearReadyPeers('roulette');
+                if (rouletteTimerRef.current) clearInterval(rouletteTimerRef.current);
+                const spun = rl.spin(rlGame);
+                setRouletteGame(spun);
+                const roomId = rlGame.roomId;
+                socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(spun) }));
+                rouletteSpinTimeoutRef.current = setTimeout(() => {
+                    const resultsGame = rl.finishSpin(rouletteRef.current || spun);
+                    setRouletteGame(resultsGame);
+                    if (amIHost(rouletteHostRef.current) && resultsGame.payouts) updateBankLedger('roulette', resultsGame.payouts);
+                    const myNet = resultsGame.payouts?.[myId];
+                    if (myNet !== undefined && walletRef.current) {
+                        const event = new rl.RouletteEngine(resultsGame).calculateResults(resultsGame);
+                        resolvePayoutEvent(event, myId, walletRef.current);
+                    }
+                    if (amIHost(rouletteHostRef.current)) socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(resultsGame) }));
+                    rouletteResultTimeoutRef.current = setTimeout(() => {
+                        const reset = rl.newRound(rouletteRef.current || resultsGame);
+                        setRouletteGame(reset);
+                        if (amIHost(rouletteHostRef.current)) socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(reset) }));
+                        startRouletteTimer();
+                    }, rl.RESULTS_DISPLAY_MS);
+                }, rl.SPIN_PHASE_MS);
+            }
+        } else if (gameType === 'blackjack') {
+            const bjGame = blackjackRef.current;
+            if (!bjGame || bjGame.phase !== 'betting' || !amIHost(bjHostRef.current)) return;
+            const bettorIds = bjGame.players.filter(p => p.bet > 0).map(p => p.peer_id);
+            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
+                clearReadyPeers('blackjack');
+                if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
+                const dealtGame = bj.dealInitialCards(bjGame);
+                setBlackjackGame(dealtGame);
+                socket.sendRoomMessage(bjGame.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(dealtGame) }));
+                bjCheckDealerTransition('betting', dealtGame);
+                if (dealtGame.phase === 'playing') startTurnTimer(dealtGame);
+            }
+        } else if (gameType === 'andarbahar') {
+            const abGame = andarBaharRef.current;
+            if (!abGame || abGame.phase !== 'betting' || !amIHost(abHostRef.current)) return;
+            const bettorIds = [...new Set((abGame.bets || []).map(b => b.peer_id))];
+            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
+                clearReadyPeers('andarbahar');
+                if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
+                abGenRef.current++;
+                const withTrump = ab.dealTrump(abGame);
+                setAndarBaharGame(withTrump);
+                const roomId = abGame.roomId;
+                socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(withTrump) }));
+                abDealTimerRef.current = setInterval(() => {
+                    const cur = andarBaharRef.current;
+                    if (!cur || !amIHost(abHostRef.current) || cur.phase !== 'dealing') { clearInterval(abDealTimerRef.current); return; }
+                    const next = ab.dealNext(cur);
+                    setAndarBaharGame(next);
+                    socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(next) }));
+                    if (next.phase === 'ended') {
+                        clearInterval(abDealTimerRef.current);
+                        if (amIHost(abHostRef.current) && next.payouts) updateBankLedger('andarbahar', next.payouts);
+                        const myNet2 = next.payouts?.[myIdRef.current];
+                        if (myNet2 !== undefined && walletRef.current) {
+                            const event = new ab.AndarBaharEngine(next).calculateResults(next);
+                            resolvePayoutEvent(event, myIdRef.current, walletRef.current);
+                        }
+                        abCycleTimerRef.current = setTimeout(() => {
+                            if (!amIHost(abHostRef.current)) return;
+                            const reset = ab.newRound(andarBaharRef.current || next);
+                            setAndarBaharGame(reset);
+                            socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(reset) }));
+                            startAbCycle(reset);
+                        }, ab.RESULTS_DISPLAY_MS);
+                    }
+                }, ab.DEAL_INTERVAL_MS);
+            }
+        }
+    };
+
     // ── Ready Up handler ────────────────────────────────────
     const handleReadyUp = useCallback((gameType) => {
         const myId = myIdRef.current;
-        // Add self locally
-        setReadyPeers(prev => {
-            const next = { ...prev };
-            next[gameType] = new Set(prev[gameType]);
-            next[gameType].add(myId);
-            return next;
-        });
+        // Build the updated ready set locally (don't wait for React state)
+        const updatedSet = new Set(readyPeersRef.current[gameType]);
+        updatedSet.add(myId);
+        // Persist to state for UI
+        setReadyPeers(prev => ({ ...prev, [gameType]: updatedSet }));
+        readyPeersRef.current = { ...readyPeersRef.current, [gameType]: updatedSet };
         // Broadcast to room
         const roomId = gameType === 'roulette' ? rouletteRef.current?.roomId
             : gameType === 'blackjack' ? blackjackRef.current?.roomId
@@ -1515,6 +1599,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 type: 'ready_up', gameType, peer_id: myId,
             }));
         }
+        // Check immediately using refs (always current)
+        tryInstantStartRef.current?.(gameType, updatedSet);
     }, []);
 
     const handleGameNewRound = useCallback((gameType) => {
@@ -1565,113 +1651,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         }
     }, [amIHost, clearReadyPeers, startBlackjackTimer, startAbCycle]);
 
-    // ── Instant start: when all bettors are ready, host triggers game immediately ──
-    // Uses state variables directly (not refs) so the effect fires on both
-    // readyPeers changes AND game state changes (e.g. when a bet is placed).
-    useEffect(() => {
-        const myId = myIdRef.current;
-
-        // Roulette: check if all bettors are ready
-        const rlGame = rouletteGame;
-        if (rlGame && rlGame.phase === 'betting' && amIHost(rouletteHostRef.current)) {
-            const bettorIds = [...new Set((rlGame.bets || []).map(b => b.peer_id))];
-            const readySet = readyPeers.roulette;
-            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
-                // All bettors ready — instant spin
-                clearReadyPeers('roulette');
-                if (rouletteTimerRef.current) clearInterval(rouletteTimerRef.current);
-                const spun = rl.spin(rlGame);
-                setRouletteGame(spun);
-                const roomId = rlGame.roomId;
-                socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(spun) }));
-                rouletteSpinTimeoutRef.current = setTimeout(() => {
-                    const resultsGame = rl.finishSpin(rouletteRef.current || spun);
-                    setRouletteGame(resultsGame);
-                    if (amIHost(rouletteHostRef.current) && resultsGame.payouts) {
-                        updateBankLedger('roulette', resultsGame.payouts);
-                    }
-                    const myNet = resultsGame.payouts?.[myId];
-                    if (myNet !== undefined && walletRef.current) {
-                        const event = new rl.RouletteEngine(resultsGame).calculateResults(resultsGame);
-                        resolvePayoutEvent(event, myId, walletRef.current);
-                    }
-                    if (amIHost(rouletteHostRef.current)) {
-                        socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(resultsGame) }));
-                    }
-                    rouletteResultTimeoutRef.current = setTimeout(() => {
-                        const reset = rl.newRound(rouletteRef.current || resultsGame);
-                        setRouletteGame(reset);
-                        if (amIHost(rouletteHostRef.current)) {
-                            socket.sendRoomMessage(roomId, rl.serializeRouletteAction({ type: 'rl_state', state: rl.serializeGame(reset) }));
-                        }
-                        startRouletteTimer();
-                    }, rl.RESULTS_DISPLAY_MS);
-                }, rl.SPIN_PHASE_MS);
-            }
-        }
-
-        // Blackjack: check if all bettors are ready
-        const bjGame = blackjackGame;
-        if (bjGame && bjGame.phase === 'betting' && amIHost(bjHostRef.current)) {
-            const bettorIds = bjGame.players.filter(p => p.bet > 0).map(p => p.peer_id);
-            const readySet = readyPeers.blackjack;
-            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
-                clearReadyPeers('blackjack');
-                if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
-                const dealtGame = bj.dealInitialCards(bjGame);
-                setBlackjackGame(dealtGame);
-                socket.sendRoomMessage(bjGame.roomId, bj.serializeBlackjackAction({ type: 'bj_state', state: bj.serializeGame(dealtGame) }));
-                bjCheckDealerTransition('betting', dealtGame);
-                if (dealtGame.phase === 'playing') startTurnTimer(dealtGame);
-            }
-        }
-
-        // Andar Bahar: check if all bettors are ready
-        const abGame = andarBaharGame;
-        if (abGame && abGame.phase === 'betting' && amIHost(abHostRef.current)) {
-            const bettorIds = [...new Set((abGame.bets || []).map(b => b.peer_id))];
-            const readySet = readyPeers.andarbahar;
-            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
-                clearReadyPeers('andarbahar');
-                if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
-                abGenRef.current++;
-                // Deal trump immediately
-                const withTrump = ab.dealTrump(abGame);
-                setAndarBaharGame(withTrump);
-                const roomId = abGame.roomId;
-                socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(withTrump) }));
-                // Start dealing cards
-                abDealTimerRef.current = setInterval(() => {
-                    const cur = andarBaharRef.current;
-                    if (!cur || !amIHost(abHostRef.current) || cur.phase !== 'dealing') {
-                        clearInterval(abDealTimerRef.current);
-                        return;
-                    }
-                    const next = ab.dealNext(cur);
-                    setAndarBaharGame(next);
-                    socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(next) }));
-                    if (next.phase === 'ended') {
-                        clearInterval(abDealTimerRef.current);
-                        if (amIHost(abHostRef.current) && next.payouts) {
-                            updateBankLedger('andarbahar', next.payouts);
-                        }
-                        const myNet = next.payouts?.[myId];
-                        if (myNet !== undefined && walletRef.current) {
-                            const event = new ab.AndarBaharEngine(next).calculateResults(next);
-                            resolvePayoutEvent(event, myId, walletRef.current);
-                        }
-                        abCycleTimerRef.current = setTimeout(() => {
-                            if (!amIHost(abHostRef.current)) return;
-                            const reset = ab.newRound(andarBaharRef.current || next);
-                            setAndarBaharGame(reset);
-                            socket.sendRoomMessage(roomId, ab.serializeAndarBaharAction({ type: 'ab_state', state: ab.serializeGame(reset) }));
-                            startAbCycle(reset);
-                        }, ab.RESULTS_DISPLAY_MS);
-                    }
-                }, ab.DEAL_INTERVAL_MS);
-            }
-        }
-    }, [readyPeers, rouletteGame, blackjackGame, andarBaharGame, amIHost, clearReadyPeers, updateBankLedger, resolvePayoutEvent, startRouletteTimer, startAbCycle, startTurnTimer, bjCheckDealerTransition]);
+    // Instant start is now handled directly by tryInstantStartRef (called from
+    // handleReadyUp and the ready_up message handler). No useEffect needed.
 
     // ── Clear ready peers when phase changes away from betting ──
     useEffect(() => {
