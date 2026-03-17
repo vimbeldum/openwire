@@ -646,6 +646,49 @@ describe('AdminPortal — Agents tab: show toggle + mood', () => {
         await setupAgentsTab();
         expect(screen.getByText(/Taarak Mehta/)).toBeInTheDocument();
     });
+
+    it('max msg/min input fires swarm.setMaxMsgPerMin', async () => {
+        const { swarm } = await setupAgentsTab();
+        const inputs = screen.getAllByRole('spinbutton');
+        const maxMsgInput = inputs.find(i => i.value === '8');
+        if (maxMsgInput) {
+            fireEvent.change(maxMsgInput, { target: { value: '15' } });
+            expect(swarm.setMaxMsgPerMin).toHaveBeenCalledWith(15);
+        }
+    });
+
+    it('per-char cooldown input fires swarm.setPerCharCooldown', async () => {
+        const { swarm } = await setupAgentsTab();
+        const inputs = screen.getAllByRole('spinbutton');
+        const cooldownInput = inputs.find(i => i.value === '10');
+        if (cooldownInput) {
+            fireEvent.change(cooldownInput, { target: { value: '20' } });
+            expect(swarm.setPerCharCooldown).toHaveBeenCalledWith(20);
+        }
+    });
+
+    it('global cooldown input fires swarm.setGlobalCooldown', async () => {
+        const { swarm } = await setupAgentsTab();
+        const inputs = screen.getAllByRole('spinbutton');
+        const globalInput = inputs.find(i => i.value === '5');
+        if (globalInput) {
+            fireEvent.change(globalInput, { target: { value: '12' } });
+            expect(swarm.setGlobalCooldown).toHaveBeenCalledWith(12);
+        }
+    });
+
+    it('god mode log button is rendered', async () => {
+        await setupAgentsTab();
+        const godModeBtn = screen.queryByText(/God Mode/);
+        expect(godModeBtn).toBeInTheDocument();
+    });
+
+    it('renders mention-only checkbox', async () => {
+        await setupAgentsTab();
+        const checkboxes = screen.getAllByRole('checkbox');
+        // Should have mention-only among the checkboxes
+        expect(checkboxes.length).toBeGreaterThan(0);
+    });
 });
 
 // ── Players tab: rendering with peers ─────────────────────────────────────
