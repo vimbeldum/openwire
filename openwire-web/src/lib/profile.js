@@ -10,7 +10,7 @@ const PROFILE_PREFIX = 'openwire:profile:';
 const IDB_DB_NAME = 'openwire-profiles';
 const IDB_STORE = 'profiles';
 
-/* ── 256-word wordlist for deterministic passphrase ───────── */
+/* ── Wordlist for deterministic passphrase ────────────────── */
 const WORDLIST = [
     'apple','arrow','atlas','azure','bacon','badge','beach','beard',
     'bench','berry','birch','blade','blaze','blend','block','bloom',
@@ -61,7 +61,7 @@ const WORDLIST = [
     'prime','prism','privy','probe','prone','prune','pulse','punch',
     'pupil','purge','quest','queue','quota','quoth','radar','radix',
     'rally','ramen','ranch','range','rapid','raven','reach','realm',
-    'rebel','recap','recon','reign','relax','relay','realm','remix',
+    'rebel','recap','recon','reign','relax','relay','remix',
     'renew','repay','rerun','reset','ridge','risky','rival','rivet',
     'rogue','rolly','roost','rough','round','rowdy','royal','rugby',
     'ruler','rusty','sadly','saint','salad','salsa','sandy','sauce',
