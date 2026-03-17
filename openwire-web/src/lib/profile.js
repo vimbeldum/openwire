@@ -5,7 +5,7 @@
    All date comparisons use IST (UTC+5:30) calendar days.
    ═══════════════════════════════════════════════════════════ */
 
-const DEVICE_KEY = 'openwire:device-id';
+const DEVICE_KEY = 'openwire_device_id';
 const PROFILE_PREFIX = 'openwire:profile:';
 const IDB_DB_NAME = 'openwire-profiles';
 const IDB_STORE = 'profiles';

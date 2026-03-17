@@ -91,11 +91,11 @@ describe('getDeviceId()', () => {
     it('generates and stores a new UUID when none exists', () => {
         const id = getDeviceId();
         expect(id).toBe('test-device-uuid-4321');
-        expect(localStorage.setItem).toHaveBeenCalledWith('openwire:device-id', id);
+        expect(localStorage.setItem).toHaveBeenCalledWith('openwire_device_id', id);
     });
 
     it('returns the existing UUID from localStorage without generating a new one', () => {
-        mockStorage['openwire:device-id'] = 'existing-uuid-abcd';
+        mockStorage['openwire_device_id'] = 'existing-uuid-abcd';
         const id = getDeviceId();
         expect(id).toBe('existing-uuid-abcd');
         expect(localStorage.setItem).not.toHaveBeenCalled();
@@ -329,10 +329,10 @@ describe('calculateDailyBonus()', () => {
    ═══════════════════════════════════════════════════════════════ */
 
 describe('wipeIdentity()', () => {
-    it('removes openwire:device-id from localStorage', async () => {
-        mockStorage['openwire:device-id'] = 'test-device-uuid-4321';
+    it('removes openwire_device_id from localStorage', async () => {
+        mockStorage['openwire_device_id'] = 'test-device-uuid-4321';
         await wipeIdentity('test-device-uuid-4321');
-        expect(localStorage.removeItem).toHaveBeenCalledWith('openwire:device-id');
+        expect(localStorage.removeItem).toHaveBeenCalledWith('openwire_device_id');
     });
 
     it('removes the profile key from localStorage', async () => {
@@ -344,10 +344,10 @@ describe('wipeIdentity()', () => {
     });
 
     it('removes both keys in one call', async () => {
-        mockStorage['openwire:device-id'] = 'test-device-uuid-4321';
+        mockStorage['openwire_device_id'] = 'test-device-uuid-4321';
         mockStorage['openwire:profile:test-device-uuid-4321'] = '{}';
         await wipeIdentity('test-device-uuid-4321');
-        expect(mockStorage['openwire:device-id']).toBeUndefined();
+        expect(mockStorage['openwire_device_id']).toBeUndefined();
         expect(mockStorage['openwire:profile:test-device-uuid-4321']).toBeUndefined();
     });
 
@@ -397,7 +397,7 @@ describe('exportPassphrase()', () => {
 
 describe('loadProfile() — error handling', () => {
     it('creates a default profile when localStorage has corrupt JSON', () => {
-        mockStorage['openwire:device-id'] = 'test-device-uuid-4321';
+        mockStorage['openwire_device_id'] = 'test-device-uuid-4321';
         mockStorage['openwire:profile:test-device-uuid-4321'] = '{CORRUPT_JSON}}}';
         const profile = loadProfile('User');
         // Should fall through catch and create fresh profile
