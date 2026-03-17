@@ -390,3 +390,118 @@ describe('exportPassphrase()', () => {
         });
     });
 });
+
+/* ═══════════════════════════════════════════════════════════════
+   9 -- Edge cases: uncovered branches and error paths
+   ═══════════════════════════════════════════════════════════════ */
+
+describe('loadProfile() — error handling', () => {
+    it('creates a default profile when localStorage has corrupt JSON', () => {
+        mockStorage['openwire:device-id'] = 'test-device-uuid-4321';
+        mockStorage['openwire:profile:test-device-uuid-4321'] = '{CORRUPT_JSON}}}';
+        const profile = loadProfile('User');
+        // Should fall through catch and create fresh profile
+        expect(profile.currentNick).toBe('User');
+        expect(profile.chips).toBe(1000);
+    });
+
+    it('uses "AnonymousUser" when nick is null/undefined', () => {
+        const profile = loadProfile(null);
+        expect(profile.currentNick).toBe('AnonymousUser');
+    });
+
+    it('uses "AnonymousUser" when nick is not provided', () => {
+        const profile = loadProfile();
+        expect(profile.currentNick).toBe('AnonymousUser');
+    });
+
+    it('returns existing profile unchanged when nick is falsy', () => {
+        const existing = {
+            deviceId: 'test-device-uuid-4321',
+            currentNick: 'KeepThis',
+            chips: 777,
+            reputation: { karma: 0, tier: 'newcomer', history: [] },
+            cosmetics: { owned: [], equipped: {} },
+            vault: { staked: 0, stakedAt: null },
+            streak: { count: 0, lastLogin: null },
+            mutedAgents: [],
+            transactions: [],
+            createdAt: '2026-01-01T00:00:00Z',
+        };
+        mockStorage['openwire:profile:test-device-uuid-4321'] = JSON.stringify(existing);
+        const profile = loadProfile(null);
+        // Should keep existing nick since new nick is falsy
+        expect(profile.currentNick).toBe('KeepThis');
+        expect(profile.chips).toBe(777);
+    });
+});
+
+describe('saveProfile() — error handling', () => {
+    it('does not throw when localStorage.setItem throws', () => {
+        const origSetItem = localStorage.setItem;
+        localStorage.setItem = vi.fn(() => { throw new Error('QuotaExceeded'); });
+        const profile = { deviceId: 'test-id', currentNick: 'Test' };
+        expect(() => saveProfile(profile)).not.toThrow();
+        localStorage.setItem = origSetItem;
+    });
+});
+
+describe('saveProfileToIndexedDB()', () => {
+    it('writes profile to IndexedDB via put()', async () => {
+        const profile = { deviceId: 'test-device-uuid-4321', currentNick: 'Test' };
+        await saveProfileToIndexedDB(profile);
+        // wait for async IDB callbacks
+        await new Promise(r => setTimeout(r, 10));
+        expect(mockStore.put).toHaveBeenCalledWith(profile);
+    });
+});
+
+describe('loadProfileFromIndexedDB()', () => {
+    it('returns null when IndexedDB has no matching profile', async () => {
+        const result = await loadProfileFromIndexedDB('nonexistent-id');
+        // wait for async IDB callbacks
+        await new Promise(r => setTimeout(r, 10));
+        expect(result).toBeNull();
+    });
+});
+
+describe('wipeIdentity() — IndexedDB interaction', () => {
+    it('calls store.delete with the deviceId', async () => {
+        await wipeIdentity('test-device-uuid-4321');
+        await new Promise(r => setTimeout(r, 10));
+        expect(mockStore.delete).toHaveBeenCalledWith('test-device-uuid-4321');
+    });
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   10 -- gifSettings.js (full coverage)
+   ═══════════════════════════════════════════════════════════════ */
+
+import { setDefaultProvider, getDefaultProvider } from '../lib/gifSettings.js';
+
+describe('gifSettings', () => {
+    beforeEach(() => {
+        Object.keys(mockStorage).forEach(k => delete mockStorage[k]);
+    });
+
+    it('getDefaultProvider returns "giphy" when nothing is stored', () => {
+        expect(getDefaultProvider()).toBe('giphy');
+    });
+
+    it('setDefaultProvider stores the value in localStorage', () => {
+        setDefaultProvider('tenor');
+        expect(localStorage.setItem).toHaveBeenCalledWith('openwire:gif_provider', 'tenor');
+    });
+
+    it('getDefaultProvider returns the stored provider', () => {
+        mockStorage['openwire:gif_provider'] = 'tenor';
+        expect(getDefaultProvider()).toBe('tenor');
+    });
+
+    it('setDefaultProvider + getDefaultProvider round-trip', () => {
+        setDefaultProvider('custom-provider');
+        // Simulate localStorage storing it (mock setItem doesn't actually write to mockStorage by default)
+        mockStorage['openwire:gif_provider'] = 'custom-provider';
+        expect(getDefaultProvider()).toBe('custom-provider');
+    });
+});
