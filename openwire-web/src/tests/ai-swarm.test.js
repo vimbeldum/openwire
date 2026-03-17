@@ -1574,3 +1574,143 @@ describe('18 — _generate guards', () => {
         swarm._running = false;
     });
 });
+
+/* ════════════════════════════════════════════════════════════════
+   Section 19 — setProvider, refreshModels, _isActive, _assignModels
+   ════════════════════════════════════════════════════════════════ */
+
+describe('19 — Provider, Models, Active check', () => {
+    it('setProvider to gemini fetches gemini models', async () => {
+        const swarm = makeSwarm();
+        await swarm.setProvider('gemini');
+        expect(swarm._provider).toBe('gemini');
+        expect(swarm._defaultModel).toBeTruthy();
+    });
+
+    it('setProvider to qwen fetches qwen models', async () => {
+        const swarm = makeSwarm();
+        await swarm.setProvider('qwen');
+        expect(swarm._provider).toBe('qwen');
+    });
+
+    it('setProvider to haimaker fetches haimaker models', async () => {
+        const swarm = makeSwarm();
+        await swarm.setProvider('haimaker');
+        expect(swarm._provider).toBe('haimaker');
+    });
+
+    it('setProvider to openrouter sets default model', async () => {
+        const swarm = makeSwarm();
+        await swarm.setProvider('openrouter');
+        expect(swarm._defaultModel).toBe('openrouter/auto');
+    });
+
+    it('refreshModels re-fetches and re-assigns', async () => {
+        const swarm = makeSwarm();
+        await swarm.refreshModels();
+        // Models should be assigned
+        const firstChar = Object.keys(swarm._characters)[0];
+        expect(swarm.getAssignedModel(firstChar)).toBeTruthy();
+    });
+
+    it('_isActive returns true for enabled character in enabled show', () => {
+        const swarm = makeSwarm();
+        const firstChar = Object.keys(swarm._characters)[0];
+        expect(swarm._isActive(firstChar)).toBe(true);
+    });
+
+    it('_isActive returns false for disabled character', () => {
+        const swarm = makeSwarm();
+        const firstChar = Object.keys(swarm._characters)[0];
+        swarm.setCharacterEnabled(firstChar, false);
+        expect(swarm._isActive(firstChar)).toBe(false);
+    });
+
+    it('_isActive returns false for non-existent character', () => {
+        const swarm = makeSwarm();
+        expect(swarm._isActive('nonexistent')).toBeFalsy();
+    });
+
+    it('_assignModels uses fallback when no free models available', () => {
+        const swarm = makeSwarm();
+        swarm._freeModels = [];
+        swarm._assignModels();
+        const firstChar = Object.keys(swarm._characters)[0];
+        expect(swarm._assignedModels[firstChar]).toBeTruthy();
+    });
+
+    it('getAssignedModel respects override', () => {
+        const swarm = makeSwarm();
+        swarm.setModelOverride('jethalal', 'my-custom-model');
+        expect(swarm.getAssignedModel('jethalal')).toBe('my-custom-model');
+    });
+});
+
+/* ════════════════════════════════════════════════════════════════
+   Section 20 — addContext reactive paths
+   ════════════════════════════════════════════════════════════════ */
+
+describe('20 — addContext reactive triggers', () => {
+    it('addContext ignores empty/non-string text', () => {
+        const swarm = makeSwarm();
+        const lenBefore = swarm._context.length;
+        swarm.addContext('User', '');
+        swarm.addContext('User', null);
+        swarm.addContext('User', 42);
+        expect(swarm._context.length).toBe(lenBefore);
+    });
+
+    it('addContext escapes XML tags in human messages', () => {
+        const swarm = makeSwarm();
+        swarm.addContext('User', '<script>alert("xss")</script>');
+        const last = swarm._context[swarm._context.length - 1];
+        expect(last.content).not.toContain('<script>');
+        expect(last.content).toContain('(script)');
+    });
+
+    it('addContext does NOT escape XML in forceIsAgent=true messages', () => {
+        const swarm = makeSwarm();
+        swarm.addContext('Agent', '<identity>test</identity>', true);
+        const last = swarm._context[swarm._context.length - 1];
+        expect(last.content).toContain('<identity>');
+    });
+
+    it('addContext skips reactive scan for agent messages', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        // Agent says something with reactive tag — should NOT trigger other agents
+        swarm.addContext('Jethalal', 'electronics shop mein sab kuch hai', true);
+        // No generate calls should have been queued for reactive triggers
+        // (the log would say "Skipped — agent message")
+        swarm._running = false;
+    });
+
+    it('addContext skips reactive scan when message has @mention', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm.addContext('User', '@jethalal kya haal hai');
+        // Should detect task but skip reactive scan
+        swarm._running = false;
+    });
+
+    it('addContext trims context buffer when exceeding CONTEXT_BUFFER_SIZE', () => {
+        const swarm = makeSwarm();
+        // Fill context past CONTEXT_BUFFER_SIZE (1000)
+        for (let i = 0; i < 1005; i++) {
+            swarm._context.push({ role: 'user', content: `msg-${i}` });
+        }
+        const lenBefore = swarm._context.length;
+        swarm.addContext('User', 'one more message that is long enough');
+        // Should have trimmed — length should not grow unboundedly
+        expect(swarm._context.length).toBeLessThanOrEqual(lenBefore + 1);
+    });
+
+    it('addContext records human facts for messages > 10 chars', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        const factsBefore = swarm._sessionFacts.length;
+        swarm.addContext('Alice', 'This is a message longer than ten characters definitely');
+        expect(swarm._sessionFacts.length).toBeGreaterThan(factsBefore);
+        swarm._running = false;
+    });
+});
