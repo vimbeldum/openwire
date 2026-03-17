@@ -1566,11 +1566,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     }, [amIHost, clearReadyPeers, startBlackjackTimer, startAbCycle]);
 
     // ── Instant start: when all bettors are ready, host triggers game immediately ──
+    // Uses state variables directly (not refs) so the effect fires on both
+    // readyPeers changes AND game state changes (e.g. when a bet is placed).
     useEffect(() => {
         const myId = myIdRef.current;
 
         // Roulette: check if all bettors are ready
-        const rlGame = rouletteRef.current;
+        const rlGame = rouletteGame;
         if (rlGame && rlGame.phase === 'betting' && amIHost(rouletteHostRef.current)) {
             const bettorIds = [...new Set((rlGame.bets || []).map(b => b.peer_id))];
             const readySet = readyPeers.roulette;
@@ -1609,7 +1611,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         }
 
         // Blackjack: check if all bettors are ready
-        const bjGame = blackjackRef.current;
+        const bjGame = blackjackGame;
         if (bjGame && bjGame.phase === 'betting' && amIHost(bjHostRef.current)) {
             const bettorIds = bjGame.players.filter(p => p.bet > 0).map(p => p.peer_id);
             const readySet = readyPeers.blackjack;
@@ -1625,7 +1627,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         }
 
         // Andar Bahar: check if all bettors are ready
-        const abGame = andarBaharRef.current;
+        const abGame = andarBaharGame;
         if (abGame && abGame.phase === 'betting' && amIHost(abHostRef.current)) {
             const bettorIds = [...new Set((abGame.bets || []).map(b => b.peer_id))];
             const readySet = readyPeers.andarbahar;
@@ -1669,7 +1671,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 }, ab.DEAL_INTERVAL_MS);
             }
         }
-    }, [readyPeers, amIHost, clearReadyPeers, updateBankLedger, resolvePayoutEvent, startRouletteTimer, startAbCycle, startTurnTimer, bjCheckDealerTransition]);
+    }, [readyPeers, rouletteGame, blackjackGame, andarBaharGame, amIHost, clearReadyPeers, updateBankLedger, resolvePayoutEvent, startRouletteTimer, startAbCycle, startTurnTimer, bjCheckDealerTransition]);
 
     // ── Clear ready peers when phase changes away from betting ──
     useEffect(() => {
