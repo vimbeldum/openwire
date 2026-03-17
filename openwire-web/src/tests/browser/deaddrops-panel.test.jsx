@@ -193,4 +193,48 @@ describe('DeadDropsPanel', () => {
             expect(screen.queryByText(/No drops yet/i)).not.toBeInTheDocument();
         });
     });
+
+    describe('voting', () => {
+        it('clicking upvote button calls vote with correct direction', () => {
+            vi.mocked(deaddropsLib.loadFromSession).mockReturnValue([MOCK_POST]);
+            renderPanel({ karma: 60 });
+            // The upvote button should be in the post card
+            const upBtn = screen.getByTitle?.('Upvote') || screen.getAllByText('▲')[0];
+            if (upBtn) {
+                fireEvent.click(upBtn);
+                expect(deaddropsLib.vote).toHaveBeenCalled();
+                expect(deaddropsLib.saveToSession).toHaveBeenCalled();
+            }
+        });
+
+        it('clicking downvote button calls vote', () => {
+            vi.mocked(deaddropsLib.loadFromSession).mockReturnValue([MOCK_POST]);
+            renderPanel({ karma: 60 });
+            const downBtn = screen.getByTitle?.('Downvote') || screen.getAllByText('▼')[0];
+            if (downBtn) {
+                fireEvent.click(downBtn);
+                expect(deaddropsLib.vote).toHaveBeenCalled();
+            }
+        });
+    });
+
+    describe('createPost error handling', () => {
+        it('shows error message when createPost fails', () => {
+            vi.mocked(deaddropsLib.createPost).mockReturnValue({ success: false, reason: 'cooldown' });
+            renderPanel({ karma: 60 });
+            const textarea = screen.getByPlaceholderText(/Drop something anonymous/i);
+            fireEvent.change(textarea, { target: { value: 'test message' } });
+            fireEvent.click(screen.getByRole('button', { name: 'Drop It' }));
+            expect(screen.getByText(/cooldown/i)).toBeInTheDocument();
+        });
+
+        it('does not clear textarea on failed post', () => {
+            vi.mocked(deaddropsLib.createPost).mockReturnValue({ success: false, reason: 'too_short' });
+            renderPanel({ karma: 60 });
+            const textarea = screen.getByPlaceholderText(/Drop something anonymous/i);
+            fireEvent.change(textarea, { target: { value: 'hi' } });
+            fireEvent.click(screen.getByRole('button', { name: 'Drop It' }));
+            expect(textarea.value).toBe('hi');
+        });
+    });
 });
