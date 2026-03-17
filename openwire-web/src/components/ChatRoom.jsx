@@ -1499,30 +1499,11 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     // ── Instant start check (called directly, not via useEffect) ──
     const tryInstantStartRef = useRef(null);
     tryInstantStartRef.current = (gameType, readySet) => {
-        const myId = myIdRef.current;
-
-        // Diagnostic: log which condition fails (remove after debugging)
-        const _dbg = (game, hostRef, bettorIds) => {
-            console.warn('[ReadyCheck]', gameType, {
-                hasGame: !!game,
-                phase: game?.phase,
-                myId,
-                hostRef: hostRef?.current ?? hostRef,
-                amIHost: amIHost(hostRef),
-                bettorIds,
-                readySetSize: readySet?.size,
-                readySetEntries: readySet ? [...readySet] : [],
-                allReady: bettorIds?.length > 0 && bettorIds.every(id => readySet?.has(id)),
-            });
-        };
-
         if (gameType === 'roulette') {
             const rlGame = rouletteRef.current;
-            const _bIds = [...new Set((rlGame?.bets || []).map(b => b.peer_id))];
-            _dbg(rlGame, rouletteHostRef.current, _bIds);
             if (!rlGame || rlGame.phase !== 'betting' || !amIHost(rouletteHostRef.current)) return;
-            const bettorIds = [...new Set((rlGame.bets || []).map(b => b.peer_id))];
-            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
+            const bettorCount = new Set((rlGame.bets || []).map(b => b.peer_id)).size;
+            if (bettorCount > 0 && readySet.size >= bettorCount) {
                 clearReadyPeers('roulette');
                 if (rouletteTimerRef.current) clearInterval(rouletteTimerRef.current);
                 const spun = rl.spin(rlGame);
@@ -1549,11 +1530,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             }
         } else if (gameType === 'blackjack') {
             const bjGame = blackjackRef.current;
-            const _bIds2 = bjGame?.players?.filter(p => p.bet > 0).map(p => p.peer_id) || [];
-            _dbg(bjGame, bjHostRef.current, _bIds2);
             if (!bjGame || bjGame.phase !== 'betting' || !amIHost(bjHostRef.current)) return;
-            const bettorIds = bjGame.players.filter(p => p.bet > 0).map(p => p.peer_id);
-            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
+            const bettorCount = bjGame.players.filter(p => p.bet > 0).length;
+            if (bettorCount > 0 && readySet.size >= bettorCount) {
                 clearReadyPeers('blackjack');
                 if (bjDealerTimerRef.current) clearTimeout(bjDealerTimerRef.current);
                 const dealtGame = bj.dealInitialCards(bjGame);
@@ -1564,11 +1543,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             }
         } else if (gameType === 'andarbahar') {
             const abGame = andarBaharRef.current;
-            const _bIds3 = [...new Set((abGame?.bets || []).map(b => b.peer_id))];
-            _dbg(abGame, abHostRef.current, _bIds3);
             if (!abGame || abGame.phase !== 'betting' || !amIHost(abHostRef.current)) return;
-            const bettorIds = [...new Set((abGame.bets || []).map(b => b.peer_id))];
-            if (bettorIds.length > 0 && bettorIds.every(id => readySet.has(id))) {
+            const bettorCount = new Set((abGame.bets || []).map(b => b.peer_id)).size;
+            if (bettorCount > 0 && readySet.size >= bettorCount) {
                 clearReadyPeers('andarbahar');
                 if (abCycleTimerRef.current) clearTimeout(abCycleTimerRef.current);
                 abGenRef.current++;
