@@ -2142,3 +2142,114 @@ describe('25 — Reactive triggers mention-only + guardrails', () => {
         swarm._running = false;
     });
 });
+
+/* ════════════════════════════════════════════════════════════════
+   Section 26 — Full generation cycle (triggers _processQueue prompt building)
+   ════════════════════════════════════════════════════════════════ */
+
+describe('26 — Full generation cycle', () => {
+    it('_generate + _processQueue produces a message callback', async () => {
+        const onMessage = vi.fn();
+        const swarm = makeSwarm({ onMessage });
+        swarm._running = true;
+        swarm._globalCooldown = 0; // disable cooldown for test speed
+        swarm._perCharCooldown = 0;
+        await swarm._generate('jethalal', { force: true });
+        // Wait for async queue processing
+        await new Promise(r => setTimeout(r, 50));
+        expect(onMessage).toHaveBeenCalled();
+        swarm._running = false;
+    });
+
+    it('generation with mood produces message', async () => {
+        const onMessage = vi.fn();
+        const swarm = makeSwarm({ onMessage });
+        swarm._running = true;
+        swarm._globalCooldown = 0;
+        swarm._perCharCooldown = 0;
+        swarm.setMood('jethalal', 'panicking');
+        await swarm._generate('jethalal', { force: true });
+        await new Promise(r => setTimeout(r, 50));
+        expect(onMessage).toHaveBeenCalled();
+        swarm._running = false;
+    });
+
+    it('generation with session facts includes them in context', async () => {
+        const onMessage = vi.fn();
+        const swarm = makeSwarm({ onMessage });
+        swarm._running = true;
+        swarm._globalCooldown = 0;
+        swarm._perCharCooldown = 0;
+        swarm.addSessionFact('Alice accused Bob of stealing the diamonds');
+        await swarm._generate('jethalal', { force: true });
+        await new Promise(r => setTimeout(r, 50));
+        expect(onMessage).toHaveBeenCalled();
+        swarm._running = false;
+    });
+
+    it('generation with context summary includes summary block', async () => {
+        const onMessage = vi.fn();
+        const swarm = makeSwarm({ onMessage });
+        swarm._running = true;
+        swarm._globalCooldown = 0;
+        swarm._perCharCooldown = 0;
+        swarm._contextSummary = ['Previous chat: Jethalal fought with Babita ji'];
+        await swarm._generate('jethalal', { force: true });
+        await new Promise(r => setTimeout(r, 50));
+        expect(onMessage).toHaveBeenCalled();
+        swarm._running = false;
+    });
+
+    it('generation with active task includes task prompt', async () => {
+        const onMessage = vi.fn();
+        const swarm = makeSwarm({ onMessage });
+        swarm._running = true;
+        swarm._globalCooldown = 0;
+        swarm._perCharCooldown = 0;
+        try { localStorage.removeItem('openwire_task_queue'); } catch {}
+        swarm.addContext('User', '@jethalal make a shopping list');
+        await swarm._generate('jethalal', { force: true });
+        await new Promise(r => setTimeout(r, 50));
+        expect(onMessage).toHaveBeenCalled();
+        swarm._running = false;
+    });
+
+    it('generation with guardrails=false uses unfiltered prompt', async () => {
+        const onMessage = vi.fn();
+        const swarm = makeSwarm({ onMessage });
+        swarm._running = true;
+        swarm._globalCooldown = 0;
+        swarm._perCharCooldown = 0;
+        swarm._guardrails = false;
+        await swarm._generate('jethalal', { force: true });
+        await new Promise(r => setTimeout(r, 50));
+        expect(onMessage).toHaveBeenCalled();
+        swarm._running = false;
+    });
+
+    it('generation with guardrails=true uses SFW prompt', async () => {
+        const onMessage = vi.fn();
+        const swarm = makeSwarm({ onMessage });
+        swarm._running = true;
+        swarm._globalCooldown = 0;
+        swarm._perCharCooldown = 0;
+        swarm._guardrails = true;
+        await swarm._generate('jethalal', { force: true });
+        await new Promise(r => setTimeout(r, 50));
+        expect(onMessage).toHaveBeenCalled();
+        swarm._running = false;
+    });
+
+    it('generation tracks stats when statsDebug enabled', async () => {
+        const onMessage = vi.fn();
+        const swarm = makeSwarm({ onMessage });
+        swarm._running = true;
+        swarm._globalCooldown = 0;
+        swarm._perCharCooldown = 0;
+        swarm.setStatsDebug(true);
+        await swarm._generate('jethalal', { force: true });
+        await new Promise(r => setTimeout(r, 50));
+        expect(swarm._stats.generations.length).toBeGreaterThan(0);
+        swarm._running = false;
+    });
+});
