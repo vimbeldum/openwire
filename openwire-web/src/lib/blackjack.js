@@ -467,7 +467,7 @@ export function dealerPlay(game) {
     if (game.phase !== 'dealer') return game;
 
     let deck = [...game.deck];
-    let dealer = { ...game.dealer, revealed: true };
+    let dealer = { ...game.dealer, hand: [...game.dealer.hand], revealed: true };
 
     // Dealer hits on 16 or less, stands on 17+
     while (calculateHand(dealer.hand) < 17) {

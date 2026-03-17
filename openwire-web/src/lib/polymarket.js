@@ -148,6 +148,33 @@ export function buyShares(game, peer_id, nick, outcomeIdx, shares) {
 
     const quantities = [...game.pool.quantities];
     quantities[outcomeIdx] += shares;
+    // Maintain CPMM invariant: decrement the other side(s) by the cost paid.
+    // For binary markets, k = q0 * q1 must stay constant after the trade.
+    // For multi-outcome, distribute the cost reduction proportionally.
+    if (isBinary) {
+        const other = 1 - outcomeIdx;
+        quantities[other] -= cost;
+        if (quantities[other] < 1) quantities[other] = 1; // floor at 1 to prevent division by zero
+    } else {
+        // Spread cost reduction across other outcomes proportionally
+        const others = quantities.map((q, i) => i !== outcomeIdx ? i : -1).filter(i => i >= 0);
+        const totalOther = others.reduce((s, i) => s + quantities[i], 0);
+        let remaining = cost;
+        for (const i of others) {
+            const share = totalOther > 0 ? Math.round(cost * quantities[i] / totalOther) : Math.round(cost / others.length);
+            const deduction = Math.min(share, quantities[i] - 1, remaining);
+            quantities[i] -= deduction;
+            remaining -= deduction;
+        }
+        // Sweep any rounding remainder into the first outcome that has room
+        for (const i of others) {
+            if (remaining <= 0) break;
+            const canTake = quantities[i] - 1;
+            const take = Math.min(canTake, remaining);
+            quantities[i] -= take;
+            remaining -= take;
+        }
+    }
     const pool = { ...game.pool, quantities };
 
     const prev = game.positions[peer_id] || { nick, shares: new Array(n).fill(0), totalCost: 0 };
@@ -192,6 +219,25 @@ export function sellShares(game, peer_id, nick, outcomeIdx, shares) {
 
     const quantities = [...game.pool.quantities];
     quantities[outcomeIdx] -= shares;
+    // Maintain CPMM invariant: increment the other side(s) by the revenue returned.
+    if (isBinary) {
+        const other = 1 - outcomeIdx;
+        quantities[other] += revenue;
+    } else {
+        const others = quantities.map((q, i) => i !== outcomeIdx ? i : -1).filter(i => i >= 0);
+        const totalOther = others.reduce((s, i) => s + quantities[i], 0);
+        let remaining = revenue;
+        for (const i of others) {
+            const share = totalOther > 0 ? Math.round(revenue * quantities[i] / totalOther) : Math.round(revenue / others.length);
+            const addition = Math.min(share, remaining);
+            quantities[i] += addition;
+            remaining -= addition;
+        }
+        // Sweep any rounding remainder into the first available outcome
+        if (remaining > 0 && others.length > 0) {
+            quantities[others[0]] += remaining;
+        }
+    }
     const pool = { ...game.pool, quantities };
     const playerShares = [...pos.shares];
     playerShares[outcomeIdx] -= shares;

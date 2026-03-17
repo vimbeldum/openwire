@@ -107,9 +107,10 @@ export function mergeCasinoStates(local, remote) {
 
     const merged = { ...local };
 
-    // LWW on housePnl: whichever peer has the newer _ts wins
+    // LWW on housePnl: whichever peer has the newer _ts wins,
+    // but merge with local to preserve game types the remote doesn't know about
     if ((remote.housePnl?._ts ?? 0) > (local.housePnl?._ts ?? 0)) {
-        merged.housePnl = { ...remote.housePnl };
+        merged.housePnl = { ...local.housePnl, ...remote.housePnl };
     }
 
     // Top-level timestamp = max of both

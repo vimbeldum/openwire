@@ -7,7 +7,7 @@
    objects and never mutate their inputs.
    ═══════════════════════════════════════════════════════════ */
 
-import { getTotalBalance, canAfford } from './wallet.js';
+import { getTotalBalance, canAfford, saveWalletSync } from './wallet.js';
 
 /* ── Constants ────────────────────────────────────────────── */
 export const MIN_STAKE    = 100;
@@ -23,7 +23,7 @@ export const PENALTY_HOURS = 12;   // withdraw penalty if < 12h staked
  * @returns {number} Floored integer interest chips earned
  */
 export function calculateInterest(principal, stakedAtTimestamp) {
-    const hoursElapsed = (Date.now() - stakedAtTimestamp) / 3_600_000;
+    const hoursElapsed = Math.max(0, (Date.now() - stakedAtTimestamp) / 3_600_000);
     const periods = hoursElapsed / 24;
     return Math.floor(principal * Math.pow(1 + RATE, periods) - principal);
 }
@@ -102,6 +102,12 @@ export function stake(profile, wallet, amount) {
             { time: Date.now(), reason: 'Vault stake', amount: -amount, balance: newTotal },
         ],
     };
+
+    // Persist wallet synchronously — the vault update is stored in the profile
+    // (a separate object), so if profile saves first and a reload occurs before
+    // the debounced wallet timer fires, the user would have staked chips AND
+    // keep the old wallet balance (chip duplication).
+    saveWalletSync(updatedWallet);
 
     // Compound accrued interest into principal before resetting the timer,
     // so additional deposits don't silently destroy earned interest.

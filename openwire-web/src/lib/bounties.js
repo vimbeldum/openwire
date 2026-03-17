@@ -72,7 +72,10 @@ export function createBounty(roomId, creatorDeviceId, creatorNick, description, 
 }
 
 /* ── 2. escrowBounty ──────────────────────────────────────── */
-// Inline debit (no wallet.js import — avoids circular deps)
+// Inline debit (no wallet.js import — avoids circular deps).
+// Persists wallet synchronously to prevent chip duplication on reload:
+// the bounty P2P message fires immediately, so the deduction must be
+// durable before the next tick.
 // Returns { success, wallet?, bounty?, reason? }
 export function escrowBounty(wallet, bounty) {
     const total = (wallet.baseBalance || 0) + (wallet.adminBonus || 0);
@@ -90,19 +93,35 @@ export function escrowBounty(wallet, bounty) {
     }
 
     const newTotal = Math.max(0, base) + Math.max(0, bonus);
+    const updatedWallet = {
+        ...wallet,
+        baseBalance: Math.max(0, base),
+        adminBonus: Math.max(0, bonus),
+        history: [
+            ...(wallet.history ?? []).slice(-99),
+            { time: Date.now(), reason: 'Bounty escrow', amount: -bounty.reward, balance: newTotal },
+        ],
+    };
+
+    // Synchronous persist — same pattern as wallet.debit() / wallet.tip()
+    _persistWalletSync(updatedWallet);
+
     return {
         success: true,
-        wallet: {
-            ...wallet,
-            baseBalance: Math.max(0, base),
-            adminBonus: Math.max(0, bonus),
-            history: [
-                ...(wallet.history ?? []).slice(-99),
-                { time: Date.now(), reason: 'Bounty escrow', amount: -bounty.reward, balance: newTotal },
-            ],
-        },
+        wallet: updatedWallet,
         bounty: { ...bounty, escrowedAt: Date.now() },
     };
+}
+
+/** Inline synchronous wallet save — avoids importing wallet.js (circular dep) */
+function _persistWalletSync(wallet) {
+    try {
+        const key = `openwire_wallet_dev_${wallet.deviceId}`;
+        localStorage.setItem(key, JSON.stringify(wallet));
+    } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('Failed to save wallet (sync)', e);
+    }
 }
 
 /* ── 3. submitAttempt ─────────────────────────────────────── */
@@ -113,6 +132,9 @@ export function submitAttempt(bounty, deviceId, nick, messageRef, nowMs) {
 
     if (nowMs >= bounty.expiresAt)
         return { success: false, reason: 'bounty_expired' };
+
+    if (bounty.status === 'voting' && bounty.votingEndsAt && nowMs >= bounty.votingEndsAt)
+        return { success: false, reason: 'voting_period_ended' };
 
     const deviceHash = hashDeviceId(deviceId);
 

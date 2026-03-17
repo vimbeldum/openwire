@@ -51,8 +51,8 @@ export function calculateKarmaChange(eventType, data = {}) {
     switch (eventType) {
         case KARMA_EVENTS.TIP_RECEIVED:
             return {
-                delta:  Math.floor((data.amount / 100) * 2),
-                reason: `Tip received: ${data.amount} chips`,
+                delta:  Math.floor(((data.amount ?? 0) / 100) * 2),
+                reason: `Tip received: ${data.amount ?? 0} chips`,
             };
         case KARMA_EVENTS.GAME_WIN:
             return { delta: 3, reason: 'Game win' };
@@ -60,8 +60,8 @@ export function calculateKarmaChange(eventType, data = {}) {
             return { delta: 1, reason: 'Reaction received' };
         case KARMA_EVENTS.DEAD_DROP_UPVOTED:
             return {
-                delta:  Math.floor(data.upvotes / 5) * 2,
-                reason: `Dead drop upvoted: ${data.upvotes} votes`,
+                delta:  Math.floor((data.upvotes ?? 0) / 5) * 2,
+                reason: `Dead drop upvoted: ${data.upvotes ?? 0} votes`,
             };
         case KARMA_EVENTS.BOUNTY_WON:
             return { delta: 5, reason: 'Bounty won' };
@@ -91,7 +91,7 @@ export function calculateKarmaChange(eventType, data = {}) {
  * @returns {{ karma: number, tier: string, history: Array }}
  */
 export function applyKarma(reputation, eventType, data = {}, timestamp = Date.now()) {
-    if (checkCooldown(reputation, eventType, data)) {
+    if (checkCooldown(reputation, eventType, data, timestamp)) {
         return { ...reputation };
     }
 
@@ -99,9 +99,14 @@ export function applyKarma(reputation, eventType, data = {}, timestamp = Date.no
 
     let newKarma = Math.max(0, (reputation.karma ?? 0) + delta);
 
+    // BANNED resets karma to 0 so the user must rebuild reputation
+    if (eventType === KARMA_EVENTS.BANNED) {
+        newKarma = 0;
+    }
+
     const entry = {
         eventType,
-        delta,
+        delta: eventType === KARMA_EVENTS.BANNED ? -(reputation.karma ?? 0) : delta,
         reason,
         timestamp,
         data: { ...data },
@@ -109,7 +114,6 @@ export function applyKarma(reputation, eventType, data = {}, timestamp = Date.no
 
     const history = [entry, ...(reputation.history ?? [])].slice(0, HISTORY_LIMIT);
 
-    // BANNED resets tier to newcomer regardless of karma
     const tier = eventType === KARMA_EVENTS.BANNED
         ? 'newcomer'
         : getTier(newKarma).name;
@@ -125,9 +129,9 @@ export function applyKarma(reputation, eventType, data = {}, timestamp = Date.no
  * @param {object} data
  * @returns {boolean}
  */
-export function checkCooldown(reputation, eventType, data = {}) {
+export function checkCooldown(reputation, eventType, data = {}, nowMs = Date.now()) {
     const history = reputation.history ?? [];
-    const now     = Date.now();
+    const now     = nowMs;
 
     if (eventType === KARMA_EVENTS.GAME_WIN) {
         const gameType = data.gameType;
