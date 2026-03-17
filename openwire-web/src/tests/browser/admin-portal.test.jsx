@@ -421,6 +421,42 @@ describe('AdminPortal — Agents tab', () => {
 
 // ── Stats tab tests ─────────────────────────────────────────────────────────
 
+describe('AdminPortal — Stats tab: Dashboard', () => {
+    it('shows Players Online count', async () => {
+        render(<AdminPortal {...makeDefaultProps({
+            peers: [makePeer(), makePeer({ peer_id: 'p2', nick: 'Bob' })],
+        })} />);
+        await userEvent.click(screen.getByRole('button', { name: /stats/i }));
+        expect(screen.getByText('2')).toBeInTheDocument();
+    });
+
+    it('shows Richest Player', async () => {
+        render(<AdminPortal {...makeDefaultProps({
+            peers: [makePeer({ balance: 5000 }), makePeer({ peer_id: 'p2', nick: 'Richie', balance: 99999 })],
+        })} />);
+        await userEvent.click(screen.getByRole('button', { name: /stats/i }));
+        expect(screen.getByText(/Richie/)).toBeInTheDocument();
+    });
+
+    it('shows "—" when no players for Richest', async () => {
+        render(<AdminPortal {...makeDefaultProps({ peers: [] })} />);
+        await userEvent.click(screen.getByRole('button', { name: /stats/i }));
+        expect(screen.getByText('—')).toBeInTheDocument();
+    });
+
+    it('shows GIF Provider select', async () => {
+        render(<AdminPortal {...makeDefaultProps()} />);
+        await userEvent.click(screen.getByRole('button', { name: /stats/i }));
+        expect(screen.getByText('Default GIF Provider')).toBeInTheDocument();
+    });
+
+    it('shows Dead Drops min karma setting', async () => {
+        render(<AdminPortal {...makeDefaultProps()} />);
+        await userEvent.click(screen.getByRole('button', { name: /stats/i }));
+        expect(screen.getByText(/Dead Drops/)).toBeInTheDocument();
+    });
+});
+
 describe('AdminPortal — Stats tab', () => {
     it('P&L values rendered per game from casinoState.housePnl', async () => {
         const casinoState = {
