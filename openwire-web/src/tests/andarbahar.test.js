@@ -315,6 +315,76 @@ describe('AndarBaharEngine', () => {
    SUITE 7 — Message protocol & serialization
    ═══════════════════════════════════════════════════════════════ */
 
+describe('AndarBaharEngine.calculateResults', () => {
+    function makeEndedState(bets, result = 'andar', trumpFirst = 'bahar', totalCards = 8) {
+        return {
+            roomId: 'room-ab',
+            result,
+            trumpFirst,
+            bets,
+            andar: Array(Math.ceil(totalCards / 2)).fill({ value: '5', suit: '♠' }),
+            bahar: Array(Math.floor(totalCards / 2)).fill({ value: '3', suit: '♥' }),
+            phase: 'ended',
+        };
+    }
+
+    it('returns win breakdown for main bet on winning side', () => {
+        const state = makeEndedState([{ peer_id: 'p1', nick: 'A', side: 'andar', amount: 100 }], 'andar', 'bahar');
+        const engine = new AndarBaharEngine(state);
+        const event = engine.calculateResults(state);
+        const row = event.breakdown.find(b => b.peer_id === 'p1');
+        expect(row.outcome).toBe('win');
+        expect(row.net).toBe(90); // 0.9:1 for andar when trump on bahar
+    });
+
+    it('returns loss breakdown for main bet on losing side', () => {
+        const state = makeEndedState([{ peer_id: 'p1', nick: 'A', side: 'bahar', amount: 100 }], 'andar', 'bahar');
+        const engine = new AndarBaharEngine(state);
+        const event = engine.calculateResults(state);
+        const row = event.breakdown.find(b => b.peer_id === 'p1');
+        expect(row.outcome).toBe('loss');
+        expect(row.net).toBe(-100);
+    });
+
+    it('returns win for correct side bet', () => {
+        // 1-5 range side bet wins when totalCards <= 5
+        const state = makeEndedState([{ peer_id: 'p1', nick: 'A', side: '1-5', amount: 100 }], 'andar', 'bahar', 3);
+        const engine = new AndarBaharEngine(state);
+        const event = engine.calculateResults(state);
+        const row = event.breakdown.find(b => b.peer_id === 'p1');
+        expect(row.outcome).toBe('win');
+        expect(row.net).toBeGreaterThan(0);
+    });
+
+    it('returns loss for incorrect side bet', () => {
+        // 1-5 range side bet loses when totalCards > 5
+        const state = makeEndedState([{ peer_id: 'p1', nick: 'A', side: '1-5', amount: 100 }], 'andar', 'bahar', 20);
+        const engine = new AndarBaharEngine(state);
+        const event = engine.calculateResults(state);
+        const row = event.breakdown.find(b => b.peer_id === 'p1');
+        expect(row.outcome).toBe('loss');
+        expect(row.net).toBe(-100);
+    });
+
+    it('calculates totals per player', () => {
+        const state = makeEndedState([
+            { peer_id: 'p1', nick: 'A', side: 'andar', amount: 100 },
+            { peer_id: 'p1', nick: 'A', side: '1-5', amount: 50 },
+        ], 'andar', 'bahar', 3);
+        const engine = new AndarBaharEngine(state);
+        const event = engine.calculateResults(state);
+        expect(event.totals.p1).toBeDefined();
+    });
+
+    it('handles empty bets array', () => {
+        const state = makeEndedState([], 'andar');
+        const engine = new AndarBaharEngine(state);
+        const event = engine.calculateResults(state);
+        expect(event.breakdown).toEqual([]);
+        expect(event.totals).toEqual({});
+    });
+});
+
 describe('Andar Bahar message protocol', () => {
     it('isAndarBaharMessage detects AB: prefix', () => {
         expect(isAndarBaharMessage('AB:{"action":"bet"}')).toBe(true);
