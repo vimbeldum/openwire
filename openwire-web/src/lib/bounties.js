@@ -196,11 +196,27 @@ export function expireBounty(bounty, nowMs) {
 // Credits winner's wallet. Call with the winning participant's wallet.
 export function releaseEscrow(wallet, bounty) {
     if (!bounty.winnerId) return wallet;
-    return { ...wallet, baseBalance: (wallet.baseBalance || 0) + bounty.reward };
+    const newBase = (wallet.baseBalance || 0) + bounty.reward;
+    return {
+        ...wallet,
+        baseBalance: newBase,
+        history: [
+            ...(wallet.history ?? []).slice(-99),
+            { time: Date.now(), reason: 'Bounty reward', amount: bounty.reward, balance: newBase + (wallet.adminBonus || 0) },
+        ],
+    };
 }
 
 /* ── 8. refundEscrow ──────────────────────────────────────── */
 // Returns escrowed reward to creator (expired / tied / no valid winner).
 export function refundEscrow(wallet, bounty) {
-    return { ...wallet, baseBalance: (wallet.baseBalance || 0) + bounty.reward };
+    const newBase = (wallet.baseBalance || 0) + bounty.reward;
+    return {
+        ...wallet,
+        baseBalance: newBase,
+        history: [
+            ...(wallet.history ?? []).slice(-99),
+            { time: Date.now(), reason: 'Bounty refund', amount: bounty.reward, balance: newBase + (wallet.adminBonus || 0) },
+        ],
+    };
 }
