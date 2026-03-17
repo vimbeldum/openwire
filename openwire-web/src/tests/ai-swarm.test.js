@@ -1714,3 +1714,128 @@ describe('20 — addContext reactive triggers', () => {
         swarm._running = false;
     });
 });
+
+/* ════════════════════════════════════════════════════════════════
+   Section 21 — flushContext, loadSummary, setStatsDebug, loadConfig
+   ════════════════════════════════════════════════════════════════ */
+
+describe('21 — Context management + config reload', () => {
+    it('flushContext clears context, facts, and summary', () => {
+        const swarm = makeSwarm();
+        swarm._context.push({ role: 'user', content: 'test' });
+        swarm._sessionFacts.push('fact1');
+        swarm._contextSummary = ['summary1'];
+        swarm.flushContext();
+        expect(swarm._context.length).toBe(1); // only TURN2_ANCHOR remains
+        expect(swarm._sessionFacts.length).toBe(0);
+        expect(swarm._contextSummary.length).toBe(0);
+    });
+
+    it('loadSummary accepts string format', () => {
+        const swarm = makeSwarm();
+        swarm.loadSummary('This is a summary of previous context');
+        expect(swarm._contextSummary).toEqual(['This is a summary of previous context']);
+    });
+
+    it('loadSummary accepts array format', () => {
+        const swarm = makeSwarm();
+        swarm.loadSummary(['Block 1', 'Block 2', 'Block 3']);
+        expect(swarm._contextSummary).toEqual(['Block 1', 'Block 2', 'Block 3']);
+    });
+
+    it('loadSummary caps at 5 blocks', () => {
+        const swarm = makeSwarm();
+        swarm.loadSummary(['a', 'b', 'c', 'd', 'e', 'f', 'g']);
+        expect(swarm._contextSummary.length).toBe(5);
+    });
+
+    it('loadSummary ignores null/undefined', () => {
+        const swarm = makeSwarm();
+        swarm._contextSummary = []; // reset
+        swarm.loadSummary(null);
+        swarm.loadSummary(undefined);
+        expect(swarm._contextSummary.length).toBe(0);
+    });
+
+    it('loadSummary ignores non-string non-array', () => {
+        const swarm = makeSwarm();
+        swarm._contextSummary = []; // reset
+        swarm.loadSummary(42);
+        swarm.loadSummary({ foo: 'bar' });
+        expect(swarm._contextSummary.length).toBe(0);
+    });
+
+    it('setStatsDebug enables debug mode', () => {
+        const swarm = makeSwarm();
+        swarm.setStatsDebug(true);
+        expect(swarm._statsDebug).toBe(true);
+    });
+
+    it('setStatsDebug(false) clears generation stats', () => {
+        const swarm = makeSwarm();
+        swarm._stats.generations = [{ id: 1 }, { id: 2 }];
+        swarm._stats.byCharacter = { jethalal: { count: 5 } };
+        swarm.setStatsDebug(false);
+        expect(swarm._stats.generations).toEqual([]);
+        expect(swarm._stats.byCharacter).toEqual({});
+    });
+
+    it('loadConfig clears and restarts timers', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        // Add some fake timers
+        swarm._timers.fake = setTimeout(() => {}, 999999);
+        swarm._crossoverTimers.add(setTimeout(() => {}, 999999));
+        swarm._moodTimers.add(setTimeout(() => {}, 999999));
+
+        swarm.loadConfig();
+        expect(Object.keys(swarm._timers).length).toBe(0);
+        expect(swarm._crossoverTimers.size).toBe(0);
+        expect(swarm._moodTimers.size).toBe(0);
+        swarm._running = false;
+    });
+
+    it('loadConfig restarts stagger timers when running', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm.loadConfig();
+        expect(swarm._staggerTimers.length).toBeGreaterThan(0);
+        // cleanup
+        swarm._staggerTimers.forEach(t => clearTimeout(t));
+        swarm._running = false;
+    });
+
+    it('loadConfig does not restart timers when not running', () => {
+        const swarm = makeSwarm();
+        swarm._running = false;
+        swarm.loadConfig();
+        expect(swarm._staggerTimers.length).toBe(0);
+    });
+
+    it('onSummaryUpdate setter works', () => {
+        const swarm = makeSwarm();
+        const cb = vi.fn();
+        swarm.onSummaryUpdate = cb;
+        expect(swarm._onSummaryUpdate).toBe(cb);
+    });
+
+    it('stop clears typing indicators for queued characters', () => {
+        const onTyping = vi.fn();
+        const swarm = makeSwarm({ onTyping });
+        swarm._running = true;
+        // Manually add a queued task
+        swarm._messageQueue = [{ characterId: 'jethalal', retries: 0 }];
+        swarm.stop();
+        expect(onTyping).toHaveBeenCalledWith('jethalal', expect.any(String), expect.any(String), false);
+        expect(swarm._messageQueue.length).toBe(0);
+    });
+
+    it('start() is idempotent when already running', async () => {
+        const swarm = makeSwarm();
+        await swarm.start();
+        const gen = swarm._generation;
+        await swarm.start(); // should be no-op
+        expect(swarm._generation).toBe(gen);
+        swarm.stop();
+    });
+});
