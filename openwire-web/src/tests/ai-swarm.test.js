@@ -1839,3 +1839,85 @@ describe('21 — Context management + config reload', () => {
         swarm.stop();
     });
 });
+
+/* ════════════════════════════════════════════════════════════════
+   Section 22 — setMentionOnlyMode, setMood, read-only getters
+   ════════════════════════════════════════════════════════════════ */
+
+describe('22 — MentionOnlyMode + read-only getters', () => {
+    it('setMentionOnlyMode(true) activates all characters for 4 min', () => {
+        const swarm = makeSwarm();
+        swarm.setMentionOnlyMode(true);
+        expect(swarm.mentionOnlyMode).toBe(true);
+        const firstChar = Object.keys(swarm._characters)[0];
+        expect(swarm._charActiveUntil[firstChar]).toBeGreaterThan(Date.now());
+    });
+
+    it('setMentionOnlyMode(false) clears active windows', () => {
+        const swarm = makeSwarm();
+        swarm.setMentionOnlyMode(true);
+        swarm.setMentionOnlyMode(false);
+        expect(swarm.mentionOnlyMode).toBe(false);
+        expect(Object.keys(swarm._charActiveUntil)).toHaveLength(0);
+    });
+
+    it('setMood updates character mood', () => {
+        const swarm = makeSwarm();
+        swarm.setMood('jethalal', 'panicking');
+        expect(swarm.getMood('jethalal')).toBe('panicking');
+    });
+
+    it('setMood ignores invalid mood', () => {
+        const swarm = makeSwarm();
+        swarm.setMood('jethalal', 'nonexistent_mood_that_doesnt_exist');
+        expect(swarm.getMood('jethalal')).toBe('normal');
+    });
+
+    it('setMood ignores non-existent character', () => {
+        const swarm = makeSwarm();
+        swarm.setMood('nonexistent', 'happy');
+        // should not throw
+    });
+
+    it('getMoods returns available moods for a character', () => {
+        const swarm = makeSwarm();
+        const moods = swarm.getMoods('jethalal');
+        expect(Array.isArray(moods)).toBe(true);
+    });
+
+    it('read-only getters return expected types', () => {
+        const swarm = makeSwarm();
+        expect(typeof swarm.running).toBe('boolean');
+        expect(Array.isArray(swarm.freeModels)).toBe(true);
+        expect(typeof swarm.chatterLevel).toBe('number');
+        expect(typeof swarm.maxMsgPerMin).toBe('number');
+        expect(Array.isArray(swarm.sessionFacts)).toBe(true);
+        expect(typeof swarm.characters).toBe('object');
+        expect(typeof swarm.groups).toBe('object');
+        expect(typeof swarm.modelFilters).toBe('object');
+        expect(typeof swarm.queueLength).toBe('number');
+        expect(Array.isArray(swarm.queueContents)).toBe(true);
+        expect(typeof swarm.provider).toBe('string');
+        expect(typeof swarm.contextSummary).toBe('string');
+        expect(typeof swarm.stats).toBe('object');
+        expect(typeof swarm.statsDebug).toBe('boolean');
+    });
+
+    it('defaultModel setter updates the model', () => {
+        const swarm = makeSwarm();
+        swarm.defaultModel = 'custom-model-x';
+        expect(swarm.defaultModel).toBe('custom-model-x');
+    });
+
+    it('perCharCooldown setter updates the value', () => {
+        const swarm = makeSwarm();
+        swarm.setPerCharCooldown(20);
+        expect(swarm._perCharCooldown).toBe(20000);
+    });
+
+    it('globalCooldown setter updates the value', () => {
+        const swarm = makeSwarm();
+        swarm.setGlobalCooldown(8);
+        expect(swarm._globalCooldown).toBe(8000);
+    });
+});
