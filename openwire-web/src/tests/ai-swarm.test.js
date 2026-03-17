@@ -2240,6 +2240,69 @@ describe('26 — Full generation cycle', () => {
         swarm._running = false;
     });
 
+    it('generation with gemini provider uses generateGeminiMessage', async () => {
+        const onMessage = vi.fn();
+        const swarm = makeSwarm({ onMessage });
+        swarm._running = true;
+        swarm._globalCooldown = 0;
+        swarm._perCharCooldown = 0;
+        await swarm.setProvider('gemini');
+        await swarm._generate('jethalal', { force: true });
+        await new Promise(r => setTimeout(r, 50));
+        expect(onMessage).toHaveBeenCalled();
+        swarm._running = false;
+    });
+
+    it('generation with qwen provider uses generateQwenMessage', async () => {
+        const onMessage = vi.fn();
+        const swarm = makeSwarm({ onMessage });
+        swarm._running = true;
+        swarm._globalCooldown = 0;
+        swarm._perCharCooldown = 0;
+        await swarm.setProvider('qwen');
+        await swarm._generate('jethalal', { force: true });
+        await new Promise(r => setTimeout(r, 50));
+        expect(onMessage).toHaveBeenCalled();
+        swarm._running = false;
+    });
+
+    it('generation with haimaker provider uses generateHaimakerMessage', async () => {
+        const onMessage = vi.fn();
+        const swarm = makeSwarm({ onMessage });
+        swarm._running = true;
+        swarm._globalCooldown = 0;
+        swarm._perCharCooldown = 0;
+        await swarm.setProvider('haimaker');
+        await swarm._generate('jethalal', { force: true });
+        await new Promise(r => setTimeout(r, 50));
+        expect(onMessage).toHaveBeenCalled();
+        swarm._running = false;
+    });
+
+    it('generation triggers crossover check after message', async () => {
+        const onMessage = vi.fn();
+        const swarm = makeSwarm({ onMessage });
+        swarm._running = true;
+        swarm._globalCooldown = 0;
+        swarm._perCharCooldown = 0;
+        swarm._lastCrossOverAt = 0;
+        await swarm._generate('jethalal', { force: true });
+        await new Promise(r => setTimeout(r, 50));
+        swarm._running = false;
+    });
+
+    it('generation with chainDepth > 0 limits recursion', async () => {
+        const onMessage = vi.fn();
+        const swarm = makeSwarm({ onMessage });
+        swarm._running = true;
+        swarm._globalCooldown = 0;
+        swarm._perCharCooldown = 0;
+        await swarm._generate('jethalal', { force: true, chainDepth: 2 });
+        await new Promise(r => setTimeout(r, 50));
+        expect(onMessage).toHaveBeenCalled();
+        swarm._running = false;
+    });
+
     it('generation tracks stats when statsDebug enabled', async () => {
         const onMessage = vi.fn();
         const swarm = makeSwarm({ onMessage });
