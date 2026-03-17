@@ -185,10 +185,14 @@ export function resolveBounty(bounty, nowMs) {
 }
 
 /* ── 6. expireBounty ──────────────────────────────────────── */
-// Sets status='expired' only when bounty is still 'open' and past expiresAt.
+// Handles both 'open' bounties past expiresAt and 'voting' bounties past votingEndsAt.
+// Without the voting check, bounties stuck in 'voting' with no new votes would
+// lock escrowed funds permanently.
 export function expireBounty(bounty, nowMs) {
     if (nowMs >= bounty.expiresAt && bounty.status === 'open')
         return { ...bounty, status: 'expired' };
+    if (bounty.status === 'voting' && bounty.votingEndsAt && nowMs >= bounty.votingEndsAt)
+        return resolveBounty(bounty, nowMs);
     return bounty;
 }
 

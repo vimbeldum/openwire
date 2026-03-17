@@ -16,7 +16,7 @@ export const MAX_TRADE_HISTORY = 50;
 
 /* ── AMM Price Calculations ─────────────────────────────── */
 
-// Prices on 0-100 scale. Binary: q_other/(q0+q1). Multi: proportional.
+// Prices on 0-100 scale. price[i] = q[i] / total (proportional to demand).
 export function calculatePrices(pool) {
     const { quantities } = pool;
     const n = quantities.length;
@@ -25,17 +25,22 @@ export function calculatePrices(pool) {
     if (n === 2) {
         const total = quantities[0] + quantities[1];
         if (total === 0) return [50, 50];
+        // Price of outcome i is proportional to its own quantity share.
+        // Buying outcome 0 increases q[0], which increases its price — correct
+        // for a prediction market where buying signals increased belief.
         return [
-            Math.round((quantities[1] / total) * 100),
             Math.round((quantities[0] / total) * 100),
+            Math.round((quantities[1] / total) * 100),
         ];
     }
 
     const totalPool = quantities.reduce((s, q) => s + q, 0);
     if (totalPool === 0) return quantities.map(() => Math.round(100 / n));
 
+    // Price of outcome i is proportional to its pool share.
+    // Higher qi (more demand) → higher price → correct market signal.
     return quantities.map(qi => {
-        const raw = ((totalPool - qi) / ((n - 1) * totalPool)) * 100;
+        const raw = (qi / totalPool) * 100;
         return Math.round(raw);
     });
 }

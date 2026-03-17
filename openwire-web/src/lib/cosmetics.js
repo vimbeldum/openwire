@@ -178,8 +178,8 @@ export function listForSale(catalog, itemId, deviceId, resalePrice) {
 
 /**
  * Purchase an item from the secondary (resale) market.
- * House cut goes to the jackpot pool.
- * Pure — returns updated catalog, wallet, and jackpot.
+ * House cut (10%) goes to the jackpot pool. Seller receives the remaining 90%.
+ * Pure — returns updated catalog, buyer wallet, seller proceeds, and jackpot.
  *
  * @param {object[]} catalog
  * @param {object}   buyerWallet
@@ -187,7 +187,7 @@ export function listForSale(catalog, itemId, deviceId, resalePrice) {
  * @param {string}   buyerDeviceId
  * @param {object}   jackpot
  * @param {number}   nowMs
- * @returns {{ success: boolean, catalog?: object[], wallet?: object, jackpot?: object, reason?: string }}
+ * @returns {{ success: boolean, catalog?: object[], wallet?: object, sellerProceeds?: number, jackpot?: object, reason?: string }}
  */
 export function buyResale(catalog, buyerWallet, itemId, buyerDeviceId, jackpot, nowMs) {
   const item = findItem(catalog, itemId);
@@ -206,6 +206,9 @@ export function buyResale(catalog, buyerWallet, itemId, buyerDeviceId, jackpot, 
 
   const newWallet = deductFromWallet(buyerWallet, item.resalePrice, `Resale: ${item.name}`);
   const newJackpot = applyResaleFee(jackpot, item.resalePrice);
+  // Seller receives resalePrice minus the 10% house cut
+  const houseCut = Math.floor(item.resalePrice * HOUSE_CUT);
+  const sellerProceeds = item.resalePrice - houseCut;
 
   const updatedItem = {
     ...item,
@@ -219,6 +222,8 @@ export function buyResale(catalog, buyerWallet, itemId, buyerDeviceId, jackpot, 
     success: true,
     catalog: replaceCatalogItem(catalog, updatedItem),
     wallet: newWallet,
+    sellerProceeds,
+    sellerDeviceHash: item.ownerDeviceHash,
     jackpot: newJackpot,
   };
 }

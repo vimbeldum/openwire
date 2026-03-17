@@ -37,8 +37,8 @@ describe('calculatePrices', () => {
             // price[0] = q[1]/(q0+q1), price[1] = q[0]/(q0+q1)
             const pool = { quantities: [3000, 1000] };
             const prices = calculatePrices(pool);
-            expect(prices[0]).toBe(25);   // 1000/4000 * 100
-            expect(prices[1]).toBe(75);   // 3000/4000 * 100
+            expect(prices[0]).toBe(75);   // 3000/4000 * 100
+            expect(prices[1]).toBe(25);   // 1000/4000 * 100
         });
 
         it('returns 50/50 when both quantities are zero', () => {
@@ -49,8 +49,8 @@ describe('calculatePrices', () => {
         it('handles one quantity at zero', () => {
             const pool = { quantities: [0, 1000] };
             const prices = calculatePrices(pool);
-            expect(prices[0]).toBe(100);
-            expect(prices[1]).toBe(0);
+            expect(prices[0]).toBe(0);    // 0/1000 * 100
+            expect(prices[1]).toBe(100);  // 1000/1000 * 100
         });
     });
 
@@ -69,14 +69,14 @@ describe('calculatePrices', () => {
 
         it('shifts prices for unequal pools', () => {
             // With quantities [500, 1000, 1500], totalPool = 3000
-            // price[0] = ((3000-500) / (2*3000)) * 100 = (2500/6000)*100 = 41.67 => 42
-            // price[1] = ((3000-1000)/ (2*3000)) * 100 = (2000/6000)*100 = 33.33 => 33
-            // price[2] = ((3000-1500)/ (2*3000)) * 100 = (1500/6000)*100 = 25
+            // price[0] = (500 / 3000) * 100 = 16.67 => 17
+            // price[1] = (1000/ 3000) * 100 = 33.33 => 33
+            // price[2] = (1500/ 3000) * 100 = 50
             const pool = { quantities: [500, 1000, 1500] };
             const prices = calculatePrices(pool);
-            expect(prices[0]).toBe(42);
+            expect(prices[0]).toBe(17);
             expect(prices[1]).toBe(33);
-            expect(prices[2]).toBe(25);
+            expect(prices[2]).toBe(50);
         });
 
         it('returns equal distribution when all quantities are zero', () => {
@@ -223,9 +223,9 @@ describe('buyShares', () => {
 
     it('updates prices after buy (binary market)', () => {
         const { game: g } = buyShares(game, 'p1', 'Alice', 0, 50);
-        // After buying outcome 0, its pool increases => its price should decrease
-        expect(g.prices[0]).toBeLessThan(50);
-        expect(g.prices[1]).toBeGreaterThan(50);
+        // After buying outcome 0, its pool increases => its price should increase
+        expect(g.prices[0]).toBeGreaterThan(50);
+        expect(g.prices[1]).toBeLessThan(50);
     });
 
     it('returns cost=0 when market is not open', () => {

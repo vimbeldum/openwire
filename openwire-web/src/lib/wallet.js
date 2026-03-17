@@ -229,6 +229,12 @@ export function tip(fromWallet, toWallet, amount) {
         ],
     };
 
+    // Persist sender wallet synchronously — consistent with debit()/credit()
+    // which both call saveWalletSync. Without this, a page reload before the
+    // debounced saveWallet timer fires reverts the sender's balance while the
+    // tip P2P message was already sent, duplicating chips in the economy.
+    saveWalletSync(updatedFrom);
+
     return { success: true, from: updatedFrom, to: updatedTo };
 }
 

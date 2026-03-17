@@ -158,9 +158,11 @@ describe('checkTriggers', () => {
     expect(result.triggered).toBe(false);
   });
 
-  it('random trigger fires when Math.random() < 1/500', () => {
+  it('random trigger fires when crypto random < 1/500', () => {
     const j = freshJackpot(1000);
-    const spy = vi.spyOn(Math, 'random').mockReturnValue(0.001);
+    // Mock crypto.getRandomValues to return a value that maps to < 1/500
+    // _cryptoRandom() = buf[0] / 0x100000000, so buf[0] = floor(0.001 * 0x100000000) = 4294967
+    const spy = vi.spyOn(crypto, 'getRandomValues').mockImplementation((buf) => { buf[0] = 4294967; return buf; });
     const result = checkTriggers(j, { type: 'random', playerId: 'p1', data: {} });
     expect(result.triggered).toBe(true);
     expect(result.trigger).toBe('random');
@@ -168,9 +170,10 @@ describe('checkTriggers', () => {
     spy.mockRestore();
   });
 
-  it('random trigger does NOT fire when Math.random() >= 1/500', () => {
+  it('random trigger does NOT fire when crypto random >= 1/500', () => {
     const j = freshJackpot(1000);
-    const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // buf[0] = floor(0.5 * 0x100000000) = 2147483648 → _cryptoRandom() = 0.5
+    const spy = vi.spyOn(crypto, 'getRandomValues').mockImplementation((buf) => { buf[0] = 2147483648; return buf; });
     const result = checkTriggers(j, { type: 'random', playerId: 'p1', data: {} });
     expect(result.triggered).toBe(false);
     spy.mockRestore();

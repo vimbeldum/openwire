@@ -53,7 +53,7 @@ export function calculateHand(cards) {
         } else if (['K', 'Q', 'J'].includes(card.value)) {
             total += 10;
         } else {
-            total += parseInt(card.value);
+            total += parseInt(card.value, 10);
         }
     }
 

@@ -14,6 +14,13 @@ export const RAKE = {
 
 const VALID_GAMES = new Set(Object.keys(RAKE));
 
+/** Cryptographic random float in [0, 1) — replaces Math.random() for financial decisions */
+function _cryptoRandom() {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return buf[0] / 0x100000000;
+}
+
 /** Minimum pool balance required before a payout can be triggered */
 const MIN_PAYOUT_POOL = 100;
 
@@ -78,7 +85,7 @@ export function checkTriggers(jackpot, event) {
   } else if (type === 'tambola_speedhouse' && data.numbersCalledForFullHouse <= 30) {
     trigger = 'tambola_speedhouse';
     payoutFraction = 0.75;
-  } else if (type === 'random' && Math.random() < 1 / 500) {
+  } else if (type === 'random' && _cryptoRandom() < 1 / 500) {
     trigger = 'random';
     payoutFraction = 0.10;
   }

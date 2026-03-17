@@ -70,7 +70,11 @@ export function stake(profile, wallet, amount) {
     }
 
     const currentStaked = profile.vault?.staked ?? 0;
-    if (currentStaked + amount > MAX_STAKE) {
+    const currentStakedAt = profile.vault?.stakedAt ?? null;
+    const accruedInterest = currentStaked > 0 && currentStakedAt !== null
+        ? calculateInterest(currentStaked, currentStakedAt)
+        : 0;
+    if (currentStaked + accruedInterest + amount > MAX_STAKE) {
         return { success: false, profile, wallet, reason: `max_stake_exceeded_${MAX_STAKE}` };
     }
 
@@ -99,11 +103,12 @@ export function stake(profile, wallet, amount) {
         ],
     };
 
-    // Update vault: add to staked, reset timer to now
+    // Compound accrued interest into principal before resetting the timer,
+    // so additional deposits don't silently destroy earned interest.
     const updatedProfile = {
         ...profile,
         vault: {
-            staked:   currentStaked + amount,
+            staked:   currentStaked + accruedInterest + amount,
             stakedAt: Date.now(),
         },
     };
