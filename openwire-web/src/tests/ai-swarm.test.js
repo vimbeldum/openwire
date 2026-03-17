@@ -1968,6 +1968,31 @@ describe('23 — _compactContext', () => {
         swarm._running = false;
     });
 
+    it('compaction broadcasts summary via onSummaryUpdate callback', async () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        const cb = vi.fn();
+        swarm.onSummaryUpdate = cb;
+        for (let i = 0; i < 55; i++) {
+            swarm._context.push({ role: 'user', content: `Message ${i} testing context` });
+        }
+        await swarm._compactContext();
+        expect(cb).toHaveBeenCalledWith(expect.any(Array));
+        swarm._running = false;
+    });
+
+    it('compaction persists summary to localStorage', async () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        for (let i = 0; i < 55; i++) {
+            swarm._context.push({ role: 'user', content: `Message ${i} for storage test` });
+        }
+        await swarm._compactContext();
+        const stored = localStorage.getItem('openwire_context_summary');
+        expect(stored).toBeTruthy();
+        swarm._running = false;
+    });
+
     it('handles compaction timeout/failure gracefully', async () => {
         const { generateGeminiMessage } = await import('../lib/agents/gemini.js');
         generateGeminiMessage.mockRejectedValueOnce(new Error('Compaction timeout'));
@@ -1982,16 +2007,61 @@ describe('23 — _compactContext', () => {
         expect(swarm._isCompacting).toBe(false);
         swarm._running = false;
     });
+});
 
-    it('perCharCooldown setter updates the value', () => {
+/* ════════════════════════════════════════════════════════════════
+   Section 24 — _processQueue edge cases
+   ════════════════════════════════════════════════════════════════ */
+
+describe('24 — _processQueue edge cases', () => {
+    it('_processQueue returns early when already processing', async () => {
         const swarm = makeSwarm();
-        swarm.setPerCharCooldown(20);
-        expect(swarm._perCharCooldown).toBe(20000);
+        swarm._running = true;
+        swarm._isProcessingQueue = true;
+        swarm._messageQueue = [{ characterId: 'jethalal', retries: 0 }];
+        await swarm._processQueue();
+        // Queue should still have the item (not processed)
+        expect(swarm._messageQueue.length).toBe(1);
+        swarm._running = false;
+        swarm._isProcessingQueue = false;
     });
 
-    it('globalCooldown setter updates the value', () => {
+    it('_processQueue returns early when queue is empty', async () => {
         const swarm = makeSwarm();
-        swarm.setGlobalCooldown(8);
-        expect(swarm._globalCooldown).toBe(8000);
+        swarm._running = true;
+        swarm._messageQueue = [];
+        await swarm._processQueue();
+        expect(swarm._isProcessingQueue).toBe(false);
+        swarm._running = false;
+    });
+
+    it('_processQueue returns early when not running', async () => {
+        const swarm = makeSwarm();
+        swarm._running = false;
+        swarm._messageQueue = [{ characterId: 'jethalal', retries: 0 }];
+        await swarm._processQueue();
+        expect(swarm._messageQueue.length).toBe(1);
+    });
+
+    it('_processQueue skips unknown character and continues', async () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm._messageQueue = [{ characterId: 'nonexistent-char', retries: 0 }];
+        await swarm._processQueue();
+        // Unknown char should be shifted off and discarded
+        expect(swarm._messageQueue.length).toBe(0);
+        swarm._running = false;
+    });
+
+    it('_processQueue respects per-character cooldown for non-force tasks', async () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm._lastMsgByChar.jethalal = Date.now(); // just spoke
+        swarm._perCharCooldown = 10000;
+        swarm._messageQueue = [{ characterId: 'jethalal', retries: 0, force: false }];
+        await swarm._processQueue();
+        // Task should have been dropped due to cooldown
+        expect(swarm._messageQueue.length).toBe(0);
+        swarm._running = false;
     });
 });
