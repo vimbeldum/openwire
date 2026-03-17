@@ -554,6 +554,98 @@ describe('A10 — RouletteEngine class', () => {
     });
 });
 
+describe('A11 — RouletteEngine.calculateResults (all bet type labels)', () => {
+    function makeResultGame(bets, result = 7) {
+        return {
+            type: 'roulette',
+            roomId: 'room-r',
+            result,
+            bets,
+            phase: 'results',
+        };
+    }
+
+    it('single bet label', () => {
+        const game = makeResultGame([{ peer_id: 'p1', nick: 'A', betType: 'single', betTarget: 7, amount: 10 }], 7);
+        const engine = new RouletteEngine(game);
+        const event = engine.calculateResults(game);
+        expect(event.breakdown[0].betLabel).toBe('Single 7');
+    });
+
+    it('color red bet label', () => {
+        const game = makeResultGame([{ peer_id: 'p1', nick: 'A', betType: 'color', betTarget: 'red', amount: 10 }], 7);
+        const engine = new RouletteEngine(game);
+        const event = engine.calculateResults(game);
+        expect(event.breakdown[0].betLabel).toBe('Red');
+    });
+
+    it('color black bet label', () => {
+        const game = makeResultGame([{ peer_id: 'p1', nick: 'A', betType: 'color', betTarget: 'black', amount: 10 }], 2);
+        const engine = new RouletteEngine(game);
+        const event = engine.calculateResults(game);
+        expect(event.breakdown[0].betLabel).toBe('Black');
+    });
+
+    it('parity even bet label', () => {
+        const game = makeResultGame([{ peer_id: 'p1', nick: 'A', betType: 'parity', betTarget: 'even', amount: 10 }], 2);
+        const engine = new RouletteEngine(game);
+        const event = engine.calculateResults(game);
+        expect(event.breakdown[0].betLabel).toBe('Even');
+    });
+
+    it('parity odd bet label', () => {
+        const game = makeResultGame([{ peer_id: 'p1', nick: 'A', betType: 'parity', betTarget: 'odd', amount: 10 }], 7);
+        const engine = new RouletteEngine(game);
+        const event = engine.calculateResults(game);
+        expect(event.breakdown[0].betLabel).toBe('Odd');
+    });
+
+    it('half low bet label', () => {
+        const game = makeResultGame([{ peer_id: 'p1', nick: 'A', betType: 'half', betTarget: 'low', amount: 10 }], 7);
+        const engine = new RouletteEngine(game);
+        const event = engine.calculateResults(game);
+        expect(event.breakdown[0].betLabel).toContain('Low');
+    });
+
+    it('half high bet label', () => {
+        const game = makeResultGame([{ peer_id: 'p1', nick: 'A', betType: 'half', betTarget: 'high', amount: 10 }], 25);
+        const engine = new RouletteEngine(game);
+        const event = engine.calculateResults(game);
+        expect(event.breakdown[0].betLabel).toContain('High');
+    });
+
+    it('dozen bet label', () => {
+        const game = makeResultGame([{ peer_id: 'p1', nick: 'A', betType: 'dozen', betTarget: 2, amount: 10 }], 15);
+        const engine = new RouletteEngine(game);
+        const event = engine.calculateResults(game);
+        expect(event.breakdown[0].betLabel).toBe('Dozen 2');
+    });
+
+    it('column bet label', () => {
+        const game = makeResultGame([{ peer_id: 'p1', nick: 'A', betType: 'column', betTarget: 1, amount: 10 }], 7);
+        const engine = new RouletteEngine(game);
+        const event = engine.calculateResults(game);
+        expect(event.breakdown[0].betLabel).toBe('Column 1');
+    });
+
+    it('unknown bet type defaults', () => {
+        const game = makeResultGame([{ peer_id: 'p1', nick: 'A', betType: 'exotic', betTarget: 'x', amount: 10 }], 7);
+        const engine = new RouletteEngine(game);
+        const event = engine.calculateResults(game);
+        expect(event.breakdown[0].betLabel).toBe('exotic');
+    });
+
+    it('totals aggregate per player', () => {
+        const game = makeResultGame([
+            { peer_id: 'p1', nick: 'A', betType: 'color', betTarget: 'red', amount: 100 },
+            { peer_id: 'p1', nick: 'A', betType: 'single', betTarget: 7, amount: 25 },
+        ], 7);
+        const engine = new RouletteEngine(game);
+        const event = engine.calculateResults(game);
+        expect(event.totals.p1).toBeDefined();
+    });
+});
+
 /* ═══════════════════════════════════════════════════════════════════════
    SECTION B — BLACKJACK ENGINE
    ═══════════════════════════════════════════════════════════════════════ */
