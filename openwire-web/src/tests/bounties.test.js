@@ -571,4 +571,34 @@ describe('refundEscrow', () => {
         refundEscrow(wallet, bounty);
         expect(wallet.baseBalance).toBe(100);
     });
+
+    it('handles wallet with missing baseBalance (nullish coalescing)', () => {
+        const wallet = {}; // no baseBalance
+        const { bounty } = makeBounty({ reward: 200 });
+        const updated = refundEscrow(wallet, bounty);
+        expect(updated.baseBalance).toBe(200);
+    });
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   9 -- Edge case: escrowBounty with missing wallet fields
+   ═══════════════════════════════════════════════════════════════ */
+
+describe('escrowBounty — nullish wallet fields', () => {
+    it('handles wallet with zero baseBalance, adminBonus covers reward', () => {
+        const wallet = makeWallet({ baseBalance: 0, adminBonus: 200 });
+        const bounty = { reward: 100 };
+        const result = escrowBounty(wallet, bounty);
+        expect(result.success).toBe(true);
+        expect(result.wallet.adminBonus).toBe(100);
+    });
+});
+
+describe('releaseEscrow — nullish wallet fields', () => {
+    it('handles wallet with missing baseBalance', () => {
+        const wallet = {};
+        const bounty = { ...makeBounty({ reward: 100 }).bounty, winnerId: 'winner' };
+        const updated = releaseEscrow(wallet, bounty);
+        expect(updated.baseBalance).toBe(100);
+    });
 });
