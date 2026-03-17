@@ -19,9 +19,7 @@ export default defineConfig({
         modulePreload: false,
         cssCodeSplit: true,
         rollupOptions: {
-            output: {
-                compact: true,
-            },
+            output: {},
             treeshake: {
                 moduleSideEffects: false,
                 propertyReadSideEffects: false,
