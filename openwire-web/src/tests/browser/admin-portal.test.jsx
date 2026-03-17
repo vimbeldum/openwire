@@ -763,6 +763,25 @@ describe('AdminPortal — Agents tab: show toggle + mood', () => {
         await setupAgentsTab();
         expect(screen.getByText(/Global AI cooldown/)).toBeInTheDocument();
     });
+
+    it('flush context button calls swarm.flushContext', async () => {
+        const { swarm } = await setupAgentsTab();
+        // Mock window.alert
+        const origAlert = window.alert;
+        window.alert = vi.fn();
+        const flushBtn = screen.getByText('Flush AI Context');
+        await userEvent.click(flushBtn);
+        expect(swarm.flushContext).toHaveBeenCalled();
+        window.alert = origAlert;
+    });
+
+    it('default model select renders', async () => {
+        await setupAgentsTab();
+        // Should have a select for default model
+        const selects = screen.getAllByRole('combobox');
+        // At least one should be the model/provider select
+        expect(selects.length).toBeGreaterThanOrEqual(1);
+    });
 });
 
 // ── Players tab: rendering with peers ─────────────────────────────────────
