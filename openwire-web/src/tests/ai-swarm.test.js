@@ -1909,6 +1909,80 @@ describe('22 — MentionOnlyMode + read-only getters', () => {
         expect(swarm.defaultModel).toBe('custom-model-x');
     });
 
+    it('guardrails getter returns boolean', () => {
+        const swarm = makeSwarm();
+        expect(typeof swarm.guardrails).toBe('boolean');
+    });
+
+    it('geminiModels, qwenModels, haimakerModels getters return arrays', () => {
+        const swarm = makeSwarm();
+        expect(Array.isArray(swarm.geminiModels)).toBe(true);
+        expect(Array.isArray(swarm.qwenModels)).toBe(true);
+        expect(Array.isArray(swarm.haimakerModels)).toBe(true);
+    });
+});
+
+/* ════════════════════════════════════════════════════════════════
+   Section 23 — _compactContext
+   ════════════════════════════════════════════════════════════════ */
+
+describe('23 — _compactContext', () => {
+    it('returns early when not running', async () => {
+        const swarm = makeSwarm();
+        swarm._running = false;
+        await swarm._compactContext();
+        expect(swarm._isCompacting).toBe(false);
+    });
+
+    it('returns early when context is below threshold', async () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        // Context has only a few entries (well below 50)
+        await swarm._compactContext();
+        expect(swarm._isCompacting).toBe(false);
+        swarm._running = false;
+    });
+
+    it('returns early when already compacting', async () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm._isCompacting = true;
+        await swarm._compactContext();
+        // should remain true (not reset)
+        expect(swarm._isCompacting).toBe(true);
+        swarm._running = false;
+        swarm._isCompacting = false;
+    });
+
+    it('compacts context and stores summary when threshold reached', async () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        // Fill context to trigger compaction (50+ entries needed)
+        for (let i = 0; i < 55; i++) {
+            swarm._context.push({ role: 'user', content: `Message ${i} from User with enough text` });
+        }
+        await swarm._compactContext();
+        // After compaction, context should be trimmed
+        expect(swarm._context.length).toBeLessThan(55);
+        expect(swarm._contextSummary.length).toBeGreaterThan(0);
+        swarm._running = false;
+    });
+
+    it('handles compaction timeout/failure gracefully', async () => {
+        const { generateGeminiMessage } = await import('../lib/agents/gemini.js');
+        generateGeminiMessage.mockRejectedValueOnce(new Error('Compaction timeout'));
+
+        const swarm = makeSwarm();
+        swarm._running = true;
+        for (let i = 0; i < 55; i++) {
+            swarm._context.push({ role: 'user', content: `Message ${i} from User test text` });
+        }
+        await swarm._compactContext();
+        // Should not crash, isCompacting should be reset
+        expect(swarm._isCompacting).toBe(false);
+        swarm._running = false;
+    });
+
     it('perCharCooldown setter updates the value', () => {
         const swarm = makeSwarm();
         swarm.setPerCharCooldown(20);
