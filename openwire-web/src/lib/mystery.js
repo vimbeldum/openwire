@@ -441,8 +441,10 @@ export function migrateHost(game, departedPeerId) {
  * @returns {string}
  */
 export function serializeGame(game) {
+    const { culpritId, ...safeMystery } = game.mystery || {};
     return JSON.stringify({
         ...game,
+        mystery: safeMystery,
         suspects: sanitizeSuspects(game.suspects),
     });
 }

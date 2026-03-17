@@ -77,6 +77,7 @@ export function sanitizeSuspects(suspects) {
             _secretConstraints,
             _crossClues,
             _conversationHistory,
+            isCulprit,
             ...safe
         } = s;
         return safe;
