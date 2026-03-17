@@ -60,7 +60,7 @@ function replaceCatalogItem(catalog, updatedItem) {
  * Chips are destroyed (sink): no credit elsewhere.
  * Returns new wallet object without side effects.
  */
-function deductFromWallet(wallet, amount) {
+function deductFromWallet(wallet, amount, reason = 'Cosmetic purchase') {
   let base = wallet.baseBalance;
   let bonus = wallet.adminBonus;
 
@@ -72,10 +72,15 @@ function deductFromWallet(wallet, amount) {
     bonus -= (amount - fromBase);
   }
 
+  const newTotal = Math.max(0, base) + Math.max(0, bonus);
   return {
     ...wallet,
     baseBalance: Math.max(0, base),
     adminBonus: Math.max(0, bonus),
+    history: [
+      ...(wallet.history ?? []).slice(-99),
+      { time: Date.now(), reason, amount: -amount, balance: newTotal },
+    ],
   };
 }
 
@@ -136,7 +141,7 @@ export function purchaseItem(catalog, wallet, itemId, deviceId, nowMs) {
   };
 
   const newCatalog = replaceCatalogItem(catalog, updatedItem);
-  const newWallet = deductFromWallet(wallet, item.price);
+  const newWallet = deductFromWallet(wallet, item.price, `Cosmetic: ${item.name}`);
 
   return { success: true, catalog: newCatalog, wallet: newWallet, item: updatedItem };
 }
@@ -199,7 +204,7 @@ export function buyResale(catalog, buyerWallet, itemId, buyerDeviceId, jackpot, 
     return { success: false, reason: 'insufficient_balance' };
   }
 
-  const newWallet = deductFromWallet(buyerWallet, item.resalePrice);
+  const newWallet = deductFromWallet(buyerWallet, item.resalePrice, `Resale: ${item.name}`);
   const newJackpot = applyResaleFee(jackpot, item.resalePrice);
 
   const updatedItem = {
