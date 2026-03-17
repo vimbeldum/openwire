@@ -1344,3 +1344,121 @@ describe('14 — Session Memory', () => {
         expect(swarm._sessionFacts.length).toBeLessThanOrEqual(50);
     });
 });
+
+/* ════════════════════════════════════════════════════════════════
+   Section 15 — CrossOver Engine
+   ════════════════════════════════════════════════════════════════ */
+
+describe('15 — CrossOver Engine', () => {
+    it('_checkCrossOver does nothing when not running', () => {
+        const swarm = makeSwarm();
+        swarm._running = false;
+        swarm._checkCrossOver('jethalal');
+        // No timers should be set
+        expect(swarm._crossoverTimers.size).toBe(0);
+    });
+
+    it('_checkCrossOver suppressed in mention-only mode', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm._mentionOnlyMode = true;
+        swarm._checkCrossOver('jethalal');
+        expect(swarm._crossoverTimers.size).toBe(0);
+        swarm._running = false;
+    });
+
+    it('_checkCrossOver suppressed during @mention cooldown', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm._mentionActiveUntil = Date.now() + 30000;
+        swarm._checkCrossOver('jethalal');
+        expect(swarm._crossoverTimers.size).toBe(0);
+        swarm._running = false;
+    });
+
+    it('_checkCrossOver suppressed during global crossover cooldown', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm._lastCrossOverAt = Date.now();
+        swarm._checkCrossOver('jethalal');
+        expect(swarm._crossoverTimers.size).toBe(0);
+        swarm._running = false;
+    });
+});
+
+/* ════════════════════════════════════════════════════════════════
+   Section 16 — Mood Shifts
+   ════════════════════════════════════════════════════════════════ */
+
+describe('16 — Mood Shifts (direct _shiftMood)', () => {
+    it('_shiftMood changes mood when probability passes', () => {
+        const swarm = makeSwarm();
+        const origRandom = Math.random;
+        Math.random = () => 0.1; // Below any probability threshold
+        swarm._shiftMood('jethalal', 'panicking', 0.5);
+        expect(swarm.getMood('jethalal')).toBe('panicking');
+        Math.random = origRandom;
+    });
+
+    it('_shiftMood does not change mood if already the same', () => {
+        const swarm = makeSwarm();
+        swarm._moods.jethalal = 'panicking';
+        const origRandom = Math.random;
+        Math.random = () => 0.1;
+        swarm._shiftMood('jethalal', 'panicking', 0.5);
+        // No change, no log
+        Math.random = origRandom;
+        expect(swarm.getMood('jethalal')).toBe('panicking');
+    });
+
+    it('_shiftMood skips when random > probability', () => {
+        const swarm = makeSwarm();
+        const origRandom = Math.random;
+        Math.random = () => 0.9; // Above 0.5 threshold
+        swarm._shiftMood('jethalal', 'panicking', 0.5);
+        expect(swarm.getMood('jethalal')).toBe('normal');
+        Math.random = origRandom;
+    });
+});
+
+/* ════════════════════════════════════════════════════════════════
+   Section 17 — _loadTasks persistence
+   ════════════════════════════════════════════════════════════════ */
+
+describe('17 — _loadTasks persistence', () => {
+    beforeEach(() => {
+        try { localStorage.removeItem('openwire_task_queue'); } catch {}
+    });
+
+    it('_persistTasks + _loadTasks round-trip', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm.addContext('User1', '@jethalal make a shopping list');
+        const tasksBefore = swarm.getActiveTasks();
+        expect(tasksBefore.length).toBe(1);
+
+        // Create a new swarm (which calls _loadTasks internally)
+        const swarm2 = makeSwarm();
+        const tasksAfter = swarm2.getActiveTasks();
+        expect(tasksAfter.length).toBe(1);
+        expect(tasksAfter[0].description).toBe(tasksBefore[0].description);
+        swarm._running = false;
+    });
+
+    it('_loadTasks prunes completed tasks older than 24h', () => {
+        // Store a completed task with old timestamp
+        const oldTask = [['old-task-id', {
+            id: 'old-task-id',
+            assignee: 'jethalal',
+            status: 'done',
+            updatedAt: Date.now() - 48 * 60 * 60 * 1000, // 48h ago
+            createdAt: Date.now() - 48 * 60 * 60 * 1000,
+        }]];
+        try {
+            localStorage.setItem('openwire_task_queue', JSON.stringify(oldTask));
+        } catch {}
+
+        const swarm = makeSwarm();
+        expect(swarm.getActiveTasks().length).toBe(0);
+    });
+});
