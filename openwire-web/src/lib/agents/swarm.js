@@ -395,9 +395,13 @@ export class AgentSwarm {
                 return c.reactive_tags.some(tag => lower.includes(tag.toLowerCase()));
             });
 
-            // Shuffle and pick responders — 3 when unfiltered, 2 when SFW
+            // Fisher-Yates shuffle and pick responders — 3 when unfiltered, 2 when SFW
             const MAX_REACTIVE = this._guardrails ? 2 : 3;
-            const shuffled = matched.sort(() => Math.random() - 0.5);
+            for (let i = matched.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [matched[i], matched[j]] = [matched[j], matched[i]];
+            }
+            const shuffled = matched;
             const selected = shuffled.slice(0, MAX_REACTIVE);
             const skipped = shuffled.slice(MAX_REACTIVE);
 
