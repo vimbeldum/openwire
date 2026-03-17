@@ -1160,7 +1160,187 @@ describe('12 — Unimplemented / Future Features', () => {
 
     it.todo('provider/model override is used during actual generation call');
 
-    it.todo('task detection fires when a human message contains action verbs (banao, karo, likho)');
-
     it.todo('context compaction fires when context grows past COMPACT_THRESHOLD (50 entries)');
+});
+
+/* ════════════════════════════════════════════════════════════════
+   Section 13 — Task Queue (TaskDetection, Completion, Cancel)
+   ════════════════════════════════════════════════════════════════ */
+
+describe('13 — Task Queue', () => {
+    beforeEach(() => {
+        // Clear persisted tasks between tests
+        try { localStorage.removeItem('openwire_task_queue'); } catch {}
+    });
+
+    it('_detectTask creates a task when @mention + verb is detected', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+
+        // jethalal is a character — mention it with a task verb
+        swarm.addContext('User1', '@jethalal list the top 5 shops');
+
+        const tasks = swarm.getActiveTasks();
+        expect(tasks.length).toBe(1);
+        expect(tasks[0].assignee).toBe('jethalal');
+        expect(tasks[0].status).toBe('active');
+        expect(tasks[0].description).toContain('list the top 5 shops');
+
+        swarm._running = false;
+    });
+
+    it('_detectTask ignores messages without @mention', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm.addContext('User1', 'list the top 5 shops');
+        expect(swarm.getActiveTasks().length).toBe(0);
+        swarm._running = false;
+    });
+
+    it('_detectTask ignores messages without task verbs', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm.addContext('User1', '@jethalal hello how are you');
+        expect(swarm.getActiveTasks().length).toBe(0);
+        swarm._running = false;
+    });
+
+    it('_detectTask skips duplicate tasks for same character', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm.addContext('User1', '@jethalal list the top 5 shops');
+        swarm.addContext('User1', '@jethalal list the top 5 shops');
+        expect(swarm.getActiveTasks().length).toBe(1);
+        swarm._running = false;
+    });
+
+    it('cancelTask sets task status to cancelled', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm.addContext('User1', '@jethalal make a plan for the party');
+        const tasks = swarm.getActiveTasks();
+        expect(tasks.length).toBe(1);
+
+        swarm.cancelTask(tasks[0].id);
+        expect(swarm.getActiveTasks().length).toBe(0);
+        swarm._running = false;
+    });
+
+    it('cancelTask is no-op for non-existent task', () => {
+        const swarm = makeSwarm();
+        swarm.cancelTask('nonexistent-id');
+        expect(swarm.getActiveTasks().length).toBe(0);
+    });
+
+    it('_detectStepCompletion marks task done on TASK_COMPLETE_RE match', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm.addContext('User1', '@jethalal create a shopping list');
+        const tasks = swarm.getActiveTasks();
+        expect(tasks.length).toBe(1);
+
+        // Simulate agent response with completion marker
+        swarm._detectStepCompletion('jethalal', 'Yeh raha — task complete!');
+        expect(swarm.getActiveTasks().length).toBe(0); // no more active tasks
+        swarm._running = false;
+    });
+
+    it('_detectStepCompletion increments step on TASK_STEP_RE match', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm.addContext('User1', '@jethalal write a song in 5 steps');
+        const tasks = swarm.getActiveTasks();
+        expect(tasks.length).toBe(1);
+        const initialSteps = tasks[0].stepsCompleted;
+
+        swarm._detectStepCompletion('jethalal', 'Step 1: Setting up the melody');
+        const updated = swarm.getActiveTasks();
+        expect(updated.length).toBe(1);
+        expect(updated[0].stepsCompleted).toBeGreaterThan(initialSteps);
+        swarm._running = false;
+    });
+
+    it('_detectStepCompletion increments on TASK_PROGRESS_RE match', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm.addContext('User1', '@jethalal pick the best 3 gadgets');
+        const tasks = swarm.getActiveTasks();
+
+        swarm._detectStepCompletion('jethalal', 'Yeh raha pehla gadget: Smart TV');
+        const updated = swarm.getActiveTasks();
+        expect(updated[0].stepsCompleted).toBe(1);
+        swarm._running = false;
+    });
+
+    it('_buildTaskPrompt returns empty string when no active tasks', () => {
+        const swarm = makeSwarm();
+        expect(swarm._buildTaskPrompt('jethalal')).toBe('');
+    });
+
+    it('_buildTaskPrompt returns active_tasks block', () => {
+        const swarm = makeSwarm();
+        swarm._running = true;
+        swarm.addContext('User1', '@jethalal select the best 5 items');
+        const prompt = swarm._buildTaskPrompt('jethalal');
+        expect(prompt).toContain('<active_tasks>');
+        expect(prompt).toContain('select the best 5 items');
+        swarm._running = false;
+    });
+
+    it('onTaskUpdate setter works', () => {
+        const swarm = makeSwarm();
+        const callback = vi.fn();
+        swarm.onTaskUpdate = callback;
+        swarm._running = true;
+        swarm.addContext('User1', '@jethalal build a schedule');
+        expect(callback).toHaveBeenCalledWith(expect.objectContaining({ type: 'created' }));
+        swarm._running = false;
+    });
+});
+
+/* ════════════════════════════════════════════════════════════════
+   Section 14 — Session Memory (extractFact, addSessionFact)
+   ════════════════════════════════════════════════════════════════ */
+
+describe('14 — Session Memory', () => {
+    it('_extractFact stores facts from messages > 15 chars', () => {
+        const swarm = makeSwarm();
+        swarm._extractFact('Alice', 'This is a longer message that should be stored as a fact');
+        expect(swarm._sessionFacts.length).toBe(1);
+        expect(swarm._sessionFacts[0]).toContain('Alice');
+    });
+
+    it('_extractFact ignores short messages', () => {
+        const swarm = makeSwarm();
+        swarm._extractFact('Alice', 'Short');
+        expect(swarm._sessionFacts.length).toBe(0);
+    });
+
+    it('_extractFact evicts oldest when at capacity (50)', () => {
+        const swarm = makeSwarm();
+        for (let i = 0; i < 50; i++) {
+            swarm._sessionFacts.push(`Fact ${i}`);
+        }
+        expect(swarm._sessionFacts.length).toBe(50);
+        swarm._extractFact('Bob', 'This is a brand new fact that should be stored');
+        expect(swarm._sessionFacts.length).toBeLessThanOrEqual(50);
+        // The oldest 5 should have been evicted
+        expect(swarm._sessionFacts[0]).not.toBe('Fact 0');
+    });
+
+    it('addSessionFact stores an external fact', () => {
+        const swarm = makeSwarm();
+        swarm.addSessionFact('Alice accused Bob of cheating');
+        expect(swarm._sessionFacts.length).toBe(1);
+        expect(swarm._sessionFacts[0]).toContain('Alice accused Bob');
+    });
+
+    it('addSessionFact evicts oldest when at capacity', () => {
+        const swarm = makeSwarm();
+        for (let i = 0; i < 50; i++) {
+            swarm._sessionFacts.push(`Fact ${i}`);
+        }
+        swarm.addSessionFact('New drama happened');
+        expect(swarm._sessionFacts.length).toBeLessThanOrEqual(50);
+    });
 });
