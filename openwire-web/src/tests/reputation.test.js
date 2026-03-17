@@ -162,6 +162,29 @@ describe('applyKarma', () => {
         expect(rep.history).toHaveLength(0);
         expect(rep.karma).toBe(100);
     });
+
+    it('returns unchanged reputation when cooldown is active (GAME_WIN same type within hour)', () => {
+        let rep = makeRep(100);
+        const now = Date.now();
+        // First GAME_WIN for blackjack succeeds
+        rep = applyKarma(rep, KARMA_EVENTS.GAME_WIN, { gameType: 'blackjack' }, now);
+        const karmaBefore = rep.karma;
+        const historyLen = rep.history.length;
+        // Second GAME_WIN for blackjack within same hour — should be blocked by cooldown
+        const result = applyKarma(rep, KARMA_EVENTS.GAME_WIN, { gameType: 'blackjack' }, now + 1000);
+        expect(result.karma).toBe(karmaBefore);
+        expect(result.history).toHaveLength(historyLen); // no new entry added
+    });
+
+    it('allows GAME_WIN for different gameType even during cooldown', () => {
+        let rep = makeRep(100);
+        const now = Date.now();
+        rep = applyKarma(rep, KARMA_EVENTS.GAME_WIN, { gameType: 'blackjack' }, now);
+        const karmaBefore = rep.karma;
+        // Different gameType should NOT be blocked
+        const result = applyKarma(rep, KARMA_EVENTS.GAME_WIN, { gameType: 'roulette' }, now + 1000);
+        expect(result.karma).toBeGreaterThan(karmaBefore);
+    });
 });
 
 /* ══════════════════════════════════════════════════════════
