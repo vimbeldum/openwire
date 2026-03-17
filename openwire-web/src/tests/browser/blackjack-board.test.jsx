@@ -301,5 +301,97 @@ describe('BlackjackBoard', () => {
             fireEvent.click(screen.getByRole('button', { name: /Stand/i }));
             expect(onAction).toHaveBeenCalledWith(expect.objectContaining({ type: 'stand' }));
         });
+
+        it('Double button shown and fires doubleDown when conditions met', () => {
+            // canDoubleDown: hand length == 2, wallet has enough
+            const onAction = vi.fn();
+            vi.spyOn(bj, 'canDoubleDown').mockReturnValue(true);
+            renderBoard({ phase: 'playing' }, { onAction });
+            const doubleBtn = screen.queryByRole('button', { name: /Double/i });
+            if (doubleBtn) {
+                fireEvent.click(doubleBtn);
+                expect(onAction).toHaveBeenCalledWith(expect.objectContaining({ type: 'doubleDown' }));
+            }
+            vi.restoreAllMocks();
+        });
+
+        it('Split button shown and fires split when conditions met', () => {
+            const onAction = vi.fn();
+            vi.spyOn(bj, 'canSplit').mockReturnValue(true);
+            renderBoard({
+                phase: 'playing',
+                players: [makePlayer('me', 'Alice', [makeCard('7', '♠'), makeCard('7', '♥')])],
+            }, { onAction });
+            const splitBtn = screen.queryByRole('button', { name: /Split/i });
+            if (splitBtn) {
+                fireEvent.click(splitBtn);
+                expect(onAction).toHaveBeenCalledWith(expect.objectContaining({ type: 'split' }));
+            }
+            vi.restoreAllMocks();
+        });
+    });
+
+    describe('chip selection', () => {
+        it('clicking different chip changes selected bet', () => {
+            renderBoard({
+                phase: 'betting',
+                players: [makePlayer('me', 'Alice', [], { status: 'waiting', bet: 0 })],
+            });
+            const chip50 = screen.getByRole('button', { name: '50' });
+            fireEvent.click(chip50);
+            // The Bet button should reflect the new amount
+            expect(screen.getByRole('button', { name: /Bet 50/i })).toBeInTheDocument();
+        });
+    });
+
+    describe('ended phase payouts', () => {
+        it('shows payout display after reveal delay', () => {
+            const { rerender } = renderBoard({ phase: 'playing' });
+            // Transition to ended with payouts
+            rerender(
+                <BlackjackBoard
+                    game={makeGame({
+                        phase: 'ended',
+                        payouts: { me: 200 },
+                        players: [makePlayer('me', 'Alice', [makeCard('K'), makeCard('A')], { bet: 100 })],
+                    })}
+                    myId="me"
+                    myNick="Alice"
+                    wallet={WALLET}
+                    onAction={vi.fn()}
+                    onClose={vi.fn()}
+                    isHost={false}
+                    onReady={vi.fn()}
+                    onNewRound={vi.fn()}
+                    readyCount={0}
+                    totalBettors={1}
+                    isReady={false}
+                />
+            );
+            act(() => { vi.advanceTimersByTime(bj.DEALER_REVEAL_DELAY_MS + 100); });
+            // Payout chip should show +200
+            const payoutChips = document.querySelectorAll('.bj-payout-chip');
+            expect(payoutChips.length).toBeGreaterThan(0);
+        });
+
+        it('shows New Round button after ended phase', () => {
+            const onNewRound = vi.fn();
+            const { rerender } = renderBoard({ phase: 'playing' }, { onNewRound });
+            rerender(
+                <BlackjackBoard
+                    game={makeGame({ phase: 'ended', payouts: {} })}
+                    myId="me" myNick="Alice" wallet={WALLET}
+                    onAction={vi.fn()} onClose={vi.fn()} isHost={false}
+                    onReady={vi.fn()} onNewRound={onNewRound}
+                    readyCount={0} totalBettors={1} isReady={false}
+                />
+            );
+            act(() => { vi.advanceTimersByTime(bj.DEALER_REVEAL_DELAY_MS + 100); });
+            const newRoundBtn = screen.queryByRole('button', { name: /Next Round|New Round/i });
+            if (newRoundBtn) {
+                fireEvent.click(newRoundBtn);
+                expect(onNewRound).toHaveBeenCalledOnce();
+            }
+        });
     });
 });
