@@ -256,6 +256,13 @@ describe('buyResale', () => {
     expect(result.success).toBe(false);
     expect(result.reason).toBe('insufficient_balance');
   });
+
+  it('fails with not_found when item does not exist in catalog', () => {
+    const catalog = freshCatalog();
+    const result = buyResale(catalog, freshWallet(2000), 'nonexistent-item-xyz', DEVICE_B, freshJackpot(), NOW);
+    expect(result.success).toBe(false);
+    expect(result.reason).toBe('not_found');
+  });
 });
 
 // ════════════════════════════════════════════════════════════
@@ -290,6 +297,14 @@ describe('equipItem', () => {
     const profile = freshProfile(['neon-green-bubble']);
     equipItem(profile, 'neon-green-bubble');
     expect(profile.cosmetics.equipped.bubbleStyle).toBeUndefined();
+  });
+
+  it('fails with not_in_catalog for item owned but not in DEFAULT_CATALOG', () => {
+    // Create profile that claims to own a non-existent catalog item
+    const profile = freshProfile(['fake-item-not-in-catalog']);
+    const result = equipItem(profile, 'fake-item-not-in-catalog');
+    expect(result.success).toBe(false);
+    expect(result.reason).toBe('not_in_catalog');
   });
 });
 
