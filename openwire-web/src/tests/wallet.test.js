@@ -306,6 +306,13 @@ describe('loadWallet', () => {
         expect(wallet.history[0].reason).toBe('Daily refresh');
     });
 
+    it('creates fresh wallet when localStorage has corrupt JSON', () => {
+        mockStorage['openwire_wallet_dev_test-device-uuid'] = '{CORRUPT!!!}}}';
+        const wallet = loadWallet('Alice');
+        expect(wallet.baseBalance).toBe(DAILY_BASE);
+        expect(wallet.nick).toBe('Alice');
+    });
+
     it('loads existing wallet from localStorage', () => {
         // Pre-populate localStorage with wallet data
         const existing = {
