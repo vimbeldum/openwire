@@ -1,0 +1,8 @@
+iteration	type	hypothesis	result	severity	location	description
+1	hypothesis	Biased sort-shuffle for agents	confirmed	MEDIUM	swarm.js:400	sort(() => Math.random() - 0.5) is biased + O(n log n)
+2	hypothesis	Invalid compact rollup option	confirmed	LOW	vite.config.js:23	compact: true no longer valid in modern Rollup
+3	hypothesis	Timer leaks in game hooks	disproven	-	hooks/*.js	All 5 hooks clean up timers properly
+4	hypothesis	Missing memoization in ChatRoom	disproven	-	ChatRoom.jsx	48 useCallback + 6 useMemo + memo-wrapped children
+5	hypothesis	Session persistence blocking	disproven	-	ChatRoom.jsx:289	5s interval, not per-message; capped at 500
+6	hypothesis	Context buffer memory leak	disproven	-	swarm.js	1000 msg cap + auto-compaction + 50 fact cap
+7	hypothesis	Swarm timer leak on stop	disproven	-	swarm.js:278	All 5 timer types cleared in stop()

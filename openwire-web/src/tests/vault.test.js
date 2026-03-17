@@ -249,6 +249,17 @@ describe('stake', () => {
         expect(lastEntry.reason).toBe('Vault stake');
         expect(lastEntry.amount).toBe(-100);
     });
+
+    it('persists wallet synchronously to localStorage after stake', () => {
+        const wallet = makeWallet({ baseBalance: 500, deviceId: 'test-dev-vault' });
+        const { success } = stake(makeProfile(), wallet, 200);
+        expect(success).toBe(true);
+        // Wallet should be saved synchronously to localStorage
+        const stored = localStorage.getItem('openwire_wallet_dev_test-dev-vault');
+        expect(stored).not.toBeNull();
+        const parsed = JSON.parse(stored);
+        expect(parsed.baseBalance).toBe(300);
+    });
 });
 
 /* ═══════════════════════════════════════════════════════════

@@ -1,0 +1,9 @@
+iteration	type	hypothesis	result	severity	location	description
+1	hypothesis	Dual device identity keys	confirmed	HIGH	wallet.js:10, profile.js:8	Different DEVICE_KEY constants create two UUIDs per device
+2	hypothesis	Wordlist has duplicates	confirmed	MEDIUM	profile.js:64	'realm' at indices 391 and 398; 624 words (comment says 256)
+3	hypothesis	settle() overwrites sitting-out	confirmed	MEDIUM	blackjack.js:506	Players with no bet get status changed to 'lose'
+4	hypothesis	escrowBounty missing history	confirmed	LOW	bounties.js:77	Wallet history not updated when escrowing bounty reward
+5	hypothesis	XSS via regex sanitization	disproven	-	socket.js:59	React escapes by default; no dangerouslySetInnerHTML used
+6	hypothesis	Unguarded JSON.parse on localStorage	disproven	-	multiple	All JSON.parse calls are wrapped in try/catch
+7	hypothesis	Timer leaks in hooks	disproven	-	hooks/*.js	All useEffect hooks return cleanup functions
+8	hypothesis	Race condition in debounced wallet save	disproven	-	wallet.js:88	saveWalletSync always writes latest; debounced save uses _pendingWallet ref

@@ -1,0 +1,6 @@
+iteration	category	target	delta	guard	status	description
+0	-	-	-	pass	baseline	0 test failures, 0 type errors, 0 lint errors (2605 passing)
+1	bug	profile.js:8	0	pass	fixed	Unify device identity key (openwire:device-id → openwire_device_id)
+2	bug	profile.js:64	0	pass	fixed	Remove duplicate 'realm' from passphrase wordlist
+3	bug	blackjack.js:506	0	pass	fixed	Skip sitting-out players in settle()
+4	bug	bounties.js:92	0	pass	fixed	Add wallet history entry for bounty escrow

@@ -861,6 +861,47 @@ describe('AMM cost function behavior (via buy/sell)', () => {
         });
     });
 
+    describe('CPMM invariant maintenance', () => {
+        it('buy decrements the other side of pool by cost (binary)', () => {
+            const game = makeOpenBinaryGame();
+            const { game: g, cost } = buyShares(game, 'p1', 'A', 0, 50);
+            // Bought side increases by shares
+            expect(g.pool.quantities[0]).toBe(DEFAULT_SEED + 50);
+            // Other side decreases by cost to maintain CPMM invariant
+            expect(g.pool.quantities[1]).toBe(DEFAULT_SEED - cost);
+        });
+
+        it('sell increments the other side of pool by revenue (binary)', () => {
+            const game = makeOpenBinaryGame();
+            const { game: g1, cost } = buyShares(game, 'p1', 'A', 0, 50);
+            const q1Before = g1.pool.quantities[1];
+            const { game: g2, revenue } = sellShares(g1, 'p1', 'A', 0, 10);
+            // Sold side decreases by shares
+            expect(g2.pool.quantities[0]).toBe(g1.pool.quantities[0] - 10);
+            // Other side increases by revenue
+            expect(g2.pool.quantities[1]).toBe(q1Before + revenue);
+        });
+
+        it('buy-then-sell round-trip recovers most of cost (no value trap)', () => {
+            const game = makeOpenBinaryGame();
+            const { game: g1, cost } = buyShares(game, 'p1', 'A', 0, 50);
+            const { revenue } = sellShares(g1, 'p1', 'A', 0, 50);
+            // Revenue should be close to cost (with rounding loss)
+            // Previously this was 0 (bug); now it should recover most of the cost
+            expect(revenue).toBeGreaterThan(0);
+            expect(revenue).toBeGreaterThanOrEqual(cost - 2); // allow +-2 rounding
+        });
+
+        it('k invariant approximately holds after buy (binary)', () => {
+            const game = makeOpenBinaryGame();
+            const k = game.pool.k;
+            const { game: g } = buyShares(game, 'p1', 'A', 0, 50);
+            const product = g.pool.quantities[0] * g.pool.quantities[1];
+            // Should be approximately equal to k (within rounding tolerance)
+            expect(Math.abs(product - k)).toBeLessThanOrEqual(k * 0.01);
+        });
+    });
+
     describe('multi-outcome proportional', () => {
         it('cost for multi-outcome buy is proportional to price', () => {
             const game = makeOpenMultiGame(['A', 'B', 'C']);
@@ -868,6 +909,14 @@ describe('AMM cost function behavior (via buy/sell)', () => {
             // With equal pool, price per outcome is 33
             // Cost = round(33 * 10 / 100) = round(3.3) = 3, at least 1
             expect(cost).toBeGreaterThanOrEqual(1);
+        });
+
+        it('buy decrements other outcomes in multi-outcome market', () => {
+            const game = makeOpenMultiGame(['A', 'B', 'C']);
+            const { game: g, cost } = buyShares(game, 'p1', 'X', 0, 10);
+            const otherSum = g.pool.quantities[1] + g.pool.quantities[2];
+            // Other outcomes' total should have decreased by cost
+            expect(otherSum).toBe(DEFAULT_SEED * 2 - cost);
         });
     });
 });

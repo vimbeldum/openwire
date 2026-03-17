@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
     MIN_REWARD,
     MAX_REWARD,
@@ -232,6 +232,27 @@ describe('escrowBounty', () => {
         const { bounty } = makeBounty({ reward: 500 });
         escrowBounty(wallet, bounty);
         expect(wallet.baseBalance).toBe(1000); // unchanged
+    });
+
+    it('persists wallet synchronously to localStorage after escrow', () => {
+        // Mock localStorage for this test — bounties.js calls it inline
+        const origSetItem = globalThis.localStorage?.setItem;
+        const setItemSpy = vi.fn();
+        globalThis.localStorage = { ...globalThis.localStorage, setItem: setItemSpy, getItem: vi.fn(() => null) };
+
+        const wallet = makeWallet({ baseBalance: 1000, deviceId: 'test-dev-bounty' });
+        const { bounty } = makeBounty({ reward: 500 });
+        const result = escrowBounty(wallet, bounty);
+
+        expect(result.success).toBe(true);
+        // Wallet should have been saved synchronously to localStorage
+        expect(setItemSpy).toHaveBeenCalledWith(
+            'openwire_wallet_dev_test-dev-bounty',
+            expect.stringContaining('"baseBalance":500'),
+        );
+
+        // Restore
+        if (origSetItem) globalThis.localStorage.setItem = origSetItem;
     });
 });
 

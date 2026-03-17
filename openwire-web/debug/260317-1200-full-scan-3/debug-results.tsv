@@ -1,0 +1,8 @@
+iteration	type	hypothesis	result	severity	location	description
+1	hypothesis	jackpot missing slots in contributions	confirmed	HIGH	jackpot.js:30	addRake('slots') produces NaN — slots missing from initial contributions
+2	hypothesis	cosmetics purchaseItem missing wallet history	confirmed	MEDIUM	cosmetics.js:63	deductFromWallet returns wallet without history entry
+3	hypothesis	tambola drawNumber O(n*m) on calledNumbers	disproven	-	tambola.js:330	90 max elements — negligible for game with 5s interval
+4	hypothesis	polymarket prices don't sum to 100	disproven	-	polymarket.js:20	Rounding artifact is cosmetic, not functional
+5	hypothesis	deaddrops sanitization bypass	disproven	-	deaddrops.js:90	Uses stripDangerousTags + React escaping
+6	hypothesis	agentStore version check stale	disproven	-	agentStore.js:74	Version 16 check properly gates store refresh
+7	hypothesis	mystery.js lazy import race	disproven	-	mystery.js:12	Async import is awaited before use

@@ -1,0 +1,49 @@
+{
+  "tasks": {
+    "task-1773418412535-uw0dte": {
+      "taskId": "task-1773418412535-uw0dte",
+      "type": "feature",
+      "description": "Add comprehensive unit + e2e tests and CI enforcement for openwire-web",
+      "priority": "critical",
+      "status": "completed",
+      "progress": 100,
+      "assignedTo": [
+        "unit-test-writer",
+        "e2e-test-writer",
+        "ci-pipeline-writer"
+      ],
+      "tags": [
+        "testing",
+        "ci",
+        "quality"
+      ],
+      "createdAt": "2026-03-13T16:13:32.535Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1773419221315-70vvpu": {
+      "taskId": "task-1773419221315-70vvpu",
+      "type": "feature",
+      "description": "Add Playwright browser E2E tests and CI enforcement for openwire-web",
+      "priority": "critical",
+      "status": "completed",
+      "progress": 100,
+      "assignedTo": [
+        "playwright-setup",
+        "playwright-landing",
+        "playwright-games",
+        "playwright-ci"
+      ],
+      "tags": [
+        "playwright",
+        "e2e",
+        "ci",
+        "browser-testing"
+      ],
+      "createdAt": "2026-03-13T16:27:01.315Z",
+      "startedAt": null,
+      "completedAt": null
+    }
+  },
+  "version": "3.0.0"
+}

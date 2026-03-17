@@ -6,7 +6,16 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/helpers/hook-handler.cjs pre-bash",
+            "command": "/Users/shwetanshu/.claude/hooks/rtk-rewrite.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /Users/shwetanshu/Documents/projects/openwire/.claude/helpers/hook-handler.cjs pre-bash",
             "timeout": 5000
           }
         ]
@@ -16,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/helpers/hook-handler.cjs pre-edit",
+            "command": "node /Users/shwetanshu/Documents/projects/openwire/.claude/helpers/hook-handler.cjs pre-edit",
             "timeout": 5000
           }
         ]
@@ -28,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/helpers/hook-handler.cjs post-edit",
+            "command": "node /Users/shwetanshu/Documents/projects/openwire/.claude/helpers/hook-handler.cjs post-edit",
             "timeout": 10000
           }
         ]
@@ -39,7 +48,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/helpers/hook-handler.cjs route",
+            "command": "node /Users/shwetanshu/Documents/projects/openwire/.claude/helpers/hook-handler.cjs route",
             "timeout": 10000
           }
         ]
@@ -50,7 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/helpers/hook-handler.cjs session-restore",
+            "command": "node /Users/shwetanshu/Documents/projects/openwire/.claude/helpers/hook-handler.cjs session-restore",
             "timeout": 15000
           }
         ]
@@ -61,7 +70,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/helpers/hook-handler.cjs session-end",
+            "command": "node /Users/shwetanshu/Documents/projects/openwire/.claude/helpers/hook-handler.cjs session-end",
             "timeout": 10000
           }
         ]
@@ -74,11 +83,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/helpers/hook-handler.cjs compact-manual"
+            "command": "node /Users/shwetanshu/Documents/projects/openwire/.claude/helpers/hook-handler.cjs compact-manual"
           },
           {
             "type": "command",
-            "command": "node .claude/helpers/hook-handler.cjs session-end",
+            "command": "node /Users/shwetanshu/Documents/projects/openwire/.claude/helpers/hook-handler.cjs session-end",
             "timeout": 5000
           }
         ]
@@ -88,11 +97,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/helpers/hook-handler.cjs compact-auto"
+            "command": "node /Users/shwetanshu/Documents/projects/openwire/.claude/helpers/hook-handler.cjs compact-auto"
           },
           {
             "type": "command",
-            "command": "node .claude/helpers/hook-handler.cjs session-end",
+            "command": "node /Users/shwetanshu/Documents/projects/openwire/.claude/helpers/hook-handler.cjs session-end",
             "timeout": 6000
           }
         ]
@@ -103,7 +112,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/helpers/hook-handler.cjs status",
+            "command": "node /Users/shwetanshu/Documents/projects/openwire/.claude/helpers/hook-handler.cjs status",
             "timeout": 3000
           }
         ]
@@ -114,7 +123,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/helpers/hook-handler.cjs post-task",
+            "command": "node /Users/shwetanshu/Documents/projects/openwire/.claude/helpers/hook-handler.cjs post-task",
             "timeout": 5000
           }
         ]
@@ -125,7 +134,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/helpers/hook-handler.cjs notify",
+            "command": "node /Users/shwetanshu/Documents/projects/openwire/.claude/helpers/hook-handler.cjs notify",
             "timeout": 3000
           }
         ]
@@ -134,7 +143,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "node .claude/helpers/statusline.cjs"
+    "command": "node /Users/shwetanshu/Documents/projects/openwire/.claude/helpers/statusline.cjs"
   },
   "permissions": {
     "allow": [

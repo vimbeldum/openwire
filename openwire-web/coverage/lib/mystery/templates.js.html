@@ -1,0 +1,2611 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for lib/mystery/templates.js</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">lib/mystery</a> templates.js</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>6/6</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/0</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>4/4</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>5/5</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a>
+<a name='L183'></a><a href='#L183'>183</a>
+<a name='L184'></a><a href='#L184'>184</a>
+<a name='L185'></a><a href='#L185'>185</a>
+<a name='L186'></a><a href='#L186'>186</a>
+<a name='L187'></a><a href='#L187'>187</a>
+<a name='L188'></a><a href='#L188'>188</a>
+<a name='L189'></a><a href='#L189'>189</a>
+<a name='L190'></a><a href='#L190'>190</a>
+<a name='L191'></a><a href='#L191'>191</a>
+<a name='L192'></a><a href='#L192'>192</a>
+<a name='L193'></a><a href='#L193'>193</a>
+<a name='L194'></a><a href='#L194'>194</a>
+<a name='L195'></a><a href='#L195'>195</a>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a>
+<a name='L201'></a><a href='#L201'>201</a>
+<a name='L202'></a><a href='#L202'>202</a>
+<a name='L203'></a><a href='#L203'>203</a>
+<a name='L204'></a><a href='#L204'>204</a>
+<a name='L205'></a><a href='#L205'>205</a>
+<a name='L206'></a><a href='#L206'>206</a>
+<a name='L207'></a><a href='#L207'>207</a>
+<a name='L208'></a><a href='#L208'>208</a>
+<a name='L209'></a><a href='#L209'>209</a>
+<a name='L210'></a><a href='#L210'>210</a>
+<a name='L211'></a><a href='#L211'>211</a>
+<a name='L212'></a><a href='#L212'>212</a>
+<a name='L213'></a><a href='#L213'>213</a>
+<a name='L214'></a><a href='#L214'>214</a>
+<a name='L215'></a><a href='#L215'>215</a>
+<a name='L216'></a><a href='#L216'>216</a>
+<a name='L217'></a><a href='#L217'>217</a>
+<a name='L218'></a><a href='#L218'>218</a>
+<a name='L219'></a><a href='#L219'>219</a>
+<a name='L220'></a><a href='#L220'>220</a>
+<a name='L221'></a><a href='#L221'>221</a>
+<a name='L222'></a><a href='#L222'>222</a>
+<a name='L223'></a><a href='#L223'>223</a>
+<a name='L224'></a><a href='#L224'>224</a>
+<a name='L225'></a><a href='#L225'>225</a>
+<a name='L226'></a><a href='#L226'>226</a>
+<a name='L227'></a><a href='#L227'>227</a>
+<a name='L228'></a><a href='#L228'>228</a>
+<a name='L229'></a><a href='#L229'>229</a>
+<a name='L230'></a><a href='#L230'>230</a>
+<a name='L231'></a><a href='#L231'>231</a>
+<a name='L232'></a><a href='#L232'>232</a>
+<a name='L233'></a><a href='#L233'>233</a>
+<a name='L234'></a><a href='#L234'>234</a>
+<a name='L235'></a><a href='#L235'>235</a>
+<a name='L236'></a><a href='#L236'>236</a>
+<a name='L237'></a><a href='#L237'>237</a>
+<a name='L238'></a><a href='#L238'>238</a>
+<a name='L239'></a><a href='#L239'>239</a>
+<a name='L240'></a><a href='#L240'>240</a>
+<a name='L241'></a><a href='#L241'>241</a>
+<a name='L242'></a><a href='#L242'>242</a>
+<a name='L243'></a><a href='#L243'>243</a>
+<a name='L244'></a><a href='#L244'>244</a>
+<a name='L245'></a><a href='#L245'>245</a>
+<a name='L246'></a><a href='#L246'>246</a>
+<a name='L247'></a><a href='#L247'>247</a>
+<a name='L248'></a><a href='#L248'>248</a>
+<a name='L249'></a><a href='#L249'>249</a>
+<a name='L250'></a><a href='#L250'>250</a>
+<a name='L251'></a><a href='#L251'>251</a>
+<a name='L252'></a><a href='#L252'>252</a>
+<a name='L253'></a><a href='#L253'>253</a>
+<a name='L254'></a><a href='#L254'>254</a>
+<a name='L255'></a><a href='#L255'>255</a>
+<a name='L256'></a><a href='#L256'>256</a>
+<a name='L257'></a><a href='#L257'>257</a>
+<a name='L258'></a><a href='#L258'>258</a>
+<a name='L259'></a><a href='#L259'>259</a>
+<a name='L260'></a><a href='#L260'>260</a>
+<a name='L261'></a><a href='#L261'>261</a>
+<a name='L262'></a><a href='#L262'>262</a>
+<a name='L263'></a><a href='#L263'>263</a>
+<a name='L264'></a><a href='#L264'>264</a>
+<a name='L265'></a><a href='#L265'>265</a>
+<a name='L266'></a><a href='#L266'>266</a>
+<a name='L267'></a><a href='#L267'>267</a>
+<a name='L268'></a><a href='#L268'>268</a>
+<a name='L269'></a><a href='#L269'>269</a>
+<a name='L270'></a><a href='#L270'>270</a>
+<a name='L271'></a><a href='#L271'>271</a>
+<a name='L272'></a><a href='#L272'>272</a>
+<a name='L273'></a><a href='#L273'>273</a>
+<a name='L274'></a><a href='#L274'>274</a>
+<a name='L275'></a><a href='#L275'>275</a>
+<a name='L276'></a><a href='#L276'>276</a>
+<a name='L277'></a><a href='#L277'>277</a>
+<a name='L278'></a><a href='#L278'>278</a>
+<a name='L279'></a><a href='#L279'>279</a>
+<a name='L280'></a><a href='#L280'>280</a>
+<a name='L281'></a><a href='#L281'>281</a>
+<a name='L282'></a><a href='#L282'>282</a>
+<a name='L283'></a><a href='#L283'>283</a>
+<a name='L284'></a><a href='#L284'>284</a>
+<a name='L285'></a><a href='#L285'>285</a>
+<a name='L286'></a><a href='#L286'>286</a>
+<a name='L287'></a><a href='#L287'>287</a>
+<a name='L288'></a><a href='#L288'>288</a>
+<a name='L289'></a><a href='#L289'>289</a>
+<a name='L290'></a><a href='#L290'>290</a>
+<a name='L291'></a><a href='#L291'>291</a>
+<a name='L292'></a><a href='#L292'>292</a>
+<a name='L293'></a><a href='#L293'>293</a>
+<a name='L294'></a><a href='#L294'>294</a>
+<a name='L295'></a><a href='#L295'>295</a>
+<a name='L296'></a><a href='#L296'>296</a>
+<a name='L297'></a><a href='#L297'>297</a>
+<a name='L298'></a><a href='#L298'>298</a>
+<a name='L299'></a><a href='#L299'>299</a>
+<a name='L300'></a><a href='#L300'>300</a>
+<a name='L301'></a><a href='#L301'>301</a>
+<a name='L302'></a><a href='#L302'>302</a>
+<a name='L303'></a><a href='#L303'>303</a>
+<a name='L304'></a><a href='#L304'>304</a>
+<a name='L305'></a><a href='#L305'>305</a>
+<a name='L306'></a><a href='#L306'>306</a>
+<a name='L307'></a><a href='#L307'>307</a>
+<a name='L308'></a><a href='#L308'>308</a>
+<a name='L309'></a><a href='#L309'>309</a>
+<a name='L310'></a><a href='#L310'>310</a>
+<a name='L311'></a><a href='#L311'>311</a>
+<a name='L312'></a><a href='#L312'>312</a>
+<a name='L313'></a><a href='#L313'>313</a>
+<a name='L314'></a><a href='#L314'>314</a>
+<a name='L315'></a><a href='#L315'>315</a>
+<a name='L316'></a><a href='#L316'>316</a>
+<a name='L317'></a><a href='#L317'>317</a>
+<a name='L318'></a><a href='#L318'>318</a>
+<a name='L319'></a><a href='#L319'>319</a>
+<a name='L320'></a><a href='#L320'>320</a>
+<a name='L321'></a><a href='#L321'>321</a>
+<a name='L322'></a><a href='#L322'>322</a>
+<a name='L323'></a><a href='#L323'>323</a>
+<a name='L324'></a><a href='#L324'>324</a>
+<a name='L325'></a><a href='#L325'>325</a>
+<a name='L326'></a><a href='#L326'>326</a>
+<a name='L327'></a><a href='#L327'>327</a>
+<a name='L328'></a><a href='#L328'>328</a>
+<a name='L329'></a><a href='#L329'>329</a>
+<a name='L330'></a><a href='#L330'>330</a>
+<a name='L331'></a><a href='#L331'>331</a>
+<a name='L332'></a><a href='#L332'>332</a>
+<a name='L333'></a><a href='#L333'>333</a>
+<a name='L334'></a><a href='#L334'>334</a>
+<a name='L335'></a><a href='#L335'>335</a>
+<a name='L336'></a><a href='#L336'>336</a>
+<a name='L337'></a><a href='#L337'>337</a>
+<a name='L338'></a><a href='#L338'>338</a>
+<a name='L339'></a><a href='#L339'>339</a>
+<a name='L340'></a><a href='#L340'>340</a>
+<a name='L341'></a><a href='#L341'>341</a>
+<a name='L342'></a><a href='#L342'>342</a>
+<a name='L343'></a><a href='#L343'>343</a>
+<a name='L344'></a><a href='#L344'>344</a>
+<a name='L345'></a><a href='#L345'>345</a>
+<a name='L346'></a><a href='#L346'>346</a>
+<a name='L347'></a><a href='#L347'>347</a>
+<a name='L348'></a><a href='#L348'>348</a>
+<a name='L349'></a><a href='#L349'>349</a>
+<a name='L350'></a><a href='#L350'>350</a>
+<a name='L351'></a><a href='#L351'>351</a>
+<a name='L352'></a><a href='#L352'>352</a>
+<a name='L353'></a><a href='#L353'>353</a>
+<a name='L354'></a><a href='#L354'>354</a>
+<a name='L355'></a><a href='#L355'>355</a>
+<a name='L356'></a><a href='#L356'>356</a>
+<a name='L357'></a><a href='#L357'>357</a>
+<a name='L358'></a><a href='#L358'>358</a>
+<a name='L359'></a><a href='#L359'>359</a>
+<a name='L360'></a><a href='#L360'>360</a>
+<a name='L361'></a><a href='#L361'>361</a>
+<a name='L362'></a><a href='#L362'>362</a>
+<a name='L363'></a><a href='#L363'>363</a>
+<a name='L364'></a><a href='#L364'>364</a>
+<a name='L365'></a><a href='#L365'>365</a>
+<a name='L366'></a><a href='#L366'>366</a>
+<a name='L367'></a><a href='#L367'>367</a>
+<a name='L368'></a><a href='#L368'>368</a>
+<a name='L369'></a><a href='#L369'>369</a>
+<a name='L370'></a><a href='#L370'>370</a>
+<a name='L371'></a><a href='#L371'>371</a>
+<a name='L372'></a><a href='#L372'>372</a>
+<a name='L373'></a><a href='#L373'>373</a>
+<a name='L374'></a><a href='#L374'>374</a>
+<a name='L375'></a><a href='#L375'>375</a>
+<a name='L376'></a><a href='#L376'>376</a>
+<a name='L377'></a><a href='#L377'>377</a>
+<a name='L378'></a><a href='#L378'>378</a>
+<a name='L379'></a><a href='#L379'>379</a>
+<a name='L380'></a><a href='#L380'>380</a>
+<a name='L381'></a><a href='#L381'>381</a>
+<a name='L382'></a><a href='#L382'>382</a>
+<a name='L383'></a><a href='#L383'>383</a>
+<a name='L384'></a><a href='#L384'>384</a>
+<a name='L385'></a><a href='#L385'>385</a>
+<a name='L386'></a><a href='#L386'>386</a>
+<a name='L387'></a><a href='#L387'>387</a>
+<a name='L388'></a><a href='#L388'>388</a>
+<a name='L389'></a><a href='#L389'>389</a>
+<a name='L390'></a><a href='#L390'>390</a>
+<a name='L391'></a><a href='#L391'>391</a>
+<a name='L392'></a><a href='#L392'>392</a>
+<a name='L393'></a><a href='#L393'>393</a>
+<a name='L394'></a><a href='#L394'>394</a>
+<a name='L395'></a><a href='#L395'>395</a>
+<a name='L396'></a><a href='#L396'>396</a>
+<a name='L397'></a><a href='#L397'>397</a>
+<a name='L398'></a><a href='#L398'>398</a>
+<a name='L399'></a><a href='#L399'>399</a>
+<a name='L400'></a><a href='#L400'>400</a>
+<a name='L401'></a><a href='#L401'>401</a>
+<a name='L402'></a><a href='#L402'>402</a>
+<a name='L403'></a><a href='#L403'>403</a>
+<a name='L404'></a><a href='#L404'>404</a>
+<a name='L405'></a><a href='#L405'>405</a>
+<a name='L406'></a><a href='#L406'>406</a>
+<a name='L407'></a><a href='#L407'>407</a>
+<a name='L408'></a><a href='#L408'>408</a>
+<a name='L409'></a><a href='#L409'>409</a>
+<a name='L410'></a><a href='#L410'>410</a>
+<a name='L411'></a><a href='#L411'>411</a>
+<a name='L412'></a><a href='#L412'>412</a>
+<a name='L413'></a><a href='#L413'>413</a>
+<a name='L414'></a><a href='#L414'>414</a>
+<a name='L415'></a><a href='#L415'>415</a>
+<a name='L416'></a><a href='#L416'>416</a>
+<a name='L417'></a><a href='#L417'>417</a>
+<a name='L418'></a><a href='#L418'>418</a>
+<a name='L419'></a><a href='#L419'>419</a>
+<a name='L420'></a><a href='#L420'>420</a>
+<a name='L421'></a><a href='#L421'>421</a>
+<a name='L422'></a><a href='#L422'>422</a>
+<a name='L423'></a><a href='#L423'>423</a>
+<a name='L424'></a><a href='#L424'>424</a>
+<a name='L425'></a><a href='#L425'>425</a>
+<a name='L426'></a><a href='#L426'>426</a>
+<a name='L427'></a><a href='#L427'>427</a>
+<a name='L428'></a><a href='#L428'>428</a>
+<a name='L429'></a><a href='#L429'>429</a>
+<a name='L430'></a><a href='#L430'>430</a>
+<a name='L431'></a><a href='#L431'>431</a>
+<a name='L432'></a><a href='#L432'>432</a>
+<a name='L433'></a><a href='#L433'>433</a>
+<a name='L434'></a><a href='#L434'>434</a>
+<a name='L435'></a><a href='#L435'>435</a>
+<a name='L436'></a><a href='#L436'>436</a>
+<a name='L437'></a><a href='#L437'>437</a>
+<a name='L438'></a><a href='#L438'>438</a>
+<a name='L439'></a><a href='#L439'>439</a>
+<a name='L440'></a><a href='#L440'>440</a>
+<a name='L441'></a><a href='#L441'>441</a>
+<a name='L442'></a><a href='#L442'>442</a>
+<a name='L443'></a><a href='#L443'>443</a>
+<a name='L444'></a><a href='#L444'>444</a>
+<a name='L445'></a><a href='#L445'>445</a>
+<a name='L446'></a><a href='#L446'>446</a>
+<a name='L447'></a><a href='#L447'>447</a>
+<a name='L448'></a><a href='#L448'>448</a>
+<a name='L449'></a><a href='#L449'>449</a>
+<a name='L450'></a><a href='#L450'>450</a>
+<a name='L451'></a><a href='#L451'>451</a>
+<a name='L452'></a><a href='#L452'>452</a>
+<a name='L453'></a><a href='#L453'>453</a>
+<a name='L454'></a><a href='#L454'>454</a>
+<a name='L455'></a><a href='#L455'>455</a>
+<a name='L456'></a><a href='#L456'>456</a>
+<a name='L457'></a><a href='#L457'>457</a>
+<a name='L458'></a><a href='#L458'>458</a>
+<a name='L459'></a><a href='#L459'>459</a>
+<a name='L460'></a><a href='#L460'>460</a>
+<a name='L461'></a><a href='#L461'>461</a>
+<a name='L462'></a><a href='#L462'>462</a>
+<a name='L463'></a><a href='#L463'>463</a>
+<a name='L464'></a><a href='#L464'>464</a>
+<a name='L465'></a><a href='#L465'>465</a>
+<a name='L466'></a><a href='#L466'>466</a>
+<a name='L467'></a><a href='#L467'>467</a>
+<a name='L468'></a><a href='#L468'>468</a>
+<a name='L469'></a><a href='#L469'>469</a>
+<a name='L470'></a><a href='#L470'>470</a>
+<a name='L471'></a><a href='#L471'>471</a>
+<a name='L472'></a><a href='#L472'>472</a>
+<a name='L473'></a><a href='#L473'>473</a>
+<a name='L474'></a><a href='#L474'>474</a>
+<a name='L475'></a><a href='#L475'>475</a>
+<a name='L476'></a><a href='#L476'>476</a>
+<a name='L477'></a><a href='#L477'>477</a>
+<a name='L478'></a><a href='#L478'>478</a>
+<a name='L479'></a><a href='#L479'>479</a>
+<a name='L480'></a><a href='#L480'>480</a>
+<a name='L481'></a><a href='#L481'>481</a>
+<a name='L482'></a><a href='#L482'>482</a>
+<a name='L483'></a><a href='#L483'>483</a>
+<a name='L484'></a><a href='#L484'>484</a>
+<a name='L485'></a><a href='#L485'>485</a>
+<a name='L486'></a><a href='#L486'>486</a>
+<a name='L487'></a><a href='#L487'>487</a>
+<a name='L488'></a><a href='#L488'>488</a>
+<a name='L489'></a><a href='#L489'>489</a>
+<a name='L490'></a><a href='#L490'>490</a>
+<a name='L491'></a><a href='#L491'>491</a>
+<a name='L492'></a><a href='#L492'>492</a>
+<a name='L493'></a><a href='#L493'>493</a>
+<a name='L494'></a><a href='#L494'>494</a>
+<a name='L495'></a><a href='#L495'>495</a>
+<a name='L496'></a><a href='#L496'>496</a>
+<a name='L497'></a><a href='#L497'>497</a>
+<a name='L498'></a><a href='#L498'>498</a>
+<a name='L499'></a><a href='#L499'>499</a>
+<a name='L500'></a><a href='#L500'>500</a>
+<a name='L501'></a><a href='#L501'>501</a>
+<a name='L502'></a><a href='#L502'>502</a>
+<a name='L503'></a><a href='#L503'>503</a>
+<a name='L504'></a><a href='#L504'>504</a>
+<a name='L505'></a><a href='#L505'>505</a>
+<a name='L506'></a><a href='#L506'>506</a>
+<a name='L507'></a><a href='#L507'>507</a>
+<a name='L508'></a><a href='#L508'>508</a>
+<a name='L509'></a><a href='#L509'>509</a>
+<a name='L510'></a><a href='#L510'>510</a>
+<a name='L511'></a><a href='#L511'>511</a>
+<a name='L512'></a><a href='#L512'>512</a>
+<a name='L513'></a><a href='#L513'>513</a>
+<a name='L514'></a><a href='#L514'>514</a>
+<a name='L515'></a><a href='#L515'>515</a>
+<a name='L516'></a><a href='#L516'>516</a>
+<a name='L517'></a><a href='#L517'>517</a>
+<a name='L518'></a><a href='#L518'>518</a>
+<a name='L519'></a><a href='#L519'>519</a>
+<a name='L520'></a><a href='#L520'>520</a>
+<a name='L521'></a><a href='#L521'>521</a>
+<a name='L522'></a><a href='#L522'>522</a>
+<a name='L523'></a><a href='#L523'>523</a>
+<a name='L524'></a><a href='#L524'>524</a>
+<a name='L525'></a><a href='#L525'>525</a>
+<a name='L526'></a><a href='#L526'>526</a>
+<a name='L527'></a><a href='#L527'>527</a>
+<a name='L528'></a><a href='#L528'>528</a>
+<a name='L529'></a><a href='#L529'>529</a>
+<a name='L530'></a><a href='#L530'>530</a>
+<a name='L531'></a><a href='#L531'>531</a>
+<a name='L532'></a><a href='#L532'>532</a>
+<a name='L533'></a><a href='#L533'>533</a>
+<a name='L534'></a><a href='#L534'>534</a>
+<a name='L535'></a><a href='#L535'>535</a>
+<a name='L536'></a><a href='#L536'>536</a>
+<a name='L537'></a><a href='#L537'>537</a>
+<a name='L538'></a><a href='#L538'>538</a>
+<a name='L539'></a><a href='#L539'>539</a>
+<a name='L540'></a><a href='#L540'>540</a>
+<a name='L541'></a><a href='#L541'>541</a>
+<a name='L542'></a><a href='#L542'>542</a>
+<a name='L543'></a><a href='#L543'>543</a>
+<a name='L544'></a><a href='#L544'>544</a>
+<a name='L545'></a><a href='#L545'>545</a>
+<a name='L546'></a><a href='#L546'>546</a>
+<a name='L547'></a><a href='#L547'>547</a>
+<a name='L548'></a><a href='#L548'>548</a>
+<a name='L549'></a><a href='#L549'>549</a>
+<a name='L550'></a><a href='#L550'>550</a>
+<a name='L551'></a><a href='#L551'>551</a>
+<a name='L552'></a><a href='#L552'>552</a>
+<a name='L553'></a><a href='#L553'>553</a>
+<a name='L554'></a><a href='#L554'>554</a>
+<a name='L555'></a><a href='#L555'>555</a>
+<a name='L556'></a><a href='#L556'>556</a>
+<a name='L557'></a><a href='#L557'>557</a>
+<a name='L558'></a><a href='#L558'>558</a>
+<a name='L559'></a><a href='#L559'>559</a>
+<a name='L560'></a><a href='#L560'>560</a>
+<a name='L561'></a><a href='#L561'>561</a>
+<a name='L562'></a><a href='#L562'>562</a>
+<a name='L563'></a><a href='#L563'>563</a>
+<a name='L564'></a><a href='#L564'>564</a>
+<a name='L565'></a><a href='#L565'>565</a>
+<a name='L566'></a><a href='#L566'>566</a>
+<a name='L567'></a><a href='#L567'>567</a>
+<a name='L568'></a><a href='#L568'>568</a>
+<a name='L569'></a><a href='#L569'>569</a>
+<a name='L570'></a><a href='#L570'>570</a>
+<a name='L571'></a><a href='#L571'>571</a>
+<a name='L572'></a><a href='#L572'>572</a>
+<a name='L573'></a><a href='#L573'>573</a>
+<a name='L574'></a><a href='#L574'>574</a>
+<a name='L575'></a><a href='#L575'>575</a>
+<a name='L576'></a><a href='#L576'>576</a>
+<a name='L577'></a><a href='#L577'>577</a>
+<a name='L578'></a><a href='#L578'>578</a>
+<a name='L579'></a><a href='#L579'>579</a>
+<a name='L580'></a><a href='#L580'>580</a>
+<a name='L581'></a><a href='#L581'>581</a>
+<a name='L582'></a><a href='#L582'>582</a>
+<a name='L583'></a><a href='#L583'>583</a>
+<a name='L584'></a><a href='#L584'>584</a>
+<a name='L585'></a><a href='#L585'>585</a>
+<a name='L586'></a><a href='#L586'>586</a>
+<a name='L587'></a><a href='#L587'>587</a>
+<a name='L588'></a><a href='#L588'>588</a>
+<a name='L589'></a><a href='#L589'>589</a>
+<a name='L590'></a><a href='#L590'>590</a>
+<a name='L591'></a><a href='#L591'>591</a>
+<a name='L592'></a><a href='#L592'>592</a>
+<a name='L593'></a><a href='#L593'>593</a>
+<a name='L594'></a><a href='#L594'>594</a>
+<a name='L595'></a><a href='#L595'>595</a>
+<a name='L596'></a><a href='#L596'>596</a>
+<a name='L597'></a><a href='#L597'>597</a>
+<a name='L598'></a><a href='#L598'>598</a>
+<a name='L599'></a><a href='#L599'>599</a>
+<a name='L600'></a><a href='#L600'>600</a>
+<a name='L601'></a><a href='#L601'>601</a>
+<a name='L602'></a><a href='#L602'>602</a>
+<a name='L603'></a><a href='#L603'>603</a>
+<a name='L604'></a><a href='#L604'>604</a>
+<a name='L605'></a><a href='#L605'>605</a>
+<a name='L606'></a><a href='#L606'>606</a>
+<a name='L607'></a><a href='#L607'>607</a>
+<a name='L608'></a><a href='#L608'>608</a>
+<a name='L609'></a><a href='#L609'>609</a>
+<a name='L610'></a><a href='#L610'>610</a>
+<a name='L611'></a><a href='#L611'>611</a>
+<a name='L612'></a><a href='#L612'>612</a>
+<a name='L613'></a><a href='#L613'>613</a>
+<a name='L614'></a><a href='#L614'>614</a>
+<a name='L615'></a><a href='#L615'>615</a>
+<a name='L616'></a><a href='#L616'>616</a>
+<a name='L617'></a><a href='#L617'>617</a>
+<a name='L618'></a><a href='#L618'>618</a>
+<a name='L619'></a><a href='#L619'>619</a>
+<a name='L620'></a><a href='#L620'>620</a>
+<a name='L621'></a><a href='#L621'>621</a>
+<a name='L622'></a><a href='#L622'>622</a>
+<a name='L623'></a><a href='#L623'>623</a>
+<a name='L624'></a><a href='#L624'>624</a>
+<a name='L625'></a><a href='#L625'>625</a>
+<a name='L626'></a><a href='#L626'>626</a>
+<a name='L627'></a><a href='#L627'>627</a>
+<a name='L628'></a><a href='#L628'>628</a>
+<a name='L629'></a><a href='#L629'>629</a>
+<a name='L630'></a><a href='#L630'>630</a>
+<a name='L631'></a><a href='#L631'>631</a>
+<a name='L632'></a><a href='#L632'>632</a>
+<a name='L633'></a><a href='#L633'>633</a>
+<a name='L634'></a><a href='#L634'>634</a>
+<a name='L635'></a><a href='#L635'>635</a>
+<a name='L636'></a><a href='#L636'>636</a>
+<a name='L637'></a><a href='#L637'>637</a>
+<a name='L638'></a><a href='#L638'>638</a>
+<a name='L639'></a><a href='#L639'>639</a>
+<a name='L640'></a><a href='#L640'>640</a>
+<a name='L641'></a><a href='#L641'>641</a>
+<a name='L642'></a><a href='#L642'>642</a>
+<a name='L643'></a><a href='#L643'>643</a>
+<a name='L644'></a><a href='#L644'>644</a>
+<a name='L645'></a><a href='#L645'>645</a>
+<a name='L646'></a><a href='#L646'>646</a>
+<a name='L647'></a><a href='#L647'>647</a>
+<a name='L648'></a><a href='#L648'>648</a>
+<a name='L649'></a><a href='#L649'>649</a>
+<a name='L650'></a><a href='#L650'>650</a>
+<a name='L651'></a><a href='#L651'>651</a>
+<a name='L652'></a><a href='#L652'>652</a>
+<a name='L653'></a><a href='#L653'>653</a>
+<a name='L654'></a><a href='#L654'>654</a>
+<a name='L655'></a><a href='#L655'>655</a>
+<a name='L656'></a><a href='#L656'>656</a>
+<a name='L657'></a><a href='#L657'>657</a>
+<a name='L658'></a><a href='#L658'>658</a>
+<a name='L659'></a><a href='#L659'>659</a>
+<a name='L660'></a><a href='#L660'>660</a>
+<a name='L661'></a><a href='#L661'>661</a>
+<a name='L662'></a><a href='#L662'>662</a>
+<a name='L663'></a><a href='#L663'>663</a>
+<a name='L664'></a><a href='#L664'>664</a>
+<a name='L665'></a><a href='#L665'>665</a>
+<a name='L666'></a><a href='#L666'>666</a>
+<a name='L667'></a><a href='#L667'>667</a>
+<a name='L668'></a><a href='#L668'>668</a>
+<a name='L669'></a><a href='#L669'>669</a>
+<a name='L670'></a><a href='#L670'>670</a>
+<a name='L671'></a><a href='#L671'>671</a>
+<a name='L672'></a><a href='#L672'>672</a>
+<a name='L673'></a><a href='#L673'>673</a>
+<a name='L674'></a><a href='#L674'>674</a>
+<a name='L675'></a><a href='#L675'>675</a>
+<a name='L676'></a><a href='#L676'>676</a>
+<a name='L677'></a><a href='#L677'>677</a>
+<a name='L678'></a><a href='#L678'>678</a>
+<a name='L679'></a><a href='#L679'>679</a>
+<a name='L680'></a><a href='#L680'>680</a>
+<a name='L681'></a><a href='#L681'>681</a>
+<a name='L682'></a><a href='#L682'>682</a>
+<a name='L683'></a><a href='#L683'>683</a>
+<a name='L684'></a><a href='#L684'>684</a>
+<a name='L685'></a><a href='#L685'>685</a>
+<a name='L686'></a><a href='#L686'>686</a>
+<a name='L687'></a><a href='#L687'>687</a>
+<a name='L688'></a><a href='#L688'>688</a>
+<a name='L689'></a><a href='#L689'>689</a>
+<a name='L690'></a><a href='#L690'>690</a>
+<a name='L691'></a><a href='#L691'>691</a>
+<a name='L692'></a><a href='#L692'>692</a>
+<a name='L693'></a><a href='#L693'>693</a>
+<a name='L694'></a><a href='#L694'>694</a>
+<a name='L695'></a><a href='#L695'>695</a>
+<a name='L696'></a><a href='#L696'>696</a>
+<a name='L697'></a><a href='#L697'>697</a>
+<a name='L698'></a><a href='#L698'>698</a>
+<a name='L699'></a><a href='#L699'>699</a>
+<a name='L700'></a><a href='#L700'>700</a>
+<a name='L701'></a><a href='#L701'>701</a>
+<a name='L702'></a><a href='#L702'>702</a>
+<a name='L703'></a><a href='#L703'>703</a>
+<a name='L704'></a><a href='#L704'>704</a>
+<a name='L705'></a><a href='#L705'>705</a>
+<a name='L706'></a><a href='#L706'>706</a>
+<a name='L707'></a><a href='#L707'>707</a>
+<a name='L708'></a><a href='#L708'>708</a>
+<a name='L709'></a><a href='#L709'>709</a>
+<a name='L710'></a><a href='#L710'>710</a>
+<a name='L711'></a><a href='#L711'>711</a>
+<a name='L712'></a><a href='#L712'>712</a>
+<a name='L713'></a><a href='#L713'>713</a>
+<a name='L714'></a><a href='#L714'>714</a>
+<a name='L715'></a><a href='#L715'>715</a>
+<a name='L716'></a><a href='#L716'>716</a>
+<a name='L717'></a><a href='#L717'>717</a>
+<a name='L718'></a><a href='#L718'>718</a>
+<a name='L719'></a><a href='#L719'>719</a>
+<a name='L720'></a><a href='#L720'>720</a>
+<a name='L721'></a><a href='#L721'>721</a>
+<a name='L722'></a><a href='#L722'>722</a>
+<a name='L723'></a><a href='#L723'>723</a>
+<a name='L724'></a><a href='#L724'>724</a>
+<a name='L725'></a><a href='#L725'>725</a>
+<a name='L726'></a><a href='#L726'>726</a>
+<a name='L727'></a><a href='#L727'>727</a>
+<a name='L728'></a><a href='#L728'>728</a>
+<a name='L729'></a><a href='#L729'>729</a>
+<a name='L730'></a><a href='#L730'>730</a>
+<a name='L731'></a><a href='#L731'>731</a>
+<a name='L732'></a><a href='#L732'>732</a>
+<a name='L733'></a><a href='#L733'>733</a>
+<a name='L734'></a><a href='#L734'>734</a>
+<a name='L735'></a><a href='#L735'>735</a>
+<a name='L736'></a><a href='#L736'>736</a>
+<a name='L737'></a><a href='#L737'>737</a>
+<a name='L738'></a><a href='#L738'>738</a>
+<a name='L739'></a><a href='#L739'>739</a>
+<a name='L740'></a><a href='#L740'>740</a>
+<a name='L741'></a><a href='#L741'>741</a>
+<a name='L742'></a><a href='#L742'>742</a>
+<a name='L743'></a><a href='#L743'>743</a>
+<a name='L744'></a><a href='#L744'>744</a>
+<a name='L745'></a><a href='#L745'>745</a>
+<a name='L746'></a><a href='#L746'>746</a>
+<a name='L747'></a><a href='#L747'>747</a>
+<a name='L748'></a><a href='#L748'>748</a>
+<a name='L749'></a><a href='#L749'>749</a>
+<a name='L750'></a><a href='#L750'>750</a>
+<a name='L751'></a><a href='#L751'>751</a>
+<a name='L752'></a><a href='#L752'>752</a>
+<a name='L753'></a><a href='#L753'>753</a>
+<a name='L754'></a><a href='#L754'>754</a>
+<a name='L755'></a><a href='#L755'>755</a>
+<a name='L756'></a><a href='#L756'>756</a>
+<a name='L757'></a><a href='#L757'>757</a>
+<a name='L758'></a><a href='#L758'>758</a>
+<a name='L759'></a><a href='#L759'>759</a>
+<a name='L760'></a><a href='#L760'>760</a>
+<a name='L761'></a><a href='#L761'>761</a>
+<a name='L762'></a><a href='#L762'>762</a>
+<a name='L763'></a><a href='#L763'>763</a>
+<a name='L764'></a><a href='#L764'>764</a>
+<a name='L765'></a><a href='#L765'>765</a>
+<a name='L766'></a><a href='#L766'>766</a>
+<a name='L767'></a><a href='#L767'>767</a>
+<a name='L768'></a><a href='#L768'>768</a>
+<a name='L769'></a><a href='#L769'>769</a>
+<a name='L770'></a><a href='#L770'>770</a>
+<a name='L771'></a><a href='#L771'>771</a>
+<a name='L772'></a><a href='#L772'>772</a>
+<a name='L773'></a><a href='#L773'>773</a>
+<a name='L774'></a><a href='#L774'>774</a>
+<a name='L775'></a><a href='#L775'>775</a>
+<a name='L776'></a><a href='#L776'>776</a>
+<a name='L777'></a><a href='#L777'>777</a>
+<a name='L778'></a><a href='#L778'>778</a>
+<a name='L779'></a><a href='#L779'>779</a>
+<a name='L780'></a><a href='#L780'>780</a>
+<a name='L781'></a><a href='#L781'>781</a>
+<a name='L782'></a><a href='#L782'>782</a>
+<a name='L783'></a><a href='#L783'>783</a>
+<a name='L784'></a><a href='#L784'>784</a>
+<a name='L785'></a><a href='#L785'>785</a>
+<a name='L786'></a><a href='#L786'>786</a>
+<a name='L787'></a><a href='#L787'>787</a>
+<a name='L788'></a><a href='#L788'>788</a>
+<a name='L789'></a><a href='#L789'>789</a>
+<a name='L790'></a><a href='#L790'>790</a>
+<a name='L791'></a><a href='#L791'>791</a>
+<a name='L792'></a><a href='#L792'>792</a>
+<a name='L793'></a><a href='#L793'>793</a>
+<a name='L794'></a><a href='#L794'>794</a>
+<a name='L795'></a><a href='#L795'>795</a>
+<a name='L796'></a><a href='#L796'>796</a>
+<a name='L797'></a><a href='#L797'>797</a>
+<a name='L798'></a><a href='#L798'>798</a>
+<a name='L799'></a><a href='#L799'>799</a>
+<a name='L800'></a><a href='#L800'>800</a>
+<a name='L801'></a><a href='#L801'>801</a>
+<a name='L802'></a><a href='#L802'>802</a>
+<a name='L803'></a><a href='#L803'>803</a>
+<a name='L804'></a><a href='#L804'>804</a>
+<a name='L805'></a><a href='#L805'>805</a>
+<a name='L806'></a><a href='#L806'>806</a>
+<a name='L807'></a><a href='#L807'>807</a>
+<a name='L808'></a><a href='#L808'>808</a>
+<a name='L809'></a><a href='#L809'>809</a>
+<a name='L810'></a><a href='#L810'>810</a>
+<a name='L811'></a><a href='#L811'>811</a>
+<a name='L812'></a><a href='#L812'>812</a>
+<a name='L813'></a><a href='#L813'>813</a>
+<a name='L814'></a><a href='#L814'>814</a>
+<a name='L815'></a><a href='#L815'>815</a>
+<a name='L816'></a><a href='#L816'>816</a>
+<a name='L817'></a><a href='#L817'>817</a>
+<a name='L818'></a><a href='#L818'>818</a>
+<a name='L819'></a><a href='#L819'>819</a>
+<a name='L820'></a><a href='#L820'>820</a>
+<a name='L821'></a><a href='#L821'>821</a>
+<a name='L822'></a><a href='#L822'>822</a>
+<a name='L823'></a><a href='#L823'>823</a>
+<a name='L824'></a><a href='#L824'>824</a>
+<a name='L825'></a><a href='#L825'>825</a>
+<a name='L826'></a><a href='#L826'>826</a>
+<a name='L827'></a><a href='#L827'>827</a>
+<a name='L828'></a><a href='#L828'>828</a>
+<a name='L829'></a><a href='#L829'>829</a>
+<a name='L830'></a><a href='#L830'>830</a>
+<a name='L831'></a><a href='#L831'>831</a>
+<a name='L832'></a><a href='#L832'>832</a>
+<a name='L833'></a><a href='#L833'>833</a>
+<a name='L834'></a><a href='#L834'>834</a>
+<a name='L835'></a><a href='#L835'>835</a>
+<a name='L836'></a><a href='#L836'>836</a>
+<a name='L837'></a><a href='#L837'>837</a>
+<a name='L838'></a><a href='#L838'>838</a>
+<a name='L839'></a><a href='#L839'>839</a>
+<a name='L840'></a><a href='#L840'>840</a>
+<a name='L841'></a><a href='#L841'>841</a>
+<a name='L842'></a><a href='#L842'>842</a>
+<a name='L843'></a><a href='#L843'>843</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/* ═══════════════════════════════════════════════════════════
+   OpenWire — Murder Mystery: Templates
+   Bounded Context: MurderMystery
+   5 handcrafted mystery templates with rich suspects,
+   cross-clues, and guaranteed solvability.
+   ═══════════════════════════════════════════════════════════ */
+&nbsp;
+const TEMPLATES = [
+&nbsp;
+    /* ── 1. The Vanishing at Vineyard Manor ────────────────── */
+    {
+        id: 'vineyard_manor',
+        title: 'The Vanishing at Vineyard Manor',
+        setting: 'A sprawling estate in the French countryside during a lavish dinner party. Rain hammers the windows. The power has flickered twice already.',
+        victim: {
+            name: 'Lord Ashworth',
+            role: 'the host of the dinner party',
+            description: 'A wealthy vineyard owner found slumped over his desk in the locked study, a shattered wine glass at his feet.',
+        },
+        weapon: 'poisoned wine glass laced with aconite',
+        motive: 'Lord Ashworth discovered the culprit had been embezzling from the vineyard for years and planned to expose them at dinner.',
+        culpritIndex: 2,
+        suspects: [
+            {
+                name: 'Chef Renard',
+                role: 'the victim\'s personal chef',
+                avatar: '👨‍🍳',
+                personality: 'Passionate, temperamental, fiercely proud of his cooking. Quick to anger but equally quick to laugh.',
+                backstory: 'Has served the Ashworth family for 12 years. Recently received a harsh review from Lord Ashworth about his declining menu quality.',
+                alibi: 'I was in the kitchen preparing the fourth course when the lights went out. My sous chef can confirm.',
+                secret: 'He has been stealing vintage wines from the cellar and selling them to a rival estate.',
+                relationshipToVictim: 'Employee and reluctant confidant. Lord Ashworth often ate in the kitchen and shared gossip.',
+                secretConstraints: ['Never directly admit to stealing wines from the cellar', 'Never reveal the name of the rival estate you sell to', 'If asked about the wine cellar, redirect to your cooking'],
+            },
+            {
+                name: 'Lady Margaux',
+                role: 'the victim\'s estranged wife',
+                avatar: '👩‍🦰',
+                personality: 'Elegant, composed, icily polite. Rarely shows emotion but her eyes miss nothing.',
+                backstory: 'Separated from Lord Ashworth for two years but never divorced. She arrived uninvited to tonight\'s dinner.',
+                alibi: 'I was in the drawing room speaking with Baroness Leclerc when we heard the crash from the study.',
+                secret: 'She has been secretly funding her lover\'s art gallery with money skimmed from the household accounts.',
+                relationshipToVictim: 'Estranged spouse. They were negotiating a bitter divorce settlement worth millions.',
+                secretConstraints: ['Never reveal you have a lover or the art gallery', 'Never admit to skimming household accounts', 'If asked about the divorce, say it was amicable'],
+            },
+            {
+                name: 'Steward Dubois',
+                role: 'the estate\'s head steward',
+                avatar: '🤵',
+                personality: 'Meticulous, reserved, deeply loyal to the estate above any individual. Speaks in measured, formal tones.',
+                backstory: 'Has managed Vineyard Manor for 20 years. Knows every secret passage, every locked drawer, every skeleton in every closet.',
+                alibi: 'I was conducting my evening rounds, checking that all doors were secured against the storm.',
+                secret: 'He has been embezzling estate funds for years to pay for his daughter\'s medical treatments abroad. Lord Ashworth found the discrepancies yesterday.',
+                relationshipToVictim: 'Trusted servant who knew the victim\'s darkest secrets. Lord Ashworth threatened to fire him and press charges.',
+                secretConstraints: ['Never admit to embezzlement or financial irregularities', 'Never mention your daughter\'s illness as a motive', 'If confronted with evidence, deflect to your decades of loyal service', 'Never reveal that Lord Ashworth threatened you yesterday'],
+            },
+            {
+                name: 'Baroness Leclerc',
+                role: 'a neighbouring aristocrat and family friend',
+                avatar: '👸',
+                personality: 'Charming, gossipy, socially ambitious. Uses laughter to disarm and information as currency.',
+                backstory: 'Old university friend of Lord Ashworth. Her own estate is heavily mortgaged and she has been lobbying Ashworth for a loan.',
+                alibi: 'I was with Lady Margaux in the drawing room. We were discussing the ghastly weather and upcoming charity gala.',
+                secret: 'She is bankrupt and was planning to blackmail Lord Ashworth over his wife\'s affair to secure the loan.',
+                relationshipToVictim: 'Old friend turned desperate opportunist. Ashworth had refused her loan request twice.',
+                secretConstraints: ['Never admit to being bankrupt', 'Never mention blackmail or leverage over Ashworth', 'If asked about money, laugh it off as beneath discussion'],
+            },
+            {
+                name: 'Gardener Marcel',
+                role: 'the estate\'s groundskeeper',
+                avatar: '👨‍🌾',
+                personality: 'Quiet, observant, salt-of-the-earth. Speaks slowly but notices everything. Uncomfortable indoors.',
+                backstory: 'Has tended the vineyard grounds for 8 years. Fiercely protective of the gardens and the estate\'s natural beauty.',
+                alibi: 'I was in the greenhouse checking on the storm damage to the orchids. The wind knocked a pane out.',
+                secret: 'He witnessed Steward Dubois entering the study through the servants\' passage 30 minutes before the body was found, but is afraid to speak up.',
+                relationshipToVictim: 'Respected employer. Lord Ashworth always asked Marcel\'s opinion on the grape harvest.',
+                secretConstraints: ['Never volunteer that you saw Dubois enter the study unless directly pressed about the servants\' passage', 'If asked what you saw, be vague and nervous rather than forthcoming', 'Never directly accuse Dubois without being pushed'],
+            },
+        ],
+        crossClues: [
+            ['Was seen near the wine cellar at an unusual hour last week', 0, 2],
+            ['Had a heated argument with the victim about money two days ago', 2, 3],
+            ['Was spotted leaving the drawing room looking pale just before dinner', 1, 0],
+            ['Has been receiving suspicious packages from abroad', 3, 2],
+            ['Overheard whispering with someone on the terrace during cocktails', 4, 1],
+            ['Was seen examining the victim\'s study door lock earlier today', 2, 4],
+            ['Mentioned something about "tonight being the last chance" at cocktails', 0, 1],
+        ],
+    },
+&nbsp;
+    /* ── 2. Murder on the Midnight Express ─────────────────── */
+    {
+        id: 'midnight_express',
+        title: 'Murder on the Midnight Express',
+        setting: 'A luxury sleeper train cutting through the Swiss Alps at midnight. Snow blankets the windows. The train has stopped between stations due to an avalanche warning.',
+        victim: {
+            name: 'Professor Harlan Voss',
+            role: 'a renowned cryptographer',
+            description: 'Found dead in his private compartment, a ciphered notebook clutched in his hand. The door was locked from the inside.',
+        },
+        weapon: 'a lethal injection disguised as a diabetic insulin pen',
+        motive: 'Professor Voss had cracked a cipher that proved the culprit was a double agent selling state secrets.',
+        culpritIndex: 1,
+        suspects: [
+            {
+                name: 'Dr. Elara Nyx',
+                role: 'Voss\'s research assistant',
+                avatar: '👩‍🔬',
+                personality: 'Brilliant, anxious, speaks in rapid bursts. Fidgets constantly. Genuinely devastated by the death.',
+                backstory: 'Has worked with Voss for three years. Was co-authoring a groundbreaking paper on quantum cryptography with him.',
+                alibi: 'I was in the dining car reviewing our paper draft. The bartender served me two espressos. He can confirm.',
+                secret: 'She copied Voss\'s research and submitted it under her own name to a rival journal. She feared he would find out.',
+                relationshipToVictim: 'Mentee and colleague. Voss treated her like a daughter, which made her betrayal worse.',
+                secretConstraints: ['Never admit to copying or plagiarizing the research', 'Never name the rival journal', 'If asked about the paper, emphasize it was collaborative'],
+            },
+            {
+                name: 'Colonel Ivan Petrov',
+                role: 'a retired military attache',
+                avatar: '🎖️',
+                personality: 'Stoic, calculating, speaks with clipped precision. Eyes constantly scanning for threats.',
+                backstory: 'Claims to be a retired diplomat travelling for leisure. Booked the compartment adjacent to Voss\'s.',
+                alibi: 'I was in my compartment reading. I heard nothing through the walls. These trains are well insulated.',
+                secret: 'He is an active intelligence operative whose cover was about to be blown by Voss\'s cipher work. He used a modified insulin pen to deliver the lethal dose.',
+                relationshipToVictim: 'Voss unknowingly held the key to exposing Petrov\'s network. They had never met before this train.',
+                secretConstraints: ['Never admit to being an active operative or agent', 'Never mention the cipher, the notebook, or Voss\'s research unprompted', 'If asked about espionage, dismiss it as movie fantasy', 'Never reveal knowledge of the insulin pen or any medical devices'],
+            },
+            {
+                name: 'Contessa Valentina Rossi',
+                role: 'an Italian socialite and art collector',
+                avatar: '💃',
+                personality: 'Dramatic, flirtatious, changes the subject with theatrical flair. Wears too many rings.',
+                backstory: 'Travelling from Milan to Zurich for an art auction. Claims to have never met Voss before boarding.',
+                alibi: 'I was in my compartment applying my evening skincare routine. One does not age gracefully by accident, darling.',
+                secret: 'She is a professional fence for stolen artwork and Voss had unknowingly photographed one of her deals at a conference last month.',
+                relationshipToVictim: 'No direct relationship, but Voss had damaging photos he did not yet know were significant.',
+                secretConstraints: ['Never admit to dealing in stolen art', 'Never mention Voss\'s photographs or the conference', 'If asked about art, discuss only legitimate auctions'],
+            },
+            {
+                name: 'Porter James Okafor',
+                role: 'the train\'s head porter',
+                avatar: '🧳',
+                personality: 'Courteous, observant, prides himself on discretion. Knows every passenger\'s habits.',
+                backstory: 'Has worked the Midnight Express for 15 years. Knows every creak of every compartment door.',
+                alibi: 'I was attending to a request in car 3 — a passenger needed extra blankets. The snow makes it freezing.',
+                secret: 'He accepted a bribe to leave Voss\'s compartment door unlocked during the service stop, but does not know who paid him or why.',
+                relationshipToVictim: 'Professional. Served Voss his evening tea at 9pm. Voss tipped generously.',
+                secretConstraints: ['Never admit to accepting a bribe', 'Never reveal that you unlocked Voss\'s door', 'If asked about compartment access, insist all doors are master-locked'],
+            },
+            {
+                name: 'Felix Strand',
+                role: 'a young journalist',
+                avatar: '📰',
+                personality: 'Eager, persistent, slightly naive. Asks too many questions. Carries a battered notebook.',
+                backstory: 'Was following Voss hoping for an interview about quantum cryptography for a tech magazine feature.',
+                alibi: 'I was in the observation car at the back, watching the snowstorm and making notes for my article.',
+                secret: 'He broke into Voss\'s compartment earlier that evening to photograph the cipher notebook, but found Voss still alive and left quickly.',
+                relationshipToVictim: 'Professional interest only. Had been emailing Voss for weeks requesting an interview — all refused.',
+                secretConstraints: ['Never admit to breaking into the compartment', 'Never mention photographing the notebook', 'If asked why you were near Voss\'s car, say you were passing through'],
+            },
+        ],
+        crossClues: [
+            ['Was seen lingering near Voss\'s compartment door around 10pm', 3, 1],
+            ['Had a tense, whispered phone call in the vestibule at the last station', 1, 2],
+            ['Was spotted carrying a small leather medical kit, unusual for a socialite', 0, 2],
+            ['Seemed to recognize Colonel Petrov and looked frightened', 4, 3],
+            ['Was overheard asking the porter about compartment master keys', 2, 4],
+            ['Mentioned the victim by name before anyone told them who died', 3, 0],
+        ],
+    },
+&nbsp;
+    /* ── 3. The Cipher of Cairo ────────────────────────────── */
+    {
+        id: 'cipher_cairo',
+        title: 'The Cipher of Cairo',
+        setting: 'An archaeological dig site in the desert outside Cairo. The team has uncovered an ancient tomb. Tensions are high as funding is about to expire.',
+        victim: {
+            name: 'Dr. Amira Khalil',
+            role: 'the lead archaeologist',
+            description: 'Found at the bottom of a newly excavated shaft inside the tomb, her safety harness deliberately cut.',
+        },
+        weapon: 'a severed climbing harness (cut with a ceramic blade that leaves no metal trace)',
+        motive: 'Dr. Khalil discovered the culprit had been smuggling artefacts from the dig to sell on the black market.',
+        culpritIndex: 3,
+        suspects: [
+            {
+                name: 'Professor Hugh Carstairs',
+                role: 'the expedition\'s academic sponsor',
+                avatar: '🎓',
+                personality: 'Pompous, territorial about credit, speaks in lectures. Refers to himself in third person when agitated.',
+                backstory: 'Oxford professor who funded the dig. Has been publicly feuding with Dr. Khalil over who gets first authorship on the tomb discovery.',
+                alibi: 'I was in the main tent cataloguing pottery shards. My graduate student was there taking notes.',
+                secret: 'He has been falsifying radiocarbon dating results to make the find seem older and more significant for his career.',
+                relationshipToVictim: 'Academic rival and grudging collaborator. He needed her field expertise but resented her brilliance.',
+                secretConstraints: ['Never admit to falsifying dating results', 'Never reveal the true age of the finds', 'If asked about scientific integrity, get defensive about your reputation'],
+            },
+            {
+                name: 'Samir Farouk',
+                role: 'the local site foreman',
+                avatar: '👷',
+                personality: 'Calm, resourceful, deeply knowledgeable about the terrain. Speaks softly but commands respect from the workers.',
+                backstory: 'Third-generation excavation foreman. His grandfather worked on the original survey of this site decades ago.',
+                alibi: 'I was supervising the night shift workers reinforcing the east wall. Six men will tell you I was there.',
+                secret: 'He has been secretly recording the tomb\'s location coordinates to sell to a competing expedition from Berlin.',
+                relationshipToVictim: 'Professional respect. Dr. Khalil was one of the few westerners who treated him as an equal.',
+                secretConstraints: ['Never mention the Berlin expedition', 'Never admit to selling coordinates or site information', 'If asked about loyalty, emphasize your family\'s long history with the site'],
+            },
+            {
+                name: 'Dr. Lena Vogt',
+                role: 'the team\'s conservator',
+                avatar: '🔬',
+                personality: 'Precise, dry-humoured, deeply ethical about preservation. Becomes cold and clinical under stress.',
+                backstory: 'German conservator specialising in fragile papyrus scrolls. Joined the dig three months ago on a temporary contract.',
+                alibi: 'I was in the conservation lab treating a scroll fragment. The humidity controls require constant monitoring at night.',
+                secret: 'She discovered that Carstairs was falsifying dates but agreed to stay silent in exchange for a co-authorship credit.',
+                relationshipToVictim: 'Cordial colleagues. Dr. Khalil trusted Lena\'s work but they were not close personally.',
+                secretConstraints: ['Never reveal your deal with Carstairs about co-authorship', 'Never mention the falsified dates unless directly confronted with evidence', 'If asked about Carstairs, be diplomatically neutral'],
+            },
+            {
+                name: 'Tariq Bassam',
+                role: 'the expedition\'s logistics coordinator',
+                avatar: '📦',
+                personality: 'Charismatic, fast-talking, always has a contact or a favour to call in. Smiles too much.',
+                backstory: 'Handles all supply chains, transport, and government permits for the dig. Has extensive connections in Cairo.',
+                alibi: 'I was on a satellite phone call with the permits office in Cairo. The bureaucracy never sleeps, even at midnight.',
+                secret: 'He has been smuggling artefacts from the site in supply crates and selling them through a network in Dubai. Dr. Khalil confronted him about missing inventory that afternoon.',
+                relationshipToVictim: 'Business relationship turned hostile. Dr. Khalil threatened to report him to antiquities authorities.',
+                secretConstraints: ['Never admit to smuggling artefacts', 'Never mention the Dubai network or buyers', 'Never reveal that Dr. Khalil confronted you about missing inventory', 'If asked about missing items, blame poor record-keeping'],
+            },
+            {
+                name: 'Maya Chen',
+                role: 'a documentary filmmaker',
+                avatar: '🎬',
+                personality: 'Observant, persistent, always filming. Asks probing questions as a professional habit.',
+                backstory: 'Embedded with the dig for a National Geographic documentary. Has been documenting everything for six weeks.',
+                alibi: 'I was in my tent reviewing footage from today\'s excavation. My camera timestamps will show I was editing.',
+                secret: 'Her footage accidentally captured Tariq loading crates into an unmarked truck two nights ago, but she has not reviewed all the raw footage yet.',
+                relationshipToVictim: 'Friendly professional bond. Dr. Khalil was her primary on-camera interview subject and had become a friend.',
+                secretConstraints: ['Never mention the footage of Tariq with the crates until directly asked about unusual footage', 'Never accuse anyone based on footage you have not fully reviewed', 'If asked about what you have filmed, be generally vague about specific content'],
+            },
+        ],
+        crossClues: [
+            ['Was seen arguing with the victim near the shaft entrance that afternoon', 0, 3],
+            ['Mentioned having a "backup plan" if the dig funding fell through', 3, 1],
+            ['Was spotted examining climbing equipment in the supply tent after hours', 1, 0],
+            ['Had dirt on their shoes inconsistent with where they claimed to be', 4, 2],
+            ['Was overheard on a phone call mentioning "the shipment" in hushed tones', 2, 3],
+            ['Seemed unusually calm when the body was discovered, as if they already knew', 0, 4],
+            ['Was seen near the victim\'s personal tent going through papers', 3, 0],
+        ],
+    },
+&nbsp;
+    /* ── 4. Death at the Diamond Gala ──────────────────────── */
+    {
+        id: 'diamond_gala',
+        title: 'Death at the Diamond Gala',
+        setting: 'A charity auction at a glittering Manhattan penthouse overlooking Central Park. The Kensington Diamond, worth $12 million, is the evening\'s centrepiece.',
+        victim: {
+            name: 'Marcus Kensington III',
+            role: 'the philanthropist hosting the gala',
+            description: 'Found dead in the private gallery, collapsed beside the empty display case where the Kensington Diamond had been.',
+        },
+        weapon: 'a fast-acting neurotoxin applied to the rim of his champagne flute',
+        motive: 'Kensington caught the culprit attempting to swap the real diamond for a replica and had to be silenced before he raised the alarm.',
+        culpritIndex: 4,
+        suspects: [
+            {
+                name: 'Vivian Chase',
+                role: 'Kensington\'s business partner',
+                avatar: '👩‍💼',
+                personality: 'Ambitious, sharp-tongued, always calculating angles. Smiles like a shark.',
+                backstory: 'Co-founder of Kensington Chase Ventures. The partnership has been strained by disagreements over the firm\'s direction.',
+                alibi: 'I was on the main floor giving a toast to the donors. Two hundred people saw me at the podium.',
+                secret: 'She has been secretly negotiating to sell her share of the firm to a hostile buyer, which would destroy Kensington\'s legacy.',
+                relationshipToVictim: 'Business partner of 15 years. Once close, now barely civil.',
+                secretConstraints: ['Never mention the hostile buyer or the sale of your shares', 'Never reveal the rift in the partnership is about control', 'If asked about business, say things are going smoothly'],
+            },
+            {
+                name: 'Dmitri Volkov',
+                role: 'a Russian gem dealer',
+                avatar: '💎',
+                personality: 'Urbane, enigmatic, speaks with deliberate pauses. Collects enemies as others collect art.',
+                backstory: 'One of the world\'s foremost diamond experts. Invited to authenticate the Kensington Diamond before the auction.',
+                alibi: 'I was in the cigar lounge discussing the merits of Burmese rubies with the ambassador. A tedious but verifiable conversation.',
+                secret: 'The diamond he authenticated earlier is actually a forgery. The real one was stolen months ago and he was paid to certify the fake.',
+                relationshipToVictim: 'Professional acquaintance. Kensington hired him for authentication, unaware of his deception.',
+                secretConstraints: ['Never admit the diamond is a forgery', 'Never reveal who paid you to certify the fake', 'If asked about authentication, insist your process is flawless'],
+            },
+            {
+                name: 'Isabella Moreno',
+                role: 'the gala\'s event coordinator',
+                avatar: '📋',
+                personality: 'Perfectionist, frazzled beneath a polished exterior. Notices every detail out of place.',
+                backstory: 'Runs Manhattan\'s most exclusive event planning firm. This gala was supposed to be her crowning achievement.',
+                alibi: 'I was in the kitchen managing the catering staff. The souffle situation was a crisis unto itself.',
+                secret: 'She accidentally left the gallery security system disarmed for 20 minutes while troubleshooting a lighting issue and is terrified this will come out.',
+                relationshipToVictim: 'Client and occasional social acquaintance. Kensington was her biggest account.',
+                secretConstraints: ['Never admit you disabled the security system', 'Never reveal the 20-minute security gap', 'If asked about security, say everything was handled by the professional team'],
+            },
+            {
+                name: 'Judge Raymond Park',
+                role: 'a federal judge and auction bidder',
+                avatar: '⚖️',
+                personality: 'Authoritative, measured, speaks as if delivering a verdict. Uncomfortable with attention on him.',
+                backstory: 'Long-time family friend of the Kensingtons. Attended the gala to bid on a lesser piece for his private collection.',
+                alibi: 'I was seated at table 4 reviewing the auction catalogue. The wine steward refilled my glass twice.',
+                secret: 'He has been accepting bribes from organised crime figures, and Kensington had hinted he knew about it over cocktails.',
+                relationshipToVictim: 'Family friend of 30 years. Their children attended the same schools.',
+                secretConstraints: ['Never admit to taking bribes or any judicial corruption', 'Never reveal that Kensington hinted he knew your secret', 'If asked about your relationship with Kensington, emphasise the family friendship'],
+            },
+            {
+                name: 'Serena Blackwell',
+                role: 'a renowned art thief turned security consultant',
+                avatar: '🕶️',
+                personality: 'Cool, wry, moves like smoke through a room. Always has an exit strategy. Dangerously charming.',
+                backstory: 'Served five years for art theft, now consults on security for high-value events. Hired by Kensington himself for tonight.',
+                alibi: 'I was monitoring the security feeds from the control room on the second floor. Nothing unusual until the body was found.',
+                secret: 'She used her security access to swap the diamond for a replica during the 20-minute gap. Kensington walked in on her replacing the display and she panicked.',
+                relationshipToVictim: 'Employer. Kensington believed in second chances and hired her despite her record.',
+                secretConstraints: ['Never admit to swapping the diamond', 'Never reveal you were in the gallery during the security gap', 'Never mention the replica or any knowledge of forgery', 'If asked about the security gap, blame a system glitch'],
+            },
+        ],
+        crossClues: [
+            ['Was spotted near the gallery entrance looking nervous around 10pm', 2, 4],
+            ['Had a private argument with the victim in the library before the gala', 0, 3],
+            ['Was seen handling a small velvet pouch that did not match any auction items', 3, 1],
+            ['Made a phone call from the bathroom mentioning "the window is open"', 4, 2],
+            ['Asked detailed questions about the security system layout to the staff', 1, 0],
+            ['Was observed leaving the control room at an unusual time', 0, 4],
+            ['Mentioned knowing something "that could ruin everyone" after too much champagne', 1, 3],
+        ],
+    },
+&nbsp;
+    /* ── 5. The Poisoned Pen ────────────────────────────────
+       ── Indian Mystery Templates (6–10) follow after #5 ── */
+    {
+        id: 'poisoned_pen',
+        title: 'The Poisoned Pen',
+        setting: 'A prestigious literary festival at a remote country hotel in the Cotswolds. It is the final evening and the winner of the Golden Quill award is about to be announced.',
+        victim: {
+            name: 'Helena Frost',
+            role: 'the legendary literary agent',
+            description: 'Found dead at her writing desk in her suite, a manuscript page still in the typewriter. The ink on her lips was not from a pen.',
+        },
+        weapon: 'poison-laced ink applied to the rim of her favourite fountain pen',
+        motive: 'Helena had discovered the culprit\'s bestselling novel was entirely ghostwritten and planned to expose the fraud at the award ceremony.',
+        culpritIndex: 0,
+        suspects: [
+            {
+                name: 'Sebastian Thorne',
+                role: 'a celebrated novelist',
+                avatar: '✍️',
+                personality: 'Charismatic, narcissistic, quotable. Treats every conversation as a performance. Deflects with literary references.',
+                backstory: 'Author of five bestsellers and this year\'s Golden Quill favourite. His latest novel has been called a masterpiece.',
+                alibi: 'I was in the bar regaling fans with stories about my creative process. At least a dozen people heard my anecdote about writing in Tuscany.',
+                secret: 'Every one of his novels was ghostwritten by a reclusive writer he keeps on retainer. Helena Frost found the original manuscripts and confronted him before dinner.',
+                relationshipToVictim: 'Client. Helena was his agent for a decade and was about to drop him after discovering the fraud.',
+                secretConstraints: ['Never admit that your novels are ghostwritten', 'Never name or describe your ghostwriter', 'Never reveal that Helena confronted you about the manuscripts', 'If asked about your writing process, be flowery and vague'],
+            },
+            {
+                name: 'Priya Sharma',
+                role: 'a debut author and Golden Quill nominee',
+                avatar: '📚',
+                personality: 'Earnest, idealistic, quietly fierce. Uncomfortable with industry politics but will not be pushed around.',
+                backstory: 'Her first novel, a searing social commentary, has been the surprise hit of the year. Helena Frost championed her from the start.',
+                alibi: 'I was in my room doing breathing exercises before the ceremony. Stage fright. I called my mother at 9:15pm — check my phone records.',
+                secret: 'She overheard Sebastian and Helena arguing violently in Helena\'s suite earlier and is afraid to come forward because Sebastian threatened her career.',
+                relationshipToVictim: 'Mentor and champion. Helena discovered Priya and personally edited her manuscript.',
+                secretConstraints: ['Never volunteer what you overheard between Sebastian and Helena', 'Never mention Sebastian\'s threat to your career unless directly pressured', 'If asked about the argument, say you heard raised voices but could not make out words'],
+            },
+            {
+                name: 'Oscar Finch',
+                role: 'a literary critic and festival judge',
+                avatar: '🧐',
+                personality: 'Acerbic, intellectual snob, takes pleasure in devastating reviews. Insecure beneath the arrogance.',
+                backstory: 'The most feared critic in London. His review can make or break a career. He and Helena had a decades-long rivalry.',
+                alibi: 'I was in the library writing my festival round-up column. My laptop timestamps will confirm every keystroke.',
+                secret: 'He wrote a glowing review of Sebastian\'s latest book for a substantial secret payment — his first-ever paid review.',
+                relationshipToVictim: 'Professional rival. Helena once publicly humiliated him at a book launch for a factual error in a review.',
+                secretConstraints: ['Never admit to accepting payment for the review', 'Never reveal the amount you were paid', 'If asked about Sebastian\'s book, say your praise was purely on merit'],
+            },
+            {
+                name: 'Margaret Holloway',
+                role: 'the festival director',
+                avatar: '🎭',
+                personality: 'Diplomatic, overworked, passionate about literature. Hides exhaustion behind enthusiasm.',
+                backstory: 'Has run the festival for 12 years. This year\'s event has been plagued by behind-the-scenes drama and budget shortfalls.',
+                alibi: 'I was backstage at the ceremony hall doing final checks on the podium setup and award presentation.',
+                secret: 'The festival is deeply in debt and she embezzled from the award fund to keep it running. Helena had found the financial discrepancies.',
+                relationshipToVictim: 'Professional ally turned liability. Helena donated generously but had started asking hard questions about the books.',
+                secretConstraints: ['Never admit to embezzlement or financial mismanagement', 'Never reveal the festival\'s true debt level', 'If asked about finances, insist sponsorship covers everything'],
+            },
+            {
+                name: 'Rupert Crane',
+                role: 'Helena\'s former protege and rival agent',
+                avatar: '🦅',
+                personality: 'Smooth, competitive, holds grudges elegantly. Always angling for the upper hand.',
+                backstory: 'Trained under Helena, then left to start his own agency. Has been poaching her clients systematically for two years.',
+                alibi: 'I was on the terrace making a business call to a client in New York. Time zone difference meant it had to be that hour.',
+                secret: 'He sent Helena an anonymous threatening letter last month warning her to stop interfering with his client poaching, and she kept the letter as evidence.',
+                relationshipToVictim: 'Former protege turned bitter rival. Helena taught him everything, then he tried to destroy her business.',
+                secretConstraints: ['Never admit to sending the threatening letter', 'Never acknowledge the client poaching as deliberate', 'If asked about your split with Helena, frame it as a natural parting of ways'],
+            },
+        ],
+        crossClues: [
+            ['Was seen entering Helena\'s suite uninvited before dinner', 1, 0],
+            ['Had ink stains on their cuffs that did not match any writing they had done publicly', 3, 0],
+            ['Was overheard on the phone saying "she knows too much"', 0, 4],
+            ['Was spotted examining Helena\'s fountain pen collection during the afternoon tour', 4, 2],
+            ['Received a large unexplained wire transfer the week before the festival', 2, 3],
+            ['Was seen leaving the supply closet where ink and pens were stored', 2, 0],
+            ['Mentioned to the bartender that "someone at this festival is a complete fraud"', 3, 1],
+        ],
+    },
+&nbsp;
+    /* ── 6. Haveli Mein Khoon (Murder in the Haveli) ─────── */
+    {
+        id: 'haveli_mein_khoon',
+        title: 'Haveli Mein Khoon',
+        setting: 'A grand Rajasthani haveli ablaze with Diwali diyas and marigold garlands. Fireworks crackle outside as the joint family gathers for the patriarch\'s annual blessing ceremony. The air smells of ghee, gunpowder, and old secrets.',
+        victim: {
+            name: 'Thakur Vikram Singh',
+            role: 'the patriarch of the Singh dynasty',
+            description: 'Found slumped before the family deity in his private puja room, a half-eaten laddu still in his hand. The silver thali of prasad sits beside him.',
+        },
+        weapon: 'poisoned prasad (a laddu laced with oleander extract)',
+        motive: 'Thakur Sahab discovered the culprit had been siphoning crores from the family trust and was about to disinherit them at the Diwali gathering.',
+        culpritIndex: 1,
+        suspects: [
+            {
+                name: 'Pandit Sharma',
+                role: 'the family priest for three generations',
+                avatar: '👳',
+                personality: 'Soft-spoken, ritually precise, commands quiet authority. Speaks in Sanskrit shlokas when nervous. Eyes that miss nothing during aarti.',
+                backstory: 'Has performed every ceremony at the haveli for 35 years. Knows every family secret whispered during confessional pujas. Recently started a side business selling "blessed" gemstones to gullible devotees.',
+                alibi: 'Main toh puja ki taiyari kar raha tha — the havan samagri needed mixing, the diyas needed lighting. I was in the main hall with the women of the house.',
+                secret: 'He has been running a fraudulent gemstone blessing racket using the haveli\'s reputation. Thakur Sahab found the fake certificates last week.',
+                relationshipToVictim: 'Spiritual advisor and keeper of confessions. Thakur Sahab trusted him with sins he told no one else.',
+                secretConstraints: ['Never admit to the gemstone racket or fake blessings', 'Never reveal Thakur Sahab discovered the certificates', 'If confronted, invoke dharma and decades of service', 'Never break priestly composure — deflect with scripture'],
+            },
+            {
+                name: 'Meera Devi',
+                role: 'the eldest daughter-in-law (badi bahu)',
+                avatar: '👩‍💼',
+                personality: 'Regal, calculating, speaks with honeyed politeness that barely conceals steel. Runs the household with an iron fist wrapped in silk.',
+                backstory: 'Married into the Singh family 18 years ago. Her husband died five years back, leaving her dependent on Thakur Sahab\'s goodwill. She has been quietly diverting family trust funds into shell companies.',
+                alibi: 'मैं तो रसोई में थी — overseeing the halwai and the Diwali feast. Ask any of the servants, I was tasting every dish personally. A badi bahu\'s duty never rests.',
+                secret: 'She has siphoned over two crore rupees from the family trust through fake invoices and shell companies. Thakur Sahab confronted her that morning and threatened to throw her out of the haveli.',
+                relationshipToVictim: 'Father-in-law whom she both respected and resented. He held all the power she craved.',
+                secretConstraints: ['Never admit to siphoning trust funds or creating shell companies', 'Never reveal Thakur Sahab confronted you that morning', 'If asked about finances, say you only manage household expenses', 'Never drop the devoted bahu persona — always invoke family honour'],
+            },
+            {
+                name: 'Raju',
+                role: 'the trusted family servant of 30 years',
+                avatar: '🧑‍🦱',
+                personality: 'Humble, deeply loyal, speaks with folded hands. Knows the haveli\'s every creaking floorboard. Nervous but honest by nature.',
+                backstory: 'Came to the haveli as a boy of 15. Thakur Sahab paid for his children\'s education. But Raju has recently fallen into a devastating gambling debt with local bookies who have threatened his family.',
+                alibi: 'Sahab, main toh patakhe laga raha tha — setting up the anaar and chakri for the children in the courtyard. Chhotu and Bahadur were helping me.',
+                secret: 'He owes seven lakh to a local gambling syndicate. They threatened to harm his daughter if he did not pay by Diwali. He stole a gold necklace from the haveli to make a partial payment.',
+                relationshipToVictim: 'Devoted servant who genuinely loved Thakur Sahab like a father figure. The guilt of the theft is eating him alive.',
+                secretConstraints: ['Never admit to the gambling debt or the stolen necklace', 'Never reveal threats to your family', 'If asked about finances, say servants have no money matters', 'If pressed about loyalty, become emotional about Thakur Sahab\'s kindness'],
+            },
+            {
+                name: 'Advocate Kapoor',
+                role: 'the family lawyer who controls the will',
+                avatar: '👨‍💼',
+                personality: 'Oily, precise, speaks in legal jargon to intimidate. Always adjusting his spectacles. A man who knows where every body is buried — sometimes literally.',
+                backstory: 'Has been the Singh family\'s legal counsel for 20 years. Drafted every will, every trust document, every land deed. His fees have quietly tripled over the last two years.',
+                alibi: 'I was in the library reviewing the trust amendment documents. Thakur Sahab wanted changes to the will — I was merely doing my professional duty. My briefcase timestamps will show.',
+                secret: 'He has been inflating legal fees and skimming from property transactions for years. More critically, he drafted a secret codicil that benefits himself if Thakur Sahab dies before signing the new will.',
+                relationshipToVictim: 'Trusted advisor who exploited that trust. Thakur Sahab was his biggest client and his biggest vulnerability.',
+                secretConstraints: ['Never reveal the secret codicil or its self-benefiting clause', 'Never admit to inflated fees or skimming', 'If asked about the will, cite attorney-client privilege', 'Never let anyone see the unsigned amendment documents'],
+            },
+            {
+                name: 'Choti Bahu',
+                role: 'the youngest wife, married just six months ago',
+                avatar: '👩',
+                personality: 'Quiet, watchful, speaks little but observes everything. Her youth and beauty make others underestimate her sharp mind.',
+                backstory: 'Married Thakur Sahab\'s youngest son in a grand ceremony. But whispers say the marriage was arranged to settle a land dispute between two powerful families. Her past before the wedding is shrouded in mystery.',
+                alibi: 'Main apne kamre mein Maa ko phone kar rahi thi — I was calling my mother. It was Diwali, I was homesick. My phone records will confirm.',
+                secret: 'She was previously married and divorced — a fact hidden from the Singh family. Her first husband is blackmailing her and she has been secretly meeting him in the nearby town.',
+                relationshipToVictim: 'Granddaughter-in-law who barely knew him. Thakur Sahab was kind to her but she found the haveli suffocating.',
+                secretConstraints: ['Never reveal your previous marriage or divorce', 'Never mention the blackmailing ex-husband', 'If asked about your past, say you come from a simple family in Udaipur', 'Never admit to secret meetings in town'],
+            },
+        ],
+        crossClues: [
+            ['Was seen entering the puja room alone thirty minutes before the body was found', 3, 1],
+            ['Had a heated argument with Thakur Sahab about "khandaan ki izzat" that morning', 1, 0],
+            ['Was spotted near the rasoi where the prasad was being prepared', 0, 2],
+            ['Received a mysterious phone call and left the haveli briefly during the puja', 4, 3],
+            ['Was seen reading documents from Thakur Sahab\'s personal almirah', 2, 1],
+            ['Overheard saying "aaj ke baad sab badal jaayega" to someone on the phone', 1, 4],
+            ['Was noticed washing hands repeatedly after returning from the puja room area', 3, 0],
+        ],
+    },
+&nbsp;
+    /* ── 7. Mumbai Local Ka Rahasya ──────────────────────── */
+    {
+        id: 'mumbai_local_rahasya',
+        title: 'Mumbai Local Ka Rahasya',
+        setting: 'A first-class compartment of the Churchgate-bound Mumbai local during evening rush hour. Rain lashes the windows as the train halts between Churchgate and Marine Lines due to signal failure. The overhead fans churn humid air thick with tension.',
+        victim: {
+            name: 'Seth Harilal',
+            role: 'a Zaveri Bazaar diamond merchant',
+            description: 'Found collapsed across two seats in the first-class compartment, a half-finished cutting chai on the fold-down tray. His briefcase of diamond samples is missing.',
+        },
+        weapon: 'poisoned chai laced with potassium cyanide (the almond smell masked by strong elaichi)',
+        motive: 'Seth Harilal was carrying evidence of a massive diamond fraud and the culprit needed to silence him before he reached the police station at Churchgate.',
+        culpritIndex: 0,
+        suspects: [
+            {
+                name: 'Arjun Malhotra',
+                role: 'a rival diamond dealer from Opera House',
+                avatar: '🧑‍💼',
+                personality: 'Smooth, aggressive, dripping with Bombay hustle. Speaks fast, thinks faster. Designer watches on both wrists.',
+                backstory: 'Has been trying to undercut Seth Harilal in the Antwerp diamond market for years. Lost a massive Hong Kong deal to Harilal last month — a loss of fifteen crore.',
+                alibi: 'Arrey bhai, main toh Dadar se chada — boarded at Dadar. I was on a call with my Hong Kong office the entire time. Check my Jio records.',
+                secret: 'He supplied counterfeit certification papers for conflict diamonds through Seth Harilal\'s network without Harilal\'s knowledge. Harilal discovered the fraud and was heading to the Economic Offences Wing.',
+                relationshipToVictim: 'Bitter business rival who publicly smiled but privately schemed. They shared the same trade but occupied different moral universes.',
+                secretConstraints: ['Never admit to conflict diamond trafficking or fake certificates', 'Never reveal knowledge of Harilal\'s trip to the police', 'If asked about rivalry, say "business mein competition toh hota hai"', 'Never break the confident Bombay businessman persona'],
+            },
+            {
+                name: 'Dr. Priya Nair',
+                role: 'a fellow passenger and cardiologist at Breach Candy Hospital',
+                avatar: '👩‍⚕️',
+                personality: 'Composed, clinical, speaks with Malayali-inflected precision. Calm in crisis but evasive about personal matters.',
+                backstory: 'Was treating Seth Harilal for a heart condition. Takes this train daily from Bandra to Churchgate. Noticed Harilal looked unusually anxious when he boarded.',
+                alibi: 'I was reading the latest Lancet cardiology paper on my iPad. When I noticed Seth ji slumping, I immediately checked his pulse — but it was too late. As a doctor, that is my duty.',
+                secret: 'She has been writing fraudulent medical certificates for Harilal\'s insurance claims in exchange for discounted diamonds for her wedding. Harilal threatened to expose her to the Medical Council.',
+                relationshipToVictim: 'Doctor-patient relationship complicated by mutual blackmail material. Professional courtesy masking dangerous entanglement.',
+                secretConstraints: ['Never admit to fake medical certificates or insurance fraud', 'Never mention receiving diamonds from Harilal', 'If asked about patient relationship, cite doctor-patient confidentiality', 'Never reveal the mutual blackmail dynamic'],
+            },
+            {
+                name: 'Inspector Patil',
+                role: 'an off-duty Mumbai Police inspector',
+                avatar: '👮',
+                personality: 'Gruff, street-smart, speaks in clipped Marathi-Hindi. Chews paan constantly. Projects authority even in plainclothes.',
+                backstory: 'Senior Inspector from the Azad Maidan police station. Was investigating Seth Harilal for connections to a hawala network. Coincidentally — or not — on the same train.',
+                alibi: 'Main off-duty tha — I was heading home to Churchgate. I sit in first class because my knees cannot handle general dabba anymore. I was reading Maharashtra Times.',
+                secret: 'He has been taking monthly hafta (bribes) from Zaveri Bazaar merchants including Harilal\'s competitors. Harilal refused to pay and filed a complaint against him.',
+                relationshipToVictim: 'Investigating officer who crossed ethical lines. Harilal was both a target and a threat to his corrupt income.',
+                secretConstraints: ['Never admit to accepting hafta or bribes', 'Never reveal Harilal filed a complaint against you', 'If asked about the investigation, say it is "under process"', 'Never break the tough-cop exterior — redirect with authority'],
+            },
+            {
+                name: 'Fatima Begum',
+                role: 'an old family friend and Chor Bazaar antiques dealer',
+                avatar: '🧕',
+                personality: 'Warm, grandmotherly, disarming. Speaks in old-Bombay Urdu that makes everyone trust her. Sharper than she appears.',
+                backstory: 'Knew Seth Harilal\'s father. Runs an antiques shop in Chor Bazaar. Borrowed twenty lakh from Harilal for her grandson\'s education abroad and has been unable to repay.',
+                alibi: 'Beta, main toh Harilal bhai se milne aa rahi thi — he asked me to come to discuss the repayment. I was sitting two rows behind him knitting a sweater for my grandson.',
+                secret: 'She has been laundering money through her antiques shop for a small-time gang. Harilal stumbled onto the connection and gave her an ultimatum: repay the debt or he would inform the police.',
+                relationshipToVictim: 'Old family friend whose relationship soured over money. She loved him like a brother but desperation changes people.',
+                secretConstraints: ['Never admit to money laundering through the antiques shop', 'Never reveal Harilal\'s ultimatum', 'If asked about the debt, minimize it as a small family loan', 'Never drop the sweet grandmother persona'],
+            },
+            {
+                name: 'Shankar Chaiwala',
+                role: 'the train\'s legendary chai seller',
+                avatar: '☕',
+                personality: 'Cheerful, garrulous, knows every regular by name and order. Sings film songs while pouring. Sees everything from behind his kettle.',
+                backstory: 'Has sold chai on the Western Line for 22 years. His chai is famous — extra elaichi, perfect sweetness. He served Seth Harilal his usual cutting chai that evening.',
+                alibi: 'Sahab, main toh chai bech raha tha — "Chai chai chai!" — you know my routine. I poured Seth ji his usual cutting and moved to the next dabba. Ask anyone on the train.',
+                secret: 'Someone paid him five thousand rupees to add a small packet of powder to Seth Harilal\'s specific cup. He was told it was medicine Harilal had forgotten to take. He did not ask questions.',
+                relationshipToVictim: 'Daily customer for seven years. Harilal always paid double and never asked for change. Shankar genuinely liked him.',
+                secretConstraints: ['Never volunteer that someone paid you to add powder to the chai', 'Never describe the person who gave you the packet unless directly pressured with evidence', 'If asked about the chai, describe your normal routine', 'Express genuine grief — you did not know it was poison'],
+            },
+        ],
+        crossClues: [
+            ['Was seen talking to the chaiwala before Harilal boarded', 2, 0],
+            ['Had a bulging envelope in their bag that looked like cash', 0, 3],
+            ['Was spotted looking through Harilal\'s briefcase after he collapsed', 3, 2],
+            ['Made a phone call saying "kaam ho gaya" just after the train stopped', 4, 0],
+            ['Was carrying a small packet that they quickly pocketed when others looked', 1, 4],
+            ['Was seen arguing with Harilal on the platform at Mumbai Central', 0, 1],
+        ],
+    },
+&nbsp;
+    /* ── 8. Bollywood Ki Raat (A Bollywood Night) ────────── */
+    {
+        id: 'bollywood_ki_raat',
+        title: 'Bollywood Ki Raat',
+        setting: 'A Filmfare after-party in a glass-walled penthouse atop a Juhu high-rise. The infinity pool glows neon blue, champagne towers catch Mumbai\'s skyline, and A-listers mingle under crystal chandeliers. Bollywood\'s biggest night just turned deadly.',
+        victim: {
+            name: 'Raj Kapoor Jr',
+            role: 'the hottest director in Bollywood',
+            description: 'Found floating face-down in the infinity pool, his Filmfare trophy sunk beside him. The pool lights are flickering erratically — something is very wrong with the wiring.',
+        },
+        weapon: 'electrocution via tampered pool lights (wiring deliberately exposed under the waterline)',
+        motive: 'Raj discovered the culprit\'s darkest secret and threatened to use it in his next "inspired by true events" film unless they paid him off.',
+        culpritIndex: 3,
+        suspects: [
+            {
+                name: 'Tara Sharma',
+                role: 'the reigning Bollywood queen',
+                avatar: '🌟',
+                personality: 'Glamorous, dramatic, speaks as if cameras are always rolling. Vulnerability flashes behind the star persona. Uses "darling" for everyone.',
+                backstory: 'Was the leading lady in Raj\'s last three blockbusters. He publicly dropped her from his next film at the Filmfare press conference, humiliating her in front of the industry.',
+                alibi: 'Darling, I was at the bar doing shots with Karan and Zoya. We were laughing about Raj\'s terrible speech. Everyone saw me — I am not exactly easy to miss, na?',
+                secret: 'She has been secretly funding a rival production house to poach Raj\'s scripts and crew. She also leaked his unreleased film\'s climax to a gossip portal.',
+                relationshipToVictim: 'Muse turned enemy. He made her a star, then tried to unmake her. The betrayal was deeply personal.',
+                secretConstraints: ['Never admit to funding the rival production house', 'Never reveal you leaked the film climax', 'If asked about the dropped role, play the dignified professional', 'Never lose the star composure — redirect with charm'],
+            },
+            {
+                name: 'Bunty Beats',
+                role: 'the music composer behind every hit',
+                avatar: '🎵',
+                personality: 'Eccentric, emotional, speaks in musical metaphors. Wears headphones around his neck like a talisman. Switches between English and Hindi mid-sentence.',
+                backstory: 'Composed the soundtrack for Raj\'s award-winning film. Recently discovered Raj had plagiarised two of his original compositions and registered them under his own name.',
+                alibi: 'Bhai, I was in the DJ booth mixing tracks for the after-party playlist. My laptop has the Ableton session logs — timestamp check karo. I was nowhere near the pool.',
+                secret: 'He sent anonymous legal notices to Raj threatening a plagiarism lawsuit that would destroy Raj\'s reputation. Raj responded by threatening to reveal that Bunty\'s biggest hit was actually composed by an uncredited assistant.',
+                relationshipToVictim: 'Creative partners locked in a mutually destructive standoff. Each held a musical nuclear weapon against the other.',
+                secretConstraints: ['Never admit to the anonymous legal notices', 'Never reveal the mutual plagiarism standoff', 'If asked about Raj\'s music, say "creative differences happen yaar"', 'Never mention the uncredited assistant who composed your hit'],
+            },
+            {
+                name: 'Pappu Paparazzi',
+                role: 'the most feared entertainment journalist in Mumbai',
+                avatar: '📸',
+                personality: 'Sly, persistent, speaks in gossip-column headlines. Always scribbling in a spiral notebook. Knows everyone\'s price.',
+                backstory: 'Runs the entertainment portal "BombayBuzz". Has destroyed careers with a single story. Raj banned him from all his film events after a particularly vicious exposé.',
+                alibi: 'I was on the terrace smoking and live-tweeting the party outfits on BombayBuzz. Check my tweet timestamps — 11:47, 11:52, 11:58 — all before the scream from the pool.',
+                secret: 'He has a folder of compromising photographs of multiple Bollywood stars including Raj — material he uses for blackmail and "favourable coverage fees". Raj was the only one who refused to pay.',
+                relationshipToVictim: 'Parasite and host. Pappu needed Raj for content; Raj needed Pappu buried. Neither could destroy the other without self-destruction.',
+                secretConstraints: ['Never reveal the blackmail folder or compromising photographs', 'Never admit to charging for favourable coverage', 'If asked about Raj, say you were a professional journalist doing your job', 'Never name any other stars you have material on'],
+            },
+            {
+                name: 'Monty Seth',
+                role: 'the producer who bankrolled Raj\'s films',
+                avatar: '💰',
+                personality: 'Loud, flashy, speaks in crores. Gold chains, designer shoes, and a laugh that fills any room. But his eyes are cold calculators.',
+                backstory: 'Invested 200 crore in Raj\'s next film. The film is 18 months behind schedule and massively over budget. Insurance will pay out only if production is permanently halted — not delayed.',
+                alibi: 'Arrey yaar, I was in the VIP section playing cards with the distributors. Paanch log the mere saath — five people! We were discussing Diwali release slots, not murder-shurder.',
+                secret: 'He tampered with the pool lights to electrocute Raj, making it look like an accident. With Raj dead, the film\'s insurance pays out the full 200 crore investment. He hired the building electrician to expose the wiring.',
+                relationshipToVictim: 'Business partner who saw Raj as an investment that had stopped generating returns. Friendship was always transactional.',
+                secretConstraints: ['Never admit to tampering with pool lights or hiring the electrician', 'Never mention the insurance payout motive', 'Never reveal the film is 18 months behind schedule', 'If asked about finances, boast about how profitable the partnership was'],
+            },
+            {
+                name: 'Dolly',
+                role: 'Raj\'s personal makeup artist and closest confidante',
+                avatar: '💄',
+                personality: 'Warm, gossipy, fiercely loyal. Speaks in rapid-fire Bambaiya Hindi. Knows where every Bollywood skeleton is buried because stars talk in the makeup chair.',
+                backstory: 'Has been Raj\'s makeup artist for 12 years — since his first film. She knows his secrets, his affairs, his fears. She is the one person he trusted completely.',
+                alibi: 'Main toh green room mein thi — packing up my kit after touching up Raj\'s look for the after-party. Mera kaam ho gaya tha, I was about to leave. Ask the security guard at the service entrance.',
+                secret: 'She has been secretly selling insider stories about Raj\'s personal life to Pappu Paparazzi for years. The money funded her daughter\'s acting school in London. Raj never suspected her.',
+                relationshipToVictim: 'His most trusted person was also his most intimate betrayer. She genuinely cared for him, which made the guilt unbearable.',
+                secretConstraints: ['Never admit to selling stories to Pappu', 'Never mention your daughter\'s London acting school as a motive', 'If asked about loyalty, become emotional about your years with Raj', 'Never connect yourself to any journalist or media outlet'],
+            },
+        ],
+        crossClues: [
+            ['Was seen talking to the building electrician in the service corridor', 0, 3],
+            ['Had a shouting match with Raj in the VIP room an hour before the party', 3, 1],
+            ['Was spotted near the pool equipment room checking electrical panels', 4, 3],
+            ['Received a large cash payment via hawala last week — "consulting fees"', 2, 0],
+            ['Was overheard telling someone "uski picture toh band honi chahiye permanently"', 1, 2],
+            ['Was seen deleting photos from their phone frantically after the body was found', 0, 4],
+        ],
+    },
+&nbsp;
+    /* ── 9. IIT Campus Ka Khooni ─────────────────────────── */
+    {
+        id: 'iit_campus_khooni',
+        title: 'IIT Campus Ka Khooni',
+        setting: 'IIT Bombay\'s Powai campus during peak placement season. The Dean\'s office in the Main Building overlooks the serene Powai Lake — but tonight the campus is anything but calm. Placement results are being announced tomorrow, and someone has just silenced the man who held everyone\'s future.',
+        victim: {
+            name: 'Professor Raghunathan',
+            role: 'the Dean of Placements',
+            description: 'Found slumped over his desk in his locked office, a steel tumbler of filter coffee at his elbow. His computer screen shows an email he never finished sending, subject line: "URGENT — Placement Irregularities".',
+        },
+        weapon: 'poisoned filter coffee laced with digitalis (foxglove extract, causes cardiac arrest)',
+        motive: 'Professor Raghunathan uncovered a placement rigging scandal and was about to email the Director with evidence that would end careers and reputations.',
+        culpritIndex: 2,
+        suspects: [
+            {
+                name: 'Rohit Sharma',
+                role: 'the department topper with a 9.8 CGPA',
+                avatar: '🧑‍🎓',
+                personality: 'Intense, perfectionist, speaks in precise logical arguments. Dark circles under his eyes from years of relentless grinding. Anxiety simmers beneath the academic armor.',
+                backstory: 'Has been the top student for three consecutive years. Applied for the most coveted Goldman Sachs placement but Professor Raghunathan refused to write him a recommendation letter, citing "character concerns".',
+                alibi: 'I was in the computer lab running simulations for my thesis. The lab attendance system logs every entry and exit — mera swipe record check karo.',
+                secret: 'He hacked into the placement portal and saw his own rejection two days early. In a rage, he sent an anonymous email to Goldman Sachs defaming Professor Raghunathan — an email the professor traced back to him.',
+                relationshipToVictim: 'Brilliant student who felt betrayed by a professor he once idolized. The denied recommendation felt like a death sentence for his career.',
+                secretConstraints: ['Never admit to hacking the placement portal', 'Never reveal you sent the defamatory email to Goldman Sachs', 'If asked about the recommendation, say you are "disappointed but respectful"', 'Never show the depth of your rage — maintain the composed topper image'],
+            },
+            {
+                name: 'Professor Iyer',
+                role: 'a senior faculty member in Computer Science',
+                avatar: '👨‍🏫',
+                personality: 'Erudite, passive-aggressive, speaks in elaborate academic language that conceals barbs. Always adjusting his spectacles. Simmering resentment masked by collegiality.',
+                backstory: 'Was the frontrunner for the Dean of Placements position before Raghunathan was appointed over him by the Director. Has been undermining Raghunathan\'s decisions in faculty meetings for two years.',
+                alibi: 'I was in my cabin grading mid-semester papers. Twenty-eight papers, each requiring careful evaluation — the timestamp on my grading portal will confirm my activity through the evening.',
+                secret: 'He has been leaking confidential placement offers to companies in exchange for consulting contracts. Raghunathan discovered the leak and collected evidence.',
+                relationshipToVictim: 'Collegial rivalry turned toxic. Iyer saw Raghunathan as an inferior academic who politicked his way to the deanship.',
+                secretConstraints: ['Never admit to leaking placement data to companies', 'Never reveal your consulting contracts with recruiting firms', 'If asked about Raghunathan, praise his "dedication" with barely hidden condescension', 'Never acknowledge that Raghunathan had evidence against you'],
+            },
+            {
+                name: 'Sneha Patel',
+                role: 'a startup founder and IIT alumna',
+                avatar: '🧑‍💻',
+                personality: 'Confident, disruptive, speaks in startup jargon. Hoodies and sneakers even at formal events. Hustle culture personified but with genuine passion beneath the bravado.',
+                backstory: 'Founded a fintech startup that she wanted to bring to campus for recruiting. Professor Raghunathan banned her company from campus placements after discovering she was offering below-market salaries with exploitative equity structures.',
+                alibi: 'I was in the guest house working on my pitch deck for tomorrow\'s YC demo day. I had a Zoom call with my co-founder in Bangalore at 8 PM — the meeting recording exists.',
+                secret: 'She bribed a placement office assistant to add her company back to the placement list. When Raghunathan found out, he threatened to publicly blacklist her company and report her to the IIT Alumni Association. She poisoned his filter coffee using digitalis she sourced through a pharma contact.',
+                relationshipToVictim: 'Alumni who felt the institution owed her access. Raghunathan stood between her and a pipeline of cheap, brilliant talent.',
+                secretConstraints: ['Never admit to bribing the placement assistant', 'Never reveal you poisoned the coffee or mention digitalis', 'Never mention being threatened with blacklisting', 'If asked about the campus ban, frame it as a bureaucratic misunderstanding'],
+            },
+            {
+                name: 'Vikram "Vicky" Kumar',
+                role: 'the charismatic sports captain',
+                avatar: '🏃',
+                personality: 'Loud, popular, speaks in hostel slang. Life of every party. But beneath the jock exterior is someone terrified of academic failure.',
+                backstory: 'Captain of the institute cricket team. His CGPA has dropped to 5.2 — dangerously close to academic probation. Raghunathan sent him a formal warning that he would be barred from placements if his grades did not improve.',
+                alibi: 'Bhai, main toh hostel mein tha — H10 common room mein FIFA khel raha tha. Poore floor ke ladke the, sabne dekha mujhe. Ek match toh Raghunathan sir ke baare mein sochne se zyada important hai.',
+                secret: 'He paid a junior student to write his semester project. The junior got caught and confessed, naming Vicky. Raghunathan was adding this to his academic probation file.',
+                relationshipToVictim: 'Student who saw the professor as an obstacle to the comfortable corporate job his middle-class family expected. Fear, not hatred.',
+                secretConstraints: ['Never admit to paying someone to write your project', 'Never reveal the junior student confessed and named you', 'If asked about academics, say you are "working on improving"', 'Never show fear about academic probation — maintain the carefree athlete image'],
+            },
+            {
+                name: 'Ramesh Kaka',
+                role: 'the department peon who has been there for 40 years',
+                avatar: '🧹',
+                personality: 'Quiet, observant, speaks in simple Hindi with old-world courtesy. Addresses everyone as "sahab" or "beta". The invisible man who sees everything.',
+                backstory: 'Has served the Computer Science department since before the current building was constructed. Makes the best filter coffee on campus — including Professor Raghunathan\'s nightly cup. Everyone confides in Ramesh Kaka because no one thinks he matters.',
+                alibi: 'Sahab, main toh roz ki tarah chai-paani ka kaam kar raha tha. Professor sahab ko unki coffee di 7 baje, phir main neeche canteen mein tha. Mera kaam khatam ho gaya tha.',
+                secret: 'He delivered the coffee that killed the professor — but he noticed the coffee powder smelled different that evening. Someone had accessed the professor\'s personal coffee tin in the kitchenette. He is terrified he will be blamed.',
+                relationshipToVictim: 'Devoted caretaker who made Raghunathan\'s coffee for 15 years. The professor was one of the few people who treated him with dignity.',
+                secretConstraints: ['Never volunteer that the coffee smelled different', 'Never reveal someone accessed the coffee tin unless directly asked about the kitchenette', 'If asked about the coffee routine, describe it normally', 'Express genuine grief — you served him faithfully and feel responsible'],
+            },
+        ],
+        crossClues: [
+            ['Was seen near the department kitchenette at an unusual time', 0, 2],
+            ['Had a loud argument with Raghunathan outside the placement office yesterday', 2, 3],
+            ['Was spotted leaving the Main Building through the back entrance after 9 PM', 3, 1],
+            ['Received a suspicious courier package at the guest house two days ago', 1, 2],
+            ['Was overheard saying "agar woh email bhej diya toh sab khatam"', 4, 0],
+            ['Was seen accessing the placement office computer after hours', 2, 4],
+            ['Mentioned to someone that "Professor sahab ki coffee mein kuch alag tha"', 0, 1],
+        ],
+    },
+&nbsp;
+    /* ── 10. Goa Beach Party Mein Murder ─────────────────── */
+    {
+        id: 'goa_beach_murder',
+        title: 'Goa Beach Party Mein Murder',
+        setting: 'A massive New Year\'s Eve beach party on Anjuna Beach, Goa. Tiki torches blaze, bass thumps from tower speakers, and hundreds of revellers dance under a canopy of stars. The stage backdrop reads "NYE BLAST 2026". Behind the stage, in the shadows, the music has stopped for one person forever.',
+        victim: {
+            name: 'DJ Sunny',
+            role: 'India\'s biggest electronic music DJ and tonight\'s headliner',
+            description: 'Found collapsed behind the main stage near the equipment cases, his face swollen from severe anaphylaxis. A half-finished cocktail sits on an amp beside him. Someone knew about his deadly shellfish allergy.',
+        },
+        weapon: 'allergic reaction triggered by crushed shrimp powder spiked into his signature cocktail (the "Sunny Sunrise")',
+        motive: 'DJ Sunny had discovered the culprit\'s devastating secret and was planning to announce it on stage at midnight to thousands of viewers on a live stream.',
+        culpritIndex: 3,
+        suspects: [
+            {
+                name: 'DJ Rina',
+                role: 'a rival DJ who was bumped from the headline slot',
+                avatar: '🎧',
+                personality: 'Fierce, competitive, speaks with Goan-Portuguese inflections. Tough exterior masking deep insecurity about being overshadowed. Smokes clove cigarettes.',
+                backstory: 'Was originally booked as the NYE headliner before DJ Sunny was brought in as a last-minute replacement. The demotion was announced publicly on Instagram — maximum humiliation.',
+                alibi: 'I was at the secondary stage doing my warm-up set. Two thousand people were watching me. My set was streaming live on YouTube — check the VOD, every second is accounted for.',
+                secret: 'She has been using DJ Sunny\'s unreleased tracks without permission, passing them off as her own at international gigs. Sunny found out and was going to expose her on the livestream.',
+                relationshipToVictim: 'Professional rivals who once collaborated. The friendship ended when competition for the same festival slots became zero-sum.',
+                secretConstraints: ['Never admit to stealing unreleased tracks', 'Never reveal you knew about Sunny\'s plan to expose you', 'If asked about rivalry, say "healthy competition only yaar"', 'Never name the international gigs where you used his tracks'],
+            },
+            {
+                name: 'Marco',
+                role: 'the bartender at the beach shack',
+                avatar: '🍹',
+                personality: 'Laid-back, charming, speaks in a Goan-Portuguese-English mix. Flip-flops, Hawaiian shirt, handlebar moustache. Everyone\'s favourite bartender.',
+                backstory: 'Third-generation Goan bartender. His family\'s beach shack has been on Anjuna since the hippie era. He was personally mixing DJ Sunny\'s drinks all evening.',
+                alibi: 'Boss, I was behind the bar the whole night — 500 people to serve on NYE, you think I had time to go backstage? My helper Dominic was with me — we were slammed.',
+                secret: 'He has been watering down premium liquor and pocketing the difference for months. The shack owner (Tony) has been threatening to fire him. He made Sunny\'s cocktail but insists nothing unusual went in.',
+                relationshipToVictim: 'Friendly professional acquaintance. DJ Sunny always tipped generously and called him "Goa ka best bartender".',
+                secretConstraints: ['Never admit to watering down liquor or skimming', 'Never reveal Tony\'s threats about firing you', 'If asked about the cocktail, describe the standard recipe precisely', 'Never deviate from the friendly bartender persona'],
+            },
+            {
+                name: 'Alisha',
+                role: 'DJ Sunny\'s ex-girlfriend',
+                avatar: '💃',
+                personality: 'Fiery, emotional, switches between English and Hindi depending on her mood. Instagram influencer energy with genuine heartbreak underneath.',
+                backstory: 'Broke up with DJ Sunny just one month ago after discovering he was seeing someone else during his Ibiza tour. She came to the Goa party uninvited, determined to confront him.',
+                alibi: 'Main beach pe thi — dancing near the bonfire with my girls. We have like fifty Instagram stories with timestamps. You can literally see me vibing the whole time, so don\'t even try.',
+                secret: 'She accessed DJ Sunny\'s phone while they were together and has screenshots of his DMs with other women, industry deals, and a voice note where he admits to tax evasion. She threatened to leak everything if he did not pay her off.',
+                relationshipToVictim: 'Ex-lover scorned. The breakup was ugly, public, and became a trending topic. She oscillates between grief and fury.',
+                secretConstraints: ['Never reveal you have his phone screenshots or voice notes', 'Never mention the blackmail or payment demands', 'If asked about the breakup, be emotional but vague', 'Never admit to accessing his phone without permission'],
+            },
+            {
+                name: 'Tony D\'Souza',
+                role: 'the beach shack owner and party organiser',
+                avatar: '🏖️',
+                personality: 'Boisterous, entrepreneurial, speaks in loud Goan-accented English. Gold chain, white linen shirt, big laugh. But the laugh stops when money is discussed.',
+                backstory: 'Owns the Anjuna beach shack and organised the NYE party. Took a massive loan to book DJ Sunny. Recently discovered that Sunny\'s management had taken a double commission and was threatening to cancel insurance coverage on the event.',
+                alibi: 'Arrey, I was running around managing everything — the caterers, the bouncers, the sound guys. Ask anyone, Tony was everywhere tonight. I even personally took Sunny\'s cocktail backstage because the waiters were busy.',
+                secret: 'He spiked DJ Sunny\'s cocktail with crushed shrimp powder, knowing about Sunny\'s shellfish allergy. With Sunny dead at his event, the event insurance pays out enough to cover his loan and the double commission loss. He took the cocktail backstage himself.',
+                relationshipToVictim: 'Business relationship that turned toxic over money. Tony needed Sunny alive for the show but dead for the insurance.',
+                secretConstraints: ['Never admit to spiking the cocktail or knowing about the allergy', 'Never reveal the insurance payout motive', 'Never mention the double commission fraud by Sunny\'s management', 'If asked about delivering the cocktail, say it was normal hospitality'],
+            },
+            {
+                name: 'Kabir',
+                role: 'a lifestyle influencer who was filming the entire party',
+                avatar: '📱',
+                personality: 'Hyperactive, always performing for the camera, speaks in influencer-speak ("content hai bhai!"). Underneath the clout-chasing is a surprisingly sharp observer.',
+                backstory: 'Has 2 million YouTube subscribers. Was doing a "NYE in Goa" vlog and had backstage access. His camera was rolling almost continuously throughout the evening.',
+                alibi: 'Bro, I was vlogging the whole time — camera was on from 8 PM! I have six hours of footage. Mera drone bhi fly kar raha tha. Content toh content hai, but I would never hurt Sunny — he was going to appear in my vlog!',
+                secret: 'His footage accidentally captured Tony D\'Souza adding something to DJ Sunny\'s cocktail backstage before delivering it. He has not reviewed all his footage yet but subconsciously knows he filmed something important near the stage.',
+                relationshipToVictim: 'Fan turned associate. DJ Sunny agreed to a collab video which would have been Kabir\'s biggest content ever.',
+                secretConstraints: ['Never mention the footage of Tony spiking the drink until directly asked about what you filmed backstage', 'Never accuse anyone based on footage you have not consciously reviewed', 'If asked about footage, be excited about the party content but vague about backstage specifics', 'Never reveal the exact moment you filmed near the cocktail area'],
+            },
+        ],
+        crossClues: [
+            ['Was seen handling something near the cocktail before it was delivered backstage', 2, 3],
+            ['Had a loud confrontation with DJ Sunny near the VIP area at 10 PM', 3, 0],
+            ['Was spotted in the kitchen area where shellfish dishes were being prepared', 0, 1],
+            ['Was filming near the backstage area and may have caught something on camera', 4, 3],
+            ['Was overheard telling someone "agar aaj raat sab plan ke hisaab se chala toh loan clear"', 1, 0],
+            ['Was seen going through DJ Sunny\'s equipment bag after the body was found', 0, 2],
+        ],
+    },
+];
+&nbsp;
+/**
+ * Returns all available mystery templates.
+ * @returns {object[]}
+ */
+export function getTemplates() {
+    return TEMPLATES;
+}
+&nbsp;
+/**
+ * Returns a specific template by id.
+ * @param {string} id  Template identifier
+ * @returns {object|undefined}
+ */
+export function getTemplateById(id) {
+    return TEMPLATES.find(t =&gt; t.id === id);
+}
+&nbsp;
+/**
+ * Select a random template from the pool.
+ * @returns {object}
+ */
+export function pickRandomTemplate() {
+    const idx = Math.floor(Math.random() * TEMPLATES.length);
+    return TEMPLATES[idx];
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-03-17T07:40:59.126Z
+            </div>
+        <script src="../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
+    </body>
+</html>
+    

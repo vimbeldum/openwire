@@ -1,0 +1,11 @@
+iteration	type	hypothesis	result	severity	location	description
+1	hypothesis	Vault stake() resets stakedAt destroying accrued interest	confirmed	HIGH	vault.js:107	Additional deposits silently erase compound interest by resetting timer
+2	hypothesis	Wallet tip() missing saveWalletSync on sender wallet	confirmed	HIGH	wallet.js:232	Race condition: page reload reverts sender balance while tip P2P message already sent
+3	hypothesis	Bounty expireBounty() ignores voting status	confirmed	HIGH	bounties.js:190	Bounties stuck in 'voting' lock escrowed funds permanently
+4	hypothesis	Jackpot random trigger uses Math.random() not crypto	confirmed	MEDIUM	jackpot.js:81	Predictable RNG for financial decisions in P2P context
+5	hypothesis	Blackjack parseInt without radix	confirmed	LOW	blackjack.js:56	Best-practice violation (works for 2-10 but no radix specified)
+6	hypothesis	Andar Bahar payout inconsistency between inline and engine	disproven	-	-	Both paths use identical payout logic
+7	hypothesis	Polymarket binary pricing formula is inverted	confirmed	CRITICAL	polymarket.js:28-31	Buying increases pool quantity but price formula uses OTHER quantity — prices go backwards
+8	hypothesis	Cosmetics buyResale() never credits the seller	confirmed	HIGH	cosmetics.js:192-224	Buyer pays resalePrice, 10% goes to jackpot, 90% vanishes - seller gets nothing
+9	hypothesis	Roulette nextSpinAt timing incorrect	disproven	-	-	Correctly sums all phase durations for next spin
+10	hypothesis	stripDangerousTags misses style/form/svg tags	noted	MEDIUM	socket.js:59-69	Missing style/form/svg/link/meta tags, but React auto-escapes prevents exploitation

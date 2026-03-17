@@ -1,0 +1,9 @@
+iteration	type	hypothesis	result	severity	location	description
+1	hypothesis	wallet.credit() accepts unvalidated P2P amounts	confirmed	HIGH	wallet.js:155	NaN/Infinity/negative amounts can corrupt wallet via P2P messages
+2	hypothesis	wallet.adminAdjust() accepts unvalidated delta	confirmed	HIGH	wallet.js:175	NaN/Infinity delta from P2P messages can corrupt adminBonus
+3	hypothesis	Mystery leaks isCulprit via P2P broadcast	confirmed	HIGH	suspects.js:73	sanitizeSuspects strips _-fields but not isCulprit boolean
+4	hypothesis	Mystery leaks culpritId in mystery definition	confirmed	HIGH	mystery.js:443	serializeGame broadcasts mystery.culpritId to all players
+5	hypothesis	XSS via dangerouslySetInnerHTML	disproven	-	entire codebase	Zero instances in source code; React escapes by default
+6	hypothesis	Prototype pollution via JSON.parse	disproven	-	entire codebase	No __proto__ or constructor[] patterns found
+7	hypothesis	Deck leak to peers	disproven	-	blackjack.js:611	serializeGame strips deck; only deckCount transmitted
+8	hypothesis	Admin password server bypass	noted	INFO	AdminPasswordGate.jsx:16	Client-side only gate; server validates admin_secret separately

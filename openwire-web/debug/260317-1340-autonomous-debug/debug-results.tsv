@@ -1,0 +1,18 @@
+iteration	type	hypothesis	result	severity	location	description
+1	hypothesis	dealerPlay mutates dealer.hand via shared reference	confirmed	HIGH	blackjack.js:470	Shallow copy doesn't clone hand array; .push() mutates original game state
+2	hypothesis	BANNED karma event doesn't reset karma to 0	confirmed	HIGH	reputation.js:100-115	Tier forced to newcomer but karma stays high; next event restores tier
+3	hypothesis	LWW merge replaces entire housePnl, losing local-only game types	confirmed	HIGH	casinoState.js:111-113	Remote housePnl wholesale replacement drops local-only game type P&L
+4	hypothesis	Multi-outcome cost distribution leaks value from rounding	confirmed	MEDIUM	polymarket.js:162-168	Remaining chips after rounding loop not swept; AMM loses value
+5	hypothesis	checkCooldown uses Date.now() instead of injected timestamp	confirmed	MEDIUM	reputation.js:132-134	applyKarma accepts timestamp but cooldown ignores it
+6	hypothesis	_authorHash leaks identity in P2P-broadcast posts	confirmed	MEDIUM	deaddrops.js:106	Deterministic device hash embedded in anonymous posts
+7	hypothesis	calculateKarmaChange produces NaN when data fields missing	confirmed	HIGH	reputation.js:54,63	undefined / 100 = NaN propagates to corrupt entire reputation
+8	hypothesis	calculateInterest returns negative for future timestamps	confirmed	MEDIUM	vault.js:26-28	Negative elapsed time produces negative interest
+9	hypothesis	submitAttempt accepts submissions after voting period ends	confirmed	MEDIUM	bounties.js:130-134	Only checks expiresAt, not votingEndsAt for voting-phase bounties
+10	hypothesis	polymarket binary prices don't sum to 100	confirmed	LOW	polymarket.js:31-34	Independent Math.round() on each price can sum to 99 or 101
+11	hypothesis	IST streak date diff miscalculates across DST	disproven	-	profile.js:251	India has no DST; IST offset is constant
+12	hypothesis	XSS bypass in stripDangerousTags	disproven	-	socket.js:59-69	No dangerouslySetInnerHTML; React auto-escapes all content
+13	hypothesis	tambola redistributeUnclaimed loses money	disproven	-	tambola.js:412-430	Called after fullHouse claim; flow is correct
+14	hypothesis	andarbahar accepts invalid bet sides	disproven	-	andarbahar.js:78-84	Invalid sides fall through to loss; garbage-in = you-lose design
+15	hypothesis	polymarket == null is loose equality bug	disproven	-	polymarket.js:320	Standard JS idiom for null/undefined check; intentional
+16	hypothesis	wallet.debit allows negative amounts	disproven	-	wallet.js:126-127	All callers validate amount > 0; canAfford(NaN) returns false
+17	hypothesis	ledger.js push mutates input	disproven	-	core/ledger.js:40	Intentional cache mutation; same data structure updated and re-saved
