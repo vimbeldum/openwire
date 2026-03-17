@@ -89,9 +89,18 @@ export function escrowBounty(wallet, bounty) {
         base   = 0;
     }
 
+    const newTotal = Math.max(0, base) + Math.max(0, bonus);
     return {
         success: true,
-        wallet: { ...wallet, baseBalance: Math.max(0, base), adminBonus: Math.max(0, bonus) },
+        wallet: {
+            ...wallet,
+            baseBalance: Math.max(0, base),
+            adminBonus: Math.max(0, bonus),
+            history: [
+                ...(wallet.history ?? []).slice(-99),
+                { time: Date.now(), reason: 'Bounty escrow', amount: -bounty.reward, balance: newTotal },
+            ],
+        },
         bounty: { ...bounty, escrowedAt: Date.now() },
     };
 }
