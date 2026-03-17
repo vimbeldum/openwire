@@ -153,6 +153,7 @@ export function debit(wallet, amount, reason = 'Bet') {
 // Game winnings → baseBalance (expires daily)
 // Admin grants  → adminBonus (permanent)
 export function credit(wallet, amount, reason = 'Winnings', isAdminGrant = false) {
+    if (!Number.isFinite(amount) || amount <= 0) return wallet;
     const updated = {
         ...wallet,
         baseBalance: isAdminGrant ? wallet.baseBalance : wallet.baseBalance + amount,
@@ -173,6 +174,7 @@ export function credit(wallet, amount, reason = 'Winnings', isAdminGrant = false
 
 /* ── Admin adjust ─────────────────────────────────────────── */
 export function adminAdjust(wallet, delta, reason = 'Admin adjustment') {
+    if (!Number.isFinite(delta)) return wallet;
     const bonus = Math.max(0, (wallet.adminBonus || 0) + delta);
     const updated = {
         ...wallet,
