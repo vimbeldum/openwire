@@ -692,6 +692,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
 
     const {
         mysteryGame, setMysteryGame,
+        mysteryAIError, setMysteryAIError,
         mysteryRef, mysteryHostRef, hasJoinedMystery,
         handleMysteryAction, startMystery, handleMysteryLocalAction,
     } = useMysteryGame(gameDeps);
@@ -2291,9 +2292,10 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     }, []);
     const closeMystery = useCallback(() => {
         setMysteryGame(null);
+        setMysteryAIError(null);
         mysteryHostRef.current = null;
         hasJoinedMystery.current = false;
-    }, []);
+    }, [setMysteryAIError]);
     const closeTtt = useCallback(() => setActiveGame(null), []);
     const helpBj = useCallback(() => openHelp('blackjack'), []);
     const helpRl = useCallback(() => openHelp('roulette'), []);
@@ -2956,6 +2958,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     onAction={handleMysteryLocalAction}
                     onClose={closeMystery}
                     isHost={mysteryHostRef.current === myIdRef.current}
+                    aiError={mysteryAIError}
+                    onClearAIError={() => setMysteryAIError(null)}
                 />
             )}
             </Suspense>

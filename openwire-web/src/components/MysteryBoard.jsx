@@ -244,7 +244,7 @@ const AI_MODELS = [
 ];
 
 /* ── Main Board ───────────────────────────────────── */
-export default memo(function MysteryBoard({ game, myId, myNick, onAction, onClose, isHost }) {
+export default memo(function MysteryBoard({ game, myId, myNick, onAction, onClose, isHost, aiError, onClearAIError }) {
     const [inputVal, setInputVal] = useState('');
     const [targetSuspect, setTargetSuspect] = useState(null);
     const [acIndex, setAcIndex] = useState(0);
@@ -309,13 +309,15 @@ export default memo(function MysteryBoard({ game, myId, myNick, onAction, onClos
 
         if (phase === 'investigation' && suspectId) {
             onAction({ type: 'interrogate', suspectId, content: text });
+            // Clear any lingering AI error when player sends a new interrogation
+            if (onClearAIError) onClearAIError();
         } else if (phase === 'deliberation') {
             onAction({ type: 'deliberate', content: text });
         }
 
         setInputVal('');
         setTargetSuspect(null);
-    }, [inputVal, targetSuspect, suspects, phase, onAction]);
+    }, [inputVal, targetSuspect, suspects, phase, onAction, onClearAIError]);
 
     const handleVote = useCallback((suspectId) => {
         onAction({ type: 'vote', suspectId });
@@ -497,6 +499,18 @@ export default memo(function MysteryBoard({ game, myId, myNick, onAction, onClos
                             {phase === 'accusation' && 'Cast Your Vote'}
                             {isReveal && 'The Truth Revealed'}
                         </div>
+
+                        {aiError && (
+                            <div className="mystery-ai-error">
+                                <span className="mystery-ai-error-icon">&#9888;</span>
+                                <span className="mystery-ai-error-text">{aiError}</span>
+                                <button
+                                    className="mystery-ai-error-dismiss"
+                                    onClick={onClearAIError}
+                                    aria-label="Dismiss AI error"
+                                >&#10005;</button>
+                            </div>
+                        )}
 
                         {showVoting ? (
                             <VotingPanel

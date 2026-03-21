@@ -23,6 +23,7 @@ export default function useMysteryGame(deps) {
     /* ── State & Refs ──────────────────────────────────────── */
 
     const [mysteryGame, setMysteryGame] = useState(null);
+    const [mysteryAIError, setMysteryAIError] = useState(null);
     const mysteryRef = useRef(null);
     const mysteryHostRef = useRef(null);
     const hasJoinedMystery = useRef(false);
@@ -53,10 +54,12 @@ export default function useMysteryGame(deps) {
                     model: currentGame._aiModel || undefined,
                 },
             );
+            // Clear any previous AI error on success
+            if (result && result.text) setMysteryAIError(null);
             return result;
         } catch (err) {
             console.warn('[Mystery] AI generation failed:', err?.message);
-            // Use template system instead of hardcoded fallback
+            setMysteryAIError('AI suspect response failed — using fallback response.');
             return null;
         }
     }, [deps.swarmRef]);
@@ -136,8 +139,19 @@ export default function useMysteryGame(deps) {
                         const currentGame = mysteryRef.current;
                         const suspect = currentGame?.suspects?.find(s => s.id === action.suspectId);
                         if (!suspect) return;
-                        const result = await generateAIResponse(suspect, action.content, action.nick);
-                        if (!result) return;
+                        let result = await generateAIResponse(suspect, action.content, action.nick);
+                        // If AI failed, fall back to template system (same as host interrogation path)
+                        if (!result || !result.text) {
+                            const ms = new MysterySwarm();
+                            ms.init(currentGame, null, null);
+                            const tmpl = await ms.generateResponse(suspect.id, action.content, action.nick);
+                            ms.destroy();
+                            result = {
+                                text: tmpl?.text || `*${suspect.name} shakes their head* I have nothing more to say.`,
+                                isRevised: false,
+                                clue: null,
+                            };
+                        }
                         setMysteryGame(prev => {
                             if (!prev) return prev;
                             const updated = mystery.addInterrogation(
@@ -447,6 +461,7 @@ export default function useMysteryGame(deps) {
 
     return {
         mysteryGame, setMysteryGame,
+        mysteryAIError, setMysteryAIError,
         mysteryRef, mysteryHostRef, hasJoinedMystery,
         handleMysteryAction, startMystery, handleMysteryLocalAction,
     };
