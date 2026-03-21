@@ -211,20 +211,29 @@ export class MysterySwarm {
             return null;
         }
 
-        const result = await this.generateFn(
-            this.modelId,
-            systemPrompt,
-            contextMessages,
-            MAX_RESPONSE_TOKENS,
-        );
+        try {
+            const result = await this.generateFn(
+                this.modelId,
+                systemPrompt,
+                contextMessages,
+                MAX_RESPONSE_TOKENS,
+            );
 
-        // The generation functions return string|null
-        if (typeof result === 'string') return result.trim() || null;
-        // Handle unexpected object returns
-        if (result && typeof result === 'object') {
-            return (result.content || result.text || '').trim() || null;
+            // The generation functions return string|null
+            if (typeof result === 'string') return result.trim() || null;
+            // Handle unexpected object returns
+            if (result && typeof result === 'object') {
+                return (result.content || result.text || '').trim() || null;
+            }
+            return null;
+        } catch (err) {
+            // LLM call failed (network error, HTTP error, rate limit, etc.)
+            // Return null to trigger template fallback instead of propagating
+            // the error into generateResponse's catch block which would produce
+            // a hardcoded generic response identical for every suspect/question.
+            console.warn('[MysterySwarm] LLM call failed, using template fallback:', err?.message);
+            return null;
         }
-        return null;
     }
 
     /**
@@ -376,6 +385,7 @@ export async function generateSuspectResponse(suspect, playerMessage, mystery, o
         text: result.text,
         clue,
         isRevised: result.isRevised,
+        error: result.error || false,
     };
 }
 

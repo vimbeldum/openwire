@@ -54,8 +54,13 @@ export default function useMysteryGame(deps) {
                     model: currentGame._aiModel || undefined,
                 },
             );
-            // Clear any previous AI error on success
-            if (result && result.text) setMysteryAIError(null);
+            // Show AI error banner if LLM failed and template fallback was used
+            if (result?.error) {
+                setMysteryAIError('AI suspect response failed — using fallback response.');
+            } else if (result?.text) {
+                // Clear any previous AI error on genuine success
+                setMysteryAIError(null);
+            }
             return result;
         } catch (err) {
             console.warn('[Mystery] AI generation failed:', err?.message);
