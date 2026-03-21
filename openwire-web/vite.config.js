@@ -9,11 +9,6 @@ export default defineConfig({
             './characters.js': resolve(__dirname, 'src/lib/agents/characters-light.js'),
         },
     },
-    define: {
-        'console.log': 'undefined',
-        'console.warn': 'undefined',
-        'console.debug': 'undefined',
-    },
     build: {
         target: 'esnext',
         modulePreload: false,
