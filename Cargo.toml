@@ -83,7 +83,7 @@ reqwest = { version = "0.12", features = ["json"] }
 
 # WebSocket client for relay bridge
 tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
-tungstenite = "0.26"
+tungstenite = "0.29"
 
 [profile.release]
 lto = true
