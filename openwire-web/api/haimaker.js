@@ -1,6 +1,6 @@
 /* ================================================================
    OpenWire — Vercel Serverless: Haimaker Proxy
-   Keeps MINMAX_API_KEY server-side. Frontend calls /api/haimaker.
+   Keeps MINIMAX_JEY server-side. Frontend calls /api/haimaker.
    GET  → fetch available models from Haimaker /v1/models
    POST → forward chat completion request via OpenAI-compatible API
    ================================================================ */
@@ -10,6 +10,7 @@ const BASE = 'https://api.haimaker.ai/v1';
 // Fallback if /v1/models fetch fails
 const FALLBACK_MODELS = [
     { id: 'minimax/minimax-m2.5', name: 'MiniMax M2.5', context_length: 131072 },
+    { id: 'minimax/minimax-2.7', name: 'MiniMax 2.7', context_length: 1000000 },
 ];
 
 export default async function handler(req, res) {
@@ -19,8 +20,8 @@ export default async function handler(req, res) {
 
     if (req.method === 'OPTIONS') return res.status(200).end();
 
-    const key = process.env.MINMAX_API_KEY;
-    if (!key) return res.status(500).json({ error: 'MINMAX_API_KEY not configured on server' });
+    const key = process.env.MINIMAX_JEY;
+    if (!key) return res.status(500).json({ error: 'MINIMAX_JEY not configured on server' });
 
     try {
         if (req.method === 'GET') {

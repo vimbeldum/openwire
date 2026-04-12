@@ -1,0 +1,375 @@
+/* Monopoly Board Styles */
+.mono-container {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1a472a 0%, #2d5a3f 100%);
+    min-height: 100vh;
+    padding: 1rem;
+    color: #fff;
+}
+
+.mono-header {
+    text-align: center;
+    padding: 1rem;
+    background: rgba(0,0,0,0.3);
+    border-radius: 12px;
+    margin-bottom: 1rem;
+}
+
+.mono-title {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #FFD700;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+.mono-phase {
+    font-size: 1.1rem;
+    color: #ccc;
+    margin-top: 0.5rem;
+}
+
+.mono-turn {
+    font-size: 0.9rem;
+    color: #aaa;
+    margin-top: 0.25rem;
+}
+
+/* Players */
+.mono-players {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.mono-player {
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 140px;
+    position: relative;
+}
+
+.mono-player.active {
+    background: rgba(255,215,0,0.2);
+    border: 2px solid #FFD700;
+}
+
+.mono-player.eliminated {
+    opacity: 0.5;
+    text-decoration: line-through;
+}
+
+.mono-token {
+    font-size: 1.5rem;
+}
+
+.mono-player-info {
+    flex: 1;
+}
+
+.mono-player-name {
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.mono-player-money {
+    color: #90EE90;
+    font-size: 0.85rem;
+}
+
+.mono-player-props {
+    font-size: 0.75rem;
+    color: #aaa;
+}
+
+.mono-turn-indicator {
+    position: absolute;
+    right: 0.5rem;
+    color: #FFD700;
+}
+
+.mono-eliminated {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    font-size: 1rem;
+}
+
+/* Dice */
+.mono-dice {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.mono-die {
+    background: #fff;
+    color: #333;
+    font-size: 2rem;
+    font-weight: bold;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+.mono-double {
+    color: #FFD700;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    animation: pulse 0.5s infinite alternate;
+}
+
+@keyframes pulse {
+    from { opacity: 0.7; }
+    to { opacity: 1; }
+}
+
+/* Board */
+.mono-board {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    overflow-x: auto;
+}
+
+.mono-board-inner {
+    display: grid;
+    grid-template-columns: repeat(10, 60px);
+    grid-template-rows: repeat(10, 60px);
+    gap: 2px;
+    width: fit-content;
+    margin: 0 auto;
+    position: relative;
+}
+
+.mono-space {
+    background: #f5f5f5;
+    border: 1px solid #ccc;
+    padding: 2px;
+    font-size: 0.6rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    position: relative;
+    min-height: 60px;
+}
+
+.mono-space-color {
+    width: 100%;
+    height: 12px;
+    border-radius: 2px;
+    margin-bottom: 2px;
+}
+
+.mono-space-name {
+    font-size: 0.55rem;
+    text-align: center;
+    color: #333;
+    line-height: 1.1;
+}
+
+.mono-space.go { background: #90EE90; }
+.mono-space.jail { background: #FFA500; }
+.mono-space.community { background: #DDA0DD; }
+.mono-space.chance { background: #FFB6C1; }
+.mono-space.tax { background: #FF6B6B; }
+.mono-space.free { background: #87CEEB; }
+.mono-space.gotojail { background: #8B0000; color: #fff; }
+
+.mono-board-center {
+    grid-column: 2 / 10;
+    grid-row: 2 / 10;
+    background: #228B22;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+}
+
+.mono-center-content {
+    text-align: center;
+    padding: 1rem;
+}
+
+.mono-center-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #FFD700;
+    margin-bottom: 0.5rem;
+}
+
+.mono-current-turn {
+    color: #fff;
+    margin-bottom: 0.5rem;
+}
+
+.mono-action-area {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.mono-token-on-board {
+    font-size: 0.8rem;
+    position: absolute;
+    bottom: 2px;
+}
+
+/* Buttons */
+.mono-btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.mono-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.mono-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.mono-roll-btn {
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    color: #333;
+}
+
+.mono-buy-btn {
+    background: linear-gradient(135deg, #4CAF50, #45a049);
+    color: #fff;
+}
+
+.mono-auction-btn {
+    background: linear-gradient(135deg, #ff9800, #f57c00);
+    color: #fff;
+}
+
+.mono-end-btn {
+    background: linear-gradient(135deg, #2196F3, #1976D2);
+    color: #fff;
+}
+
+/* Properties Section */
+.mono-properties-section {
+    background: rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.mono-section-title {
+    font-size: 1rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: #FFD700;
+}
+
+.mono-property-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.mono-property-card {
+    background: rgba(255,255,255,0.9);
+    border-radius: 6px;
+    padding: 0.5rem;
+    min-width: 80px;
+    border-left: 4px solid;
+}
+
+.mono-prop-name {
+    font-size: 0.75rem;
+    color: #333;
+    font-weight: bold;
+}
+
+.mono-prop-rent {
+    font-size: 0.7rem;
+    color: #666;
+}
+
+.mono-no-props {
+    color: #aaa;
+    font-style: italic;
+}
+
+/* Winner */
+.mono-winner {
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    color: #333;
+    text-align: center;
+    padding: 1rem;
+    border-radius: 12px;
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    animation: winner-glow 1s infinite alternate;
+}
+
+@keyframes winner-glow {
+    from { box-shadow: 0 0 10px #FFD700; }
+    to { box-shadow: 0 0 30px #FFD700; }
+}
+
+/* Log */
+.mono-log {
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+    max-height: 100px;
+    overflow-y: auto;
+}
+
+.mono-log-entry {
+    font-size: 0.8rem;
+    color: #ccc;
+    padding: 0.25rem 0;
+}
+
+/* Footer */
+.mono-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.mono-help-btn, .mono-close-btn {
+    flex: 1;
+    padding: 0.75rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.mono-help-btn {
+    background: rgba(255,255,255,0.2);
+    color: #fff;
+}
+
+.mono-close-btn {
+    background: rgba(255,100,100,0.8);
+    color: #fff;
+}

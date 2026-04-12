@@ -86,6 +86,13 @@ export async function fetchAllFreeModels() {
  * Shows name, context window, and parameter count if available.
  */
 export function formatModelLabel(model) {
+    if (model._provider === 'haimaker') {
+        const name = model.name || model.id;
+        const ctx = model.context_length
+            ? `${Math.round(model.context_length / 1000)}k`
+            : '';
+        return [name, ctx].filter(Boolean).join(' | ');
+    }
     const name = model.name || model.id;
     const params = extractParamCount(model);
     const ctx = model.context_length

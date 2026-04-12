@@ -23,7 +23,7 @@ const FALLBACK_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
 const DEFAULT_ALL_MODEL = 'openrouter/auto';
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-lite';
 const DEFAULT_QWEN_MODEL = 'qwen3.5-flash';
-const DEFAULT_HAIMAKER_MODEL = 'minimax/minimax-m2.5';
+const DEFAULT_HAIMAKER_MODEL = 'minimax/minimax-2.7';
 const DEFAULT_MSG_PER_MIN = 60;
 const CROSSOVER_PROBABILITY = 0.7;
 const MAX_RETRIES = 3;
@@ -251,6 +251,7 @@ export class AgentSwarm {
         // Re-load latest config
         this._loadFromStore();
 
+        let haimakerModels = [];
         try {
             this._freeModels = await fetchFreeModels(this._modelFilters);
             this._log(`[Swarm] Fetched ${this._freeModels.length} free OpenRouter models`);
@@ -258,6 +259,17 @@ export class AgentSwarm {
             this._onError(`[Swarm] Model fetch failed: ${e.message}. Using fallback.`);
             this._log(`[Swarm] OpenRouter model fetch FAILED: ${e.message}`);
             this._freeModels = [];
+        }
+
+        try {
+            haimakerModels = await fetchHaimakerModels();
+            this._log(`[Swarm] Fetched ${haimakerModels.length} Haimaker models`);
+        } catch (e) {
+            this._log(`[Swarm] Haimaker model fetch FAILED: ${e.message}`);
+        }
+
+        if (haimakerModels.length > 0) {
+            this._freeModels = [...this._freeModels, ...haimakerModels];
         }
 
         this._onModelLoad(this._freeModels);
@@ -314,6 +326,15 @@ export class AgentSwarm {
             this._assignModels();
         } catch (e) {
             this._log(`[Swarm] Model refresh failed: ${e.message}`);
+        }
+
+        try {
+            this._haimakerModels = await fetchHaimakerModels();
+            this._haimakerModels = this._haimakerModels.map(m => ({ ...m, _provider: 'haimaker' }));
+            this._freeModels = [...this._freeModels, ...this._haimakerModels];
+            this._log(`[Swarm] Merged ${this._haimakerModels.length} Haimaker models`);
+        } catch (e) {
+            this._log(`[Swarm] Haimaker model fetch failed: ${e.message}`);
         }
     }
 
@@ -610,7 +631,7 @@ export class AgentSwarm {
                     this._onError(`Haimaker model fetch failed: ${e.message}`);
                 }
             }
-            const minimax = this._haimakerModels.find(m => m.id.includes('minimax-m2.5'));
+            const minimax = this._haimakerModels.find(m => m.id.includes('minimax-2.7'));
             this._defaultModel = minimax?.id || this._haimakerModels[0]?.id || DEFAULT_HAIMAKER_MODEL;
             this._log(`[Config] Default model -> ${this._defaultModel}`);
         } else {

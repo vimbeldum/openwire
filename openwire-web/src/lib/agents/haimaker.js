@@ -57,7 +57,7 @@ export function formatHaimakerLabel(model) {
 const IS_DEBUG_HM = typeof localStorage !== 'undefined' && localStorage.getItem('openwire_debug') === 'true';
 const FETCH_TIMEOUT_MS = 120_000; // Thinking models need up to 2 mins
 
-export async function generateHaimakerMessage(modelId, systemPrompt, contextMessages, maxTokens = 4096) {
+export async function generateHaimakerMessage(modelId, systemPrompt, contextMessages, maxTokens = 8192) {
 
     // Build OpenAI-style messages array — higher token budget because thinking models
     // use internal reasoning tokens before producing the visible reply

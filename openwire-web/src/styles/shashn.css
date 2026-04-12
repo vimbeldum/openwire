@@ -1,0 +1,376 @@
+/* Shashn Board Styles */
+.shashn-container {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #0f5132 0%, #198754 100%);
+    min-height: 100vh;
+    padding: 1rem;
+    color: #fff;
+}
+
+.shashn-header {
+    text-align: center;
+    padding: 1rem;
+    background: rgba(0,0,0,0.3);
+    border-radius: 12px;
+    margin-bottom: 1rem;
+}
+
+.shashn-title {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #FFD700;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+.shashn-phase {
+    font-size: 1.1rem;
+    color: #ccc;
+    margin-top: 0.5rem;
+}
+
+.shashn-round {
+    font-size: 0.9rem;
+    color: #aaa;
+    margin-top: 0.25rem;
+}
+
+.shashn-trump {
+    font-size: 1rem;
+    font-weight: bold;
+    margin-top: 0.25rem;
+}
+
+/* Players */
+.shashn-players {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-bottom: 1rem;
+}
+
+.shashn-player {
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    position: relative;
+    border: 2px solid transparent;
+}
+
+.shashn-player.active {
+    background: rgba(255,215,0,0.2);
+    border-color: #FFD700;
+}
+
+.shashn-player-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.shashn-player-name {
+    font-weight: bold;
+    font-size: 1rem;
+}
+
+.shashn-player-score {
+    color: #90EE90;
+    font-size: 0.9rem;
+}
+
+.shashn-player-tricks {
+    color: #aaa;
+    font-size: 0.8rem;
+}
+
+.shashn-turn-badge {
+    position: absolute;
+    right: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #FFD700;
+    color: #333;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+}
+
+/* Trick Area */
+.shashn-trick-area {
+    background: rgba(0,0,0,0.2);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.shashn-trick-label {
+    font-size: 0.9rem;
+    color: #ccc;
+    margin-bottom: 0.75rem;
+}
+
+.shashn-trick-cards {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.shashn-trick-empty {
+    color: #888;
+    font-style: italic;
+    padding: 2rem;
+}
+
+.shashn-trick-empty-slot {
+    color: #666;
+    font-style: italic;
+    padding: 2rem;
+    border: 2px dashed #444;
+    border-radius: 8px;
+    width: 100px;
+}
+
+.shashn-trick-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.shashn-trick-player {
+    font-size: 0.75rem;
+    color: #aaa;
+}
+
+.shashn-trick-winner {
+    color: #FFD700;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.shashn-trick-actions {
+    margin-top: 0.5rem;
+}
+
+/* Cards */
+.shashn-card {
+    width: 70px;
+    height: 100px;
+    background: linear-gradient(135deg, #fff, #f5f5f5);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+    border: 2px solid #ddd;
+    position: relative;
+}
+
+.shashn-card:hover:not(.disabled):not(.selected) {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+}
+
+.shashn-card.selected {
+    border-color: #FFD700;
+    box-shadow: 0 0 15px rgba(255,215,0,0.6);
+    transform: translateY(-8px);
+}
+
+.shashn-card.disabled {
+    opacity: 0.8;
+    cursor: not-allowed;
+}
+
+.shashn-card-rank {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: inherit;
+}
+
+.shashn-card-suit {
+    font-size: 1.8rem;
+}
+
+.shashn-card-placeholder {
+    width: 70px;
+    height: 100px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+    border: 2px dashed #555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+}
+
+.shashn-card-facedown {
+    background: linear-gradient(135deg, #1a1a5e, #2a2a8e);
+    border-color: #3a3aae;
+}
+
+.shashn-card-back {
+    font-size: 2rem;
+}
+
+/* Hand Section */
+.shashn-hand-section {
+    background: rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.shashn-section-title {
+    font-size: 1rem;
+    font-weight: bold;
+    color: #FFD700;
+    margin-bottom: 0.5rem;
+}
+
+.shashn-lead-suit {
+    font-size: 0.85rem;
+    color: #ccc;
+    margin-bottom: 0.5rem;
+}
+
+.shashn-hand {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.shashn-play-area {
+    margin-top: 1rem;
+    text-align: center;
+}
+
+/* Buttons */
+.shashn-btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.1s;
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    color: #333;
+}
+
+.shashn-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+}
+
+.shashn-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.shashn-play-btn {
+    background: linear-gradient(135deg, #28a745, #198754);
+    color: #fff;
+}
+
+/* Scores */
+.shashn-scores {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.shashn-score-item {
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.shashn-score-label {
+    color: #aaa;
+}
+
+.shashn-score-value {
+    font-weight: bold;
+    color: #FFD700;
+}
+
+.shashn-score-divider {
+    color: #666;
+    font-style: italic;
+}
+
+/* Log */
+.shashn-log {
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+    max-height: 80px;
+    overflow-y: auto;
+}
+
+.shashn-log-entry {
+    font-size: 0.8rem;
+    color: #ccc;
+    padding: 0.2rem 0;
+}
+
+/* Winner */
+.shashn-winner {
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    color: #333;
+    text-align: center;
+    padding: 1rem;
+    border-radius: 12px;
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    animation: winner-glow 1s infinite alternate;
+}
+
+@keyframes winner-glow {
+    from { box-shadow: 0 0 10px #FFD700; }
+    to { box-shadow: 0 0 30px #FFD700; }
+}
+
+/* Footer */
+.shashn-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.shashn-help-btn, .shashn-close-btn {
+    flex: 1;
+    padding: 0.75rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.shashn-help-btn {
+    background: rgba(255,255,255,0.2);
+    color: #fff;
+}
+
+.shashn-close-btn {
+    background: rgba(255,100,100,0.8);
+    color: #fff;
+}

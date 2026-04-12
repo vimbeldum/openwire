@@ -8,12 +8,18 @@ import * as rl from '../lib/roulette';
 import * as ab from '../lib/andarbahar';
 import * as pm from '../lib/polymarket';
 import * as mystery from '../lib/mystery';
+import * as mono from '../lib/monopoly';
+import * as clue from '../lib/cluedo';
+import * as shashn from '../lib/shashn';
 import * as wallet from '../lib/wallet';
 import useBlackjackGame from '../hooks/useBlackjackGame';
 import useRouletteGame from '../hooks/useRouletteGame';
 import useAndarBaharGame from '../hooks/useAndarBaharGame';
 import usePolymarketGame from '../hooks/usePolymarketGame';
 import useMysteryGame from '../hooks/useMysteryGame';
+import useMonopolyGame from '../hooks/useMonopolyGame';
+import useCluedoGame from '../hooks/useCluedoGame';
+import useShashnGame from '../hooks/useShashnGame';
 import MessageRow from './chat/MessageRow';
 
 // Retry wrapper: on chunk-not-found after deploy, reload once to get fresh HTML
@@ -52,6 +58,9 @@ const CosmeticsShop = lazyRetry(() => import('./CosmeticsShop'));
 const TambolaBoard = lazyRetry(() => import('./TambolaBoard'));
 const SlotsBoard = lazyRetry(() => import('./SlotsBoard'));
 const MysteryBoard = lazyRetry(() => import('./MysteryBoard'));
+const MonopolyBoard = lazyRetry(() => import('./MonopolyBoard'));
+const CluedoBoard = lazyRetry(() => import('./CluedoBoard'));
+const ShashnBoard = lazyRetry(() => import('./ShashnBoard'));
 const KarmaGuide   = lazyRetry(() => import('./KarmaGuide'));
 const PokeOverlay  = lazyRetry(() => import('./chat/PokeOverlay'));
 import LiveTicker from './chat/LiveTicker';
@@ -116,6 +125,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     // Games
     const [activeGame, setActiveGame] = useState(null);       // Tic-Tac-Toe
     // Blackjack, Roulette, Andar Bahar, Polymarket — managed by extracted hooks (see below)
+    // Monopoly, Cluedo, Shashn — managed by extracted hooks (see below)
 
     // How to Play
     const [showHelp, setShowHelp] = useState(false);
@@ -408,18 +418,27 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         setPolymarketGame(null);
         setActiveGame(null);
         setMysteryGame(null);
+        setMonopolyGame(null);
+        setCluedoGame(null);
+        setShashnGame(null);
         // Reset host refs
         bjHostRef.current = null;
         rouletteHostRef.current = null;
         abHostRef.current = null;
         pmHostRef.current = null;
         mysteryHostRef.current = null;
+        monoHostRef.current = null;
+        clueHostRef.current = null;
+        shashnHostRef.current = null;
         // Reset consent flags
         hasJoinedBj.current = false;
         hasJoinedRl.current = false;
         hasJoinedAb.current = false;
         hasJoinedPm.current = false;
         hasJoinedMystery.current = false;
+        hasJoinedMono.current = false;
+        hasJoinedClue.current = false;
+        hasJoinedShashn.current = false;
         // Clear ready peers
         setReadyPeers({ roulette: new Set(), blackjack: new Set(), andarbahar: new Set() });
     }, []);
@@ -697,6 +716,25 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         handleMysteryAction, startMystery, handleMysteryLocalAction,
     } = useMysteryGame(gameDeps);
 
+    const {
+        monopolyGame, setMonopolyGame,
+        monopolyRef, monoHostRef, hasJoinedMono,
+        monoTimerRef,
+        handleMonopolyAction, startMonopoly, handleMonoAction,
+    } = useMonopolyGame(gameDeps);
+
+    const {
+        cluedoGame, setCluedoGame,
+        cluedoRef, clueHostRef, hasJoinedClue,
+        handleCluedoAction, startCluedo, handleClueAction,
+    } = useCluedoGame(gameDeps);
+
+    const {
+        shashnGame, setShashnGame,
+        shashnRef, shashnHostRef, hasJoinedShashn,
+        handleShashnAction, startShashn, handleShashnLocalAction,
+    } = useShashnGame(gameDeps);
+
     // ── Game invite from chat message ────────────────────────
     const joinGameFromInvite = useCallback((msg) => {
         const { gameType, inviteData } = msg;
@@ -745,6 +783,30 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     type: 'game_join', gameType: 'mystery', peer_id: myId, nick: myNick,
                 }));
                 addMsg('\u2605', '\uD83D\uDD0D Joined Murder Mystery!', 'system');
+                break;
+            case 'monopoly':
+                hasJoinedMono.current = true;
+                monoHostRef.current = inviteData.host;
+                socket.sendRoomMessage(inviteData.room_id, mono.serializeMonopolyAction({
+                    type: 'mono_join', peer_id: myId, nick: myNick,
+                }));
+                addMsg('\u2605', '\u{1F3E0} Joined Monopoly!', 'system');
+                break;
+            case 'cluedo':
+                hasJoinedClue.current = true;
+                clueHostRef.current = inviteData.host;
+                socket.sendRoomMessage(inviteData.room_id, clue.serializeCluedoAction({
+                    type: 'clue_join', peer_id: myId, nick: myNick,
+                }));
+                addMsg('\u2605', '\u{1F50D} Joined Cluedo!', 'system');
+                break;
+            case 'shashn':
+                hasJoinedShashn.current = true;
+                shashnHostRef.current = inviteData.host;
+                socket.sendRoomMessage(inviteData.room_id, shashn.serializeShashnAction({
+                    type: 'shashn_join', peer_id: myId, nick: myNick,
+                }));
+                addMsg('\u2605', '\u{1F0A1} Joined Shashn!', 'system');
                 break;
             case 'tictactoe': {
                 const newTTT = game.createGame(
@@ -1224,11 +1286,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 const isAbMsg = ab.isAndarBaharMessage(msg.data);
                 const isPmMsg = pm.isPolymarketMessage(msg.data);
                 const isMmMsg = mystery.isMysteryMessage(msg.data);
+                const isMonoMsg = mono.isMonopolyMessage(msg.data);
+                const isClueMsg = clue.isCluedoMessage(msg.data);
+                const isShashnMsg = shashn.isShashnMessage(msg.data);
                 const isGameMsg = game.isGameMessage(msg.data);
 
                 // Try custom JSON action first (typing, react, tip, whisper, ticker, screenshot)
                 let customAction = null;
-                if (!isBjMsg && !isRlMsg && !isAbMsg && !isPmMsg && !isMmMsg && !isGameMsg && msg.data?.startsWith('{')) {
+                if (!isBjMsg && !isRlMsg && !isAbMsg && !isPmMsg && !isMmMsg && !isMonoMsg && !isClueMsg && !isShashnMsg && !isGameMsg && msg.data?.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(msg.data);
                         const CUSTOM = ['typing', 'react', 'tip', 'poke', 'screenshot_alert', 'casino_ticker', 'whisper', 'agent_message', 'mention_notify', 'swarm_config', 'context_summary', 'admin_announce', 'ready_up', 'game_new_round', 'game_join', 'admin_adjust_balance', 'admin_adjust_karma', 'admin_setting'];
@@ -1266,6 +1331,21 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     const action = mystery.parseMysteryAction(msg.data);
                     if (action && (action.type === 'mm_start' || !mysteryRef.current || mysteryRef.current.roomId === msg.room_id)) {
                         handleMysteryAction(msg, action);
+                    }
+                } else if (isMonoMsg) {
+                    const action = mono.parseMonopolyAction(msg.data);
+                    if (action && (action.type === 'mono_start' || !monopolyRef.current || monopolyRef.current.roomId === msg.room_id)) {
+                        handleMonopolyAction(msg, action);
+                    }
+                } else if (isClueMsg) {
+                    const action = clue.parseCluedoAction(msg.data);
+                    if (action && (action.type === 'clue_start' || !cluedoRef.current || cluedoRef.current.roomId === msg.room_id)) {
+                        handleCluedoAction(msg, action);
+                    }
+                } else if (isShashnMsg) {
+                    const action = shashn.parseShashnAction(msg.data);
+                    if (action && (action.type === 'shashn_start' || !shashnRef.current || shashnRef.current.roomId === msg.room_id)) {
+                        handleShashnAction(msg, action);
                     }
                 } else if (isCurrentRoom) {
                     const gifMatch = msg.data.match(/^\[GIF\](.+)$/);
@@ -1420,6 +1500,42 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                         if (snapshots.polymarket) {
                             const restored = pm.deserializeGame(snapshots.polymarket);
                             if (restored) setPolymarketGame(restored);
+                        }
+                    }
+                }
+
+                // Monopoly
+                if (monopolyRef.current?.roomId === msg.room_id) {
+                    monoHostRef.current = msg.new_host;
+                    if (msg.new_host === myId) {
+                        addMsg('★', 'You are now the Monopoly host', 'system');
+                        if (snapshots.monopoly) {
+                            const restored = mono.deserializeGame(snapshots.monopoly);
+                            if (restored) setMonopolyGame(restored);
+                        }
+                    }
+                }
+
+                // Cluedo
+                if (cluedoRef.current?.roomId === msg.room_id) {
+                    clueHostRef.current = msg.new_host;
+                    if (msg.new_host === myId) {
+                        addMsg('★', 'You are now the Cluedo host', 'system');
+                        if (snapshots.cluedo) {
+                            const restored = clue.deserializeGame(snapshots.cluedo);
+                            if (restored) setCluedoGame(restored);
+                        }
+                    }
+                }
+
+                // Shashn
+                if (shashnRef.current?.roomId === msg.room_id) {
+                    shashnHostRef.current = msg.new_host;
+                    if (msg.new_host === myId) {
+                        addMsg('★', 'You are now the Shashn host', 'system');
+                        if (snapshots.shashn) {
+                            const restored = shashn.deserializeGame(snapshots.shashn);
+                            if (restored) setShashnGame(restored);
                         }
                     }
                 }
@@ -2243,7 +2359,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const currentRoomName = currentRoom ? rooms.find(r => r.room_id === currentRoom)?.name || 'Unknown Room' : null;
     const balance = myWallet ? wallet.getTotalBalance(myWallet) : 0;
     const myCosmetics = useMemo(() => profile ? getEquippedClasses(profile) : null, [profile]);
-    const anyGameActive = !!(activeGame || blackjackGame || rouletteGame || andarBaharGame || polymarketGame || mysteryGame);
+    const anyGameActive = !!(activeGame || blackjackGame || rouletteGame || andarBaharGame || polymarketGame || mysteryGame || monopolyGame || cluedoGame || shashnGame);
 
     // Safe room leave — don't leave if an active game is using the room
     const safeLeaveRoom = useCallback((roomId) => {
@@ -2296,6 +2412,21 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         mysteryHostRef.current = null;
         hasJoinedMystery.current = false;
     }, [setMysteryAIError]);
+    const closeMono = useCallback(() => {
+        setMonopolyGame(null);
+        monoHostRef.current = null;
+        hasJoinedMono.current = false;
+    }, []);
+    const closeClue = useCallback(() => {
+        setCluedoGame(null);
+        clueHostRef.current = null;
+        hasJoinedClue.current = false;
+    }, []);
+    const closeShashn = useCallback(() => {
+        setShashnGame(null);
+        shashnHostRef.current = null;
+        hasJoinedShashn.current = false;
+    }, []);
     const closeTtt = useCallback(() => setActiveGame(null), []);
     const helpBj = useCallback(() => openHelp('blackjack'), []);
     const helpRl = useCallback(() => openHelp('roulette'), []);
@@ -2669,6 +2800,33 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                             </div>
 
                             <div className="sidebar-group">
+                                <div className="sidebar-group-title">Board Games</div>
+                                <button className="sidebar-btn" onClick={() => {
+                                    const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
+                                    if (!roomId) { addMsg('\u2605', '\u26A0 Select or create a room first', 'system'); return; }
+                                    if (monopolyRef.current) { setSidebarOpen(false); return; }
+                                    startMonopoly(roomId);
+                                    setSidebarOpen(false);
+                                }}>{'\u{1F3E0}'} Monopoly</button>
+
+                                <button className="sidebar-btn" onClick={() => {
+                                    const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
+                                    if (!roomId) { addMsg('\u2605', '\u26A0 Select or create a room first', 'system'); return; }
+                                    if (cluedoRef.current) { setSidebarOpen(false); return; }
+                                    startCluedo(roomId);
+                                    setSidebarOpen(false);
+                                }}>{'\u{1F50D}'} Cluedo</button>
+
+                                <button className="sidebar-btn" onClick={() => {
+                                    const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
+                                    if (!roomId) { addMsg('\u2605', '\u26A0 Select or create a room first', 'system'); return; }
+                                    if (shashnRef.current) { setSidebarOpen(false); return; }
+                                    startShashn(roomId);
+                                    setSidebarOpen(false);
+                                }}>{'\u{1F0A1}'} Shashn</button>
+                            </div>
+
+                            <div className="sidebar-group">
                                 <div className="sidebar-group-title">Social</div>
                                 <button className="sidebar-btn" onClick={() => {
                                     const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
@@ -2960,6 +3118,36 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     isHost={mysteryHostRef.current === myIdRef.current}
                     aiError={mysteryAIError}
                     onClearAIError={() => setMysteryAIError(null)}
+                />
+            )}
+            {monopolyGame && (
+                <MonopolyBoard
+                    game={monopolyGame}
+                    myId={myIdRef.current}
+                    myNick={nickRef.current}
+                    onAction={handleMonoAction}
+                    onClose={closeMono}
+                    isHost={monoHostRef.current === myIdRef.current}
+                />
+            )}
+            {cluedoGame && (
+                <CluedoBoard
+                    game={cluedoGame}
+                    myId={myIdRef.current}
+                    myNick={nickRef.current}
+                    onAction={handleClueAction}
+                    onClose={closeClue}
+                    isHost={clueHostRef.current === myIdRef.current}
+                />
+            )}
+            {shashnGame && (
+                <ShashnBoard
+                    game={shashnGame}
+                    myId={myIdRef.current}
+                    myNick={nickRef.current}
+                    onAction={handleShashnLocalAction}
+                    onClose={closeShashn}
+                    isHost={shashnHostRef.current === myIdRef.current}
                 />
             )}
             </Suspense>
