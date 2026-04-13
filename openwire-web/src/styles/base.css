@@ -171,3 +171,388 @@ body {
 button:active, .sidebar-btn:active, .chip-btn:active {
   transform: scale(0.97);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE-FIRST GLOBAL RESPONSIVE STYLES
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Breakpoint Variables ─────────────────────────── */
+/*
+  sm:  480px  - Large phones
+  md:  768px  - Tablets / large phones landscape
+  lg:  1024px - Small laptops / tablets landscape
+  xl:  1280px - Desktops
+*/
+
+/* ── Global Overflow Prevention ──────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  /* Prevent pull-to-refresh on mobile */
+  overscroll-behavior-y: contain;
+}
+
+#root {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Prevent horizontal scroll on all major containers */
+.app-container,
+.chat-layout,
+.landing,
+.game-overlay,
+.admin-portal,
+.pss-panel,
+.ah-panel,
+.vault-body,
+.dd-card,
+.howtoplay-panel,
+.mystery-table,
+.rl-table,
+.slots-table,
+.bj-table,
+.ab-table,
+.game-card,
+.acp-panel {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* ── Touch-Friendly Tap Targets ──────────────────── */
+/* Minimum 44x44px tap target per WCAG 2.5.5 */
+button,
+.sidebar-btn,
+.chip-btn,
+.hamburger-btn,
+.btn-icon-close,
+.btn-icon-help,
+.admin-btn,
+.dd-drop-btn,
+.dd-vote-btn,
+.invite-toast-actions button,
+.game-invite-join,
+.game-invite-dismiss,
+.acp-add-btn,
+.acp-toggle-track,
+.ready-btn,
+.ab-side-btn,
+.ab-side-btn-small,
+.bj-btn-action,
+.quick-bet-btn,
+.rl-outside-btn,
+.rl-cell,
+.slots-spin-btn,
+.cs-btn,
+.admin-btn-sidebar {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Smaller icon buttons still need touch target padding */
+button[class*="icon"],
+button[class*="close"],
+.btn-logout,
+.hamburger-btn,
+.sidebar-close-btn,
+.poke-btn,
+.whisper-btn,
+.tip-btn,
+.btn-account-history,
+.btn-agent-panel,
+.btn-mute-agents {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Typography Scaling on Mobile ─────────────────── */
+@media (max-width: 480px) {
+  :root {
+    --text-xs:  0.65rem;
+    --text-sm:  0.72rem;
+    --text-base: 0.8rem;
+    --text-md:  0.88rem;
+    --text-lg:  1rem;
+    --text-xl:  1.15rem;
+  }
+}
+
+/* ── Global Mobile Grid Adjustments ─────────────── */
+@media (max-width: 768px) {
+  /* Chat layout */
+  .chat-layout {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto auto 1fr auto auto auto !important;
+  }
+
+  .sidebar {
+    display: none !important;
+  }
+
+  .sidebar.mobile-open {
+    display: flex !important;
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    background: var(--bg-dark);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sidebar.mobile-open .sidebar-close-btn {
+    display: block !important;
+  }
+
+  .hamburger-btn {
+    display: flex !important;
+  }
+
+  .chat-header h1 {
+    font-size: 0.95rem;
+    flex-shrink: 0;
+  }
+
+  .header-context {
+    display: none !important;
+  }
+
+  .gif-picker {
+    width: calc(100vw - 2rem);
+    max-width: 380px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .invite-toasts {
+    right: 0.75rem;
+    left: 0.75rem;
+    max-width: none;
+  }
+
+  .game-challenge {
+    min-width: 280px;
+    width: calc(100vw - 3rem);
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+@media (min-width: 769px) {
+  .hamburger-btn {
+    display: none !important;
+  }
+
+  .sidebar-close-btn {
+    display: none !important;
+  }
+}
+
+/* ── Floating Chat Mobile ───────────────────────── */
+@media (max-width: 700px) {
+  .floating-chat-panel {
+    width: calc(100vw - 2rem);
+    max-width: 360px;
+    left: 1rem;
+    right: 1rem;
+  }
+
+  .floating-chat-btn {
+    bottom: 1rem;
+    left: 1rem;
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* ── Mobile Font Sizes ───────────────────────────── */
+@media (max-width: 480px) {
+  .landing-logo {
+    font-size: 2.2rem !important;
+  }
+
+  .landing-card {
+    padding: 1.25rem !important;
+    border-radius: var(--radius) !important;
+  }
+
+  .landing-card h2 {
+    font-size: 1.1rem !important;
+  }
+
+  .landing-sub {
+    font-size: 0.9rem !important;
+  }
+
+  /* Chat messages */
+  .msg {
+    font-size: 0.88rem !important;
+  }
+
+  .msg .msg-content {
+    max-width: 85% !important;
+  }
+
+  /* Chat input */
+  .chat-input {
+    padding: 0.75rem 1rem !important;
+    gap: 0.5rem !important;
+  }
+
+  .chat-input input {
+    padding: 0.7rem 1rem !important;
+    font-size: 0.9rem !important;
+  }
+
+  .chat-input button {
+    padding: 0.7rem 1rem !important;
+    min-width: 44px;
+  }
+
+  /* Message bubbles */
+  .msg.self .msg-content,
+  .msg.peer .msg-content {
+    max-width: 82% !important;
+    padding: 0.3rem 0.6rem !important;
+  }
+
+  /* Invite toasts */
+  .invite-toast {
+    padding: 0.85rem 1rem !important;
+  }
+
+  /* Sidebar */
+  .sidebar-section {
+    padding: 1rem !important;
+  }
+
+  /* Wallet */
+  .sidebar-wallet {
+    margin: 0.5rem !important;
+  }
+
+  /* Overlay panels */
+  .game-card {
+    padding: 1.5rem !important;
+    border-radius: var(--radius) !important;
+    min-width: unset !important;
+    width: calc(100vw - 2rem) !important;
+    max-height: 92dvh !important;
+  }
+
+  /* Admin portal */
+  .admin-portal {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+  }
+
+  /* Account history */
+  .ah-panel {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    border-radius: 0 !important;
+  }
+
+  /* Post session */
+  .pss-panel {
+    width: calc(100vw - 2rem) !important;
+    max-width: 400px !important;
+    padding: 1.25rem !important;
+  }
+
+  /* Vault panel */
+  .vault-body {
+    padding: 0.75rem !important;
+  }
+
+  /* Dead drops */
+  .dd-compose textarea {
+    min-height: 80px;
+  }
+
+  /* How to play */
+  .howtoplay-panel {
+    width: calc(100vw - 1.5rem) !important;
+    padding: 1rem !important;
+    border-radius: var(--radius) !important;
+  }
+
+  /* Slots table */
+  .slots-table {
+    width: calc(100vw - 1rem) !important;
+    padding: 0.75rem !important;
+    border-radius: var(--radius) !important;
+  }
+
+  /* Mystery table */
+  .mystery-table {
+    border-radius: 0 !important;
+    width: 100vw !important;
+  }
+
+  /* Roulette table */
+  .rl-table {
+    width: 100vw !important;
+    border-radius: 0 !important;
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  /* Blackjack table */
+  .bj-table {
+    min-width: unset !important;
+    width: 100vw !important;
+    border-radius: 0 !important;
+    padding: 1rem !important;
+  }
+
+  /* Andar Bahar table */
+  .ab-table {
+    width: 100vw !important;
+    border-radius: 0 !important;
+    padding: 0.75rem !important;
+  }
+
+  /* ACP panel */
+  .acp-panel {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    border-radius: 0 !important;
+  }
+
+  /* Admin gate card */
+  .admin-gate-card {
+    padding: 2rem !important;
+    min-width: unset !important;
+    width: calc(100vw - 3rem) !important;
+  }
+}
+
+/* ── Tablet Adjustments ──────────────────────────── */
+@media (min-width: 481px) and (max-width: 768px) {
+  .bj-players-area {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* ── Print: hide mobile-only elements ─────────── */
+@media print {
+  .hamburger-btn,
+  .sidebar-close-btn,
+  .mobile-open {
+    display: none !important;
+  }
+}

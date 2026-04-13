@@ -246,3 +246,36 @@
     max-height: 6rem;
   }
 }
+
+@media (max-width: 480px) {
+  .slots-table {
+    gap: 0.5rem;
+    padding: 0.6rem;
+  }
+
+  .slots-reels {
+    gap: 0.4rem;
+    padding: 0.6rem;
+  }
+
+  .slots-reel {
+    font-size: clamp(2.2rem, 10vw, 3.5rem);
+    height: clamp(55px, 12vw, 80px);
+  }
+
+  .slots-spin-btn {
+    padding: 0.7rem;
+    font-size: 1.05rem;
+    min-height: 52px;
+  }
+
+  .slots-payout-table {
+    font-size: 0.7rem;
+    max-height: 5rem;
+  }
+
+  .slots-history-pip {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.3rem;
+  }
+}

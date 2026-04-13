@@ -1655,44 +1655,90 @@
 
 @media (max-width: 768px) {
   .chat-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
   }
 
   .sidebar {
-    display: none;
+    display: none !important;
   }
 
   .sidebar.mobile-open {
-    display: flex;
+    display: flex !important;
     position: fixed;
     inset: 0;
     z-index: 500;
     background: var(--bg-dark);
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .sidebar.mobile-open .sidebar-close-btn {
-    display: block;
+    display: block !important;
   }
 
   .hamburger-btn {
-    display: block;
+    display: flex !important;
   }
 
   .chat-header h1 {
     font-size: 0.95rem;
+    flex-shrink: 0;
   }
 
   .header-context {
-    display: none;
+    display: none !important;
   }
 
   .chat-input {
-    grid-column: 1;
+    grid-column: 1 !important;
+    padding: 0.75rem 1rem !important;
+  }
+
+  .chat-input input {
+    font-size: 0.9rem;
+    padding: 0.7rem 1rem;
+  }
+
+  .chat-input button {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.7rem 1rem;
   }
 
   .gif-picker {
-    width: calc(100vw - 3rem);
+    width: calc(100vw - 2rem);
+    max-width: 380px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .messages-area {
+    padding: 1rem !important;
+  }
+
+  .msg {
+    font-size: 0.88rem;
+  }
+
+  .live-ticker {
+    font-size: 0.7rem;
+    min-height: 26px;
+    max-height: 26px;
+  }
+
+  .invite-toasts {
+    right: 0.75rem;
+    left: 0.75rem;
+    max-width: none;
+  }
+
+  .invite-toast {
+    width: 100%;
+  }
+
+  .game-challenge {
+    min-width: 280px;
+    width: calc(100vw - 2rem);
     left: 50%;
     transform: translateX(-50%);
   }
@@ -1700,17 +1746,52 @@
 
 @media (min-width: 769px) {
   .hamburger-btn {
-    display: none;
+    display: none !important;
   }
 
   .sidebar-close-btn {
-    display: none;
+    display: none !important;
   }
 }
 
 @media (max-width: 700px) {
   .floating-chat-panel {
-    width: calc(100vw - 3rem);
+    width: calc(100vw - 2rem) !important;
+    max-width: 360px;
+    left: 1rem;
+    right: 1rem;
+  }
+
+  .floating-chat-btn {
+    bottom: 1rem;
+    left: 1rem;
+  }
+}
+
+/* ── Mobile Chat Input Fixed at Bottom ─────── */
+@media (max-width: 768px) {
+  .chat-input {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    background: rgba(26, 26, 26, 0.98);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-scrolling: touch;
+  }
+
+  .chat-layout {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .messages-area {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 

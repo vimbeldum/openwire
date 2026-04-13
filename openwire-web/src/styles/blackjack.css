@@ -659,17 +659,91 @@
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .bj-table {
-    min-width: 320px;
-    padding: 1.25rem;
+    min-width: unset;
+    padding: 1rem;
   }
 
   .bj-players-area {
     grid-template-columns: 1fr;
   }
+
+  .bj-card-pos {
+    margin-right: -20px;
+  }
+
+  .bj-cards-fan {
+    gap: 4px;
+  }
+
+  .bj-bet-row {
+    gap: 0.75rem;
+  }
+
+  .bj-btn-action {
+    padding: 0.65rem 1.5rem;
+    font-size: 0.85rem;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .bj-play-controls {
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .bj-phase-msg {
+    font-size: 0.8rem;
+    padding: 0.4rem 1rem;
+  }
+
+  .bj-dealer-area {
+    padding: 0.5rem;
+  }
+
+  .bj-hand-zone {
+    padding: 0.6rem;
+  }
 }
 
 @media (max-width: 480px) {
   .bj-table {
-    min-width: 290px;
+    padding: 0.75rem;
+  }
+
+  .bj-card {
+    width: 44px;
+    height: 62px;
+    font-size: 0.75rem;
+  }
+
+  .bj-card-pos {
+    margin-right: -18px;
+  }
+
+  .bj-card-center {
+    font-size: 1.2rem;
+  }
+
+  .bj-btn-action {
+    padding: 0.6rem 1.25rem;
+    font-size: 0.8rem;
+    min-height: 48px;
+    min-width: 48px;
+    border-radius: 100px;
+  }
+
+  .bj-hand-header {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .bj-hand-name {
+    font-size: 0.75rem;
+  }
+
+  .bj-payout-chip {
+    font-size: 0.72rem;
+    padding: 0.25rem 0.5rem;
   }
 }

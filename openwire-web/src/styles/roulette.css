@@ -617,16 +617,16 @@
 /* ── Roulette responsive ─── */
 @media (max-width: 700px) {
   .rl-wheel-container {
-    width: 180px;
-    height: 180px;
+    width: 140px;
+    height: 140px;
   }
 
   .rl-left-col {
-    flex: 0 0 210px;
+    flex: 0 0 160px;
   }
 
   .rl-wheel-section {
-    padding-top: 26px;
+    padding-top: 20px;
   }
 
   .rl-wheel-info {
@@ -634,30 +634,123 @@
   }
 
   .rl-cell {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
+    min-height: 36px;
+  }
+
+  .rl-zero-vert {
+    font-size: 1rem;
+    min-height: 36px;
+  }
+
+  .rl-outside-btn {
+    font-size: 0.65rem;
+    padding: 0.2rem;
+    min-height: 36px;
+  }
+
+  .rl-result-num {
+    font-size: 1.2rem;
+  }
+
+  .rl-payout-result {
+    font-size: 0.95rem;
+  }
+
+  .rl-history {
+    max-height: 36px;
+  }
+
+  .rl-hist-chip {
+    min-width: 24px;
+    height: 24px;
+    font-size: 0.65rem;
   }
 }
 
 @media (max-height: 600px) {
   .rl-wheel-container {
-    width: 140px;
-    height: 140px;
+    width: 120px;
+    height: 120px;
   }
 
   .rl-wheel-section {
-    padding-top: 20px;
+    padding-top: 16px;
   }
 
   .rl-cell {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
+    min-height: 32px;
   }
 
   .rl-zero-row {
-    height: 1.8em;
+    height: 1.6em;
   }
 
   .rl-grid-vertical > .rl-grid-row {
-    min-height: 1.8em;
+    min-height: 1.6em;
+  }
+}
+
+/* ── Mobile portrait roulette ─── */
+@media (max-width: 480px) {
+  .rl-body {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .rl-left-col {
+    flex: 0 0 auto;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .rl-wheel-container {
+    width: 100px;
+    height: 100px;
+  }
+
+  .rl-wheel-info {
+    flex: 1;
+    align-items: flex-start;
+  }
+
+  .rl-wheel-section {
+    padding-top: 0;
+    margin-bottom: 0;
+  }
+
+  .rl-right-col {
+    flex: 1;
+  }
+
+  .rl-cell {
+    font-size: 0.7rem;
+    min-height: 44px;
+  }
+
+  .rl-outside-btn {
+    min-height: 44px;
+    font-size: 0.65rem;
+  }
+
+  .rl-outside-bets {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .rl-outside-row {
+    flex: 1;
+  }
+
+  .rl-my-bets {
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 }
 

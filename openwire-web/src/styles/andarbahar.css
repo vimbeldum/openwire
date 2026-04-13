@@ -539,3 +539,149 @@
   border-radius: 2px;
   transition: width 0.25s linear;
 }
+
+/* ── Andar Bahar Mobile Responsive ─────────────────────── */
+@media (max-width: 768px) {
+  .ab-table {
+    width: 100vw;
+    border-radius: 0;
+    padding: 0.75rem 0.5rem;
+  }
+
+  .ab-trump-area {
+    gap: 0.75rem;
+  }
+
+  .ab-trump,
+  .ab-trump-placeholder {
+    width: 60px;
+    height: 84px;
+    font-size: 1.8rem;
+  }
+
+  .ab-phase-badge-col {
+    min-width: 100px;
+    padding-top: 1rem;
+  }
+
+  .ab-phase-badge {
+    font-size: 0.65rem;
+    padding: 0.35rem 0.75rem;
+  }
+
+  .ab-piles-row {
+    gap: 0.5rem;
+  }
+
+  .ab-pile-zone {
+    padding: 0.5rem;
+  }
+
+  .ab-pile-header {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .ab-pile-name {
+    font-size: 0.7rem;
+  }
+
+  .ab-cards-fan {
+    gap: 2px;
+    min-height: 50px;
+  }
+
+  .ab-side-btns {
+    gap: 0.5rem;
+  }
+
+  .ab-side-btn {
+    padding: 0.7rem 0.75rem;
+    min-height: 72px;
+  }
+
+  .ab-btn-top {
+    font-size: 0.9rem;
+  }
+
+  .ab-btn-sub {
+    font-size: 0.65rem;
+  }
+
+  .ab-side-btn-small {
+    padding: 0.3rem;
+    min-height: 44px;
+  }
+
+  .ab-bet-controls {
+    padding: 0.4rem;
+  }
+
+  .ab-bet-placed-msg {
+    font-size: 0.78rem;
+    padding: 0.4rem;
+  }
+
+  .ab-my-result {
+    font-size: 0.95rem;
+  }
+
+  .ab-countdown {
+    min-width: 120px;
+  }
+
+  .ab-countdown-label {
+    font-size: 0.65rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .ab-table {
+    padding: 0.5rem 0.35rem;
+  }
+
+  .ab-trump-area {
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .ab-trump,
+  .ab-trump-placeholder {
+    width: 52px;
+    height: 72px;
+    font-size: 1.5rem;
+  }
+
+  .ab-phase-badge-col {
+    min-width: 80px;
+    padding-top: 0.75rem;
+  }
+
+  .ab-piles-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
+  }
+
+  .ab-pile-zone {
+    padding: 0.4rem;
+  }
+
+  .ab-side-btn {
+    padding: 0.6rem 0.5rem;
+    min-height: 64px;
+  }
+
+  .ab-btn-top {
+    font-size: 0.85rem;
+  }
+
+  .ab-payout-note {
+    font-size: 0.6rem;
+  }
+
+  .ab-bet-pill {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.45rem;
+  }
+}
