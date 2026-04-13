@@ -1,0 +1,12 @@
+var e=`/api/gemini`,t=/think|reasoning|deepseek-r1|qwq/i;async function n(){let t=new AbortController,n=setTimeout(()=>t.abort(),15e3),r;try{r=await fetch(e,{signal:t.signal})}finally{clearTimeout(n)}if(!r.ok)throw await r.text().catch(()=>``),Error(`Gemini model fetch failed: ${r.status}`);return((await r.json()).models||[]).filter(e=>e.supportedGenerationMethods?.includes(`generateContent`)&&!e.name?.includes(`embedding`)).map(e=>({id:e.name?.replace(`models/`,``)||e.name,name:e.displayName||e.name,context_length:e.inputTokenLimit||0,outputTokenLimit:e.outputTokenLimit||0,_provider:`gemini`})).sort((e,t)=>(t.context_length||0)-(e.context_length||0))}function r(e){return[e.name||e.id,e.context_length?`${Math.round(e.context_length/1e3)}k`:``].filter(Boolean).join(` | `)}var i=typeof localStorage<`u`&&localStorage.getItem(`openwire_debug`)===`true`,a=3e4;async function o(n,r,o,s=120){let c=[],l=r+`
+
+Reminder: Roman-script Hinglish only. No Devanagari. 1-2 short sentences max. No emoji. You MAY use *asterisks* ONLY for physical actions (e.g., *slaps him*, *runs away*). Always finish your sentence completely — never stop mid-word or mid-sentence.`,u=t.test(n)?l:l+`
+
+---
+
+`+l+`
+
+---
+
+`+l,d=o.map(e=>({role:e.role===`assistant`?`model`:`user`,content:e.content}));[{role:`user`,content:u},...d].forEach(e=>{let t=e.role===`model`?`model`:`user`,n=c[c.length-1];n&&n.role===t?n.parts[0].text+=`
+`+e.content:c.push({role:t,parts:[{text:e.content}]})});let f={model:n,contents:c,generationConfig:{maxOutputTokens:s||200,temperature:.78}};i&&console.log(`[Gemini] Request:`,{model:n,contextCount:o.length,maxTokens:s});let p=new AbortController,m=setTimeout(()=>p.abort(),a),h;try{h=await fetch(e,{method:`POST`,headers:{"Content-Type":`application/json`},body:JSON.stringify(f),signal:p.signal})}finally{clearTimeout(m)}if(!h.ok){let e=await h.json().catch(()=>({})),t=e?.error?.message||`HTTP ${h.status}`;i&&console.error(`[Gemini] Error:`,h.status,e);let n=Error(t);throw n.status=h.status,n}let g=await h.json(),_=g.candidates?.[0]?.content?.parts?.[0]?.text?.trim();return i&&(console.log(`[Gemini] Response:`,{model:n,text:_||`(empty)`}),_||console.warn(`[Gemini] Empty response! Full data:`,g)),_||null}export{n as fetchGeminiModels,r as formatGeminiLabel,o as generateGeminiMessage};

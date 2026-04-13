@@ -1,0 +1,9 @@
+var e=`/api/qwen`,t=/think|reasoning|deepseek-r1|qwq/i;async function n(){let t=new AbortController,n=setTimeout(()=>t.abort(),15e3),r;try{r=await fetch(e,{signal:t.signal})}finally{clearTimeout(n)}if(!r.ok)throw await r.text().catch(()=>``),Error(`Qwen model fetch failed: ${r.status}`);return((await r.json()).models||[]).map(e=>({id:e.id,name:e.name||e.id,context_length:e.context_length||0,_provider:`qwen`}))}function r(e){return[e.name||e.id,e.context_length?`${Math.round(e.context_length/1e3)}k`:``].filter(Boolean).join(` | `)}var i=typeof localStorage<`u`&&localStorage.getItem(`openwire_debug`)===`true`,a=3e4;async function o(n,r,o,s=120){let c=r+`
+
+Reminder: Roman-script Hinglish only. No Devanagari. 1-2 short sentences max. No emoji. You MAY use *asterisks* ONLY for physical actions (e.g., *slaps him*, *runs away*). Always finish your sentence completely — never stop mid-word or mid-sentence.`,l={model:n,messages:[{role:`system`,content:t.test(n)?c:c+`
+
+[REINFORCEMENT]
+`+c+`
+
+[REINFORCEMENT]
+`+c},...o.map(e=>({role:e.role===`model`?`assistant`:e.role,content:e.content}))],max_tokens:s||200,temperature:.78};i&&console.log(`[Qwen] Request:`,{model:n,contextCount:o.length,maxTokens:s});let u=new AbortController,d=setTimeout(()=>u.abort(),a),f;try{f=await fetch(e,{method:`POST`,headers:{"Content-Type":`application/json`},body:JSON.stringify(l),signal:u.signal})}finally{clearTimeout(d)}if(!f.ok){let e=await f.json().catch(()=>({})),t=e?.error?.message||`HTTP ${f.status}`;i&&console.error(`[Qwen] Error:`,f.status,e);let n=Error(t);throw n.status=f.status,n}let p=await f.json(),m=p.choices?.[0]?.message?.content?.trim();return i&&(console.log(`[Qwen] Response:`,{model:n,text:m||`(empty)`}),m||console.warn(`[Qwen] Empty response! Full data:`,p)),m||null}export{n as fetchQwenModels,r as formatQwenLabel,o as generateQwenMessage};

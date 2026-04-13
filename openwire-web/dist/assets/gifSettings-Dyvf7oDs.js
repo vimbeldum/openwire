@@ -1,0 +1,1 @@
+var e=`openwire:gif_provider`;function t(t){try{localStorage.setItem(e,t)}catch{}}function n(){try{return localStorage.getItem(e)||`giphy`}catch{return`giphy`}}export{t as n,n as t};
