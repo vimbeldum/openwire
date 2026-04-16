@@ -103,6 +103,30 @@ export default function useMonopolyGame(deps) {
                 });
                 break;
             }
+            case 'mono_jailroll': {
+                if (!amIHost(monoHostRef.current)) break;
+                setMonopolyGame(prev => {
+                    if (!prev) return prev;
+                    const updated = mono.jailRoll(prev);
+                    setTimeout(() => {
+                        socket.sendRoomMessage(updated.roomId, mono.serializeMonopolyAction({ type: 'mono_state', state: mono.serializeGame(updated) }));
+                    }, 0);
+                    return updated;
+                });
+                break;
+            }
+            case 'mono_escapejail': {
+                if (!amIHost(monoHostRef.current)) break;
+                setMonopolyGame(prev => {
+                    if (!prev) return prev;
+                    const updated = mono.escapeJail(prev);
+                    setTimeout(() => {
+                        socket.sendRoomMessage(updated.roomId, mono.serializeMonopolyAction({ type: 'mono_state', state: mono.serializeGame(updated) }));
+                    }, 0);
+                    return updated;
+                });
+                break;
+            }
         }
     }, [addMsg, amIHost]);
 
@@ -134,7 +158,7 @@ export default function useMonopolyGame(deps) {
 
         // Non-host sends actions to host
         if (!amIHost(monoHostRef.current)) {
-            if (action.type === 'roll' || action.type === 'buy' || action.type === 'auction' || action.type === 'endturn') {
+            if (action.type === 'roll' || action.type === 'buy' || action.type === 'auction' || action.type === 'endturn' || action.type === 'jailroll' || action.type === 'escapejail') {
                 socket.sendRoomMessage(game.roomId, mono.serializeMonopolyAction({
                     type: `mono_${action.type}`,
                     peer_id: myId,
@@ -159,6 +183,12 @@ export default function useMonopolyGame(deps) {
                 break;
             case 'endturn':
                 newGame = mono.endTurn(game);
+                break;
+            case 'jailroll':
+                newGame = mono.jailRoll(game);
+                break;
+            case 'escapejail':
+                newGame = mono.escapeJail(game);
                 break;
             default:
                 return;

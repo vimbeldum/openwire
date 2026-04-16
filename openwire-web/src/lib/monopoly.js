@@ -149,6 +149,7 @@ function getRailroadRent(ownerId, players) {
         const prop = getPropertyById(pid);
         return prop?.group === 'railroad';
     }).length;
+    if (railroadsOwned === 0) return 0;
     return 25 * Math.pow(2, railroadsOwned - 1);
 }
 
@@ -175,6 +176,7 @@ export function createMonopoly(roomId) {
         },
         dice: [0, 0],
         diceRolled: false,
+        doublesCount: 0,
         turnNumber: 1,
         phaseTimeout: null,
         winner: null,
@@ -228,8 +230,29 @@ export function roll(game) {
     if (game.phase !== 'rolling') return game;
     if (game.diceRolled) return game;
 
+    // Check if already rolled doubles this turn (shouldn't happen but safety check)
     const dice = rollDice();
     const isDouble = dice[0] === dice[1];
+    const currentDoubles = game.doublesCount || 0;
+
+    // Three doubles in a row = go to jail
+    if (isDouble && currentDoubles >= 2) {
+        const newGame = {
+            ...game,
+            players: game.players.map((p, i) =>
+                i === game.currentPlayer
+                    ? { ...p, position: 10, inJail: true, diceRolled: true }
+                    : p
+            ),
+            dice,
+            diceRolled: true,
+            doublesCount: 0,
+            phase: 'jail',
+            log: [...game.log, `${player.nick} rolled 3 doubles and must go to jail!`],
+        };
+        return newGame;
+    }
+
     let newPosition = (player.position + dice[0] + dice[1]) % 40;
     let money = player.money;
 
@@ -247,10 +270,17 @@ export function roll(game) {
         ),
         dice,
         diceRolled: true,
+        doublesCount: isDouble ? currentDoubles + 1 : 0,
     };
 
     const space = BOARD_SPACES[newPosition];
     newGame = handleSpace(newGame, space, dice[0] + dice[1]);
+
+    // If doubles were rolled, allow another roll instead of ending turn
+    if (isDouble && newGame.phase === 'rolling' && !newGame.players[newGame.currentPlayer].inJail) {
+        newGame.diceRolled = false;
+        newGame.log = [...newGame.log, `${player.nick} rolled a double! Roll again.`];
+    }
 
     return newGame;
 }
@@ -286,7 +316,7 @@ function handleSpace(game, space, diceSum) {
                     };
                     // Check bankruptcy
                     const updatedPlayer = game.players[game.currentPlayer];
-                    if (updatedPlayer.money <= 0) {
+                    if (updatedPlayer.money < 0) {
                         return handleBankruptcy(game, game.currentPlayer);
                     }
                 }
@@ -321,6 +351,55 @@ function handleSpace(game, space, diceSum) {
                     diceRolled: false,
                 };
             }
+            if (card === 'Go back 3 spaces') {
+                const newPos = (player.position - 3 + 40) % 40;
+                const newSpace = BOARD_SPACES[newPos];
+                return {
+                    ...game,
+                    players: game.players.map((p, i) =>
+                        i === game.currentPlayer ? { ...p, position: newPos } : p
+                    ),
+                    phase: 'rolling',
+                    diceRolled: false,
+                };
+            }
+            if (card === 'Advance to nearest utility') {
+                // Utilities are at positions 12 and 28
+                const targetPos = player.position < 12 ? 12 : (player.position < 28 ? 28 : 12);
+                const newPos = targetPos;
+                let newMoney = player.money;
+                if (newPos < player.position) newMoney += 200;
+                const newSpace = BOARD_SPACES[newPos];
+                const newGame2 = {
+                    ...game,
+                    players: game.players.map((p, i) =>
+                        i === game.currentPlayer ? { ...p, position: newPos, money: newMoney } : p
+                    ),
+                };
+                return handleSpace(newGame2, newSpace, diceSum);
+            }
+            if (card === 'Advance to nearest railroad') {
+                // Railroads are at positions 5, 15, 25, 35
+                const railroads = [5, 15, 25, 35];
+                let targetPos = railroads[0];
+                for (const rr of railroads) {
+                    if (rr > player.position) {
+                        targetPos = rr;
+                        break;
+                    }
+                    targetPos = rr; // wrap around to first
+                }
+                let newMoney = player.money;
+                if (targetPos < player.position) newMoney += 200;
+                const newSpace = BOARD_SPACES[targetPos];
+                const newGame2 = {
+                    ...game,
+                    players: game.players.map((p, i) =>
+                        i === game.currentPlayer ? { ...p, position: targetPos, money: newMoney } : p
+                    ),
+                };
+                return handleSpace(newGame2, newSpace, diceSum);
+            }
             return { ...game, phase: 'rolling', diceRolled: false };
         }
         case 'community': {
@@ -353,7 +432,7 @@ function handleSpace(game, space, diceSum) {
                 log: [...game.log, `${player.nick} paid $${owed} tax`],
             };
             const updatedPlayer = game.players[game.currentPlayer];
-            if (updatedPlayer.money <= 0) {
+            if (updatedPlayer.money < 0) {
                 return handleBankruptcy(game, game.currentPlayer);
             }
             return { ...game, phase: 'rolling', diceRolled: false };
@@ -472,7 +551,126 @@ export function auctionProperty(game) {
 }
 
 export function endTurn(game) {
+    // If in jail phase and not escaped, increment jail turns
+    const player = game.players[game.currentPlayer];
+    if (player?.inJail && game.phase === 'jail') {
+        const jailTurns = (player.jailTurns || 0) + 1;
+        game = {
+            ...game,
+            players: game.players.map((p, i) =>
+                i === game.currentPlayer ? { ...p, jailTurns } : p
+            ),
+        };
+        // After 3 turns in jail, must pay $50 to escape
+        if (jailTurns >= 3) {
+            const money = player.money - 50;
+            if (money < 0) {
+                return handleBankruptcy(game, game.currentPlayer);
+            }
+            game = {
+                ...game,
+                players: game.players.map((p, i) =>
+                    i === game.currentPlayer
+                        ? { ...p, money, inJail: false, jailTurns: 0 }
+                        : p
+                ),
+                log: [...game.log, `${player.nick} served 3 jail turns and paid $50 to escape`],
+            };
+        }
+    }
     return advanceTurn(game);
+}
+
+export function escapeJail(game) {
+    const player = game.players[game.currentPlayer];
+    if (!player || player.eliminated || player.bankrupt) return game;
+    if (!player.inJail || game.phase !== 'jail') return game;
+
+    // Pay $50 to escape
+    const money = player.money - 50;
+    if (money < 0) return handleBankruptcy(game, game.currentPlayer);
+
+    return {
+        ...game,
+        players: game.players.map((p, i) =>
+            i === game.currentPlayer
+                ? { ...p, money, inJail: false, jailTurns: 0 }
+                : p
+        ),
+        phase: 'rolling',
+        diceRolled: false,
+        log: [...game.log, `${player.nick} paid $50 to escape jail`],
+    };
+}
+
+export function jailRoll(game) {
+    const player = game.players[game.currentPlayer];
+    if (!player || player.eliminated || player.bankrupt) return game;
+    if (!player.inJail || game.phase !== 'jail') return game;
+
+    const dice = rollDice();
+    const isDouble = dice[0] === dice[1];
+
+    // Double allows escape from jail
+    if (isDouble) {
+        let newPosition = (player.position + dice[0] + dice[1]) % 40;
+        let money = player.money;
+        if (newPosition < player.position) money += 200;
+
+        let newGame = {
+            ...game,
+            players: game.players.map((p, i) =>
+                i === game.currentPlayer
+                    ? { ...p, position: newPosition, money, inJail: false, jailTurns: 0 }
+                    : p
+            ),
+            dice,
+            diceRolled: true,
+            phase: 'rolling',
+            log: [...game.log, `${player.nick} rolled double ${dice[0]} and escaped jail!`],
+        };
+
+        const space = BOARD_SPACES[newPosition];
+        newGame = handleSpace(newGame, space, dice[0] + dice[1]);
+        return newGame;
+    }
+
+    // Failed to escape - increment jail turns
+    const jailTurns = (player.jailTurns || 0) + 1;
+    let logMsg = `${player.nick} rolled ${dice[0]}+${dice[1]} but didn't get double. Jail turn ${jailTurns}/3`;
+
+    let newGame = {
+        ...game,
+        players: game.players.map((p, i) =>
+            i === game.currentPlayer
+                ? { ...p, jailTurns, dice: [dice[0], dice[1]] }
+                : p
+        ),
+        dice,
+        diceRolled: true,
+        log: [...game.log, logMsg],
+    };
+
+    // After 3 turns, must pay $50 to get out
+    if (jailTurns >= 3) {
+        const money = player.money - 50;
+        if (money < 0) {
+            return handleBankruptcy(newGame, game.currentPlayer);
+        }
+        newGame = {
+            ...newGame,
+            players: newGame.players.map((p, i) =>
+                i === game.currentPlayer
+                    ? { ...p, money, inJail: false, jailTurns: 0 }
+                    : p
+            ),
+            phase: 'rolling',
+            diceRolled: false,
+            log: [...newGame.log, `${player.nick} served 3 jail turns and paid $50 to escape`],
+        };
+    }
+
+    return advanceTurn(newGame);
 }
 
 function advanceTurn(game) {
@@ -487,7 +685,7 @@ function advanceTurn(game) {
         attempts++;
     }
 
-    if (nextIdx <= currentIdx) {
+    if (nextIdx < currentIdx) {
         turnNum++;
     }
 
@@ -497,6 +695,7 @@ function advanceTurn(game) {
         turnNumber: turnNum,
         phase: 'rolling',
         diceRolled: false,
+        doublesCount: 0,
     };
 }
 

@@ -377,7 +377,7 @@ export default memo(function MonopolyBoard({
                             )}
 
                             <div className="mono-action-area">
-                                {game.phase === 'rolling' && isMyTurn && !game.diceRolled && (
+                                {game.phase === 'rolling' && isMyTurn && !game.diceRolled && !currentPlayer?.inJail && (
                                     <button 
                                         className="mono-btn mono-roll-btn" 
                                         onClick={handleRoll}
@@ -385,6 +385,31 @@ export default memo(function MonopolyBoard({
                                     >
                                         🎲 Roll Dice
                                     </button>
+                                )}
+
+                                {game.phase === 'jail' && isMyTurn && (
+                                    <>
+                                        <button 
+                                            className="mono-btn mono-roll-btn" 
+                                            onClick={() => onAction({ type: 'jailroll' })}
+                                            disabled={rolling}
+                                        >
+                                            🎲 Roll for Double
+                                        </button>
+                                        <button 
+                                            className="mono-btn mono-buy-btn" 
+                                            onClick={() => onAction({ type: 'escapejail' })}
+                                            disabled={currentPlayer?.money < 50}
+                                        >
+                                            Pay $50 to Escape
+                                        </button>
+                                        <button 
+                                            className="mono-btn mono-end-btn" 
+                                            onClick={() => onAction({ type: 'endturn' })}
+                                        >
+                                            End Turn (Stay in Jail)
+                                        </button>
+                                    </>
                                 )}
 
                                 {game.phase === 'property' && isMyTurn && (
@@ -404,7 +429,7 @@ export default memo(function MonopolyBoard({
                                     </>
                                 )}
 
-                                {game.phase === 'rolling' && isMyTurn && game.diceRolled && (
+                                {game.phase === 'rolling' && isMyTurn && game.diceRolled && !currentPlayer?.inJail && (
                                     <button 
                                         className="mono-btn mono-end-btn" 
                                         onClick={() => onAction({ type: 'endturn' })}
