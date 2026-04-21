@@ -82,7 +82,7 @@ dirs-next = "2"
 reqwest = { version = "0.12", features = ["json"] }
 
 # WebSocket client for relay bridge
-tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
+tokio-tungstenite = { version = "0.29", features = ["native-tls"] }
 tungstenite = "0.26"
 
 [profile.release]
