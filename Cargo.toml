@@ -38,7 +38,7 @@ ratatui = "0.30"
 crossterm = "0.29"
 
 # Image support (optional)
-ratatui-image = { version = "1", optional = true }
+ratatui-image = { version = "10", optional = true }
 image = { version = "0.25", optional = true }
 
 # Web framework
