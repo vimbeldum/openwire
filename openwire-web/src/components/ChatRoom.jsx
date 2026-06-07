@@ -2450,6 +2450,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const helpAb = useCallback(() => openHelp('andarbahar'), []);
     const helpPm = useCallback(() => openHelp('polymarket'), []);
     const helpMm = useCallback(() => openHelp('mystery'), []);
+    const helpMono = useCallback(() => openHelp('monopoly'), []);
     const helpTtt = useCallback(() => openHelp('tictactoe'), []);
     const readyBj = useCallback(() => handleReadyUp('blackjack'), [handleReadyUp]);
     const readyRl = useCallback(() => handleReadyUp('roulette'), [handleReadyUp]);
@@ -3118,6 +3119,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     myNick={nickRef.current}
                     onAction={handleMonoAction}
                     onClose={closeMono}
+                    onHelp={helpMono}
                     isHost={monoHostRef.current === myIdRef.current}
                 />
             )}

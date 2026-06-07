@@ -1,0 +1,52 @@
+# Page snapshot
+
+```yaml
+- main "Join a room fast, keep the conversation primary." [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]: Browser-first encrypted chat
+        - generic [ref=e8]: OpenWire keeps the active conversation front and center.
+      - generic [ref=e9]:
+        - paragraph [ref=e10]: OpenWire
+        - heading "Join a room fast, keep the conversation primary." [level=1] [ref=e11]
+        - paragraph [ref=e12]: Start with the hosted relay for the fastest path, or point at your own local CLI node when you need direct control. No account setup, just a nickname and a route into the network.
+      - list "OpenWire highlights" [ref=e13]:
+        - listitem [ref=e14]: Join from any browser with the same room behavior already in use.
+        - listitem [ref=e15]: Use relay mode by default or remember a custom CLI node endpoint locally.
+        - listitem [ref=e16]: Keep admin access protected behind the existing gate.
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - paragraph [ref=e20]: Get connected
+          - heading "Join the network" [level=2] [ref=e21]
+          - paragraph [ref=e22]: Your nickname stays local to this join flow. Leave it blank to continue as Anonymous.
+        - generic [ref=e23]: Relay default
+      - generic [ref=e24]:
+        - generic [ref=e25]: Nickname
+        - textbox "Nickname Names are sanitized to 24 visible characters before joining." [active] [ref=e26]:
+          - /placeholder: Enter your nickname...
+        - generic [ref=e27]: Names are sanitized to 24 visible characters before joining.
+      - group "Connect via" [ref=e28]:
+        - generic [ref=e29]: Connect via
+        - paragraph [ref=e30]: Choose the relay for the default hosted path, or switch to a local CLI node and reuse its WebSocket URL next time.
+        - generic [ref=e31]:
+          - generic [ref=e32] [cursor=pointer]:
+            - radio "OpenWire Relay Best for most sessions. Uses the standard hosted route." [checked] [ref=e33]
+            - generic [ref=e34]:
+              - strong [ref=e35]: OpenWire Relay
+              - generic [ref=e36]: Best for most sessions. Uses the standard hosted route.
+          - generic [ref=e37] [cursor=pointer]:
+            - radio "Local CLI Node Use your own bridge endpoint and keep it stored in this browser." [ref=e38]
+            - generic [ref=e39]:
+              - strong [ref=e40]: Local CLI Node
+              - generic [ref=e41]: Use your own bridge endpoint and keep it stored in this browser.
+      - generic [ref=e42]:
+        - button "Join OpenWire →" [ref=e43] [cursor=pointer]:
+          - generic [ref=e44]: Join OpenWire
+          - generic [ref=e45]: →
+        - paragraph [ref=e46]: Joining keeps the current room behavior intact and does not change your admin access path.
+  - button "🔐 Admin Access" [ref=e47] [cursor=pointer]:
+    - generic [ref=e48]: 🔐
+    - generic [ref=e49]: Admin Access
+```

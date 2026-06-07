@@ -53,46 +53,46 @@ const BOARD_SPACES = [
 // Format: position -> { gridRow, gridCol } (1-based for CSS Grid)
 // Monopoly board layout (counterclockwise from GO at bottom-right):
 const GRID_POSITIONS = {
-    0:  { row: 10, col: 10 },  // GO (bottom-right corner)
-    1:  { row: 10, col: 9  },  // Mediterranean
-    2:  { row: 10, col: 8  },  // Community Chest
-    3:  { row: 10, col: 7  },  // Baltic
-    4:  { row: 10, col: 6  },  // Income Tax
-    5:  { row: 10, col: 5  },  // Reading Railroad
-    6:  { row: 10, col: 4  },  // Oriental
-    7:  { row: 10, col: 3  },  // Chance
-    8:  { row: 10, col: 2  },  // Vermont
-    9:  { row: 10, col: 1  },  // Connecticut
-    10: { row: 10, col: 0  },  // Jail (bottom-left corner)
-    11: { row: 9,  col: 0  },  // St. Charles
-    12: { row: 8,  col: 0  },  // Electric Company
-    13: { row: 7,  col: 0  },  // States
-    14: { row: 6,  col: 0  },  // Virginia
-    15: { row: 5,  col: 0  },  // Pennsylvania R.R.
-    16: { row: 4,  col: 0  },  // St. James
-    17: { row: 3,  col: 0  },  // Community Chest
-    18: { row: 2,  col: 0  },  // Tennessee
-    19: { row: 1,  col: 0  },  // New York
-    20: { row: 0,  col: 0  },  // Free Parking (top-left corner)
-    21: { row: 0,  col: 1  },  // Kentucky
-    22: { row: 0,  col: 2  },  // Chance
-    23: { row: 0,  col: 3  },  // Indiana
-    24: { row: 0,  col: 4  },  // Illinois
-    25: { row: 0,  col: 5  },  // B&O R.R.
-    26: { row: 0,  col: 6  },  // Atlantic
-    27: { row: 0,  col: 7  },  // Ventnor
-    28: { row: 0,  col: 8  },  // Water Works
-    29: { row: 0,  col: 9  },  // Marvin Gardens
-    30: { row: 0,  col: 10 },  // Go To Jail (top-right corner)
-    31: { row: 1,  col: 10 },  // Pacific
-    32: { row: 2,  col: 10 },  // N. Carolina
-    33: { row: 3,  col: 10 },  // Community Chest
-    34: { row: 4,  col: 10 },  // Pennsylvania
-    35: { row: 5,  col: 10 },  // Short Line
-    36: { row: 6,  col: 10 },  // Chance
-    37: { row: 7,  col: 10 },  // Park Place
-    38: { row: 8,  col: 10 },  // Luxury Tax
-    39: { row: 9,  col: 10 },  // Boardwalk
+    0:  { row: 10, col: 10 }, // GO (bottom-right corner)
+    1:  { row: 10, col: 9  },
+    2:  { row: 10, col: 8  },
+    3:  { row: 10, col: 7  },
+    4:  { row: 10, col: 6  },
+    5:  { row: 10, col: 5  },
+    6:  { row: 10, col: 4  },
+    7:  { row: 10, col: 3  },
+    8:  { row: 10, col: 2  },
+    9:  { row: 10, col: 1  },
+    10: { row: 9,  col: 1  }, // Jail (bottom-left corner visual slot)
+    11: { row: 8,  col: 1  },
+    12: { row: 7,  col: 1  },
+    13: { row: 6,  col: 1  },
+    14: { row: 5,  col: 1  },
+    15: { row: 4,  col: 1  },
+    16: { row: 3,  col: 1  },
+    17: { row: 2,  col: 1  },
+    18: { row: 1,  col: 1  },
+    19: { row: 1,  col: 2  },
+    20: { row: 1,  col: 1  }, // Free Parking (top-left corner)
+    21: { row: 1,  col: 2  },
+    22: { row: 1,  col: 3  },
+    23: { row: 1,  col: 4  },
+    24: { row: 1,  col: 5  },
+    25: { row: 1,  col: 6  },
+    26: { row: 1,  col: 7  },
+    27: { row: 1,  col: 8  },
+    28: { row: 1,  col: 9  },
+    29: { row: 1,  col: 10 },
+    30: { row: 1,  col: 10 }, // Go To Jail (top-right corner)
+    31: { row: 2,  col: 10 },
+    32: { row: 3,  col: 10 },
+    33: { row: 4,  col: 10 },
+    34: { row: 5,  col: 10 },
+    35: { row: 6,  col: 10 },
+    36: { row: 7,  col: 10 },
+    37: { row: 8,  col: 10 },
+    38: { row: 9,  col: 10 },
+    39: { row: 10, col: 10 },
 };
 
 // Property group colors
@@ -118,6 +118,26 @@ const GROUP_COLORS = {
 
 // Player token emojis
 const TOKEN_EMOJIS = ['🔴', '🔵', '🟢', '🟡', '🟣', '🟠', '⚫', '⚪'];
+
+const GROUP_LABELS = {
+    brown: 'Brown',
+    lightBlue: 'Light Blue',
+    pink: 'Pink',
+    orange: 'Orange',
+    red: 'Red',
+    yellow: 'Yellow',
+    green: 'Green',
+    darkBlue: 'Dark Blue',
+    railroad: 'Railroad',
+    utility: 'Utility',
+    go: 'Start',
+    jail: 'Jail',
+    free: 'Free Parking',
+    community: 'Community Chest',
+    chance: 'Chance',
+    tax: 'Tax',
+    gotojail: 'Go To Jail',
+};
 
 // Dice dot patterns
 const DICE_PATTERNS = {
@@ -147,10 +167,11 @@ const DiceFace = memo(function DiceFace({ value, rolling }) {
 const Space = memo(function Space({ space, players, onSelect }) {
     const color = GROUP_COLORS[space.group] || '#999';
     const playersHere = players.filter(p => p.position === space.id);
-    
+    const isCorner = space.id === 0 || space.id === 10 || space.id === 20 || space.id === 30;
+
     return (
         <div 
-            className={`mono-space ${space.type} ${space.group}`}
+            className={`mono-space ${space.type} ${space.group} ${isCorner ? 'corner' : ''}`}
             onClick={() => onSelect && onSelect(space)}
         >
             {color && (
@@ -186,7 +207,7 @@ const PropertyCard = memo(function PropertyCard({ prop }) {
             <div className="mono-prop-header">
                 <div className="mono-prop-name">{prop.name}</div>
             </div>
-            <div className="mono-prop-group">{prop.group}</div>
+            <div className="mono-prop-group">{GROUP_LABELS[prop.group] || prop.group}</div>
             <div className="mono-prop-rent">
                 <span className="mono-prop-rent-label">Rent</span>
                 ${prop.rent[0]}
@@ -219,6 +240,11 @@ export default memo(function MonopolyBoard({
         [game?.players, myId]
     );
     const isMyTurn = currentPlayer?.peer_id === myId;
+    const currentSpace = currentPlayer ? BOARD_SPACES[currentPlayer.position] : null;
+    const activeProperty = useMemo(() => {
+        if (!currentSpace?.propId || !game?.properties) return null;
+        return game.properties.find((prop) => prop.id === currentSpace.propId) || null;
+    }, [currentSpace?.propId, game?.properties]);
 
     const playerTokens = useMemo(() => {
         if (!game?.players) return [];
@@ -256,6 +282,31 @@ export default memo(function MonopolyBoard({
         ended: 'Game Over!',
     };
 
+    const actionHint = useMemo(() => {
+        if (!currentPlayer) return 'Waiting for the next turn.';
+        if (game.phase === 'jail') return isMyTurn ? 'Roll doubles or pay $50 to get out.' : `${currentPlayer.nick} is trying to escape jail.`;
+        if (game.phase === 'property') {
+            if (activeProperty?.owner) {
+                const owner = game.players.find((player) => player.peer_id === activeProperty.owner);
+                return owner ? `${activeProperty.name} is owned by ${owner.nick}. Rent is already settled.` : 'This property is already owned.';
+            }
+            return isMyTurn
+                ? `Decide whether to buy ${activeProperty?.name || 'this space'} or send it to auction.`
+                : `${currentPlayer.nick} is deciding whether to buy or auction this property.`;
+        }
+        if (game.phase === 'rolling') return isMyTurn ? 'Roll, then end your turn unless you hit a purchase decision or a double.' : `Waiting for ${currentPlayer.nick} to roll.`;
+        if (game.phase === 'ended') return 'The last remaining player wins the board.';
+        return 'Keep the cash flow positive and control complete color sets.';
+    }, [activeProperty, currentPlayer, game.phase, game.players, isMyTurn]);
+
+    const centerBadge = currentPlayer?.inJail
+        ? 'In Jail'
+        : activeProperty?.owner
+            ? 'Owned Space'
+            : currentSpace?.type === 'property' || currentSpace?.type === 'railroad' || currentSpace?.type === 'utility'
+                ? 'Buyable Space'
+                : GROUP_LABELS[currentSpace?.group] || 'Board Space';
+
     if (!game) {
         return (
             <div className="mono-container">
@@ -284,7 +335,7 @@ export default memo(function MonopolyBoard({
                     ))}
                 </div>
                 <div className="mono-footer">
-                    <button className="mono-help-btn" onClick={() => onHelp('monopoly')}>❓ Help</button>
+                    <button className="mono-help-btn" onClick={() => onHelp?.('monopoly')}>❓ Help</button>
                     <button className="mono-close-btn" onClick={onClose}>✕ Close</button>
                 </div>
             </div>
@@ -375,6 +426,18 @@ export default memo(function MonopolyBoard({
                                     <span>{currentPlayer.nick}</span>'s turn
                                 </div>
                             )}
+
+                            <div className="mono-center-status">
+                                <div className="mono-center-badge">{centerBadge}</div>
+                                <div className="mono-center-space">
+                                    {currentSpace?.name || 'Waiting for players'}
+                                </div>
+                                <div className="mono-center-meta">
+                                    <span>{currentPlayer ? `$${currentPlayer.money?.toLocaleString()}` : 'Cash pending'}</span>
+                                    <span>{currentPlayer?.properties?.length || 0} deeds</span>
+                                </div>
+                                <div className="mono-center-hint">{actionHint}</div>
+                            </div>
 
                             <div className="mono-action-area">
                                 {game.phase === 'rolling' && isMyTurn && !game.diceRolled && !currentPlayer?.inJail && (
@@ -477,7 +540,7 @@ export default memo(function MonopolyBoard({
 
             {/* Footer */}
             <div className="mono-footer">
-                <button className="mono-help-btn" onClick={() => onHelp('monopoly')}>❓ Help</button>
+                <button className="mono-help-btn" onClick={() => onHelp?.('monopoly')}>❓ Help</button>
                 <button className="mono-close-btn" onClick={onClose}>✕ Close</button>
             </div>
         </div>

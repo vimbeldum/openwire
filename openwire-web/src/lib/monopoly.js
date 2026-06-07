@@ -772,6 +772,19 @@ class MonopolyEngine extends GameEngine {
 export const MONOPOLY_RULES = {
     name: 'Monopoly',
     description: 'Classic property trading and building game. Roll dice, buy properties, collect rent, and bankrupt your opponents to win!',
+    objective: 'Outlast the table by owning the best properties, collecting rent, and forcing every other player into bankruptcy.',
+    howToPlay: [
+        'On your turn, roll the dice and move around the 40-space board.',
+        'If you land on an unowned property, railroad, or utility, you can buy it or send it to auction.',
+        'If you land on an owned deed, you automatically pay rent to the owner.',
+        'Rolling doubles gives you another roll, but three doubles in one turn sends you to jail.',
+        'In jail, either roll doubles to escape, pay $50, or wait up to three turns before the fee is forced.',
+    ],
+    tips: [
+        'Complete color groups early so you control the most valuable lanes of the board.',
+        'Keep enough cash on hand for rent spikes, taxes, and jail exits.',
+        'Railroads and utilities are lower-maintenance ways to pressure opponents while you build your portfolio.',
+    ],
     bets: [],
 };
 

@@ -1,0 +1,89 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e4]:
+  - banner [ref=e5]:
+    - heading "⚡ OpenWire" [level=1] [ref=e8]
+    - generic "Conversation context" [ref=e9]:
+      - generic [ref=e11]:
+        - generic [ref=e12]: 🏠
+        - generic [ref=e13]: Room
+        - generic [ref=e14]: TestRoom
+        - button "Leave room" [ref=e15] [cursor=pointer]: ✕
+    - generic "Session status" [ref=e16]:
+      - generic [ref=e17]: TestUserOpenWire Relay
+      - generic [ref=e18]: Connecting...
+      - generic [ref=e19]:
+        - button "Account History" [ref=e20] [cursor=pointer]: 📊
+        - generic [ref=e21]: 💰 5,000
+      - generic [ref=e22]:
+        - button "Mute AI characters" [ref=e24] [cursor=pointer]: 🔊
+        - button "Logout" [ref=e25] [cursor=pointer]
+  - status [ref=e26]:
+    - generic [ref=e27]: 🔌
+    - generic [ref=e28]: Connecting...
+  - generic [ref=e30]:
+    - generic [ref=e31]: 🔌
+    - generic [ref=e32]: Connecting to server...
+    - generic [ref=e33]: Establishing a secure connection. You will be able to chat momentarily.
+  - generic [ref=e35]:
+    - textbox "Session unavailable - messages disabled" [disabled] [ref=e37]
+    - button "Open GIF picker" [ref=e38] [cursor=pointer]: GIF
+    - button "Send" [disabled] [ref=e39]
+  - generic "Room and peer context" [ref=e40]:
+    - generic [ref=e41]:
+      - generic [ref=e42]: Channels
+      - generic [ref=e43] [cursor=pointer]:
+        - generic [ref=e44]: 💬
+        - generic [ref=e45]: General Chat
+    - generic [ref=e46]:
+      - generic [ref=e47]: My Wallet
+      - generic [ref=e48]:
+        - generic [ref=e49]: 5,000 chips
+        - generic [ref=e50]: "Base: 5000 · Bonus: 0"
+        - generic [ref=e51]: Resets at midnight IST
+        - generic [ref=e52]:
+          - text: "⭐ Karma: 0 · newcomer"
+          - button "?" [ref=e53] [cursor=pointer]
+        - button "🏦 Vault" [ref=e54] [cursor=pointer]
+    - generic [ref=e55]:
+      - generic [ref=e56]: Online (0)
+      - generic [ref=e57]: No peers yet…
+    - generic [ref=e58]:
+      - generic [ref=e59]: Rooms (1)
+      - generic [ref=e60] [cursor=pointer]:
+        - generic [ref=e61]: 🏠
+        - generic [ref=e62]: TestRoom (Joined)
+    - generic [ref=e63]:
+      - button "+ Create Room" [ref=e64] [cursor=pointer]
+      - generic [ref=e65]:
+        - generic [ref=e66]: Casino Games
+        - button "🃏 Blackjack" [ref=e67] [cursor=pointer]
+        - button "🎰 Roulette" [ref=e68] [cursor=pointer]
+        - button "🃏 Andar Bahar" [ref=e69] [cursor=pointer]
+        - button "🍒 Slots" [ref=e70] [cursor=pointer]
+        - button "🎱 Tambola" [ref=e71] [cursor=pointer]
+      - generic [ref=e72]:
+        - generic [ref=e73]: Board Games
+        - button "🏠 Monopoly" [ref=e74] [cursor=pointer]
+        - button "🔍 Cluedo" [ref=e75] [cursor=pointer]
+        - button "🂡 Shashn" [ref=e76] [cursor=pointer]
+      - generic [ref=e77]:
+        - generic [ref=e78]: Social
+        - button "🎮 Tic-Tac-Toe" [ref=e79] [cursor=pointer]
+        - button "🔍 Mystery" [ref=e80] [cursor=pointer]
+        - button "📊 Predictions" [ref=e81] [cursor=pointer]
+      - generic [ref=e82]:
+        - generic [ref=e83]: Community
+        - button "💀 Dead Drops" [ref=e84] [cursor=pointer]
+        - button "✨ Cosmetics Shop" [ref=e85] [cursor=pointer]
+        - button "✉ Invite to Room" [ref=e86] [cursor=pointer]
+        - button "🤖 Chaos Agent" [ref=e87] [cursor=pointer]
+      - generic [ref=e88]:
+        - generic [ref=e89]: Room Mode
+        - generic [ref=e90]:
+          - button "Normal" [ref=e91] [cursor=pointer]
+          - button "5 Words" [ref=e92] [cursor=pointer]
+          - button "Emoji Only" [ref=e93] [cursor=pointer]
+          - button "No Backspace" [ref=e94] [cursor=pointer]
+```

@@ -35,7 +35,7 @@ describe('HowToPlay', () => {
     it('renders all game tabs', () => {
         const { container } = render(<HowToPlay onClose={vi.fn()} />);
         const tabs = container.querySelectorAll('.howtoplay-tab');
-        expect(tabs).toHaveLength(5);
+        expect(tabs).toHaveLength(6);
     });
 
     it('switches game when tab clicked', () => {
@@ -72,6 +72,12 @@ describe('HowToPlay', () => {
         const { container } = render(<HowToPlay activeGame="nonexistent" onClose={vi.fn()} />);
         const active = container.querySelector('.howtoplay-tab.active');
         expect(active.textContent).toContain('Roulette');
+    });
+
+    it('renders Monopoly rules content when Monopoly is selected', () => {
+        render(<HowToPlay activeGame="monopoly" onClose={vi.fn()} />);
+        expect(screen.getByText(/Outlast the table/i)).toBeInTheDocument();
+        expect(screen.getByText(/No betting/i)).toBeInTheDocument();
     });
 });
 

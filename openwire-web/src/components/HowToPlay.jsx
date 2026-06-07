@@ -4,6 +4,7 @@ import { BLACKJACK_RULES } from '../lib/blackjack.js';
 import { ANDARBAHAR_RULES } from '../lib/andarbahar.js';
 import { SLOTS_RULES } from '../lib/slots.js';
 import { TICTACTOE_RULES } from '../lib/game.js';
+import { MONOPOLY_RULES } from '../lib/monopoly.js';
 
 /* ── Game Rules Registry (each entry sourced from its bounded context lib) */
 const GAME_RULES = {
@@ -12,6 +13,7 @@ const GAME_RULES = {
     andarbahar: ANDARBAHAR_RULES,
     slots:      SLOTS_RULES,
     tictactoe:  TICTACTOE_RULES,
+    monopoly:   MONOPOLY_RULES,
 };
 
 const GAME_ICONS = {
@@ -20,6 +22,7 @@ const GAME_ICONS = {
     andarbahar: '🎴',
     slots:      '🎲',
     tictactoe:  '✕○',
+    monopoly:   '🏠',
 };
 
 /* ── Shared Presentation Domain: Rules Overlay ──────────────
@@ -72,16 +75,58 @@ export default function HowToPlay({ activeGame, onClose }) {
                         </h2>
                         <p className="howtoplay-desc">{rules.description}</p>
 
+                        {rules.objective && (
+                            <>
+                                <h3 className="howtoplay-section">Objective</h3>
+                                <p className="howtoplay-desc">{rules.objective}</p>
+                            </>
+                        )}
+
+                        {Array.isArray(rules.howToPlay) && rules.howToPlay.length > 0 && (
+                            <>
+                                <h3 className="howtoplay-section">Turn Flow</h3>
+                                <div className="howtoplay-bets">
+                                    {rules.howToPlay.map((step, i) => (
+                                        <div key={i} className="howtoplay-bet-row">
+                                            <span className="howtoplay-bet-name">Step {i + 1}</span>
+                                            <span className="howtoplay-bet-desc">{step}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+
                         <h3 className="howtoplay-section">Bets &amp; Payouts</h3>
                         <div className="howtoplay-bets">
-                            {rules.bets.map((bet, i) => (
-                                <div key={i} className="howtoplay-bet-row">
-                                    <span className="howtoplay-bet-name">{bet.name}</span>
-                                    <span className="howtoplay-bet-odds">{bet.odds}</span>
-                                    <span className="howtoplay-bet-desc">{bet.description}</span>
+                            {rules.bets.length > 0 ? (
+                                rules.bets.map((bet, i) => (
+                                    <div key={i} className="howtoplay-bet-row">
+                                        <span className="howtoplay-bet-name">{bet.name}</span>
+                                        <span className="howtoplay-bet-odds">{bet.odds}</span>
+                                        <span className="howtoplay-bet-desc">{bet.description}</span>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="howtoplay-bet-row">
+                                    <span className="howtoplay-bet-name">No betting</span>
+                                    <span className="howtoplay-bet-desc">Monopoly is a board-control game here: manage cash, buy deeds, and bankrupt the table.</span>
                                 </div>
-                            ))}
+                            )}
                         </div>
+
+                        {Array.isArray(rules.tips) && rules.tips.length > 0 && (
+                            <>
+                                <h3 className="howtoplay-section">Winning Tips</h3>
+                                <div className="howtoplay-bets">
+                                    {rules.tips.map((tip, i) => (
+                                        <div key={i} className="howtoplay-bet-row">
+                                            <span className="howtoplay-bet-name">Tip {i + 1}</span>
+                                            <span className="howtoplay-bet-desc">{tip}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
 

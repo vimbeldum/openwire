@@ -1,0 +1,56 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e4]:
+  - banner [ref=e5]:
+    - heading "⚡ OpenWire" [level=1] [ref=e8]
+    - generic "Conversation context" [ref=e9]:
+      - generic [ref=e11]:
+        - generic [ref=e12]: 💬
+        - generic [ref=e13]: Channel
+        - generic [ref=e14]: General Chat
+    - generic "Session status" [ref=e15]:
+      - generic [ref=e16]: AnonymousOpenWire Relay
+      - generic [ref=e17]: Connecting...
+      - generic [ref=e18]:
+        - button "Account History" [ref=e19] [cursor=pointer]: 📊
+        - generic [ref=e20]: 💰 1,000
+      - generic [ref=e21]:
+        - button "Mute AI characters" [ref=e23] [cursor=pointer]: 🔊
+        - button "Logout" [ref=e24] [cursor=pointer]
+  - status [ref=e25]:
+    - generic [ref=e26]: 🔌
+    - generic [ref=e27]: Connecting...
+  - generic [ref=e29]:
+    - generic [ref=e30]: 🔌
+    - generic [ref=e31]: Connecting to server...
+    - generic [ref=e32]: Establishing a secure connection. You will be able to chat momentarily.
+  - generic [ref=e34]:
+    - textbox "Session unavailable - messages disabled" [disabled] [ref=e36]
+    - button "Open GIF picker" [ref=e37] [cursor=pointer]: GIF
+    - button "Send" [disabled] [ref=e38]
+  - generic "Room and peer context" [ref=e39]:
+    - generic [ref=e40]:
+      - generic [ref=e41]: Channels
+      - generic [ref=e42] [cursor=pointer]:
+        - generic [ref=e43]: 💬
+        - generic [ref=e44]: General Chat (Joined)
+    - generic [ref=e45]:
+      - generic [ref=e46]: My Wallet
+      - generic [ref=e47]:
+        - generic [ref=e48]: 1,000 chips
+        - generic [ref=e49]: "Base: 1000 · Bonus: 0"
+        - generic [ref=e50]: Resets at midnight IST
+        - generic [ref=e51]:
+          - text: "⭐ Karma: 0 · newcomer"
+          - button "?" [ref=e52] [cursor=pointer]
+        - button "🏦 Vault" [ref=e53] [cursor=pointer]
+    - generic [ref=e54]:
+      - generic [ref=e55]: Online (0)
+      - generic [ref=e56]: No peers yet…
+    - generic [ref=e58]: Rooms (0)
+    - generic [ref=e59]:
+      - button "+ Create Room" [ref=e60] [cursor=pointer]
+      - button "💀 Dead Drops" [ref=e61] [cursor=pointer]
+      - button "✨ Cosmetics Shop" [ref=e62] [cursor=pointer]
+```
