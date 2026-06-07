@@ -15,6 +15,30 @@ export const MAX_PLAYERS = 8;
 export const STARTING_MONEY = 1500;
 export const TURN_TIMEOUT_MS = 60 * 1000; // 60s per turn
 
+const GROUP_SIZES = {
+    brown: 2,
+    lightBlue: 3,
+    pink: 3,
+    orange: 3,
+    red: 3,
+    yellow: 3,
+    green: 3,
+    darkBlue: 2,
+};
+
+const HOUSE_COSTS = {
+    brown: 50,
+    lightBlue: 50,
+    pink: 100,
+    orange: 100,
+    red: 150,
+    yellow: 150,
+    green: 200,
+    darkBlue: 200,
+};
+
+const HOUSE_RENT_MULTIPLIERS = [1, 5, 15, 45, 80, 125];
+
 /* ── Property Data ───────────────────────────────────────── */
 
 const STREET_GROUPS = {
@@ -167,7 +191,7 @@ export function createMonopoly(roomId) {
     return {
         type: 'monopoly',
         roomId,
-        phase: 'lobby', // 'lobby' | 'rolling' | 'property' | 'auction' | 'jail' | 'trade' | 'ended'
+        phase: 'lobby', // 'lobby' | 'rolling' | 'property' | 'auction' | 'jail' | 'card' | 'trade' | 'ended'
         players: [],
         currentPlayer: 0,
         deck: {
@@ -181,6 +205,7 @@ export function createMonopoly(roomId) {
         phaseTimeout: null,
         winner: null,
         properties: PROPERTIES.map(p => ({ ...p })),
+        pendingCardChoice: null,
         log: [],
     };
 }
@@ -196,7 +221,7 @@ export function addPlayer(game, peer_id, nick) {
         ...game,
         players: [
             ...game.players,
-            { peer_id, nick, money: STARTING_MONEY, position: 0, properties: [], inJail: false, jailTurns: 0, bankrupt: false, eliminated: false },
+            { peer_id, nick, money: STARTING_MONEY, position: 0, properties: [], inJail: false, jailTurns: 0, jailFreeCards: 0, bankrupt: false, eliminated: false },
         ],
     };
 }
@@ -223,6 +248,210 @@ export function startGame(game) {
         turnNumber: 1,
         log: [...game.log, `Monopoly started with ${game.players.length} players.`],
     };
+}
+
+function getPlayerById(game, peerId) {
+    return game.players.find((player) => player.peer_id === peerId) || null;
+}
+
+function ownsFullSet(game, peerId, group) {
+    const groupSize = GROUP_SIZES[group];
+    if (!groupSize) return false;
+    return game.properties.filter((property) => property.group === group && property.owner === peerId).length === groupSize;
+}
+
+function getStreetRent(game, prop) {
+    const owner = prop.owner ? getPlayerById(game, prop.owner) : null;
+    if (!owner) return prop.rent[0];
+    const baseRent = prop.rent[0];
+    if ((prop.houses || 0) > 0) {
+        return baseRent * HOUSE_RENT_MULTIPLIERS[Math.min(prop.houses, 5)];
+    }
+    return ownsFullSet(game, owner.peer_id, prop.group) ? baseRent * 2 : baseRent;
+}
+
+function getImprovementCount(game, peerId) {
+    const owned = game.properties.filter((property) => property.owner === peerId);
+    return owned.reduce((total, property) => total + Math.min(property.houses || 0, 4), 0);
+}
+
+function getHotelCount(game, peerId) {
+    return game.properties.filter((property) => property.owner === peerId && (property.houses || 0) >= 5).length;
+}
+
+function rotateDeckWithChoice(deck, cardsShown, selectedIndex) {
+    const remaining = deck.slice(cardsShown.length);
+    return [...remaining, ...cardsShown.slice(0, selectedIndex), ...cardsShown.slice(selectedIndex + 1), cardsShown[selectedIndex]];
+}
+
+function getCardChoices(game, deckKey) {
+    const deck = game.deck[deckKey] || [];
+    return deck.slice(0, Math.min(3, deck.length));
+}
+
+function openCardChoice(game, kind, player, spaceId) {
+    const deckKey = kind === 'chance' ? 'chance' : 'communityChest';
+    const options = getCardChoices(game, deckKey);
+    if (options.length === 0) return { ...game, phase: 'rolling', diceRolled: true };
+    return {
+        ...game,
+        phase: 'card',
+        pendingCardChoice: {
+            kind,
+            deckKey,
+            forPeerId: player.peer_id,
+            forNick: player.nick,
+            options,
+            sourceSpaceId: spaceId,
+        },
+        log: [...game.log, `${player.nick} can pick 1 of ${options.length} ${kind === 'chance' ? 'Chance' : 'Community Chest'} cards.`],
+    };
+}
+
+function resolveFinancialCard(game, amount, label) {
+    const player = game.players[game.currentPlayer];
+    const money = player.money + amount;
+    if (money < 0) {
+        return handleBankruptcy({
+            ...game,
+            players: game.players.map((p, i) => i === game.currentPlayer ? { ...p, money } : p),
+            log: [...game.log, `${player.nick} ${label}`],
+        }, game.currentPlayer);
+    }
+    return {
+        ...game,
+        players: game.players.map((p, i) => i === game.currentPlayer ? { ...p, money } : p),
+        log: [...game.log, `${player.nick} ${label}`],
+    };
+}
+
+function applySelectedCard(game, kind, card) {
+    const player = game.players[game.currentPlayer];
+    if (!player) return game;
+
+    if (kind === 'community') {
+        switch (card) {
+            case 'Bank error in your favor': return resolveFinancialCard(game, 200, 'received $200 from a bank error in their favor.');
+            case 'Doctor fee': return resolveFinancialCard(game, -50, 'paid a $50 doctor fee.');
+            case 'From sale of stock': return resolveFinancialCard(game, 50, 'received $50 from the sale of stock.');
+            case 'Get out of jail free':
+                return {
+                    ...game,
+                    players: game.players.map((p, i) =>
+                        i === game.currentPlayer ? { ...p, jailFreeCards: (p.jailFreeCards || 0) + 1 } : p
+                    ),
+                    log: [...game.log, `${player.nick} received a Get Out of Jail Free card.`],
+                };
+            case 'Go to jail':
+                return {
+                    ...game,
+                    players: game.players.map((p, i) => i === game.currentPlayer ? { ...p, position: 10, inJail: true, jailTurns: 0 } : p),
+                    phase: 'jail',
+                    log: [...game.log, `${player.nick} drew Community Chest and went to jail.`],
+                };
+            case 'Holiday fund matures': return resolveFinancialCard(game, 100, 'received $100 from a holiday fund.');
+            case 'Income tax refund': return resolveFinancialCard(game, 20, 'received a $20 income tax refund.');
+            case 'Life insurance matures': return resolveFinancialCard(game, 100, 'received $100 from life insurance.');
+            case 'Hospital fee': return resolveFinancialCard(game, -100, 'paid a $100 hospital fee.');
+            case 'Inheritance': return resolveFinancialCard(game, 100, 'received a $100 inheritance.');
+            case 'School fee': return resolveFinancialCard(game, -50, 'paid a $50 school fee.');
+            case 'Receive $25 consultancy fee': return resolveFinancialCard(game, 25, 'received a $25 consultancy fee.');
+            case 'You inherit $100': return resolveFinancialCard(game, 100, 'inherited $100.');
+            case 'Tax refund': return resolveFinancialCard(game, 50, 'received a $50 tax refund.');
+            case 'You won second place': return resolveFinancialCard(game, 10, 'won $10 for second place.');
+            case 'Birthday gift $50': return resolveFinancialCard(game, 50, 'received a $50 birthday gift.');
+            default:
+                return game;
+        }
+    }
+
+    switch (card) {
+        case 'Advance to GO':
+            return {
+                ...game,
+                players: game.players.map((p, i) =>
+                    i === game.currentPlayer ? { ...p, position: 0, money: p.money + 200 } : p
+                ),
+                log: [...game.log, `${player.nick} advanced to GO and collected $200.`],
+            };
+        case 'Bank pays dividend':
+            return resolveFinancialCard(game, 50, 'received a $50 bank dividend.');
+        case 'Go to jail':
+            return {
+                ...game,
+                players: game.players.map((p, i) => i === game.currentPlayer ? { ...p, position: 10, inJail: true, jailTurns: 0 } : p),
+                phase: 'jail',
+                log: [...game.log, `${player.nick} drew Chance and went to jail.`],
+            };
+        case 'General repairs': {
+            const charge = getImprovementCount(game, player.peer_id) * 25 + getHotelCount(game, player.peer_id) * 100;
+            return resolveFinancialCard(game, -charge, charge > 0 ? `paid $${charge} for general repairs.` : 'had no repair costs.');
+        }
+        case 'Speeding fine':
+            return resolveFinancialCard(game, -15, 'paid a $15 speeding fine.');
+        case 'Go back 3 spaces': {
+            const newPos = (player.position - 3 + 40) % 40;
+            const moved = {
+                ...game,
+                players: game.players.map((p, i) => i === game.currentPlayer ? { ...p, position: newPos } : p),
+                log: [...game.log, `${player.nick} went back 3 spaces.`],
+            };
+            return handleSpace(moved, BOARD_SPACES[newPos], game.dice[0] + game.dice[1]);
+        }
+        case 'Advance to nearest utility': {
+            const targetPos = player.position < 12 ? 12 : (player.position < 28 ? 28 : 12);
+            const bonus = targetPos < player.position ? 200 : 0;
+            const moved = {
+                ...game,
+                players: game.players.map((p, i) =>
+                    i === game.currentPlayer ? { ...p, position: targetPos, money: p.money + bonus } : p
+                ),
+                log: [...game.log, `${player.nick} advanced to the nearest utility.`],
+            };
+            return handleSpace(moved, BOARD_SPACES[targetPos], game.dice[0] + game.dice[1]);
+        }
+        case 'Advance to nearest railroad': {
+            const railroads = [5, 15, 25, 35];
+            const targetPos = railroads.find((rr) => rr > player.position) ?? 5;
+            const bonus = targetPos < player.position ? 200 : 0;
+            const moved = {
+                ...game,
+                players: game.players.map((p, i) =>
+                    i === game.currentPlayer ? { ...p, position: targetPos, money: p.money + bonus } : p
+                ),
+                log: [...game.log, `${player.nick} advanced to the nearest railroad.`],
+            };
+            return handleSpace(moved, BOARD_SPACES[targetPos], game.dice[0] + game.dice[1]);
+        }
+        case 'Elected chairman': {
+            const others = game.players.filter((p, i) => i !== game.currentPlayer && !p.eliminated && !p.bankrupt);
+            const payout = others.length * 25;
+            if (player.money < payout) {
+                return handleBankruptcy({
+                    ...game,
+                    players: game.players.map((p, i) => {
+                        if (i === game.currentPlayer) return { ...p, money: p.money - payout };
+                        if (!p.eliminated && !p.bankrupt) return { ...p, money: p.money + 25 };
+                        return p;
+                    }),
+                    log: [...game.log, `${player.nick} was elected chairman and owes the table $${payout}.`],
+                }, game.currentPlayer);
+            }
+            return {
+                ...game,
+                players: game.players.map((p, i) => {
+                    if (i === game.currentPlayer) return { ...p, money: p.money - payout };
+                    if (!p.eliminated && !p.bankrupt) return { ...p, money: p.money + 25 };
+                    return p;
+                }),
+                log: [...game.log, `${player.nick} paid $25 to each player as elected chairman.`],
+            };
+        }
+        case 'Loan matures':
+            return resolveFinancialCard(game, 150, 'received $150 from a matured loan.');
+        default:
+            return game;
+    }
 }
 
 export function roll(game) {
@@ -299,13 +528,13 @@ function handleSpace(game, space, diceSum) {
                 // Pay rent
                 const owner = game.players.find(p => p.peer_id === prop.owner);
                 if (owner && !owner.eliminated && !owner.bankrupt) {
-                    let rent = prop.rent[0];
+                    let rent = prop.group === 'railroad' || prop.group === 'utility' ? prop.rent[0] : getStreetRent(game, prop);
                     if (prop.group === 'railroad') {
                         rent = getRailroadRent(prop.owner, game.players);
                     } else if (prop.group === 'utility') {
                         rent = getUtilityRent(prop.owner, diceSum, game.players);
                     }
-                    const owed = Math.min(rent, player.money);
+                    const owed = rent;
                     game = {
                         ...game,
                         players: game.players.map((p, i) => {
@@ -326,110 +555,17 @@ function handleSpace(game, space, diceSum) {
             return { ...game, phase: 'property' };
         }
         case 'chance': {
-            const card = game.deck.chance[0];
-            game = {
-                ...game,
-                deck: { ...game.deck, chance: [...game.deck.chance.slice(1), card] },
-                log: [...game.log, `${player.nick} drew Chance: ${card}`],
-            };
-            if (card === 'Go to jail') {
-                return {
-                    ...game,
-                    players: game.players.map((p, i) =>
-                        i === game.currentPlayer
-                            ? { ...p, position: 10, inJail: true }
-                            : p
-                    ),
-                    phase: 'jail',
-                };
-            }
-            if (card === 'Advance to GO') {
-                return {
-                    ...game,
-                    players: game.players.map((p, i) =>
-                        i === game.currentPlayer ? { ...p, position: 0, money: p.money + 200 } : p
-                    ),
-                    phase: 'rolling',
-                    diceRolled: true,
-                };
-            }
-            if (card === 'Go back 3 spaces') {
-                const newPos = (player.position - 3 + 40) % 40;
-                const newSpace = BOARD_SPACES[newPos];
-                return handleSpace({
-                    ...game,
-                    players: game.players.map((p, i) =>
-                        i === game.currentPlayer ? { ...p, position: newPos } : p
-                    ),
-                    phase: 'rolling',
-                    diceRolled: true,
-                }, newSpace, diceSum);
-            }
-            if (card === 'Advance to nearest utility') {
-                // Utilities are at positions 12 and 28
-                const targetPos = player.position < 12 ? 12 : (player.position < 28 ? 28 : 12);
-                const newPos = targetPos;
-                let newMoney = player.money;
-                if (newPos < player.position) newMoney += 200;
-                const newSpace = BOARD_SPACES[newPos];
-                const newGame2 = {
-                    ...game,
-                    players: game.players.map((p, i) =>
-                        i === game.currentPlayer ? { ...p, position: newPos, money: newMoney } : p
-                    ),
-                };
-                return handleSpace(newGame2, newSpace, diceSum);
-            }
-            if (card === 'Advance to nearest railroad') {
-                // Railroads are at positions 5, 15, 25, 35
-                const railroads = [5, 15, 25, 35];
-                let targetPos = railroads[0];
-                for (const rr of railroads) {
-                    if (rr > player.position) {
-                        targetPos = rr;
-                        break;
-                    }
-                    targetPos = rr; // wrap around to first
-                }
-                let newMoney = player.money;
-                if (targetPos < player.position) newMoney += 200;
-                const newSpace = BOARD_SPACES[targetPos];
-                const newGame2 = {
-                    ...game,
-                    players: game.players.map((p, i) =>
-                        i === game.currentPlayer ? { ...p, position: targetPos, money: newMoney } : p
-                    ),
-                };
-                return handleSpace(newGame2, newSpace, diceSum);
-            }
-            return { ...game, phase: 'rolling', diceRolled: true };
+            return openCardChoice(game, 'chance', player, space.id);
         }
         case 'community': {
-            const card = game.deck.communityChest[0];
-            game = {
-                ...game,
-                deck: { ...game.deck, communityChest: [...game.deck.communityChest.slice(1), card] },
-                log: [...game.log, `${player.nick} drew Community Chest: ${card}`],
-            };
-            if (card === 'Go to jail') {
-                return {
-                    ...game,
-                    players: game.players.map((p, i) =>
-                        i === game.currentPlayer
-                            ? { ...p, position: 10, inJail: true }
-                            : p
-                    ),
-                    phase: 'jail',
-                };
-            }
-            return { ...game, phase: 'rolling', diceRolled: true };
+            return openCardChoice(game, 'community', player, space.id);
         }
         case 'tax': {
             const owed = space.amount;
             game = {
                 ...game,
                 players: game.players.map((p, i) =>
-                    i === game.currentPlayer ? { ...p, money: Math.max(0, p.money - owed) } : p
+                    i === game.currentPlayer ? { ...p, money: p.money - owed } : p
                 ),
                 log: [...game.log, `${player.nick} paid $${owed} tax`],
             };
@@ -557,6 +693,61 @@ export function auctionProperty(game) {
     return advanceTurn(newGame);
 }
 
+export function chooseCard(game, optionIndex) {
+    const choice = game.pendingCardChoice;
+    const player = game.players[game.currentPlayer];
+    if (!choice || game.phase !== 'card' || !player) return game;
+    if (choice.forPeerId !== player.peer_id) return game;
+    if (optionIndex < 0 || optionIndex >= choice.options.length) return game;
+
+    const selectedCard = choice.options[optionIndex];
+    const rotatedDeck = rotateDeckWithChoice(game.deck[choice.deckKey], choice.options, optionIndex);
+    let nextGame = {
+        ...game,
+        deck: { ...game.deck, [choice.deckKey]: rotatedDeck },
+        pendingCardChoice: null,
+        phase: 'rolling',
+        diceRolled: true,
+        log: [...game.log, `${player.nick} picked ${choice.kind === 'chance' ? 'Chance' : 'Community Chest'}: ${selectedCard}`],
+    };
+    nextGame = applySelectedCard(nextGame, choice.kind, selectedCard);
+    return nextGame;
+}
+
+export function canBuildImprovement(game, peerId, propId) {
+    const prop = game.properties.find((property) => property.id === propId);
+    if (!prop || !HOUSE_COSTS[prop.group]) return false;
+    if (game.currentPlayer < 0 || game.players[game.currentPlayer]?.peer_id !== peerId) return false;
+    if (prop.owner !== peerId) return false;
+    if (!ownsFullSet(game, peerId, prop.group)) return false;
+    if ((prop.houses || 0) >= 5) return false;
+    const player = getPlayerById(game, peerId);
+    return !!player && player.money >= HOUSE_COSTS[prop.group];
+}
+
+export function buildImprovement(game, propId) {
+    const player = game.players[game.currentPlayer];
+    if (!player || player.eliminated || player.bankrupt) return game;
+    if (game.phase !== 'rolling' && game.phase !== 'property') return game;
+    if (!canBuildImprovement(game, player.peer_id, propId)) return game;
+
+    const prop = game.properties.find((property) => property.id === propId);
+    const cost = HOUSE_COSTS[prop.group];
+    const nextHouses = (prop.houses || 0) + 1;
+    const label = nextHouses >= 5 ? 'hotel' : 'house';
+
+    return {
+        ...game,
+        players: game.players.map((p, i) =>
+            i === game.currentPlayer ? { ...p, money: p.money - cost } : p
+        ),
+        properties: game.properties.map((property) =>
+            property.id === propId ? { ...property, houses: nextHouses } : property
+        ),
+        log: [...game.log, `${player.nick} built a ${label} on ${prop.name} for $${cost}.`],
+    };
+}
+
 export function endTurn(game) {
     // If in jail phase and not escaped, increment jail turns
     const player = game.players[game.currentPlayer];
@@ -592,6 +783,20 @@ export function escapeJail(game) {
     const player = game.players[game.currentPlayer];
     if (!player || player.eliminated || player.bankrupt) return game;
     if (!player.inJail || game.phase !== 'jail') return game;
+
+    if ((player.jailFreeCards || 0) > 0) {
+        return {
+            ...game,
+            players: game.players.map((p, i) =>
+                i === game.currentPlayer
+                    ? { ...p, inJail: false, jailTurns: 0, jailFreeCards: (p.jailFreeCards || 0) - 1 }
+                    : p
+            ),
+            phase: 'rolling',
+            diceRolled: false,
+            log: [...game.log, `${player.nick} used a Get Out of Jail Free card.`],
+        };
+    }
 
     // Pay $50 to escape
     const money = player.money - 50;
@@ -784,7 +989,9 @@ export const MONOPOLY_RULES = {
     howToPlay: [
         'On your turn, roll the dice and move around the 40-space board.',
         'If you land on an unowned property, railroad, or utility, you can buy it or send it to auction.',
+        'Chance and Community Chest now show 3 cards; pick 1 card to resolve that event.',
         'If you land on an owned deed, you automatically pay rent to the owner.',
+        'Owning a full color set lets you build houses and then a hotel on those streets.',
         'Rolling doubles gives you another roll, but three doubles in one turn sends you to jail.',
         'In jail, either roll doubles to escape, pay $50, or wait up to three turns before the fee is forced.',
     ],

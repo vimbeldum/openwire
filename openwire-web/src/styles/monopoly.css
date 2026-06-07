@@ -277,6 +277,7 @@
     grid-template-rows: repeat(11, 46px);
     gap: 2px;
     background: #0d0d0d;
+    position: relative;
 }
 
 /* ── Board Spaces ───────────────────────────────────────── */
@@ -379,21 +380,19 @@
 }
 
 /* ── Tokens on Board ────────────────────────────────────── */
-.mono-tokens-on-space {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
-    gap: 1px;
+.mono-token-layer {
     position: absolute;
-    bottom: 2px;
-    left: 2px;
-    right: 2px;
+    inset: 0;
+    pointer-events: none;
+    z-index: 6;
 }
 
-.mono-token-on-board {
-    font-size: 0.75rem;
-    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+.mono-token-piece {
+    position: absolute;
+    transform: translate(calc(-50% + var(--mono-token-offset-x, 0px)), calc(-50% + var(--mono-token-offset-y, 0px)));
+    font-size: 1.2rem;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.65));
+    transition: top 0.7s ease, left 0.7s ease, transform 0.7s ease;
     animation: tokenAppear 0.3s ease-out;
 }
 
@@ -417,7 +416,7 @@
     justify-content: center;
     gap: 0.5rem;
     box-shadow: inset 0 0 30px rgba(0,0,0,0.4);
-    z-index: 5;
+    z-index: 7;
 }
 
 .mono-space-wrapper {
@@ -509,6 +508,60 @@
     flex-direction: column;
     gap: 0.5rem;
     margin-top: 0.5rem;
+    width: min(84%, 360px);
+}
+
+.mono-card-choice-panel {
+    background: rgba(8, 16, 12, 0.58);
+    border: 1px solid rgba(243, 208, 107, 0.28);
+    border-radius: 12px;
+    padding: 0.7rem;
+}
+
+.mono-card-choice-title {
+    color: var(--mono-gold);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    text-align: center;
+}
+
+.mono-card-choice-subtitle {
+    margin-top: 0.25rem;
+    color: var(--mono-text-dim);
+    font-size: 0.74rem;
+    text-align: center;
+}
+
+.mono-card-choice-grid {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.65rem;
+}
+
+.mono-card-choice {
+    border: 1px solid rgba(243, 208, 107, 0.24);
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
+    color: var(--mono-text);
+    padding: 0.65rem 0.75rem;
+    font-size: 0.8rem;
+    line-height: 1.35;
+    cursor: pointer;
+    transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    text-align: left;
+}
+
+.mono-card-choice:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: rgba(243, 208, 107, 0.6);
+    background: linear-gradient(135deg, rgba(243,208,107,0.15) 0%, rgba(255,255,255,0.04) 100%);
+}
+
+.mono-card-choice:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
 }
 
 .mono-btn {
@@ -701,6 +754,29 @@
     border-radius: 2px;
 }
 
+.mono-build-btn {
+    margin-top: 0.5rem;
+    width: 100%;
+    border: none;
+    border-radius: 8px;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #246b43 0%, #1b8f55 100%);
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.mono-build-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.mono-build-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 .mono-no-props {
     color: var(--mono-text-dim);
     font-style: italic;
@@ -877,8 +953,8 @@
         height: 6px;
     }
     
-    .mono-token-on-board {
-        font-size: 0.6rem;
+    .mono-token-piece {
+        font-size: 0.95rem;
     }
     
     .mono-board-center {
@@ -918,6 +994,11 @@
     .mono-btn {
         padding: 0.5rem 1rem;
         font-size: 0.8rem;
+    }
+
+    .mono-card-choice {
+        font-size: 0.72rem;
+        padding: 0.55rem 0.6rem;
     }
 }
 

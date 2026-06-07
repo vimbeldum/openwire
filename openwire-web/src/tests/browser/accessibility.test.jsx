@@ -164,15 +164,34 @@ describe('AdminPasswordGate — accessible form structure', () => {
         await screen.findByText('Incorrect password.');
         expect(screen.getByText('Incorrect password.')).toBeInTheDocument();
     });
+
+    it('calls onSuccess when correct password is entered and submitted', async () => {
+        const onSuccess = vi.fn();
+        render(<AdminPasswordGate onSuccess={onSuccess} onCancel={vi.fn()} />);
+        await userEvent.type(screen.getByPlaceholderText('Admin password'), 'openwire-admin');
+        fireEvent.submit(screen.getByRole('button', { name: /unlock/i }).closest('form'));
+        await vi.waitFor(() => {
+            expect(onSuccess).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    it('clears error state when user starts typing after a failed attempt', async () => {
+        render(<AdminPasswordGate onSuccess={vi.fn()} onCancel={vi.fn()} />);
+        await userEvent.type(screen.getByPlaceholderText('Admin password'), 'wrong');
+        fireEvent.submit(screen.getByRole('button', { name: /unlock/i }).closest('form'));
+        await screen.findByText('Incorrect password.');
+        fireEvent.change(screen.getByPlaceholderText('Admin password'), { target: { value: 'c' } });
+        expect(screen.queryByText('Incorrect password.')).not.toBeInTheDocument();
+    });
 });
 
 describe('Accessibility — dialog and overlay semantics', () => {
     it('AdminPasswordGate overlay has role="dialog" and aria-modal="true"', () => {
         render(<AdminPasswordGate onSuccess={vi.fn()} onCancel={vi.fn()} />);
-        const overlay = document.querySelector('.admin-overlay');
-        expect(overlay).toHaveAttribute('role', 'dialog');
-        expect(overlay).toHaveAttribute('aria-modal', 'true');
-        expect(overlay).toHaveAttribute('aria-label', 'Unlock admin access');
+        const dialog = screen.getByRole('dialog', { name: /unlock admin access/i });
+        expect(dialog).toBeInTheDocument();
+        expect(dialog).toHaveAttribute('aria-modal', 'true');
+        expect(dialog).toHaveAttribute('aria-label', 'Unlock admin access');
     });
 
     it('AdminPasswordGate has a close button with accessible label', () => {

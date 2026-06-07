@@ -149,14 +149,18 @@ describe('Landing', () => {
     });
 
     describe('admin access', () => {
-        it('shows AdminPasswordGate when admin button clicked', () => {
+        it('shows AdminPasswordGate dialog with correct accessible label when admin button clicked', () => {
             renderLanding();
             fireEvent.click(screen.getByRole('button', { name: /admin access/i }));
+            const dialog = screen.getByRole('dialog', { name: /unlock admin access/i });
+            expect(dialog).toBeInTheDocument();
+            expect(dialog).toHaveAttribute('aria-modal', 'true');
             expect(screen.getByLabelText(/Password/i)).toBeInTheDocument();
         });
 
-        it('shows an inline error for an incorrect admin password', async () => {
-            renderLanding();
+        it('shows an inline error for an incorrect admin password and does NOT call onJoin', async () => {
+            const onJoin = vi.fn();
+            renderLanding({ onJoin });
 
             fireEvent.click(screen.getByRole('button', { name: /admin access/i }));
             fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'wrong-pass' } });
@@ -164,13 +168,33 @@ describe('Landing', () => {
 
             expect(await screen.findByText('Incorrect password.')).toBeInTheDocument();
             expect(screen.getByLabelText(/Password/i)).toHaveAttribute('aria-invalid', 'true');
+            expect(onJoin).not.toHaveBeenCalled();
         });
 
         it('joins as Admin after a successful admin unlock when nickname is blank', async () => {
-            renderLanding();
+            const onJoin = vi.fn();
+            renderLanding({ onJoin });
             fireEvent.click(screen.getByRole('button', { name: /admin access/i }));
             fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'openwire-admin' } });
             fireEvent.click(screen.getByRole('button', { name: /unlock/i }));
+
+            await vi.waitFor(() => {
+                expect(onJoin).toHaveBeenCalledWith('Admin', true, { mode: 'relay' });
+            });
+            expect(await screen.findByText(/join the network/i)).toBeInTheDocument();
+        });
+
+        it('passes the correct nickname and isAdmin flag on successful admin unlock with a filled nickname', async () => {
+            const onJoin = vi.fn();
+            renderLanding({ onJoin });
+            fireEvent.click(screen.getByRole('button', { name: /admin access/i }));
+            fireEvent.change(screen.getByLabelText(/Nickname/i), { target: { value: 'Alice' } });
+            fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'openwire-admin' } });
+            fireEvent.click(screen.getByRole('button', { name: /unlock/i }));
+
+            await vi.waitFor(() => {
+                expect(onJoin).toHaveBeenCalledWith('Alice', true, { mode: 'relay' });
+            });
             expect(await screen.findByText(/join the network/i)).toBeInTheDocument();
         });
     });

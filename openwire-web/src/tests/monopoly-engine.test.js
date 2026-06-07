@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { addPlayer, auctionProperty, createMonopoly, roll, startGame } from '../lib/monopoly.js';
+import {
+    addPlayer,
+    auctionProperty,
+    buildImprovement,
+    chooseCard,
+    createMonopoly,
+    roll,
+    startGame,
+} from '../lib/monopoly.js';
 
 function withRandomSequence(values, fn) {
     const spy = vi.spyOn(Math, 'random');
@@ -88,5 +96,49 @@ describe('monopoly engine', () => {
         expect(result.players.find((player) => player.peer_id === 'p1')?.money).toBe(1500);
         expect(result.players.find((player) => player.peer_id === 'p2')?.money).toBe(1470);
         expect(result.currentPlayer).toBe(1);
+    });
+
+    it('opens a 3-card choice when landing on community chest and resolves the selected card', () => {
+        const game = makeStartedGame();
+        const landed = withRandomSequence([0, 0], () => roll(game));
+
+        expect(landed.phase).toBe('card');
+        expect(landed.pendingCardChoice?.kind).toBe('community');
+        expect(landed.pendingCardChoice?.options).toHaveLength(3);
+
+        const selected = chooseCard(landed, 1);
+        expect(selected.phase).toBe('rolling');
+        expect(selected.pendingCardChoice).toBeNull();
+        expect(selected.log.at(-1)).toMatch(/received|paid|went to jail|inherited|won/i);
+    });
+
+    it('builds houses and hotels on a completed color set', () => {
+        const started = makeStartedGame();
+        const withSet = {
+            ...started,
+            currentPlayer: 0,
+            players: started.players.map((player, index) =>
+                index === 0
+                    ? { ...player, money: 1500, properties: [1, 2] }
+                    : player
+            ),
+            properties: started.properties.map((property) => {
+                if (property.id === 1 || property.id === 2) return { ...property, owner: 'p1' };
+                return property;
+            }),
+        };
+
+        const builtHouse = buildImprovement(withSet, 1);
+        expect(builtHouse.properties.find((property) => property.id === 1)?.houses).toBe(1);
+        expect(builtHouse.players[0].money).toBe(1450);
+
+        const hotelReady = {
+            ...builtHouse,
+            properties: builtHouse.properties.map((property) =>
+                property.id === 1 ? { ...property, houses: 4 } : property
+            ),
+        };
+        const builtHotel = buildImprovement(hotelReady, 1);
+        expect(builtHotel.properties.find((property) => property.id === 1)?.houses).toBe(5);
     });
 });

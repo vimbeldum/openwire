@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useMemo, memo } from 'react';
+import * as mono from '../lib/monopoly.js';
 import '../styles/monopoly.css';
 
 /* ═══════════════════════════════════════════════════════════
-   Monopoly Board — Complete 10x10 with All 40 Spaces
+   Monopoly Board — Complete 11x11 with All 40 Spaces
    ═══════════════════════════════════════════════════════════ */
 
 // Full board data matching src/lib/monopoly.js
@@ -139,6 +140,17 @@ const GROUP_LABELS = {
     gotojail: 'Go To Jail',
 };
 
+const HOUSE_COSTS = {
+    brown: 50,
+    lightBlue: 50,
+    pink: 100,
+    orange: 100,
+    red: 150,
+    yellow: 150,
+    green: 200,
+    darkBlue: 200,
+};
+
 // Dice dot patterns
 const DICE_PATTERNS = {
     1: [0,0,0,0,1,0,0,0,0],
@@ -164,9 +176,8 @@ const DiceFace = memo(function DiceFace({ value, rolling }) {
 });
 
 // Space Component
-const Space = memo(function Space({ space, players, onSelect }) {
+const Space = memo(function Space({ space, onSelect }) {
     const color = GROUP_COLORS[space.group] || '#999';
-    const playersHere = players.filter(p => p.position === space.id);
     const isCorner = space.id === 0 || space.id === 10 || space.id === 20 || space.id === 30;
 
     return (
@@ -187,21 +198,15 @@ const Space = memo(function Space({ space, players, onSelect }) {
             {space.type === 'tax' && space.price && (
                 <div className="mono-space-price">-${space.price}</div>
             )}
-            {playersHere.length > 0 && (
-                <div className="mono-tokens-on-space">
-                    {playersHere.map((p, i) => (
-                        <span key={i} className="mono-token-on-board">
-                            {TOKEN_EMOJIS[p.playerIndex % 8]}
-                        </span>
-                    ))}
-                </div>
-            )}
         </div>
     );
 });
 
 // Property Card Component
-const PropertyCard = memo(function PropertyCard({ prop }) {
+const PropertyCard = memo(function PropertyCard({ prop, canBuild, onBuild }) {
+    const houseCost = HOUSE_COSTS[prop.group] || 0;
+    const improvementLabel = (prop.houses || 0) >= 4 ? 'Build Hotel' : 'Build House';
+
     return (
         <div className={`mono-property-card ${prop.group}`}>
             <div className="mono-prop-header">
@@ -214,11 +219,52 @@ const PropertyCard = memo(function PropertyCard({ prop }) {
             </div>
             {prop.group !== 'railroad' && prop.group !== 'utility' && (
                 <div className="mono-prop-houses">
-                    {[...Array(prop.houses || 0)].map((_, i) => (
-                        <div key={i} className="mono-house" />
-                    ))}
+                    {(prop.houses || 0) >= 5
+                        ? <div className="mono-hotel" aria-label="Hotel" />
+                        : [...Array(prop.houses || 0)].map((_, i) => (
+                            <div key={i} className="mono-house" />
+                        ))}
                 </div>
             )}
+            {houseCost > 0 && (
+                <button
+                    type="button"
+                    className="mono-build-btn"
+                    onClick={() => onBuild(prop.id)}
+                    disabled={!canBuild}
+                >
+                    {improvementLabel} (${houseCost})
+                </button>
+            )}
+        </div>
+    );
+});
+
+const BoardToken = memo(function BoardToken({ player, slotIndex }) {
+    const grid = GRID_POSITIONS[player.position] || GRID_POSITIONS[0];
+    const offsets = [
+        { x: -10, y: -10 },
+        { x: 10, y: -10 },
+        { x: -10, y: 10 },
+        { x: 10, y: 10 },
+        { x: -14, y: 0 },
+        { x: 14, y: 0 },
+        { x: 0, y: -14 },
+        { x: 0, y: 14 },
+    ];
+    const offset = offsets[slotIndex % offsets.length];
+
+    return (
+        <div
+            className="mono-token-piece"
+            style={{
+                top: `${((grid.row - 0.5) / 11) * 100}%`,
+                left: `${((grid.col - 0.5) / 11) * 100}%`,
+                '--mono-token-offset-x': `${offset.x}px`,
+                '--mono-token-offset-y': `${offset.y}px`,
+            }}
+        >
+            {player.token}
         </div>
     );
 });
@@ -248,6 +294,7 @@ export default memo(function MonopolyBoard({
         if (!currentSpace?.propId || !game?.properties) return null;
         return game.properties.find((prop) => prop.id === currentSpace.propId) || null;
     }, [currentSpace?.propId, game?.properties]);
+    const pendingChoice = game?.pendingCardChoice || null;
 
     const playerTokens = useMemo(() => {
         if (!game?.players) return [];
@@ -259,11 +306,29 @@ export default memo(function MonopolyBoard({
                 token: TOKEN_EMOJIS[i % 8],
             }));
     }, [game?.players]);
+    const tokenSlots = useMemo(() => {
+        const counts = new Map();
+        const slots = new Map();
+        playerTokens.forEach((player) => {
+            const count = counts.get(player.position) || 0;
+            slots.set(player.peer_id, count);
+            counts.set(player.position, count + 1);
+        });
+        return slots;
+    }, [playerTokens]);
 
     const myProperties = useMemo(() => {
         if (!game || !myId) return [];
         return game.properties?.filter(p => p.owner === myId) || [];
     }, [game, myId]);
+    const buildableProperties = useMemo(() => {
+        if (!game || !myId) return new Set();
+        return new Set(
+            myProperties
+                .filter((prop) => mono.canBuildImprovement(game, myId, prop.id))
+                .map((prop) => prop.id)
+        );
+    }, [game, myId, myProperties]);
 
     const handleRoll = () => {
         setRolling(true);
@@ -293,12 +358,16 @@ export default memo(function MonopolyBoard({
     const handleSpaceSelect = (space) => {
         // Could show property details modal here
     };
+    const handleBuild = (propId) => {
+        onAction({ type: 'build', propId });
+    };
 
     const phaseLabels = {
         lobby: 'Waiting for players...',
         rolling: 'Roll the dice!',
         property: 'Buy or Auction?',
         auction: 'Auction in progress',
+        card: 'Choose a card',
         jail: 'In Jail',
         trade: 'Trading',
         ended: 'Game Over!',
@@ -306,6 +375,11 @@ export default memo(function MonopolyBoard({
 
     const actionHint = useMemo(() => {
         if (!currentPlayer) return 'Waiting for the next turn.';
+        if (game.phase === 'card' && pendingChoice) {
+            return isMyTurn
+                ? `Pick 1 of ${pendingChoice.options.length} ${pendingChoice.kind === 'chance' ? 'Chance' : 'Community Chest'} cards.`
+                : `${currentPlayer.nick} is choosing a ${pendingChoice.kind === 'chance' ? 'Chance' : 'Community Chest'} card.`;
+        }
         if (game.phase === 'jail') return isMyTurn ? 'Roll doubles or pay $50 to get out.' : `${currentPlayer.nick} is trying to escape jail.`;
         if (game.phase === 'property') {
             if (activeProperty?.owner) {
@@ -319,7 +393,7 @@ export default memo(function MonopolyBoard({
         if (game.phase === 'rolling') return isMyTurn ? 'Roll, then end your turn unless you hit a purchase decision or a double.' : `Waiting for ${currentPlayer.nick} to roll.`;
         if (game.phase === 'ended') return 'The last remaining player wins the board.';
         return 'Keep the cash flow positive and control complete color sets.';
-    }, [activeProperty, currentPlayer, game.phase, game.players, isMyTurn]);
+    }, [activeProperty, currentPlayer, game.phase, game.players, isMyTurn, pendingChoice]);
 
     const centerBadge = currentPlayer?.inJail
         ? 'In Jail'
@@ -449,11 +523,19 @@ export default memo(function MonopolyBoard({
                             >
                                 <Space 
                                     space={space} 
-                                    players={playerTokens}
                                     onSelect={handleSpaceSelect}
                                 />
                             </div>
                         ))}
+                        <div className="mono-token-layer" aria-hidden="true">
+                            {playerTokens.map((player) => (
+                                <BoardToken
+                                    key={player.peer_id}
+                                    player={player}
+                                    slotIndex={tokenSlots.get(player.peer_id) || 0}
+                                />
+                            ))}
+                        </div>
                         
                         {/* Center panel */}
                         <div className="mono-board-center">
@@ -479,6 +561,30 @@ export default memo(function MonopolyBoard({
                             </div>
 
                             <div className="mono-action-area">
+                                {game.phase === 'card' && pendingChoice && (
+                                    <div className="mono-card-choice-panel">
+                                        <div className="mono-card-choice-title">
+                                            {pendingChoice.kind === 'chance' ? 'Chance' : 'Community Chest'}
+                                        </div>
+                                        <div className="mono-card-choice-subtitle">
+                                            {isMyTurn ? 'Pick 1 card to resolve.' : `Waiting for ${currentPlayer?.nick} to choose.`}
+                                        </div>
+                                        <div className="mono-card-choice-grid">
+                                            {pendingChoice.options.map((card, index) => (
+                                                <button
+                                                    key={`${card}-${index}`}
+                                                    type="button"
+                                                    className="mono-card-choice"
+                                                    disabled={!isMyTurn}
+                                                    onClick={() => onAction({ type: 'choosecard', optionIndex: index })}
+                                                >
+                                                    {card}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {game.phase === 'rolling' && isMyTurn && !game.diceRolled && !currentPlayer?.inJail && (
                                     <button 
                                         className="mono-btn mono-roll-btn" 
@@ -501,9 +607,9 @@ export default memo(function MonopolyBoard({
                                         <button 
                                             className="mono-btn mono-buy-btn" 
                                             onClick={() => onAction({ type: 'escapejail' })}
-                                            disabled={currentPlayer?.money < 50}
+                                            disabled={(currentPlayer?.money < 50) && !(currentPlayer?.jailFreeCards > 0)}
                                         >
-                                            Pay $50 to Escape
+                                            {currentPlayer?.jailFreeCards > 0 ? 'Use Jail Free Card' : 'Pay $50 to Escape'}
                                         </button>
                                         <button 
                                             className="mono-btn mono-end-btn" 
@@ -552,7 +658,12 @@ export default memo(function MonopolyBoard({
                 </div>
                 <div className="mono-property-grid">
                     {myProperties.map(prop => (
-                        <PropertyCard key={prop.id} prop={prop} />
+                        <PropertyCard
+                            key={prop.id}
+                            prop={prop}
+                            canBuild={buildableProperties.has(prop.id)}
+                            onBuild={handleBuild}
+                        />
                     ))}
                     {myProperties.length === 0 && (
                         <div className="mono-no-props">No properties yet — buy some!</div>

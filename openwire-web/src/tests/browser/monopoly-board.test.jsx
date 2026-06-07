@@ -159,4 +159,55 @@ describe('MonopolyBoard', () => {
         });
         expect(container.querySelectorAll('.mono-die.rolling').length).toBe(0);
     });
+
+    it('shows a 3-card choice panel and sends the selected card action', () => {
+        const onAction = vi.fn();
+
+        render(
+            <MonopolyBoard
+                game={makeGame({
+                    phase: 'card',
+                    pendingCardChoice: {
+                        kind: 'community',
+                        options: ['Doctor fee', 'Inheritance', 'Go to jail'],
+                        forPeerId: 'me',
+                    },
+                })}
+                myId="me"
+                onAction={onAction}
+                onClose={vi.fn()}
+                onHelp={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByText('Inheritance'));
+        expect(onAction).toHaveBeenCalledWith({ type: 'choosecard', optionIndex: 1 });
+    });
+
+    it('shows build controls for owned complete sets and sends build actions', () => {
+        const onAction = vi.fn();
+
+        render(
+            <MonopolyBoard
+                game={makeGame({
+                    currentPlayer: 0,
+                    properties: [
+                        { id: 1, name: 'Mediterranean', group: 'brown', price: 60, rent: [2, 4], houses: 0, owner: 'me' },
+                        { id: 2, name: 'Baltic', group: 'brown', price: 60, rent: [4, 8], houses: 0, owner: 'me' },
+                    ],
+                    players: [
+                        { peer_id: 'me', nick: 'Alice', money: 1380, position: 1, properties: [1, 2], inJail: false, eliminated: false },
+                        { peer_id: 'opp', nick: 'Bob', money: 1500, position: 7, properties: [], inJail: false, eliminated: false },
+                    ],
+                })}
+                myId="me"
+                onAction={onAction}
+                onClose={vi.fn()}
+                onHelp={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getAllByText(/Build House/i)[0]);
+        expect(onAction).toHaveBeenCalledWith({ type: 'build', propId: 1 });
+    });
 });

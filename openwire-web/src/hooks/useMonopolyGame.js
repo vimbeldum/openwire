@@ -161,6 +161,34 @@ export default function useMonopolyGame(deps) {
                 });
                 break;
             }
+            case 'mono_choosecard': {
+                if (!amIHost(monoHostRef.current)) break;
+                setMonopolyGame(prev => {
+                    if (!prev) return prev;
+                    const actingPlayer = prev.players[prev.currentPlayer];
+                    if (action.peer_id && action.peer_id !== actingPlayer?.peer_id) return prev;
+                    const updated = mono.chooseCard(prev, action.optionIndex);
+                    setTimeout(() => {
+                        socket.sendRoomMessage(updated.roomId, mono.serializeMonopolyAction({ type: 'mono_state', state: mono.serializeGame(updated) }));
+                    }, 0);
+                    return updated;
+                });
+                break;
+            }
+            case 'mono_build': {
+                if (!amIHost(monoHostRef.current)) break;
+                setMonopolyGame(prev => {
+                    if (!prev) return prev;
+                    const actingPlayer = prev.players[prev.currentPlayer];
+                    if (action.peer_id && action.peer_id !== actingPlayer?.peer_id) return prev;
+                    const updated = mono.buildImprovement(prev, action.propId);
+                    setTimeout(() => {
+                        socket.sendRoomMessage(updated.roomId, mono.serializeMonopolyAction({ type: 'mono_state', state: mono.serializeGame(updated) }));
+                    }, 0);
+                    return updated;
+                });
+                break;
+            }
         }
     }, [addMsg, amIHost]);
 
@@ -202,11 +230,13 @@ export default function useMonopolyGame(deps) {
 
         // Non-host sends actions to host
         if (!amIHost(monoHostRef.current)) {
-            if (action.type === 'begin' || action.type === 'roll' || action.type === 'buy' || action.type === 'auction' || action.type === 'endturn' || action.type === 'jailroll' || action.type === 'escapejail') {
+            if (action.type === 'begin' || action.type === 'roll' || action.type === 'buy' || action.type === 'auction' || action.type === 'endturn' || action.type === 'jailroll' || action.type === 'escapejail' || action.type === 'choosecard' || action.type === 'build') {
                 socket.sendRoomMessage(game.roomId, mono.serializeMonopolyAction({
                     type: `mono_${action.type}`,
                     peer_id: myId,
                     nick: myNick,
+                    optionIndex: action.optionIndex,
+                    propId: action.propId,
                 }));
             }
             return;
@@ -236,6 +266,12 @@ export default function useMonopolyGame(deps) {
                 break;
             case 'escapejail':
                 newGame = mono.escapeJail(game);
+                break;
+            case 'choosecard':
+                newGame = mono.chooseCard(game, action.optionIndex);
+                break;
+            case 'build':
+                newGame = mono.buildImprovement(game, action.propId);
                 break;
             default:
                 return;
