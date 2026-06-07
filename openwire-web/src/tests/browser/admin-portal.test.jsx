@@ -282,7 +282,7 @@ describe('AdminPortal — Close button', () => {
     it('calls onClose when the close (X) button is clicked', async () => {
         const onClose = vi.fn();
         render(<AdminPortal {...makeDefaultProps({ onClose })} />);
-        await userEvent.click(screen.getByRole('button', { name: /✕/i }));
+        await userEvent.click(screen.getByRole('button', { name: /close admin portal/i }));
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 });

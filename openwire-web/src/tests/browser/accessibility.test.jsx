@@ -166,6 +166,26 @@ describe('AdminPasswordGate — accessible form structure', () => {
     });
 });
 
+describe('Accessibility — dialog and overlay semantics', () => {
+    it('AdminPasswordGate overlay has role="dialog" and aria-modal="true"', () => {
+        render(<AdminPasswordGate onSuccess={vi.fn()} onCancel={vi.fn()} />);
+        const overlay = document.querySelector('.admin-overlay');
+        expect(overlay).toHaveAttribute('role', 'dialog');
+        expect(overlay).toHaveAttribute('aria-modal', 'true');
+        expect(overlay).toHaveAttribute('aria-label', 'Admin password required');
+    });
+
+    it('AdminPasswordGate has a close button with accessible label', () => {
+        render(<AdminPasswordGate onSuccess={vi.fn()} onCancel={vi.fn()} />);
+        expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+    });
+
+    it.todo('AccountHistory overlay has role="dialog" and aria-modal="true" with accessible label');
+    it.todo('AccountHistory close button has aria-label="Close account history"');
+    it.todo('AdminPortal overlay has role="dialog" and aria-modal="true" with accessible label');
+    it.todo('AdminPortal close button has aria-label="Close admin portal"');
+});
+
 describe('Accessibility — keyboard and focus (jsdom)', () => {
     it('clicking the admin overlay closes the gate', () => {
         const onCancel = vi.fn();

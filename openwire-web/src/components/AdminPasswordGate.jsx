@@ -28,7 +28,7 @@ export function AdminPasswordGate({ onSuccess, onCancel }) {
     };
 
     return (
-        <div className="admin-overlay" onClick={(e) => e.target === e.currentTarget && onCancel()}>
+        <div className="admin-overlay" role="dialog" aria-modal="true" aria-label="Admin password required" onClick={(e) => e.target === e.currentTarget && onCancel()}>
             <Panel tone="subtle" padding="lg">
                 <div className="admin-gate-icon">🔐</div>
                 <div className="admin-gate-header">

@@ -2523,7 +2523,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                         <div key={t.id} className="mention-toast">
                             <span className="mention-toast-icon">@</span>
                             <span><strong>{t.from}</strong> mentioned you: {t.text.length > 60 ? t.text.slice(0, 60) + '…' : t.text}</span>
-                            <button className="mention-toast-close" onClick={() => setMentionToasts(prev => prev.filter(x => x.id !== t.id))}>✕</button>
+                            <button className="mention-toast-close" onClick={() => setMentionToasts(prev => prev.filter(x => x.id !== t.id))} aria-label="Dismiss mention">✕</button>
                         </div>
                     ))}
                 </div>
@@ -2569,7 +2569,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             {whisperTarget && (
                 <div className="whisper-mode-bar">
                     🤫 Whispering to <strong>{whisperTarget.nick}</strong>
-                    <button onClick={() => setWhisperTarget(null)}>✕ Exit</button>
+                    <button onClick={() => setWhisperTarget(null)} aria-label="Exit whisper mode">✕ Exit</button>
                 </div>
             )}
 
@@ -2642,7 +2642,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     )}
                     {showGifPicker && <Suspense fallback={null}><GifPicker onSelect={handleGifSelect} onClose={() => setShowGifPicker(false)} /></Suspense>}
                 </div>
-                <button type="button" className="gif-btn" onClick={() => setShowGifPicker(!showGifPicker)}>GIF</button>
+                <button type="button" className="gif-btn" onClick={() => setShowGifPicker(!showGifPicker)} aria-label="Open GIF picker">GIF</button>
                 <button
                     type="submit"
                     disabled={!isComposerEnabled(sessionState) || (roomConstraint === '5word' && input.trim().split(/\s+/).filter(Boolean).length > 5)}
@@ -2712,11 +2712,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                             <button
                                 className="whisper-btn"
                                 title={`Whisper to ${p.nick}`}
+                                aria-label={`Whisper to ${p.nick}`}
                                 onClick={() => { setWhisperTarget({ peer_id: p.peer_id, nick: p.nick }); setSidebarOpen(false); }}
                             >🤫</button>
                             <button
                                 className="tip-btn"
                                 title={`Tip ${p.nick}`}
+                                aria-label={`Tip ${p.nick}`}
                                 onClick={() => {
                                     const amount = parseInt(prompt(`Tip amount to ${p.nick}:`), 10);
                                     if (!amount || amount <= 0) return;
@@ -2729,7 +2731,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                                     addMsg('💸', `Tipped ${amount} chips to ${p.nick}!`, 'system');
                                 }}
                             >💰</button>
-                            <button className="poke-btn" title={`Poke ${p.nick}`}
+                            <button className="poke-btn" title={`Poke ${p.nick}`} aria-label={`Poke ${p.nick}`}
                                 onClick={() => handlePoke(p.peer_id, p.nick, 'snowball')}>👊</button>
                         </div>
                     ))}
@@ -3147,6 +3149,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     className={`floating-chat-btn ${showGameChat ? 'active' : ''}`}
                     onClick={() => setShowGameChat(v => !v)}
                     title="Toggle Chat"
+                    aria-label="Toggle floating chat"
                 >
                     {showGameChat ? '✕' : '💬'}
                     {!showGameChat && messages.length > 0 && <span className="floating-chat-badge" />}
@@ -3158,7 +3161,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 <div className="floating-chat-panel">
                     <div className="floating-chat-header">
                         <span>💬 Chat {currentRoomName ? `· #${currentRoomName}` : ''}</span>
-                        <button onClick={() => setShowGameChat(false)}>✕</button>
+                        <button onClick={() => setShowGameChat(false)} aria-label="Close floating chat">✕</button>
                     </div>
                     <div className="floating-chat-messages">
                         {filteredMessages.slice(-50).map((m) => (

@@ -125,7 +125,7 @@ export default function AccountHistory({ deviceId, myId, onClose }) {
     };
 
     return (
-        <div className="ah-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+        <div className="ah-overlay" role="dialog" aria-modal="true" aria-label="Account history" onClick={e => e.target === e.currentTarget && onClose()}>
             <div className="ah-panel">
                 {/* Header */}
                 <div className="ah-header">
@@ -136,7 +136,7 @@ export default function AccountHistory({ deviceId, myId, onClose }) {
                                 Clear
                             </button>
                         )}
-                        <button className="btn-icon-close" onClick={onClose}>✕</button>
+                        <button className="btn-icon-close" onClick={onClose} aria-label="Close account history">✕</button>
                     </div>
                 </div>
 

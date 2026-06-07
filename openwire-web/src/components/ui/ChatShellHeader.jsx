@@ -87,7 +87,7 @@ export default function ChatShellHeader({
               <span className="room-icon">🏠</span>
               <span className="room-label">Room</span>
               <span className="room-name">{currentRoomName}</span>
-              <button className="leave-room-btn" onClick={() => { safeLeaveRoom(currentRoom); setCurrentRoom(null); }} title="Leave Room">✕</button>
+              <button className="leave-room-btn" onClick={() => { safeLeaveRoom(currentRoom); setCurrentRoom(null); }} title="Leave Room" aria-label="Leave room">✕</button>
             </span>
           ) : (
             <span className="general-chat-indicator">
@@ -142,6 +142,7 @@ export default function ChatShellHeader({
               className="btn-account-history"
               onClick={() => setShowAccountHistory(true)}
               title="Account History"
+              aria-label="Account History"
             >📊</button>
             <span className="header-chips">💰 {balance.toLocaleString()}</span>
           </div>
@@ -152,6 +153,7 @@ export default function ChatShellHeader({
               className={`btn-agent-panel ${agentRunning ? 'active' : ''}`}
               onClick={() => setShowAgentPanel(v => !v)}
               title="Pop-Culture Agent Swarm"
+              aria-label="Toggle AI agent panel"
             >🤖</button>
           )}
           <div className="mute-agents-wrapper" ref={muteMenuRef}>
@@ -159,6 +161,7 @@ export default function ChatShellHeader({
               className={`btn-mute-agents ${allAgentsMuted ? 'muted' : ''}`}
               onClick={() => setShowMuteMenu(v => !v)}
               title={allAgentsMuted ? 'AI characters muted' : 'Mute AI characters'}
+              aria-label={allAgentsMuted ? 'Unmute AI characters' : 'Mute AI characters'}
             >{allAgentsMuted ? '🔇' : '🔊'}</button>
             {showMuteMenu && (
               <div className="mute-agents-menu">

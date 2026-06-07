@@ -116,14 +116,14 @@ function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, onAdj
     const richest = peers.reduce((best, p) => (!best || (p.balance || 0) > (best.balance || 0)) ? p : best, null);
 
     return (
-        <div className="admin-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+        <div className="admin-overlay" role="dialog" aria-modal="true" aria-label="Admin portal" onClick={(e) => e.target === e.currentTarget && onClose()}>
             <div className="admin-portal">
                 <div className="admin-header">
                     <div className="admin-title">
                         <span className="admin-badge">🔐 ADMIN</span>
                         <h2>OpenWire Admin Portal</h2>
                     </div>
-                    <button className="bj-close" onClick={onClose}>✕</button>
+                    <button className="bj-close" onClick={onClose} aria-label="Close admin portal">✕</button>
                 </div>
 
                 {/* Tab bar */}
@@ -208,7 +208,7 @@ function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, onAdj
 
                         {/* Adjust balance modal */}
                         {adjustTarget && (
-                            <div className="admin-adjust-modal">
+                            <div className="admin-adjust-modal" role="dialog" aria-modal="true" aria-label="Adjust balance">
                                 <div className="admin-adjust-card">
                                     <h3>Adjust — {adjustTarget.nick}</h3>
                                     <p>Chips: <strong>{(adjustTarget.balance || 0).toLocaleString()}</strong></p>
