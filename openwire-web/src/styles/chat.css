@@ -169,6 +169,109 @@
   }
 }
 
+/* ── Status-dot variants for session states ────────── */
+.status-dot--success {
+  background: var(--green);
+  box-shadow: 0 0 12px var(--green);
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+.status-dot--info {
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(102, 161, 238, 0.6);
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+.status-dot--warning {
+  background: #f59e0b;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+  animation: statusPulse 1.5s ease-in-out infinite;
+}
+
+.status-dot--error {
+  background: var(--red);
+  box-shadow: 0 0 12px var(--red);
+  animation: none;
+}
+
+/* ── Session Status Banner (between ticker and messages) ── */
+.session-status-banner {
+  grid-column: 1;
+  grid-row: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  min-height: 28px;
+  max-height: 28px;
+  overflow: hidden;
+  z-index: 2;
+  position: relative;
+}
+
+/* Reposition messages-area when banner is present (banner shares row 3) */
+.session-status-banner ~ .messages-area {
+  grid-row: 4;
+}
+
+.session-status-banner--info {
+  background: rgba(102, 161, 238, 0.12);
+  border-bottom: 1px solid rgba(102, 161, 238, 0.2);
+  color: var(--accent);
+}
+
+.session-status-banner--warning {
+  background: rgba(245, 158, 11, 0.12);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+.session-status-banner--error {
+  background: rgba(232, 58, 48, 0.12);
+  border-bottom: 1px solid rgba(232, 58, 48, 0.2);
+  color: var(--red);
+}
+
+.session-status-banner .banner-icon {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+}
+
+.session-status-banner .banner-text {
+  flex: 1;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Disabled composer state ── */
+.chat-input.composer-disabled input {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.chat-input.composer-disabled input::placeholder {
+  color: var(--text-dim);
+  opacity: 0.4;
+}
+
+.chat-input.composer-disabled button[type="submit"] {
+  opacity: 0.35;
+  cursor: not-allowed;
+  background: rgba(102, 102, 102, 0.4);
+  background-image: none;
+}
+
+.chat-input.composer-disabled button[type="submit"]:hover {
+  transform: none;
+  box-shadow: none;
+}
+
 /* ── Messages Area (primary conversation surface) ── */
 .messages-area {
   grid-column: 1;

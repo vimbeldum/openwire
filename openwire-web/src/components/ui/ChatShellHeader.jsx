@@ -1,5 +1,6 @@
 import { CHAOS_PERSONALITIES, ROOM_CONSTRAINTS } from '../../lib/chaosAgent';
 import Badge from './Badge';
+import { SessionStatus, getStatusLabel, getStatusVariant } from '../../lib/chatSessionState';
 
 export default function ChatShellHeader({
   /* Navigation */
@@ -22,6 +23,7 @@ export default function ChatShellHeader({
   cliHost,
   connected,
   peers,
+  sessionState,
 
   /* Wallet */
   myWallet,
@@ -51,6 +53,9 @@ export default function ChatShellHeader({
   activePoke,
   setActivePoke,
 }) {
+  const statusVariant = getStatusVariant(sessionState);
+  const statusLabel = getStatusLabel(sessionState);
+
   return (
     <header className="chat-header">
       <div className="header-brand">
@@ -102,8 +107,13 @@ export default function ChatShellHeader({
           }
         </div>
         <div className="header-presence-block">
-          <span className={`status-dot ${connected ? '' : 'offline'}`} />
-          <span className="header-online-count">{connected ? `${peers.length} online` : 'Connecting...'}</span>
+          <span className={`status-dot status-dot--${statusVariant}`} />
+          <span className="header-online-count">
+            {sessionState.status === SessionStatus.CONNECTED
+              ? `${peers.length} online`
+              : statusLabel
+            }
+          </span>
         </div>
         {myWallet && (
           <div className="header-wallet-block">

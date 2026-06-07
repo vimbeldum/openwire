@@ -73,6 +73,8 @@ import {
   sessionStateReducer,
   SessionStatus,
   isComposerEnabled,
+  getStatusLabel,
+  getStatusVariant,
 } from '../lib/chatSessionState.js';
 import { getRoomAlias } from '../lib/core/identity.js';
 import { loadStore, getCharactersDict } from '../lib/agents/agentStore.js';
@@ -2473,6 +2475,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 connectionConfig={connectionConfig}
                 cliHost={cliHost}
                 connected={connected}
+                sessionState={sessionState}
                 peers={peers}
                 myWallet={myWallet}
                 balance={balance}
@@ -2529,9 +2532,23 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             {/* Casino Live Ticker — game events only, separate from chat */}
             <LiveTicker items={tickerItems} />
 
+            {sessionState.status !== SessionStatus.CONNECTED && (
+                <div className={`session-status-banner session-status-banner--${getStatusVariant(sessionState)}`} role="status" aria-live="polite">
+                    <span className="banner-icon">
+                        {sessionState.status === SessionStatus.RECONNECTING && '🔄'}
+                        {sessionState.status === SessionStatus.RECONNECT_FAILED && '🔌'}
+                        {sessionState.status === SessionStatus.CONNECTING && '🔌'}
+                        {sessionState.status === SessionStatus.DISCONNECTED && '🚫'}
+                        {sessionState.status === SessionStatus.CLI_NODE_CONNECTING && '🔗'}
+                        {sessionState.status === SessionStatus.CLI_NODE_FALLBACK && '⚠️'}
+                    </span>
+                    <span className="banner-text">{getStatusLabel(sessionState)}</span>
+                </div>
+            )}
+
             <div className="messages-area">
                 {filteredMessages.length === 0 && (
-                    <ConversationEmptyState />
+                    <ConversationEmptyState sessionState={sessionState} />
                 )}
                 {filteredMessages.map((m) => (
                     <MessageRow
@@ -2556,7 +2573,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 </div>
             )}
 
-            <form className="chat-input" onSubmit={(e) => { if (mentionQuery !== null && mentionSuggestions.length > 0) { e.preventDefault(); return; } handleSend(e); }}>
+            <form className={`chat-input${!isComposerEnabled(sessionState) ? ' composer-disabled' : ''}`} onSubmit={(e) => { if (!isComposerEnabled(sessionState)) { e.preventDefault(); return; } if (mentionQuery !== null && mentionSuggestions.length > 0) { e.preventDefault(); return; } handleSend(e); }}>
                 <div className="chat-input-wrapper" style={{ flex: 1, position: 'relative' }}>
                     {mentionSuggestions.length > 0 && mentionQuery !== null && (
                         <div className="mention-dropdown">
@@ -2595,11 +2612,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                         type="text"
                         className={roomConstraint === 'emoji' ? 'constraint-emoji-input' : roomConstraint === 'nobackspace' ? 'constraint-nobackspace-input' : ''}
                         placeholder={
-                            roomConstraint === 'emoji' ? 'Emoji only...'
-                            : roomConstraint === '5word' ? 'Max 5 words...'
-                            : roomConstraint === 'nobackspace' ? 'Type carefully...'
-                            : currentRoom ? `Message #${rooms.find(r => r.room_id === currentRoom)?.name || 'room'}...` : 'Message General Chat... (or /help)'
+                            !isComposerEnabled(sessionState)
+                              ? 'Session unavailable - messages disabled'
+                              : roomConstraint === 'emoji' ? 'Emoji only...'
+                              : roomConstraint === '5word' ? 'Max 5 words...'
+                              : roomConstraint === 'nobackspace' ? 'Type carefully...'
+                              : currentRoom ? `Message #${rooms.find(r => r.room_id === currentRoom)?.name || 'room'}...` : 'Message General Chat... (or /help)'
                         }
+                        disabled={!isComposerEnabled(sessionState)}
                         value={input}
                         onChange={(e) => {
                             handleInputChange(e);
@@ -2625,7 +2645,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 <button type="button" className="gif-btn" onClick={() => setShowGifPicker(!showGifPicker)}>GIF</button>
                 <button
                     type="submit"
-                    disabled={roomConstraint === '5word' && input.trim().split(/\s+/).filter(Boolean).length > 5}
+                    disabled={!isComposerEnabled(sessionState) || (roomConstraint === '5word' && input.trim().split(/\s+/).filter(Boolean).length > 5)}
                 >Send</button>
             </form>
 
