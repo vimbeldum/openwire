@@ -91,8 +91,8 @@ test.describe('Landing Page Form Interactions', () => {
 
         // Should navigate away from Landing into ChatRoom
         await expect(page.locator('.landing')).not.toBeVisible();
-        await expect(page.locator('.global-header')).toBeVisible();
-        await expect(page.locator('.global-header strong')).toHaveText('EnterKeyUser');
+        await expect(page.locator('.chat-header')).toBeVisible();
+        await expect(page.locator('.chat-header .header-nick')).toHaveText('EnterKeyUser');
     });
 
     test('Tab key moves focus from nickname input to mode radios', async ({ page }) => {
@@ -149,9 +149,9 @@ test.describe('Landing Page Form Interactions', () => {
 
         // Should navigate to ChatRoom with CLI badge
         await expect(page.locator('.landing')).not.toBeVisible();
-        await expect(page.locator('.global-header')).toBeVisible();
-        await expect(page.locator('.global-header strong')).toHaveText('CliEnterUser');
-        await expect(page.locator('.connection-mode-badge')).toContainText('CLI Node');
+        await expect(page.locator('.chat-header')).toBeVisible();
+        await expect(page.locator('.chat-header .header-nick')).toHaveText('CliEnterUser');
+        await expect(page.locator('.chat-header .connection-mode-badge')).toContainText('CLI Node');
     });
 
     test('form submit with very long nickname truncates to 24 chars', async ({ page }) => {
@@ -166,8 +166,8 @@ test.describe('Landing Page Form Interactions', () => {
 
         // Submit and verify the displayed nick is at most 24 chars
         await page.locator('.landing-card button[type="submit"]').click();
-        await expect(page.locator('.global-header')).toBeVisible();
-        const displayedNick = await page.locator('.global-header strong').textContent();
+        await expect(page.locator('.chat-header')).toBeVisible();
+        const displayedNick = await page.locator('.chat-header .header-nick').textContent();
         expect(displayedNick.length).toBeLessThanOrEqual(24);
     });
 
@@ -181,8 +181,8 @@ test.describe('Landing Page Form Interactions', () => {
         await submitBtn.click();
 
         // Should end up in ChatRoom successfully (not in an error state)
-        await expect(page.locator('.global-header')).toBeVisible();
-        await expect(page.locator('.global-header strong')).toHaveText('RapidUser');
+        await expect(page.locator('.chat-header')).toBeVisible();
+        await expect(page.locator('.chat-header .header-nick')).toHaveText('RapidUser');
 
         // Verify only one session is stored (not duplicated)
         const session = await page.evaluate(() =>
@@ -207,8 +207,8 @@ test.describe('Session & Navigation Flow', () => {
         const nickInput = page.locator('input[placeholder="Enter your nickname..."]');
         await nickInput.fill('FlowUser');
         await page.locator('.landing-card button[type="submit"]').click();
-        await expect(page.locator('.global-header')).toBeVisible();
-        await expect(page.locator('.global-header strong')).toHaveText('FlowUser');
+        await expect(page.locator('.chat-header')).toBeVisible();
+        await expect(page.locator('.chat-header .header-nick')).toHaveText('FlowUser');
         await expect(page.locator('.chat-layout')).toBeVisible();
 
         // Logout
@@ -220,8 +220,8 @@ test.describe('Session & Navigation Flow', () => {
         const nickInput2 = page.locator('input[placeholder="Enter your nickname..."]');
         await nickInput2.fill('FlowUser2');
         await page.locator('.landing-card button[type="submit"]').click();
-        await expect(page.locator('.global-header')).toBeVisible();
-        await expect(page.locator('.global-header strong')).toHaveText('FlowUser2');
+        await expect(page.locator('.chat-header')).toBeVisible();
+        await expect(page.locator('.chat-header .header-nick')).toHaveText('FlowUser2');
         await expect(page.locator('.chat-layout')).toBeVisible();
     });
 
@@ -233,13 +233,13 @@ test.describe('Session & Navigation Flow', () => {
         await loginAs(page, 'ReloadUser');
         await setWallet(page, 3000);
         await page.goto('/');
-        await expect(page.locator('.global-header')).toBeVisible();
+        await expect(page.locator('.chat-header')).toBeVisible();
         await expect(page.locator('.chat-layout')).toBeVisible();
 
         // Reload the page
         await page.reload();
-        await expect(page.locator('.global-header')).toBeVisible();
-        await expect(page.locator('.global-header strong')).toHaveText('ReloadUser');
+        await expect(page.locator('.chat-header')).toBeVisible();
+        await expect(page.locator('.chat-header .header-nick')).toHaveText('ReloadUser');
         await expect(page.locator('.chat-layout')).toBeVisible();
         await expect(page.locator('.landing')).not.toBeVisible();
     });
@@ -249,7 +249,7 @@ test.describe('Session & Navigation Flow', () => {
         // Start with a logged-in session
         await loginAs(page, 'ClearStorageUser');
         await page.goto('/');
-        await expect(page.locator('.global-header')).toBeVisible();
+        await expect(page.locator('.chat-header')).toBeVisible();
 
         // Manually clear localStorage (simulates user clearing browser data)
         await page.evaluate(() => localStorage.clear());
@@ -355,7 +355,7 @@ test.describe('Header Interactions', () => {
         await loginAs(page, 'HeaderUser');
         await setWallet(page, 1000);
         await page.goto('/');
-        await page.waitForSelector('.global-header');
+        await page.waitForSelector('.chat-header');
 
         const logoutBtn = page.locator('.btn-logout');
         await expect(logoutBtn).toBeVisible();
@@ -367,7 +367,7 @@ test.describe('Header Interactions', () => {
         await loginAs(page, 'HistoryUser');
         await setWallet(page, 1000);
         await page.goto('/');
-        await page.waitForSelector('.global-header');
+        await page.waitForSelector('.chat-header');
 
         const historyBtn = page.locator('.btn-account-history');
         await expect(historyBtn).toBeVisible();
@@ -377,7 +377,7 @@ test.describe('Header Interactions', () => {
         await historyBtn.click();
         // The AccountHistory component is lazy-loaded; wait briefly for it
         // Just verify no crash occurred and the button is still accessible
-        await expect(page.locator('.global-header')).toBeVisible();
+        await expect(page.locator('.chat-header')).toBeVisible();
     });
 
     test('admin agent button visible only for admin users', async ({ page }) => {
@@ -385,7 +385,7 @@ test.describe('Header Interactions', () => {
         await mockWebSocket(page);
         await loginAs(page, 'AdminHeaderUser', true);
         await page.goto('/');
-        await page.waitForSelector('.global-header');
+        await page.waitForSelector('.chat-header');
 
         const agentBtn = page.locator('.btn-agent-panel');
         await expect(agentBtn).toBeVisible();
@@ -396,7 +396,7 @@ test.describe('Header Interactions', () => {
         await mockWebSocket(page);
         await loginAs(page, 'RegularHeaderUser', false);
         await page.goto('/');
-        await page.waitForSelector('.global-header');
+        await page.waitForSelector('.chat-header');
 
         const agentBtn = page.locator('.btn-agent-panel');
         await expect(agentBtn).not.toBeVisible();
@@ -406,12 +406,12 @@ test.describe('Header Interactions', () => {
         await mockWebSocket(page);
         await loginAs(page, 'RelayBadgeUser');
         await page.goto('/');
-        await page.waitForSelector('.global-header');
+        await page.waitForSelector('.chat-header');
 
-        const badge = page.locator('.connection-mode-badge');
+        const badge = page.locator('.chat-header .connection-mode-badge');
         await expect(badge).toBeVisible();
         await expect(badge).toHaveClass(/connection-mode-relay/);
-        await expect(badge).toContainText('OpenWire Relay');
+        await expect(badge).toContainText('Relay');
     });
 
     test('connection mode badge shows CLI Node when connected via CLI', async ({ page }) => {
@@ -429,11 +429,11 @@ test.describe('Header Interactions', () => {
         await cliInput.fill('ws://192.168.1.100:18080');
         await page.locator('.landing-card button[type="submit"]').click();
 
-        await expect(page.locator('.global-header')).toBeVisible();
-        const badge = page.locator('.connection-mode-badge');
+        await expect(page.locator('.chat-header')).toBeVisible();
+        const badge = page.locator('.chat-header .connection-mode-badge');
         await expect(badge).toBeVisible();
         await expect(badge).toHaveClass(/connection-mode-cli/);
-        await expect(badge).toContainText('CLI Node');
+        await expect(badge).toContainText('CLI');
         await expect(badge).toContainText('192.168.1.100:18080');
     });
 });

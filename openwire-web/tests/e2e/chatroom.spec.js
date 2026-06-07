@@ -18,10 +18,10 @@ test.describe('ChatRoom', () => {
     // ── 1. Basic rendering ────────────────────────────────────────
 
     test('renders ChatRoom when logged in', async ({ page }) => {
-        // Global header shows the logged-in nick
-        const header = page.locator('.global-header');
+        // Chat header shows the logged-in nick
+        const header = page.locator('.chat-header');
         await expect(header).toBeVisible();
-        await expect(header.locator('strong')).toHaveText('TestUser');
+        await expect(header.locator('.header-nick')).toHaveText('TestUser');
 
         // Chat layout is present (ChatRoom renders .chat-layout)
         await expect(page.locator('.chat-layout')).toBeVisible();

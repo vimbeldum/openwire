@@ -2444,80 +2444,106 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     return (
         <div className="chat-layout">
             <header className="chat-header">
-                <button className="hamburger-btn" onClick={() => setSidebarOpen(v => !v)} aria-label="Toggle sidebar">☰</button>
-                <h1>⚡ OpenWire</h1>
-                <div className="header-context">
-                    {currentRoomName ? (
-                        <span className="current-room-indicator">
-                            <span className="room-icon">🏠</span>
-                            <span className="room-name">{currentRoomName}</span>
-                            <button className="leave-room-btn" onClick={() => { safeLeaveRoom(currentRoom); setCurrentRoom(null); }} title="Leave Room">✕</button>
-                        </span>
-                    ) : (
-                        <span className="general-chat-indicator">💬 General Chat</span>
-                    )}
-                    {roomConstraint && (
-                        <span className="constraint-badge">{ROOM_CONSTRAINTS[roomConstraint].badge}</span>
-                    )}
-                    {chaosEnabled && (
-                        <span className="constraint-badge chaos-badge">{CHAOS_PERSONALITIES[chaosPersonality].emoji} Chaos ON</span>
-                    )}
+                <div className="header-brand">
+                    <button
+                        className="hamburger-btn"
+                        onClick={() => setSidebarOpen(v => !v)}
+                        aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+                        aria-expanded={sidebarOpen}
+                        aria-controls="chat-sidebar"
+                    >☰</button>
+                    <div className="header-brand-copy">
+                        <h1>⚡ OpenWire</h1>
+                        <p className="header-brand-tagline">Premium Bento chat shell</p>
+                    </div>
                 </div>
-                <div className="header-status">
-                    <span className="header-nick">{myNick}</span>
-                    {isCliMode
-                        ? <span className="connection-mode-badge connection-mode-cli" title={connectionConfig.cliUrl}>
-                            <span className="connection-mode-lock">&#128274;</span> CLI ({cliHost})
-                          </span>
-                        : <span className="connection-mode-badge connection-mode-relay">Relay</span>
-                    }
-                    <span className={`status-dot ${connected ? '' : 'offline'}`} />
-                    <span className="header-online-count">{connected ? `${peers.length} online` : 'Connecting...'}</span>
+                <div className="header-context" aria-label="Conversation context">
+                    <div className="header-context-primary">
+                        {currentRoomName ? (
+                            <span className="current-room-indicator">
+                                <span className="room-icon">🏠</span>
+                                <span className="room-label">Room</span>
+                                <span className="room-name">{currentRoomName}</span>
+                                <button className="leave-room-btn" onClick={() => { safeLeaveRoom(currentRoom); setCurrentRoom(null); }} title="Leave Room">✕</button>
+                            </span>
+                        ) : (
+                            <span className="general-chat-indicator">
+                                <span className="room-icon">💬</span>
+                                <span className="room-label">Channel</span>
+                                <span className="room-name">General Chat</span>
+                            </span>
+                        )}
+                    </div>
+                    <div className="header-context-badges">
+                        {roomConstraint && (
+                            <span className="constraint-badge">{ROOM_CONSTRAINTS[roomConstraint].badge}</span>
+                        )}
+                        {chaosEnabled && (
+                            <span className="constraint-badge chaos-badge">{CHAOS_PERSONALITIES[chaosPersonality].emoji} Chaos ON</span>
+                        )}
+                    </div>
+                </div>
+                <div className="header-status" aria-label="Session status">
+                    <div className="header-identity-block">
+                        <span className="header-nick">{myNick}</span>
+                        {isCliMode
+                            ? <span className="connection-mode-badge connection-mode-cli" title={connectionConfig.cliUrl}>
+                                <span className="connection-mode-lock">&#128274;</span> CLI Node ({cliHost})
+                              </span>
+                            : <span className="connection-mode-badge connection-mode-relay">OpenWire Relay</span>
+                        }
+                    </div>
+                    <div className="header-presence-block">
+                        <span className={`status-dot ${connected ? '' : 'offline'}`} />
+                        <span className="header-online-count">{connected ? `${peers.length} online` : 'Connecting...'}</span>
+                    </div>
                     {myWallet && (
-                        <>
+                        <div className="header-wallet-block">
                             <button
                                 className="btn-account-history"
                                 onClick={() => setShowAccountHistory(true)}
                                 title="Account History"
                             >📊</button>
                             <span className="header-chips">💰 {balance.toLocaleString()}</span>
-                        </>
+                        </div>
                     )}
-                    {isAdminRef.current && (
-                    <button
-                        className={`btn-agent-panel ${agentRunning ? 'active' : ''}`}
-                        onClick={() => setShowAgentPanel(v => !v)}
-                        title="Pop-Culture Agent Swarm"
-                    >🤖</button>
-                    )}
-                    <div className="mute-agents-wrapper" ref={muteMenuRef}>
+                    <div className="header-actions">
+                        {isAdminRef.current && (
                         <button
-                            className={`btn-mute-agents ${allAgentsMuted ? 'muted' : ''}`}
-                            onClick={() => setShowMuteMenu(v => !v)}
-                            title={allAgentsMuted ? 'AI characters muted' : 'Mute AI characters'}
-                        >{allAgentsMuted ? '🔇' : '🔊'}</button>
-                        {showMuteMenu && (
-                            <div className="mute-agents-menu">
-                                <div className="mute-menu-header">
-                                    <span>AI Characters</span>
-                                    <button className="mute-menu-toggle-all" onClick={toggleMuteAll}>
-                                        {allAgentsMuted ? 'Unmute All' : 'Mute All'}
-                                    </button>
-                                </div>
-                                {Object.values(CHARACTERS).map(c => (
-                                    <label key={c.id} className="mute-menu-row">
-                                        <input
-                                            type="checkbox"
-                                            checked={!mutedAgents[c.id]}
-                                            onChange={() => toggleMuteAgent(c.id)}
-                                        />
-                                        <span>{c.avatar} {c.name}</span>
-                                    </label>
-                                ))}
-                            </div>
+                            className={`btn-agent-panel ${agentRunning ? 'active' : ''}`}
+                            onClick={() => setShowAgentPanel(v => !v)}
+                            title="Pop-Culture Agent Swarm"
+                        >🤖</button>
                         )}
+                        <div className="mute-agents-wrapper" ref={muteMenuRef}>
+                            <button
+                                className={`btn-mute-agents ${allAgentsMuted ? 'muted' : ''}`}
+                                onClick={() => setShowMuteMenu(v => !v)}
+                                title={allAgentsMuted ? 'AI characters muted' : 'Mute AI characters'}
+                            >{allAgentsMuted ? '🔇' : '🔊'}</button>
+                            {showMuteMenu && (
+                                <div className="mute-agents-menu">
+                                    <div className="mute-menu-header">
+                                        <span>AI Characters</span>
+                                        <button className="mute-menu-toggle-all" onClick={toggleMuteAll}>
+                                            {allAgentsMuted ? 'Unmute All' : 'Mute All'}
+                                        </button>
+                                    </div>
+                                    {Object.values(CHARACTERS).map(c => (
+                                        <label key={c.id} className="mute-menu-row">
+                                            <input
+                                                type="checkbox"
+                                                checked={!mutedAgents[c.id]}
+                                                onChange={() => toggleMuteAgent(c.id)}
+                                            />
+                                            <span>{c.avatar} {c.name}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        {onLogout && <button className="btn-logout" onClick={onLogout}>Logout</button>}
                     </div>
-                    {onLogout && <button className="btn-logout" onClick={onLogout}>Logout</button>}
                 </div>
             </header>
 
@@ -2560,8 +2586,8 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 {filteredMessages.length === 0 && (
                     <div className="empty-state">
                         <div className="empty-state-icon">⚡</div>
-                        <div className="empty-state-title">Welcome to OpenWire</div>
-                        <div className="empty-state-hint">Type a message below or open a game from the sidebar</div>
+                        <div className="empty-state-title">Your Bento shell is ready</div>
+                        <div className="empty-state-hint">Start the conversation below, browse room context in the sidebar, or launch a game when your table is ready.</div>
                     </div>
                 )}
                 {filteredMessages.map((m) => (
@@ -2660,7 +2686,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 >Send</button>
             </form>
 
-            <div className={`sidebar${sidebarOpen ? ' mobile-open' : ''}`}>
+            <div className={`sidebar${sidebarOpen ? ' mobile-open' : ''}`} id="chat-sidebar" aria-label="Room and peer context">
                 <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar">✕</button>
                 <div className="sidebar-section">
                     <div className="sidebar-title">Channels</div>
