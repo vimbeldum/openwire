@@ -29,7 +29,7 @@ export function AdminPasswordGate({ onSuccess, onCancel }) {
 
     return (
         <div className="admin-overlay" onClick={(e) => e.target === e.currentTarget && onCancel()}>
-            <Panel className="admin-gate-card" tone="subtle" padding="lg">
+            <Panel tone="subtle" padding="lg">
                 <div className="admin-gate-icon">🔐</div>
                 <div className="admin-gate-header">
                     <h2>Admin Access</h2>

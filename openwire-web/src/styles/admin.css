@@ -530,53 +530,6 @@
   text-align: center;
 }
 
-/* Password gate */
-.admin-gate-card {
-  background: var(--glass-bg);
-  border: 1px solid rgba(102, 161, 238, 0.2);
-  border-radius: var(--radius-lg);
-  padding: 2.5rem;
-  min-width: 340px;
-  text-align: center;
-  box-shadow: var(--shadow-elevated), 0 0 60px rgba(102, 161, 238, 0.08);
-}
-
-.admin-gate-icon {
-  font-size: 3rem;
-  margin-bottom: 0.75rem;
-}
-
-.admin-gate-card h2 {
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: var(--accent);
-  margin-bottom: 1.25rem;
-}
-
-.admin-gate-card input {
-  width: 100%;
-  padding: 0.85rem 1.2rem;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-family: var(--font);
-  font-size: 0.95rem;
-  outline: none;
-  transition: border-color 0.2s;
-  text-align: center;
-  letter-spacing: 0.1em;
-}
-
-.admin-gate-card input:focus {
-  border-color: var(--accent);
-}
-
-.admin-gate-error {
-  color: var(--red);
-  font-size: 0.85rem;
-  margin-top: 0.5rem;
-}
 
 .admin-gate-actions {
   display: flex;
