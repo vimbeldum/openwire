@@ -70,4 +70,28 @@ describe('MonopolyBoard', () => {
         fireEvent.click(screen.getAllByText(/Help/i)[0]);
         expect(screen.getByText(/My Properties/i)).toBeInTheDocument();
     });
+
+    it('shows a lobby start button for the host and triggers begin', () => {
+        const onAction = vi.fn();
+
+        render(
+            <MonopolyBoard
+                game={makeGame({
+                    phase: 'lobby',
+                    players: [
+                        { peer_id: 'me', nick: 'Alice', money: 1500, position: 0, properties: [], inJail: false, eliminated: false },
+                        { peer_id: 'opp', nick: 'Bob', money: 1500, position: 0, properties: [], inJail: false, eliminated: false },
+                    ],
+                })}
+                myId="me"
+                isHost={true}
+                onAction={onAction}
+                onClose={vi.fn()}
+                onHelp={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByText(/Start Game/i));
+        expect(onAction).toHaveBeenCalledWith({ type: 'begin' });
+    });
 });

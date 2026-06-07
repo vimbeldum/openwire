@@ -221,6 +221,7 @@ export function startGame(game) {
         phase: 'rolling',
         currentPlayer: 0,
         turnNumber: 1,
+        log: [...game.log, `Monopoly started with ${game.players.length} players.`],
     };
 }
 
@@ -292,7 +293,7 @@ function handleSpace(game, space, diceSum) {
         case 'property':
         case 'railroad':
         case 'utility': {
-            const prop = getPropertyById(space.propId);
+            const prop = game.properties.find((property) => property.id === space.propId);
             if (!prop) return { ...game, phase: 'rolling', diceRolled: false };
             if (prop.owner !== null) {
                 // Pay rent
@@ -320,6 +321,7 @@ function handleSpace(game, space, diceSum) {
                         return handleBankruptcy(game, game.currentPlayer);
                     }
                 }
+                return { ...game, phase: 'rolling', diceRolled: true };
             }
             return { ...game, phase: 'property' };
         }
@@ -348,20 +350,20 @@ function handleSpace(game, space, diceSum) {
                         i === game.currentPlayer ? { ...p, position: 0, money: p.money + 200 } : p
                     ),
                     phase: 'rolling',
-                    diceRolled: false,
+                    diceRolled: true,
                 };
             }
             if (card === 'Go back 3 spaces') {
                 const newPos = (player.position - 3 + 40) % 40;
                 const newSpace = BOARD_SPACES[newPos];
-                return {
+                return handleSpace({
                     ...game,
                     players: game.players.map((p, i) =>
                         i === game.currentPlayer ? { ...p, position: newPos } : p
                     ),
                     phase: 'rolling',
-                    diceRolled: false,
-                };
+                    diceRolled: true,
+                }, newSpace, diceSum);
             }
             if (card === 'Advance to nearest utility') {
                 // Utilities are at positions 12 and 28
@@ -400,7 +402,7 @@ function handleSpace(game, space, diceSum) {
                 };
                 return handleSpace(newGame2, newSpace, diceSum);
             }
-            return { ...game, phase: 'rolling', diceRolled: false };
+            return { ...game, phase: 'rolling', diceRolled: true };
         }
         case 'community': {
             const card = game.deck.communityChest[0];
@@ -420,7 +422,7 @@ function handleSpace(game, space, diceSum) {
                     phase: 'jail',
                 };
             }
-            return { ...game, phase: 'rolling', diceRolled: false };
+            return { ...game, phase: 'rolling', diceRolled: true };
         }
         case 'tax': {
             const owed = space.amount;
@@ -435,7 +437,7 @@ function handleSpace(game, space, diceSum) {
             if (updatedPlayer.money < 0) {
                 return handleBankruptcy(game, game.currentPlayer);
             }
-            return { ...game, phase: 'rolling', diceRolled: false };
+            return { ...game, phase: 'rolling', diceRolled: true };
         }
         case 'gotojail':
             return {
@@ -448,13 +450,13 @@ function handleSpace(game, space, diceSum) {
                 phase: 'jail',
             };
         case 'go':
-            return { ...game, phase: 'rolling', diceRolled: false };
+            return { ...game, phase: 'rolling', diceRolled: true };
         case 'jail':
-            return { ...game, phase: 'jail' };
+            return { ...game, phase: 'rolling', diceRolled: true };
         case 'free':
-            return { ...game, phase: 'rolling', diceRolled: false };
+            return { ...game, phase: 'rolling', diceRolled: true };
         default:
-            return { ...game, phase: 'rolling', diceRolled: false };
+            return { ...game, phase: 'rolling', diceRolled: true };
     }
 }
 

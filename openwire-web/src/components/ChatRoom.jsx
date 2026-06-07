@@ -731,7 +731,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         monopolyGame, setMonopolyGame,
         monopolyRef, monoHostRef, hasJoinedMono,
         monoTimerRef,
-        handleMonopolyAction, startMonopoly, handleMonoAction,
+        handleMonopolyAction, startMonopoly, joinMonopoly, handleMonoAction,
     } = useMonopolyGame(gameDeps);
 
     const {
@@ -796,11 +796,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 addMsg('\u2605', '\uD83D\uDD0D Joined Murder Mystery!', 'system');
                 break;
             case 'monopoly':
-                hasJoinedMono.current = true;
-                monoHostRef.current = inviteData.host;
-                socket.sendRoomMessage(inviteData.room_id, mono.serializeMonopolyAction({
-                    type: 'mono_join', peer_id: myId, nick: myNick,
-                }));
+                joinMonopoly(inviteData.room_id, inviteData.host);
                 addMsg('\u2605', '\u{1F3E0} Joined Monopoly!', 'system');
                 break;
             case 'cluedo':
@@ -2796,7 +2792,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                                 <button className="sidebar-btn" onClick={() => {
                                     const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
                                     if (!roomId) { addMsg('\u2605', '\u26A0 Select or create a room first', 'system'); return; }
-                                    if (monopolyRef.current) { setSidebarOpen(false); return; }
+                                    if (monopolyRef.current && hasJoinedMono.current) { setMonopolyGame(monopolyRef.current); setSidebarOpen(false); return; }
+                                    if (monoHostRef.current && !hasJoinedMono.current) {
+                                        joinMonopoly(roomId, monoHostRef.current);
+                                        addMsg('\u2605', '\u{1F3E0} Joining Monopoly lobby...', 'system');
+                                        setSidebarOpen(false);
+                                        return;
+                                    }
                                     startMonopoly(roomId);
                                     setSidebarOpen(false);
                                 }}>{'\u{1F3E0}'} Monopoly</button>

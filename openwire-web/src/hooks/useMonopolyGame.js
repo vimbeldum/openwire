@@ -47,19 +47,42 @@ export default function useMonopolyGame(deps) {
                 setMonopolyGame(prev => {
                     if (!prev) return prev;
                     const updated = mono.addPlayer(prev, action.peer_id, action.nick);
-                    if (updated !== prev) {
-                        setTimeout(() => {
-                            socket.sendRoomMessage(updated.roomId, mono.serializeMonopolyAction({ type: 'mono_state', state: mono.serializeGame(updated) }));
-                        }, 0);
-                    }
+                    const nextGame = updated !== prev ? updated : prev;
+                    setTimeout(() => {
+                        socket.sendRoomMessage(nextGame.roomId, mono.serializeMonopolyAction({ type: 'mono_state', state: mono.serializeGame(nextGame) }));
+                    }, 0);
+                    return nextGame;
+                });
+                break;
+            }
+            case 'mono_begin': {
+                if (!amIHost(monoHostRef.current)) break;
+                setMonopolyGame(prev => {
+                    if (!prev) return prev;
+                    const updated = mono.startGame(prev);
+                    setTimeout(() => {
+                        socket.sendRoomMessage(updated.roomId, mono.serializeMonopolyAction({ type: 'mono_state', state: mono.serializeGame(updated) }));
+                    }, 0);
                     return updated;
                 });
+                break;
+            }
+            case 'mono_rejoin': {
+                if (!amIHost(monoHostRef.current) || !monopolyRef.current) break;
+                setTimeout(() => {
+                    socket.sendRoomMessage(monopolyRef.current.roomId, mono.serializeMonopolyAction({
+                        type: 'mono_state',
+                        state: mono.serializeGame(monopolyRef.current),
+                    }));
+                }, 0);
                 break;
             }
             case 'mono_roll': {
                 if (!amIHost(monoHostRef.current)) break;
                 setMonopolyGame(prev => {
                     if (!prev) return prev;
+                    const actingPlayer = prev.players[prev.currentPlayer];
+                    if (action.peer_id && action.peer_id !== actingPlayer?.peer_id) return prev;
                     const updated = mono.roll(prev);
                     setTimeout(() => {
                         socket.sendRoomMessage(updated.roomId, mono.serializeMonopolyAction({ type: 'mono_state', state: mono.serializeGame(updated) }));
@@ -72,6 +95,8 @@ export default function useMonopolyGame(deps) {
                 if (!amIHost(monoHostRef.current)) break;
                 setMonopolyGame(prev => {
                     if (!prev) return prev;
+                    const actingPlayer = prev.players[prev.currentPlayer];
+                    if (action.peer_id && action.peer_id !== actingPlayer?.peer_id) return prev;
                     const updated = mono.buyProperty(prev);
                     setTimeout(() => {
                         socket.sendRoomMessage(updated.roomId, mono.serializeMonopolyAction({ type: 'mono_state', state: mono.serializeGame(updated) }));
@@ -84,6 +109,8 @@ export default function useMonopolyGame(deps) {
                 if (!amIHost(monoHostRef.current)) break;
                 setMonopolyGame(prev => {
                     if (!prev) return prev;
+                    const actingPlayer = prev.players[prev.currentPlayer];
+                    if (action.peer_id && action.peer_id !== actingPlayer?.peer_id) return prev;
                     const updated = mono.auctionProperty(prev);
                     setTimeout(() => {
                         socket.sendRoomMessage(updated.roomId, mono.serializeMonopolyAction({ type: 'mono_state', state: mono.serializeGame(updated) }));
@@ -96,6 +123,8 @@ export default function useMonopolyGame(deps) {
                 if (!amIHost(monoHostRef.current)) break;
                 setMonopolyGame(prev => {
                     if (!prev) return prev;
+                    const actingPlayer = prev.players[prev.currentPlayer];
+                    if (action.peer_id && action.peer_id !== actingPlayer?.peer_id) return prev;
                     const updated = mono.endTurn(prev);
                     setTimeout(() => {
                         socket.sendRoomMessage(updated.roomId, mono.serializeMonopolyAction({ type: 'mono_state', state: mono.serializeGame(updated) }));
@@ -108,6 +137,8 @@ export default function useMonopolyGame(deps) {
                 if (!amIHost(monoHostRef.current)) break;
                 setMonopolyGame(prev => {
                     if (!prev) return prev;
+                    const actingPlayer = prev.players[prev.currentPlayer];
+                    if (action.peer_id && action.peer_id !== actingPlayer?.peer_id) return prev;
                     const updated = mono.jailRoll(prev);
                     setTimeout(() => {
                         socket.sendRoomMessage(updated.roomId, mono.serializeMonopolyAction({ type: 'mono_state', state: mono.serializeGame(updated) }));
@@ -120,6 +151,8 @@ export default function useMonopolyGame(deps) {
                 if (!amIHost(monoHostRef.current)) break;
                 setMonopolyGame(prev => {
                     if (!prev) return prev;
+                    const actingPlayer = prev.players[prev.currentPlayer];
+                    if (action.peer_id && action.peer_id !== actingPlayer?.peer_id) return prev;
                     const updated = mono.escapeJail(prev);
                     setTimeout(() => {
                         socket.sendRoomMessage(updated.roomId, mono.serializeMonopolyAction({ type: 'mono_state', state: mono.serializeGame(updated) }));
@@ -136,18 +169,28 @@ export default function useMonopolyGame(deps) {
         const myId = myIdRef.current;
         const myNick = nickRef.current;
         const newGame = mono.createMonopoly(roomId);
-        const started = mono.startGame(mono.addPlayer(newGame, myId, myNick));
-        setMonopolyGame(started);
+        const lobby = mono.addPlayer(newGame, myId, myNick);
+        setMonopolyGame(lobby);
         monoHostRef.current = myId;
         hasJoinedMono.current = true;
-        addMsg('\u2605', `\u{1F3E0} Monopoly started! Buy properties, collect rent, bankrupt opponents to win!`, 'system');
+        addMsg('\u2605', `\u{1F3E0} Monopoly lobby opened! Waiting for players to join.`, 'system');
         socket.sendRoomMessage(roomId, mono.serializeMonopolyAction({
             type: 'mono_start', room_id: roomId, host: myId, host_nick: myNick,
         }));
         socket.sendRoomMessage(roomId, mono.serializeMonopolyAction({
-            type: 'mono_state', state: mono.serializeGame(started),
+            type: 'mono_state', state: mono.serializeGame(lobby),
         }));
     }, [addMsg]);
+
+    const joinMonopoly = useCallback((roomId, hostId) => {
+        const myId = myIdRef.current;
+        const myNick = nickRef.current;
+        hasJoinedMono.current = true;
+        monoHostRef.current = hostId;
+        socket.sendRoomMessage(roomId, mono.serializeMonopolyAction({
+            type: 'mono_join', peer_id: myId, nick: myNick,
+        }));
+    }, []);
 
     // ── Local action handler ──────────────────────────────
     const handleMonoAction = useCallback((action) => {
@@ -173,6 +216,9 @@ export default function useMonopolyGame(deps) {
         let newGame = game;
 
         switch (action.type) {
+            case 'begin':
+                newGame = mono.startGame(game);
+                break;
             case 'roll':
                 newGame = mono.roll(game);
                 break;
@@ -210,6 +256,6 @@ export default function useMonopolyGame(deps) {
         monopolyGame, setMonopolyGame,
         monopolyRef, monoHostRef, hasJoinedMono,
         monoTimerRef,
-        handleMonopolyAction, startMonopoly, handleMonoAction,
+        handleMonopolyAction, startMonopoly, joinMonopoly, handleMonoAction,
     };
 }

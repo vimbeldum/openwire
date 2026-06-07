@@ -708,6 +708,16 @@
     padding: 1rem;
 }
 
+.mono-lobby-panel {
+    margin-bottom: 0.75rem;
+}
+
+.mono-lobby-copy {
+    color: var(--mono-text-dim);
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
 /* ── Winner Banner ──────────────────────────────────────── */
 .mono-winner {
     background: linear-gradient(135deg, var(--mono-gold) 0%, var(--mono-gold-dark) 100%);

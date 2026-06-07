@@ -230,7 +230,8 @@ export default memo(function MonopolyBoard({
     wallet, 
     onAction, 
     onClose, 
-    onHelp 
+    onHelp,
+    isHost,
 }) {
     const [rolling, setRolling] = useState(false);
 
@@ -316,6 +317,7 @@ export default memo(function MonopolyBoard({
     }
 
     if (game.phase === 'lobby') {
+        const canStart = isHost && game.players.length >= 2;
         return (
             <div className="mono-container">
                 <div className="mono-header">
@@ -323,18 +325,34 @@ export default memo(function MonopolyBoard({
                     <div className="mono-phase">Waiting for players...</div>
                     <div className="mono-turn">Need {Math.max(0, 2 - game.players.length)} more players</div>
                 </div>
+                <div className="mono-properties-section mono-lobby-panel">
+                    <div className="mono-section-title">Lobby</div>
+                    <div className="mono-lobby-copy">
+                        {isHost
+                            ? (game.players.length >= 2
+                                ? 'Players are in. Start the game when you are ready.'
+                                : 'Invite room members to join this Monopoly table.')
+                            : 'You are in the lobby. Wait for the host to start the game.'}
+                    </div>
+                    <div className="mono-lobby-copy">Players joined: {game.players.length} / 8</div>
+                </div>
                 <div className="mono-players">
                     {game.players.map((p, i) => (
                         <div key={p.peer_id} className="mono-player">
                             <div className="mono-token">{TOKEN_EMOJIS[i % 8]}</div>
                             <div className="mono-player-info">
-                                <div className="mono-player-name">{p.nick}</div>
+                                <div className="mono-player-name">{p.nick}{p.peer_id === myId ? ' (You)' : ''}</div>
                                 <div className="mono-player-money">${p.money?.toLocaleString()}</div>
                             </div>
                         </div>
                     ))}
                 </div>
                 <div className="mono-footer">
+                    {isHost && (
+                        <button className="mono-help-btn" onClick={() => onAction({ type: 'begin' })} disabled={!canStart}>
+                            ▶ Start Game
+                        </button>
+                    )}
                     <button className="mono-help-btn" onClick={() => onHelp?.('monopoly')}>❓ Help</button>
                     <button className="mono-close-btn" onClick={onClose}>✕ Close</button>
                 </div>
