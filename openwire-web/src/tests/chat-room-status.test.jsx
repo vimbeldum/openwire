@@ -389,6 +389,16 @@ describe('ConversationEmptyState — copy per session state', () => {
     expect(screen.getByText(/Type a message below/)).toBeTruthy();
   });
 
+  it('mobile CONNECTED hint mentions hamburger for peer/room/game access', () => {
+    const state = { status: SessionStatus.CONNECTED, connectionMode: 'relay', cliNodeHost: null, reconnectAttempt: 0 };
+    renderEmptyState(state);
+    const hint = screen.getByText(/Type a message below/);
+    expect(hint.textContent).toMatch(/\u2630/);
+    expect(hint.textContent).toMatch(/peers/);
+    expect(hint.textContent).toMatch(/rooms/);
+    expect(hint.textContent).toMatch(/games/);
+  });
+
   it('shows hint about network check when RECONNECT_FAILED', () => {
     const state = { status: SessionStatus.RECONNECT_FAILED, connectionMode: 'relay', cliNodeHost: null, reconnectAttempt: 25 };
     renderEmptyState(state);

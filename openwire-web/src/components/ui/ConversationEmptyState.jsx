@@ -9,7 +9,7 @@ const EMPTY_STATE_MESSAGES = {
   [SessionStatus.CONNECTED]: {
     icon: '⚡',
     title: 'Ready for the conversation',
-    hint: 'Type a message below, browse peers in the sidebar, or launch a game when your table is ready.',
+    hint: 'Type a message below, or use \u2630 to browse peers, rooms, and games.',
   },
   [SessionStatus.RECONNECTING]: {
     icon: '🔄',
