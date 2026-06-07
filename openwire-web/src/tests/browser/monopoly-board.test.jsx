@@ -1,5 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import { vi } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import { beforeEach, afterEach, vi } from 'vitest';
 import MonopolyBoard from '../../components/MonopolyBoard.jsx';
 
 function makeGame(overrides = {}) {
@@ -24,6 +24,14 @@ function makeGame(overrides = {}) {
 }
 
 describe('MonopolyBoard', () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it('renders the Monopoly title and current turn summary', () => {
         render(
             <MonopolyBoard
@@ -117,5 +125,38 @@ describe('MonopolyBoard', () => {
 
         fireEvent.click(screen.getByText(/Start When Ready/i));
         expect(onAction).toHaveBeenCalledWith({ type: 'begin' });
+    });
+
+    it('keeps dice rolling until the authoritative dice result arrives', () => {
+        const onAction = vi.fn();
+        const { rerender, container } = render(
+            <MonopolyBoard
+                game={makeGame({ dice: [0, 0] })}
+                myId="me"
+                onAction={onAction}
+                onClose={vi.fn()}
+                onHelp={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByText(/Roll Dice/i));
+        expect(onAction).toHaveBeenCalledWith({ type: 'roll' });
+        expect(container.querySelectorAll('.mono-die.rolling').length).toBe(2);
+
+        rerender(
+            <MonopolyBoard
+                game={makeGame({ dice: [6, 3], diceRolled: true })}
+                myId="me"
+                onAction={onAction}
+                onClose={vi.fn()}
+                onHelp={vi.fn()}
+            />
+        );
+
+        expect(container.querySelectorAll('.mono-die.rolling').length).toBe(2);
+        act(() => {
+            vi.advanceTimersByTime(600);
+        });
+        expect(container.querySelectorAll('.mono-die.rolling').length).toBe(0);
     });
 });

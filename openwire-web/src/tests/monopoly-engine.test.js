@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { addPlayer, createMonopoly, roll, startGame } from '../lib/monopoly.js';
+import { addPlayer, auctionProperty, createMonopoly, roll, startGame } from '../lib/monopoly.js';
 
 function withRandomSequence(values, fn) {
     const spy = vi.spyOn(Math, 'random');
@@ -70,5 +70,23 @@ describe('monopoly engine', () => {
         expect(result.players[0].position).toBe(10);
         expect(result.phase).toBe('rolling');
         expect(result.players[0].inJail).toBe(false);
+    });
+
+    it('auction charges only the winner and advances the turn', () => {
+        const started = makeStartedGame();
+        const propertyPhase = {
+            ...started,
+            phase: 'property',
+            currentPlayer: 0,
+            players: started.players.map((player, index) =>
+                index === 0 ? { ...player, position: 1 } : player
+            ),
+        };
+
+        const result = withRandomSequence([0.9], () => auctionProperty(propertyPhase));
+        expect(result.properties.find((property) => property.id === 1)?.owner).toBe('p2');
+        expect(result.players.find((player) => player.peer_id === 'p1')?.money).toBe(1500);
+        expect(result.players.find((player) => player.peer_id === 'p2')?.money).toBe(1470);
+        expect(result.currentPlayer).toBe(1);
     });
 });

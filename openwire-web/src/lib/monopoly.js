@@ -529,23 +529,28 @@ export function auctionProperty(game) {
     // Simplified auction - random player buys at min(price/2, highest bid)
     const bidders = game.players.filter(p => !p.eliminated && !p.bankrupt && p.money >= Math.floor(prop.price / 2));
     if (bidders.length === 0) {
-        return { ...game, phase: 'rolling', diceRolled: false };
+        return advanceTurn({
+            ...game,
+            phase: 'rolling',
+            diceRolled: true,
+            log: [...game.log, `No one could afford the auction for ${prop.name}.`],
+        });
     }
     const winner = bidders[Math.floor(Math.random() * bidders.length)];
     const auctionPrice = Math.floor(prop.price / 2);
 
     const newGame = {
         ...game,
-        players: game.players.map((p, i) => {
-            if (p.peer_id === winner.peer_id) return { ...p, money: p.money - auctionPrice, properties: [...p.properties, prop.id] };
-            if (p.peer_id === player.peer_id) return { ...p, money: p.money + auctionPrice }; // original owner gets nothing
-            return p;
-        }),
+        players: game.players.map((p) => (
+            p.peer_id === winner.peer_id
+                ? { ...p, money: p.money - auctionPrice, properties: [...p.properties, prop.id] }
+                : p
+        )),
         properties: game.properties.map(p =>
             p.id === prop.id ? { ...p, owner: winner.peer_id } : p
         ),
         phase: 'rolling',
-        diceRolled: false,
+        diceRolled: true,
         log: [...game.log, `${winner.nick} won auction for ${prop.name} at $${auctionPrice}`],
     };
 

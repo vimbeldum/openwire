@@ -1,4 +1,4 @@
-import { useState, useMemo, memo } from 'react';
+import { useEffect, useRef, useState, useMemo, memo } from 'react';
 import '../styles/monopoly.css';
 
 /* ═══════════════════════════════════════════════════════════
@@ -234,6 +234,8 @@ export default memo(function MonopolyBoard({
     isHost,
 }) {
     const [rolling, setRolling] = useState(false);
+    const prevDiceRef = useRef(game?.dice || [0, 0]);
+    const rollTimerRef = useRef(null);
 
     const currentPlayer = game?.players?.[game.currentPlayer];
     const myPlayer = useMemo(() => 
@@ -266,8 +268,27 @@ export default memo(function MonopolyBoard({
     const handleRoll = () => {
         setRolling(true);
         onAction({ type: 'roll' });
-        setTimeout(() => setRolling(false), 600);
     };
+
+    useEffect(() => {
+        const prevDice = prevDiceRef.current || [0, 0];
+        const nextDice = game?.dice || [0, 0];
+        const diceChanged = prevDice[0] !== nextDice[0] || prevDice[1] !== nextDice[1];
+
+        if (rolling && diceChanged) {
+            if (rollTimerRef.current) clearTimeout(rollTimerRef.current);
+            rollTimerRef.current = setTimeout(() => {
+                setRolling(false);
+                rollTimerRef.current = null;
+            }, 550);
+        }
+
+        prevDiceRef.current = nextDice;
+    }, [game?.dice, rolling]);
+
+    useEffect(() => () => {
+        if (rollTimerRef.current) clearTimeout(rollTimerRef.current);
+    }, []);
 
     const handleSpaceSelect = (space) => {
         // Could show property details modal here
