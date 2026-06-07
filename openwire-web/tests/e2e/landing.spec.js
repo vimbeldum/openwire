@@ -10,17 +10,17 @@ test.describe('Landing Page', () => {
     test('renders landing page with logo and form', async ({ page }) => {
         await page.goto('/');
 
-        await expect(page.locator('.landing-logo')).toContainText('OpenWire');
-        await expect(page.locator('.landing-card h2')).toContainText('Join the Network');
+        await expect(page.locator('.landing-kicker')).toContainText('OpenWire');
+        await expect(page.locator('.landing-card h2')).toContainText('Join the network');
         await expect(page.locator('input[placeholder="Enter your nickname..."]')).toBeVisible();
-        await expect(page.locator('.landing-card button[type="submit"]')).toContainText('Connect');
+        await expect(page.locator('.landing-card button[type="submit"]')).toContainText('Join OpenWire');
     });
 
     test('renders subtitle text', async ({ page }) => {
         await page.goto('/');
 
-        await expect(page.locator('.landing-sub')).toContainText('Decentralized encrypted messenger');
-        await expect(page.locator('.landing-sub')).toContainText('No sign-up');
+        await expect(page.locator('.landing-sub')).toContainText('Start with the hosted relay');
+        await expect(page.locator('.landing-sub')).toContainText('No account setup');
     });
 
     test('nickname input accepts text and enforces maxLength', async ({ page }) => {
@@ -43,8 +43,8 @@ test.describe('Landing Page', () => {
 
         // Landing should disappear, ChatRoom header should appear
         await expect(page.locator('.landing')).not.toBeVisible();
-        await expect(page.locator('.global-header')).toBeVisible();
-        await expect(page.locator('.global-header strong')).toContainText('RelayUser');
+        await expect(page.locator('.chat-header')).toBeVisible();
+        await expect(page.locator('.header-nick')).toContainText('RelayUser');
     });
 
     test('relay radio is checked by default', async ({ page }) => {
@@ -98,8 +98,8 @@ test.describe('Landing Page', () => {
         await page.locator('.landing-card button[type="submit"]').click();
 
         // Verify ChatRoom appears with CLI Node badge
-        await expect(page.locator('.global-header')).toBeVisible();
-        await expect(page.locator('.global-header strong')).toContainText('CliUser');
+        await expect(page.locator('.chat-header')).toBeVisible();
+        await expect(page.locator('.header-nick')).toContainText('CliUser');
         await expect(page.locator('.connection-mode-badge')).toContainText('CLI Node');
     });
 
@@ -110,9 +110,9 @@ test.describe('Landing Page', () => {
         await nickInput.fill('  SpaceyUser  ');
         await page.locator('.landing-card button[type="submit"]').click();
 
-        await expect(page.locator('.global-header strong')).toContainText('SpaceyUser');
+        await expect(page.locator('.header-nick')).toContainText('SpaceyUser');
         // Verify the trimmed value has no leading/trailing spaces
-        const nickText = await page.locator('.global-header strong').textContent();
+        const nickText = await page.locator('.header-nick').textContent();
         expect(nickText).toBe('SpaceyUser');
     });
 
@@ -122,8 +122,8 @@ test.describe('Landing Page', () => {
         // Leave nickname empty, just click submit
         await page.locator('.landing-card button[type="submit"]').click();
 
-        await expect(page.locator('.global-header')).toBeVisible();
-        await expect(page.locator('.global-header strong')).toContainText('Anonymous');
+        await expect(page.locator('.chat-header')).toBeVisible();
+        await expect(page.locator('.header-nick')).toContainText('Anonymous');
     });
 
     test('admin access button opens admin gate', async ({ page }) => {
@@ -175,12 +175,12 @@ test.describe('Landing Page', () => {
         await loginAs(page, 'PersistUser');
         await page.goto('/');
 
-        await expect(page.locator('.global-header strong')).toContainText('PersistUser');
+        await expect(page.locator('.header-nick')).toContainText('PersistUser');
 
         // Reload -- loginAs init script re-applies, simulating persistence
         await page.reload();
-        await expect(page.locator('.global-header')).toBeVisible();
-        await expect(page.locator('.global-header strong')).toContainText('PersistUser');
+        await expect(page.locator('.chat-header')).toBeVisible();
+        await expect(page.locator('.header-nick')).toContainText('PersistUser');
         await expect(page.locator('.landing')).not.toBeVisible();
     });
 
@@ -191,15 +191,15 @@ test.describe('Landing Page', () => {
         const nickInput = page.locator('input[placeholder="Enter your nickname..."]');
         await nickInput.fill('LogoutUser');
         await page.locator('.landing-card button[type="submit"]').click();
-        await expect(page.locator('.global-header')).toBeVisible();
+        await expect(page.locator('.chat-header')).toBeVisible();
 
         // Click logout
         await page.locator('.btn-logout').click();
 
         // Should be back on Landing
         await expect(page.locator('.landing')).toBeVisible();
-        await expect(page.locator('.landing-logo')).toContainText('OpenWire');
-        await expect(page.locator('.global-header')).not.toBeVisible();
+        await expect(page.locator('.landing-kicker')).toContainText('OpenWire');
+        await expect(page.locator('.chat-header')).not.toBeVisible();
     });
 
     test('logout clears session from localStorage', async ({ page }) => {
@@ -209,7 +209,7 @@ test.describe('Landing Page', () => {
         const nickInput = page.locator('input[placeholder="Enter your nickname..."]');
         await nickInput.fill('ClearUser');
         await page.locator('.landing-card button[type="submit"]').click();
-        await expect(page.locator('.global-header')).toBeVisible();
+        await expect(page.locator('.chat-header')).toBeVisible();
 
         // Logout
         await page.locator('.btn-logout').click();
@@ -232,8 +232,8 @@ test.describe('Landing Page', () => {
         await page.goto('/');
 
         // Should go straight to ChatRoom
-        await expect(page.locator('.global-header')).toBeVisible();
-        await expect(page.locator('.global-header strong')).toContainText('HelperUser');
+        await expect(page.locator('.chat-header')).toBeVisible();
+        await expect(page.locator('.header-nick')).toContainText('HelperUser');
         await expect(page.locator('.landing')).not.toBeVisible();
     });
 });

@@ -42,7 +42,7 @@ test.describe('Viewport Constraints -- ChatRoom', () => {
 
     test('chatroom has no vertical scroll', async ({ page }) => {
         await page.goto('/');
-        await page.waitForSelector('.global-header');
+        await page.waitForSelector('.chat-header');
 
         const hasVScroll = await page.evaluate(() =>
             document.documentElement.scrollHeight > window.innerHeight
@@ -52,7 +52,7 @@ test.describe('Viewport Constraints -- ChatRoom', () => {
 
     test('chatroom has no horizontal scroll', async ({ page }) => {
         await page.goto('/');
-        await page.waitForSelector('.global-header');
+        await page.waitForSelector('.chat-header');
 
         const hasHScroll = await page.evaluate(() =>
             document.documentElement.scrollWidth > window.innerWidth
@@ -87,7 +87,7 @@ test.describe('Viewport Constraints -- Responsive', () => {
         await loginAs(page, 'MobileUser');
         await page.setViewportSize({ width: 375, height: 667 });
         await page.goto('/');
-        await page.waitForSelector('.global-header');
+        await page.waitForSelector('.chat-header');
 
         const overflow = await page.evaluate(() => ({
             vScroll: document.documentElement.scrollHeight > window.innerHeight,
@@ -114,7 +114,7 @@ test.describe('Viewport Constraints -- Responsive', () => {
         await loginAs(page, 'DesktopUser');
         await page.setViewportSize({ width: 1920, height: 1080 });
         await page.goto('/');
-        await page.waitForSelector('.global-header');
+        await page.waitForSelector('.chat-header');
 
         const overflow = await page.evaluate(() => ({
             vScroll: document.documentElement.scrollHeight > window.innerHeight,
@@ -283,7 +283,7 @@ test.describe('Session Persistence', () => {
         // Fill nickname and submit
         await page.locator('input[placeholder="Enter your nickname..."]').fill('PersistTest');
         await page.locator('.landing-card button[type="submit"]').click();
-        await page.waitForSelector('.global-header');
+        await page.waitForSelector('.chat-header');
 
         // Verify localStorage contains the session
         const session = await page.evaluate(() =>
@@ -301,7 +301,7 @@ test.describe('Session Persistence', () => {
         // Login
         await page.locator('input[placeholder="Enter your nickname..."]').fill('LogoutTest');
         await page.locator('.landing-card button[type="submit"]').click();
-        await page.waitForSelector('.global-header');
+        await page.waitForSelector('.chat-header');
 
         // Logout
         await page.locator('.btn-logout').click();
@@ -319,7 +319,7 @@ test.describe('Session Persistence', () => {
         await loginAs(page, 'WalletUser');
         await setWallet(page, 5000);
         await page.goto('/');
-        await page.waitForSelector('.global-header');
+        await page.waitForSelector('.chat-header');
 
         // Verify wallet data persists in localStorage (reliable regardless of
         // whether the header-chips element has rendered yet)
@@ -334,7 +334,7 @@ test.describe('Session Persistence', () => {
 
         // Reload and verify balance persists across navigation
         await page.reload();
-        await page.waitForSelector('.global-header');
+        await page.waitForSelector('.chat-header');
 
         const walletAfterReload = await page.evaluate(() => {
             const deviceId = localStorage.getItem('openwire_device_id');
@@ -396,6 +396,6 @@ test.describe('Error Handling', () => {
         await expect(errorFallback).not.toBeVisible();
 
         // Confirm the app actually rendered its content
-        await expect(page.locator('.landing-logo')).toContainText('OpenWire');
+        await expect(page.locator('.landing-kicker')).toContainText('OpenWire');
     });
 });
