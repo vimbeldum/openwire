@@ -53,26 +53,26 @@ const BOARD_SPACES = [
 // Format: position -> { gridRow, gridCol } (1-based for CSS Grid)
 // Monopoly board layout (counterclockwise from GO at bottom-right):
 const GRID_POSITIONS = {
-    0:  { row: 10, col: 10 }, // GO (bottom-right corner)
-    1:  { row: 10, col: 9  },
-    2:  { row: 10, col: 8  },
-    3:  { row: 10, col: 7  },
-    4:  { row: 10, col: 6  },
-    5:  { row: 10, col: 5  },
-    6:  { row: 10, col: 4  },
-    7:  { row: 10, col: 3  },
-    8:  { row: 10, col: 2  },
-    9:  { row: 10, col: 1  },
-    10: { row: 9,  col: 1  }, // Jail (bottom-left corner visual slot)
-    11: { row: 8,  col: 1  },
-    12: { row: 7,  col: 1  },
-    13: { row: 6,  col: 1  },
-    14: { row: 5,  col: 1  },
-    15: { row: 4,  col: 1  },
-    16: { row: 3,  col: 1  },
-    17: { row: 2,  col: 1  },
-    18: { row: 1,  col: 1  },
-    19: { row: 1,  col: 2  },
+    0:  { row: 11, col: 11 }, // GO (bottom-right corner)
+    1:  { row: 11, col: 10 },
+    2:  { row: 11, col: 9  },
+    3:  { row: 11, col: 8  },
+    4:  { row: 11, col: 7  },
+    5:  { row: 11, col: 6  },
+    6:  { row: 11, col: 5  },
+    7:  { row: 11, col: 4  },
+    8:  { row: 11, col: 3  },
+    9:  { row: 11, col: 2  },
+    10: { row: 11, col: 1  }, // Jail (bottom-left corner)
+    11: { row: 10, col: 1  },
+    12: { row: 9,  col: 1  },
+    13: { row: 8,  col: 1  },
+    14: { row: 7,  col: 1  },
+    15: { row: 6,  col: 1  },
+    16: { row: 5,  col: 1  },
+    17: { row: 4,  col: 1  },
+    18: { row: 3,  col: 1  },
+    19: { row: 2,  col: 1  },
     20: { row: 1,  col: 1  }, // Free Parking (top-left corner)
     21: { row: 1,  col: 2  },
     22: { row: 1,  col: 3  },
@@ -83,16 +83,16 @@ const GRID_POSITIONS = {
     27: { row: 1,  col: 8  },
     28: { row: 1,  col: 9  },
     29: { row: 1,  col: 10 },
-    30: { row: 1,  col: 10 }, // Go To Jail (top-right corner)
-    31: { row: 2,  col: 10 },
-    32: { row: 3,  col: 10 },
-    33: { row: 4,  col: 10 },
-    34: { row: 5,  col: 10 },
-    35: { row: 6,  col: 10 },
-    36: { row: 7,  col: 10 },
-    37: { row: 8,  col: 10 },
-    38: { row: 9,  col: 10 },
-    39: { row: 10, col: 10 },
+    30: { row: 1,  col: 11 }, // Go To Jail (top-right corner)
+    31: { row: 2,  col: 11 },
+    32: { row: 3,  col: 11 },
+    33: { row: 4,  col: 11 },
+    34: { row: 5,  col: 11 },
+    35: { row: 6,  col: 11 },
+    36: { row: 7,  col: 11 },
+    37: { row: 8,  col: 11 },
+    38: { row: 9,  col: 11 },
+    39: { row: 10, col: 11 },
 };
 
 // Property group colors

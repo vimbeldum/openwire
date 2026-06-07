@@ -273,8 +273,8 @@
 
 .mono-board-inner {
     display: grid;
-    grid-template-columns: repeat(10, 52px);
-    grid-template-rows: repeat(10, 52px);
+    grid-template-columns: repeat(11, 46px);
+    grid-template-rows: repeat(11, 46px);
     gap: 2px;
     background: #0d0d0d;
 }
@@ -404,8 +404,8 @@
 
 /* ── Board Center ───────────────────────────────────────── */
 .mono-board-center {
-    grid-column: 2 / 10;
-    grid-row: 2 / 10;
+    grid-column: 2 / 11;
+    grid-row: 2 / 11;
     background:
         radial-gradient(circle at top, rgba(243,208,107,0.12), transparent 30%),
         linear-gradient(145deg, var(--mono-green-panel) 0%, var(--mono-dark) 100%);
@@ -820,8 +820,8 @@
     }
     
     .mono-board-inner {
-        grid-template-columns: repeat(10, 42px);
-        grid-template-rows: repeat(10, 42px);
+        grid-template-columns: repeat(11, 38px);
+        grid-template-rows: repeat(11, 38px);
     }
     
     .mono-space-name {
@@ -854,8 +854,8 @@
 
 @media (max-width: 480px) {
     .mono-board-inner {
-        grid-template-columns: repeat(10, 34px);
-        grid-template-rows: repeat(10, 34px);
+        grid-template-columns: repeat(11, 31px);
+        grid-template-rows: repeat(11, 31px);
         gap: 1px;
     }
     
@@ -872,8 +872,8 @@
     }
     
     .mono-board-center {
-        grid-column: 2 / 10;
-        grid-row: 2 / 10;
+        grid-column: 2 / 11;
+        grid-row: 2 / 11;
     }
     
     .mono-center-title {

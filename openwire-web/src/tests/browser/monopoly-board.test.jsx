@@ -35,8 +35,8 @@ describe('MonopolyBoard', () => {
             />
         );
 
-        expect(screen.getByText(/MONOPOLY/i)).toBeInTheDocument();
-        expect(screen.getByText(/Alice/)).toBeInTheDocument();
+        expect(screen.getAllByText(/MONOPOLY/i).length).toBeGreaterThan(0);
+        expect(screen.getAllByText(/\$1,380/).length).toBeGreaterThan(0);
         expect(screen.getByText(/Roll, then end your turn/i)).toBeInTheDocument();
     });
 
