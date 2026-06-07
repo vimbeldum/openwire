@@ -56,6 +56,16 @@ export default function ChatShellHeader({
   const statusVariant = getStatusVariant(sessionState);
   const statusLabel = getStatusLabel(sessionState);
 
+  // Derive compact room/peer summary for mobile drawer context.
+  // Avoid duplicating full statusLabel text here — the header-status block already
+  // renders that. The compact summary focuses on room context + a concise peer count.
+  const roomLabel = currentRoomName
+    ? { icon: '🏠', label: currentRoomName }
+    : { icon: '💬', label: 'General Chat' };
+  const peerSummary = sessionState.status === SessionStatus.CONNECTED
+    ? `${peers.length} online`
+    : ''; /* non-CONNECTED state is conveyed by the status-dot color alone */
+
   return (
     <header className="chat-header">
       <div className="header-brand">
@@ -96,6 +106,17 @@ export default function ChatShellHeader({
           )}
         </div>
       </div>
+
+      {/* Compact mobile context summary — visible on narrow screens where .header-context is hidden */}
+      <div className="header-context-compact" aria-label="Room and session summary">
+        <span className="compact-room-name">{roomLabel.icon} {roomLabel.label}</span>
+        <span className="compact-separator" aria-hidden="true">·</span>
+        <span className="compact-peer-count">
+          <span className={`compact-status-dot status-dot--${statusVariant}`} />
+          {peerSummary}
+        </span>
+      </div>
+
       <div className="header-status" aria-label="Session status">
         <div className="header-identity-block">
           <span className="header-nick">{myNick}</span>

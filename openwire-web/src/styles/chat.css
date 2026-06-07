@@ -56,6 +56,48 @@
   justify-content: center;
 }
 
+/* ── Mobile Context Summary (replaces header-context on narrow screens) ── */
+.header-context-compact {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.75rem 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  white-space: nowrap;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.compact-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.compact-room-name {
+  font-weight: 600;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.compact-separator {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.compact-peer-count {
+  flex-shrink: 0;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
 .current-room-indicator,
 .general-chat-indicator {
   display: flex;
@@ -1829,6 +1871,10 @@
 
   .header-context {
     display: none !important;
+  }
+
+  .header-context-compact {
+    display: flex !important;
   }
 
   .chat-input {
