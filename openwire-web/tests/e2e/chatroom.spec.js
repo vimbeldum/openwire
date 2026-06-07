@@ -5,14 +5,19 @@
  * viewport constraints, and core user interactions after login.
  */
 import { test, expect } from '@playwright/test';
-import { mockWebSocket, loginAs, clearSession, setWallet, injectWelcome } from './helpers.js';
+import { mockWebSocket, loginAs, clearSession, setWallet, injectWelcome, setupRuntimeGuard, expectNoRuntimeErrors } from './helpers.js';
 
 test.describe('ChatRoom', () => {
     test.beforeEach(async ({ page }) => {
         await mockWebSocket(page);
         await loginAs(page, 'TestUser');
         await setWallet(page, 1000);
+        await setupRuntimeGuard(page);
         await page.goto('/');
+    });
+
+    test.afterEach(async ({ page }) => {
+        await expectNoRuntimeErrors(page);
     });
 
     // ── 1. Basic rendering ────────────────────────────────────────
@@ -145,6 +150,14 @@ test.describe('ChatRoom', () => {
    11. RESPONSIVE BREAKPOINTS
    ══════════════════════════════════════════════════════════════════ */
 test.describe('ChatRoom — responsive breakpoints', () => {
+    test.beforeEach(async ({ page }) => {
+        await setupRuntimeGuard(page);
+    });
+
+    test.afterEach(async ({ page }) => {
+        await expectNoRuntimeErrors(page);
+    });
+
     const BREAKPOINTS = [390, 768, 1024, 1280];
 
     for (const width of BREAKPOINTS) {

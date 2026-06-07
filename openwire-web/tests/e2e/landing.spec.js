@@ -1,10 +1,15 @@
 import { test, expect } from '@playwright/test';
-import { mockWebSocket, loginAs, clearSession } from './helpers.js';
+import { mockWebSocket, loginAs, clearSession, setupRuntimeGuard, expectNoRuntimeErrors } from './helpers.js';
 
 test.describe('Landing Page', () => {
     test.beforeEach(async ({ page }) => {
         await clearSession(page);
         await mockWebSocket(page);
+        await setupRuntimeGuard(page);
+    });
+
+    test.afterEach(async ({ page }) => {
+        await expectNoRuntimeErrors(page);
     });
 
     test('renders landing page with logo and form', async ({ page }) => {

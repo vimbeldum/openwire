@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockWebSocket, loginAs, clearSession, setWallet } from './helpers.js';
+import { mockWebSocket, loginAs, clearSession, setWallet, setupRuntimeGuard, expectNoRuntimeErrors } from './helpers.js';
 
 // ---------------------------------------------------------------------------
 // Viewport Constraints -- Landing
@@ -8,6 +8,11 @@ test.describe('Viewport Constraints -- Landing', () => {
     test.beforeEach(async ({ page }) => {
         await clearSession(page);
         await mockWebSocket(page);
+        await setupRuntimeGuard(page);
+    });
+
+    test.afterEach(async ({ page }) => {
+        await expectNoRuntimeErrors(page);
     });
 
     test('landing page has no vertical scroll', async ({ page }) => {
@@ -38,6 +43,11 @@ test.describe('Viewport Constraints -- ChatRoom', () => {
     test.beforeEach(async ({ page }) => {
         await mockWebSocket(page);
         await loginAs(page, 'ViewportUser');
+        await setupRuntimeGuard(page);
+    });
+
+    test.afterEach(async ({ page }) => {
+        await expectNoRuntimeErrors(page);
     });
 
     test('chatroom has no vertical scroll', async ({ page }) => {
@@ -68,6 +78,11 @@ test.describe('Viewport Constraints -- Responsive', () => {
     test.beforeEach(async ({ page }) => {
         await clearSession(page);
         await mockWebSocket(page);
+        await setupRuntimeGuard(page);
+    });
+
+    test.afterEach(async ({ page }) => {
+        await expectNoRuntimeErrors(page);
     });
 
     test('landing page at 375x667 (iPhone SE) has no scroll', async ({ page }) => {
@@ -145,6 +160,11 @@ test.describe('Admin Portal Access', () => {
     test.beforeEach(async ({ page }) => {
         await clearSession(page);
         await mockWebSocket(page);
+        await setupRuntimeGuard(page);
+    });
+
+    test.afterEach(async ({ page }) => {
+        await expectNoRuntimeErrors(page);
     });
 
     test('admin access button visible on landing', async ({ page }) => {
@@ -273,6 +293,11 @@ test.describe('Admin Portal Access', () => {
 test.describe('Session Persistence', () => {
     test.beforeEach(async ({ page }) => {
         await mockWebSocket(page);
+        await setupRuntimeGuard(page);
+    });
+
+    test.afterEach(async ({ page }) => {
+        await expectNoRuntimeErrors(page);
     });
 
     test('session stored in localStorage after login', async ({ page }) => {
@@ -354,6 +379,11 @@ test.describe('Error Handling', () => {
     test.beforeEach(async ({ page }) => {
         await clearSession(page);
         await mockWebSocket(page);
+        await setupRuntimeGuard(page);
+    });
+
+    test.afterEach(async ({ page }) => {
+        await expectNoRuntimeErrors(page);
     });
 
     test('app renders without critical console errors', async ({ page }) => {
