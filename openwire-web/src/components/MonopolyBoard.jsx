@@ -317,7 +317,7 @@ export default memo(function MonopolyBoard({
     }
 
     if (game.phase === 'lobby') {
-        const canStart = isHost && game.players.length >= 2;
+        const canStart = game.players.length >= 2;
         return (
             <div className="mono-container">
                 <div className="mono-header">
@@ -332,7 +332,9 @@ export default memo(function MonopolyBoard({
                             ? (game.players.length >= 2
                                 ? 'Players are in. Start the game when you are ready.'
                                 : 'Invite room members to join this Monopoly table.')
-                            : 'You are in the lobby. Wait for the host to start the game.'}
+                            : (game.players.length >= 2
+                                ? 'Enough players are here. Start will sync through the host.'
+                                : 'You are in the lobby. Wait for more players or the host.')}
                     </div>
                     <div className="mono-lobby-copy">Players joined: {game.players.length} / 8</div>
                 </div>
@@ -348,11 +350,9 @@ export default memo(function MonopolyBoard({
                     ))}
                 </div>
                 <div className="mono-footer">
-                    {isHost && (
-                        <button className="mono-help-btn" onClick={() => onAction({ type: 'begin' })} disabled={!canStart}>
-                            ▶ Start Game
-                        </button>
-                    )}
+                    <button className="mono-help-btn" onClick={() => onAction({ type: 'begin' })} disabled={!canStart}>
+                        {isHost ? '▶ Start Game' : '▶ Start When Ready'}
+                    </button>
                     <button className="mono-help-btn" onClick={() => onHelp?.('monopoly')}>❓ Help</button>
                     <button className="mono-close-btn" onClick={onClose}>✕ Close</button>
                 </div>

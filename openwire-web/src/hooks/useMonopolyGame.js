@@ -202,7 +202,7 @@ export default function useMonopolyGame(deps) {
 
         // Non-host sends actions to host
         if (!amIHost(monoHostRef.current)) {
-            if (action.type === 'roll' || action.type === 'buy' || action.type === 'auction' || action.type === 'endturn' || action.type === 'jailroll' || action.type === 'escapejail') {
+            if (action.type === 'begin' || action.type === 'roll' || action.type === 'buy' || action.type === 'auction' || action.type === 'endturn' || action.type === 'jailroll' || action.type === 'escapejail') {
                 socket.sendRoomMessage(game.roomId, mono.serializeMonopolyAction({
                     type: `mono_${action.type}`,
                     peer_id: myId,

@@ -94,4 +94,28 @@ describe('MonopolyBoard', () => {
         fireEvent.click(screen.getByText(/Start Game/i));
         expect(onAction).toHaveBeenCalledWith({ type: 'begin' });
     });
+
+    it('shows a start button for non-host players once enough players joined', () => {
+        const onAction = vi.fn();
+
+        render(
+            <MonopolyBoard
+                game={makeGame({
+                    phase: 'lobby',
+                    players: [
+                        { peer_id: 'host', nick: 'Alice', money: 1500, position: 0, properties: [], inJail: false, eliminated: false },
+                        { peer_id: 'me', nick: 'Bob', money: 1500, position: 0, properties: [], inJail: false, eliminated: false },
+                    ],
+                })}
+                myId="me"
+                isHost={false}
+                onAction={onAction}
+                onClose={vi.fn()}
+                onHelp={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByText(/Start When Ready/i));
+        expect(onAction).toHaveBeenCalledWith({ type: 'begin' });
+    });
 });
