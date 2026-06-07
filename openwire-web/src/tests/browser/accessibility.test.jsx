@@ -172,7 +172,7 @@ describe('Accessibility — dialog and overlay semantics', () => {
         const overlay = document.querySelector('.admin-overlay');
         expect(overlay).toHaveAttribute('role', 'dialog');
         expect(overlay).toHaveAttribute('aria-modal', 'true');
-        expect(overlay).toHaveAttribute('aria-label', 'Admin password required');
+        expect(overlay).toHaveAttribute('aria-label', 'Unlock admin access');
     });
 
     it('AdminPasswordGate has a close button with accessible label', () => {
