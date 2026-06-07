@@ -131,6 +131,18 @@ test.describe('Landing Page', () => {
         await expect(page.locator('.header-nick')).toContainText('Anonymous');
     });
 
+    test('whitespace-only nickname falls back to Anonymous', async ({ page }) => {
+        await page.goto('/');
+
+        // Fill with only whitespace — sanitizeNick trims to empty, falls back to Anonymous
+        const nickInput = page.locator('input[placeholder="Enter your nickname..."]');
+        await nickInput.fill('   ');
+        await page.locator('.landing-card button[type="submit"]').click();
+
+        await expect(page.locator('.chat-header')).toBeVisible();
+        await expect(page.locator('.header-nick')).toContainText('Anonymous');
+    });
+
     test('admin access button opens admin gate', async ({ page }) => {
         await page.goto('/');
 
