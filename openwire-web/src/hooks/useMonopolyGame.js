@@ -243,7 +243,7 @@ export default function useMonopolyGame(deps) {
 
         setMonopolyGame(newGame);
         socket.sendRoomMessage(newGame.roomId, mono.serializeMonopolyAction({ type: 'mono_state', state: mono.serializeGame(newGame) }));
-    }, [amIHost]);
+    }, [amIHost, monopolyGame]);
 
     // Cleanup
     useEffect(() => {
