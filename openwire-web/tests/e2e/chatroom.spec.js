@@ -144,10 +144,81 @@ test.describe('ChatRoom', () => {
         const msgCount = await messagesArea.locator('.msg.peer, .msg.self').count();
         expect(msgCount).toBe(0);
     });
+
+    // ── 11. Empty state: connecting ────────────────────────────────
+
+    test('empty state shows connecting message before welcome', async ({ page }) => {
+        // Before welcome, session state is CONNECTING — empty state renders appropriately
+        const emptyTitle = page.locator('.empty-state-title');
+        await expect(emptyTitle).toBeVisible();
+        await expect(emptyTitle).toHaveText('Connecting to server...');
+
+        // Icon and hint are also present
+        await expect(page.locator('.empty-state-icon')).toBeVisible();
+        await expect(page.locator('.empty-state-hint')).toBeVisible();
+        await expect(page.locator('.empty-state-hint')).toHaveText(
+            'Establishing a secure connection. You will be able to chat momentarily.'
+        );
+    });
+
+    // ── 12. Empty state hidden after welcome ───────────────────────
+
+    test('empty state is hidden after welcome as messages appear', async ({ page }) => {
+        // Before welcome, empty state is visible
+        await expect(page.locator('.empty-state-title')).toBeVisible();
+
+        // After welcome, the app adds system messages which hides the empty state
+        await injectWelcome(page);
+
+        // Empty state is no longer visible (replaced by system messages)
+        await expect(page.locator('.empty-state-title')).not.toBeVisible();
+
+        // System messages now appear in the messages area
+        await expect(page.locator('.messages-area')).toContainText('Connected!');
+        await expect(page.locator('.messages-area')).toContainText('Type /help for commands.');
+    });
+
+    // ── 13. Session status banner ──────────────────────────────────
+
+    test('session status banner visible before connected, hidden after', async ({ page }) => {
+        // Before welcome — banner should be visible with connecting text
+        const banner = page.locator('.session-status-banner');
+        await expect(banner).toBeVisible();
+        await expect(banner).toContainText('Connecting...');
+
+        // After welcome — banner should be hidden (CONNECTED)
+        await injectWelcome(page);
+        await expect(banner).not.toBeVisible();
+    });
+
+    // ── 14. Composer disabled state ────────────────────────────────
+
+    test('chat input disabled before welcome, enabled after', async ({ page }) => {
+        // Before welcome — session is CONNECTING, composer should be disabled
+        await expect(page.locator('.chat-input')).toHaveClass(/composer-disabled/);
+        const chatInput = page.locator('.chat-input input[type="text"]');
+        await expect(chatInput).toBeDisabled();
+
+        // After welcome — session is CONNECTED, composer should be enabled
+        await injectWelcome(page);
+        await expect(page.locator('.chat-input')).not.toHaveClass(/composer-disabled/);
+        await expect(chatInput).toBeEnabled();
+    });
+
+    // ── 15. Header online count ────────────────────────────────────
+
+    test('header online-count reflects session state truthfully', async ({ page }) => {
+        // Before welcome — session is CONNECTING, shows status label
+        await expect(page.locator('.header-online-count')).toHaveText('Connecting...');
+
+        // After welcome — session is CONNECTED, shows peer count
+        await injectWelcome(page);
+        await expect(page.locator('.header-online-count')).toHaveText('1 online');
+    });
 });
 
 /* ══════════════════════════════════════════════════════════════════
-   11. RESPONSIVE BREAKPOINTS
+   16. RESPONSIVE BREAKPOINTS
    ══════════════════════════════════════════════════════════════════ */
 test.describe('ChatRoom — responsive breakpoints', () => {
     test.beforeEach(async ({ page }) => {
