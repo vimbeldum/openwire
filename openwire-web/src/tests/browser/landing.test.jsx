@@ -22,14 +22,10 @@ if (typeof globalThis.localStorage === 'undefined' || !globalThis.localStorage?.
 
 import Landing from '../../components/Landing.jsx';
 
-/* ── Helpers ─────────────────────────────────────── */
-
 function renderLanding(props = {}) {
     const defaults = { onJoin: vi.fn() };
     return render(<Landing {...defaults} {...props} />);
 }
-
-/* ── Tests ──────────────────────────────────────── */
 
 describe('Landing', () => {
     beforeEach(() => {
@@ -42,30 +38,33 @@ describe('Landing', () => {
     });
 
     describe('rendering', () => {
-        it('renders the OpenWire branding', () => {
-            const { container } = renderLanding();
-            expect(container.querySelector('.landing-logo')).toBeInTheDocument();
+        it('renders the landing headline and shared copy', () => {
+            renderLanding();
+            expect(screen.getByRole('heading', { name: /join a room fast, keep the conversation primary/i })).toBeInTheDocument();
+            expect(screen.getByText(/browser-first encrypted chat/i)).toBeInTheDocument();
         });
 
         it('renders the name input field', () => {
             renderLanding();
+            expect(screen.getByLabelText('Nickname')).toBeInTheDocument();
             expect(screen.getByPlaceholderText(/nickname/i)).toBeInTheDocument();
         });
 
-        it('renders the Connect button', () => {
+        it('renders the primary join action', () => {
             renderLanding();
-            expect(screen.getByRole('button', { name: /Connect/ })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: /join openwire/i })).toBeInTheDocument();
         });
 
-        it('renders connection mode radio buttons', () => {
+        it('renders connection mode radio buttons with helper copy', () => {
             renderLanding();
-            expect(screen.getByText('OpenWire Relay')).toBeInTheDocument();
-            expect(screen.getByText('Local CLI Node')).toBeInTheDocument();
+            expect(screen.getByRole('radio', { name: /openwire relay/i })).toBeInTheDocument();
+            expect(screen.getByRole('radio', { name: /local cli node/i })).toBeInTheDocument();
+            expect(screen.getByText(/choose the relay for the default hosted path/i)).toBeInTheDocument();
         });
 
         it('renders admin access link', () => {
             renderLanding();
-            expect(screen.getByText(/Admin Access/)).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: /admin access/i })).toBeInTheDocument();
         });
     });
 
@@ -73,10 +72,16 @@ describe('Landing', () => {
         it('calls onJoin with sanitized nick and relay config', () => {
             const onJoin = vi.fn();
             renderLanding({ onJoin });
-            const input = screen.getByPlaceholderText(/nickname/i);
-            fireEvent.change(input, { target: { value: 'Alice' } });
-            fireEvent.submit(screen.getByRole('button', { name: /Connect/ }).closest('form'));
+            fireEvent.change(screen.getByLabelText('Nickname'), { target: { value: 'Alice' } });
+            fireEvent.submit(screen.getByRole('button', { name: /join openwire/i }).closest('form'));
             expect(onJoin).toHaveBeenCalledWith('Alice', false, { mode: 'relay' });
+        });
+
+        it('falls back to Anonymous when nickname is blank', () => {
+            const onJoin = vi.fn();
+            renderLanding({ onJoin });
+            fireEvent.submit(screen.getByRole('button', { name: /join openwire/i }).closest('form'));
+            expect(onJoin).toHaveBeenCalledWith('Anonymous', false, { mode: 'relay' });
         });
     });
 
@@ -85,82 +90,95 @@ describe('Landing', () => {
             const onJoin = vi.fn();
             renderLanding({ onJoin });
 
-            fireEvent.change(screen.getByPlaceholderText(/nickname/i), { target: { value: 'Bob' } });
+            fireEvent.change(screen.getByLabelText('Nickname'), { target: { value: 'Bob' } });
+            fireEvent.click(screen.getByRole('radio', { name: /local cli node/i }));
 
-            const cliRadio = screen.getByText('Local CLI Node').closest('label').querySelector('input');
-            fireEvent.click(cliRadio);
-
-            const urlInput = screen.getByPlaceholderText(/192\.168/);
+            const urlInput = screen.getByLabelText('Node WebSocket URL');
             expect(urlInput).toBeInTheDocument();
 
             fireEvent.change(urlInput, { target: { value: 'ws://myhost:9999' } });
+            fireEvent.submit(screen.getByRole('button', { name: /join openwire/i }).closest('form'));
 
-            fireEvent.submit(screen.getByRole('button', { name: /Connect/ }).closest('form'));
             expect(onJoin).toHaveBeenCalledWith('Bob', false, { mode: 'cli-node', cliUrl: 'ws://myhost:9999' });
         });
 
         it('does not show CLI URL input in relay mode', () => {
             renderLanding();
-            expect(screen.queryByPlaceholderText(/192\.168/)).not.toBeInTheDocument();
+            expect(screen.queryByLabelText('Node WebSocket URL')).not.toBeInTheDocument();
         });
 
         it('falls back to the default cli url when the field is blank', () => {
             const onJoin = vi.fn();
             renderLanding({ onJoin });
 
-            fireEvent.change(screen.getByPlaceholderText(/nickname/i), { target: { value: 'Bob' } });
-            fireEvent.click(screen.getByText('Local CLI Node').closest('label').querySelector('input'));
-            fireEvent.change(screen.getByPlaceholderText(/192\.168/), { target: { value: '   ' } });
-            fireEvent.submit(screen.getByRole('button', { name: /Connect/ }).closest('form'));
+            fireEvent.change(screen.getByLabelText('Nickname'), { target: { value: 'Bob' } });
+            fireEvent.click(screen.getByRole('radio', { name: /local cli node/i }));
+            fireEvent.change(screen.getByLabelText('Node WebSocket URL'), { target: { value: '   ' } });
+            fireEvent.submit(screen.getByRole('button', { name: /join openwire/i }).closest('form'));
 
             expect(onJoin).toHaveBeenCalledWith('Bob', false, { mode: 'cli-node', cliUrl: 'ws://localhost:18080' });
             expect(globalThis.localStorage.getItem('openwire_cli_node_url')).toBe('ws://localhost:18080');
+        });
+
+        it('hydrates the stored cli url when local storage already has one', () => {
+            globalThis.localStorage.setItem('openwire_cli_node_url', 'ws://persisted:18080');
+            renderLanding();
+
+            fireEvent.click(screen.getByRole('radio', { name: /local cli node/i }));
+            expect(screen.getByLabelText('Node WebSocket URL')).toHaveValue('ws://persisted:18080');
         });
     });
 
     describe('connection mode switching', () => {
         it('switches to cli-node mode when radio clicked', () => {
             renderLanding();
-            const cliRadio = screen.getByText('Local CLI Node').closest('label').querySelector('input');
-            fireEvent.click(cliRadio);
-            expect(screen.getByPlaceholderText(/192\.168/)).toBeInTheDocument();
+            fireEvent.click(screen.getByRole('radio', { name: /local cli node/i }));
+            expect(screen.getByLabelText('Node WebSocket URL')).toBeInTheDocument();
+            expect(screen.getByText('CLI node selected')).toBeInTheDocument();
         });
 
         it('switches back to relay mode', () => {
             renderLanding();
-            const cliRadio = screen.getByText('Local CLI Node').closest('label').querySelector('input');
-            fireEvent.click(cliRadio);
-            expect(screen.getByPlaceholderText(/192\.168/)).toBeInTheDocument();
+            fireEvent.click(screen.getByRole('radio', { name: /local cli node/i }));
+            expect(screen.getByLabelText('Node WebSocket URL')).toBeInTheDocument();
 
-            const relayRadio = screen.getByText('OpenWire Relay').closest('label').querySelector('input');
-            fireEvent.click(relayRadio);
-            expect(screen.queryByPlaceholderText(/192\.168/)).not.toBeInTheDocument();
+            fireEvent.click(screen.getByRole('radio', { name: /openwire relay/i }));
+            expect(screen.queryByLabelText('Node WebSocket URL')).not.toBeInTheDocument();
+            expect(screen.getByText('Relay default')).toBeInTheDocument();
         });
     });
 
     describe('admin access', () => {
         it('shows AdminPasswordGate when admin button clicked', () => {
             renderLanding();
-            fireEvent.click(screen.getByText(/Admin Access/));
-            expect(screen.getByPlaceholderText(/password/i) || screen.getByText(/admin/i)).toBeTruthy();
+            fireEvent.click(screen.getByRole('button', { name: /admin access/i }));
+            expect(screen.getByLabelText('Password')).toBeInTheDocument();
         });
 
         it('shows an inline error for an incorrect admin password', async () => {
             renderLanding();
 
-            fireEvent.click(screen.getByText(/Admin Access/));
-            fireEvent.change(screen.getByPlaceholderText(/password/i), { target: { value: 'wrong-pass' } });
-            fireEvent.click(screen.getByRole('button', { name: /Unlock/i }));
+            fireEvent.click(screen.getByRole('button', { name: /admin access/i }));
+            fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrong-pass' } });
+            fireEvent.click(screen.getByRole('button', { name: /unlock/i }));
 
             expect(await screen.findByText('Incorrect password.')).toBeInTheDocument();
-            expect(screen.getByPlaceholderText(/password/i)).toHaveAttribute('aria-invalid', 'true');
+            expect(screen.getByLabelText('Password')).toHaveAttribute('aria-invalid', 'true');
+        });
+
+        it('joins as Admin after a successful admin unlock when nickname is blank', async () => {
+            renderLanding();
+            fireEvent.click(screen.getByRole('button', { name: /admin access/i }));
+            fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'openwire-admin' } });
+            fireEvent.click(screen.getByRole('button', { name: /unlock/i }));
+            expect(await screen.findByText(/join the network/i)).toBeInTheDocument();
         });
     });
 
     describe('name input', () => {
         it('updates input value on change', () => {
             renderLanding();
-            const input = screen.getByPlaceholderText(/nickname/i);
+            const input = screen.getByLabelText('Nickname');
             fireEvent.change(input, { target: { value: 'TestUser' } });
             expect(input.value).toBe('TestUser');
         });

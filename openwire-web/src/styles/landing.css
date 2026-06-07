@@ -1,333 +1,224 @@
-/* ── Landing ───────────────────────────────────── */
 .landing {
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
-  gap: 2rem;
-  padding: 2rem;
+  gap: 1.25rem;
+  padding: clamp(1.25rem, 3vw, 2.5rem);
 }
 
-.landing-logo {
-  font-size: 3.5rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  background: linear-gradient(135deg, var(--accent), var(--secondary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  text-shadow: 0 0 60px rgba(102, 161, 238, 0.3);
-  filter: drop-shadow(0 0 30px rgba(102, 161, 238, 0.4));
-  animation: logoGlow 3s ease-in-out infinite;
+.landing-shell {
+  width: min(1120px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 460px);
+  gap: clamp(1rem, 2vw, 1.5rem);
+  align-items: stretch;
 }
 
-@keyframes logoGlow {
-
-  0%,
-  100% {
-    opacity: 0.9;
-  }
-
-  50% {
-    opacity: 1;
-  }
-}
-
-.landing-sub {
-  color: var(--text-muted);
-  font-size: 1.1rem;
-  text-align: center;
-  max-width: 420px;
-  line-height: 1.7;
-}
-
+.landing-hero,
 .landing-card {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
-  padding: 2.5rem;
-  width: 100%;
-  max-width: 400px;
-  backdrop-filter: blur(var(--blur));
-  -webkit-backdrop-filter: blur(var(--blur));
-  box-shadow: var(--shadow-elevated), var(--shadow-glow);
-  position: relative;
-  overflow: hidden;
+  min-width: 0;
 }
 
-.landing-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--glass-shine), transparent);
+.landing-hero {
+  display: grid;
+  gap: 1.5rem;
+  align-content: start;
 }
 
-.landing-card h2 {
-  font-size: 1.3rem;
-  font-weight: 700;
-  margin-bottom: 1.5rem;
-  color: var(--text-primary);
-  text-align: center;
-}
-
-.landing-card input {
-  width: 100%;
-  padding: 0.9rem 1.2rem;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-family: var(--font);
-  font-size: 1rem;
-  outline: none;
-  transition: all 0.2s ease;
-}
-
-.landing-card input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow), 0 0 20px var(--accent-glow);
-}
-
-.landing-card input::placeholder {
-  color: var(--text-dim);
-}
-
-.landing-card button {
-  width: 100%;
-  margin-top: 1.25rem;
-  padding: 0.9rem;
-  background: linear-gradient(135deg, var(--accent), var(--secondary));
-  border: none;
-  border-radius: var(--radius-sm);
-  color: white;
-  font-family: var(--font);
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.landing-card button::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent);
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.landing-card button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(102, 161, 238, 0.4);
-}
-
-.landing-card button:hover::before {
-  opacity: 1;
-}
-
-.landing-card button:active {
-  transform: translateY(0);
-}
-
-/* ── Landing: Connect-via mode selector ────────── */
-.landing-connect-via {
-  margin-top: 1rem;
+.landing-eyebrow {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  overflow: hidden;
-}
-
-.landing-connect-via-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.landing-connect-via-options {
-  display: flex;
-  gap: 0;
-  flex-wrap: nowrap;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
-.landing-radio-option {
-  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   align-items: center;
-  justify-content: center;
-  gap: 0;
-  cursor: pointer;
-  font-size: 0.85rem;
+}
+
+.landing-eyebrow-text {
   color: var(--text-muted);
-  user-select: none;
-  padding: 0.55rem 1rem;
-  flex: 1;
-  text-align: center;
-  transition: all 0.2s ease;
-  position: relative;
+  font-size: 0.95rem;
 }
 
-.landing-radio-option:not(:last-child) {
-  border-right: 1px solid var(--glass-border);
+.landing-copy {
+  display: grid;
+  gap: 0.85rem;
 }
 
-.landing-radio-option:has(input:checked) {
-  background: linear-gradient(135deg, rgba(102, 161, 238, 0.2), rgba(168, 102, 238, 0.15));
-  color: var(--text-primary);
-  font-weight: 600;
+.landing-kicker,
+.landing-card-kicker {
+  margin: 0;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
-.landing-radio-option input[type="radio"] {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-  pointer-events: none;
+.landing-copy h1,
+.landing-card h2 {
+  margin: 0;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
 }
 
-.landing-cli-url-input {
-  width: 100%;
-  padding: 0.7rem 1rem;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  outline: none;
-  transition: border-color 0.2s;
-  box-sizing: border-box;
-  overflow: hidden;
+.landing-copy h1 {
+  font-size: clamp(2.3rem, 5vw, 4.4rem);
+  max-width: 12ch;
 }
 
-.landing-cli-url-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
+.landing-sub,
+.landing-card-subtitle,
+.landing-connect-help,
+.landing-action-note {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.6;
 }
 
-.landing-cli-url-input::placeholder {
-  color: var(--text-dim);
+.landing-highlights {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.75rem;
+  color: var(--text-secondary);
 }
 
-/* ── App: Connection mode badge in global header ─ */
-.connection-mode-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.25rem 0.65rem;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  white-space: nowrap;
-  overflow: hidden;
-  max-width: 220px;
-  text-overflow: ellipsis;
-  flex-shrink: 1;
-}
-
-.connection-mode-relay {
-  background: rgba(102, 161, 238, 0.12);
-  border-color: rgba(102, 161, 238, 0.25);
+.landing-highlights li::marker {
   color: var(--accent);
 }
 
-.connection-mode-cli {
-  background: rgba(22, 199, 46, 0.12);
-  border-color: rgba(22, 199, 46, 0.25);
-  color: var(--green);
+.landing-card {
+  display: grid;
+  gap: 1.25rem;
 }
 
-.connection-mode-lock {
-  margin-right: 0.3em;
+.landing-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
-/* ═══════════════════════════════════════════════════════════
-   LANDING PAGE: Admin Link
-   ═══════════════════════════════════════════════════════════ */
-
-.landing-admin-row {
-  margin-top: -0.5rem;
-  text-align: center;
+.landing-card-header > div {
+  display: grid;
+  gap: 0.45rem;
 }
 
-/* ── Touch-friendly form elements ── */
-.landing-card input {
-  min-height: 44px;
-  touch-action: manipulation;
+.landing-connect-via {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: grid;
+  gap: 0.9rem;
 }
 
-.landing-card button {
-  min-height: 44px;
-  touch-action: Manipulation;
+.landing-connect-via-label {
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
-/* Safety: prevent overflow-x on connect-via options */
 .landing-connect-via-options {
-  overflow-x: auto;
-  max-width: 100%;
+  display: grid;
+  gap: 0.75rem;
 }
 
-/* ── Responsive ── */
-@media (max-width: 480px) {
+.landing-radio-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: start;
+  padding: 0.95rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.landing-radio-option:hover {
+  border-color: rgba(102, 161, 238, 0.32);
+  background: rgba(102, 161, 238, 0.06);
+  transform: translateY(-1px);
+}
+
+.landing-radio-option:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.landing-radio-option input {
+  margin: 0.2rem 0 0;
+  accent-color: var(--accent);
+}
+
+.landing-radio-option span {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.landing-radio-option strong {
+  color: var(--text-primary);
+  font-size: 0.98rem;
+}
+
+.landing-radio-option small {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.landing-cli-url-input {
+  margin-top: 0.1rem;
+}
+
+.landing-actions {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.admin-access-link {
+  color: var(--text-muted);
+}
+
+.admin-access-link:hover,
+.admin-access-link:focus-visible {
+  color: var(--text-primary);
+}
+
+@media (max-width: 920px) {
   .landing {
-    padding: 1.5rem;
-    gap: 1.5rem;
+    justify-content: flex-start;
+    padding-block: 1.5rem 2rem;
   }
 
-  .landing-logo {
-    font-size: 2.2rem;
-    letter-spacing: -0.02em;
+  .landing-shell {
+    grid-template-columns: 1fr;
   }
 
-  .landing-sub {
-    font-size: 0.88rem;
-    max-width: 100%;
+  .landing-copy h1 {
+    max-width: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .landing {
+    gap: 1rem;
+    padding-inline: 1rem;
   }
 
+  .landing-hero,
   .landing-card {
     padding: 1.25rem;
-    border-radius: var(--radius);
   }
 
-  .landing-card h2 {
-    font-size: 1.1rem;
-    margin-bottom: 1.25rem;
-  }
-
-  .landing-card input {
-    padding: 0.75rem 1rem;
-    font-size: 0.95rem;
-    min-height: 48px;
-  }
-
-  .landing-card button {
-    padding: 0.8rem;
-    font-size: 0.95rem;
-    min-height: 48px;
-  }
-
-  .landing-connect-via-options {
-    flex-wrap: wrap;
-    overflow-x: hidden;
+  .landing-card-header {
+    flex-direction: column;
   }
 
   .landing-radio-option {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.8rem;
-    min-height: 44px;
-  }
-
-  .landing-cli-url-input {
-    font-size: 0.8rem;
-    padding: 0.6rem 0.85rem;
+    padding: 0.9rem;
   }
 }

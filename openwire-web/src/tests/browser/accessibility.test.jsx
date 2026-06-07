@@ -17,8 +17,6 @@ import userEvent from '@testing-library/user-event';
 import Landing from '../../components/Landing';
 import { AdminPasswordGate } from '../../components/AdminPortal';
 
-// ── localStorage stub — Landing.jsx reads localStorage in useState initializer ──
-
 const localStorageMock = (() => {
     let store = {};
     return {
@@ -34,8 +32,6 @@ Object.defineProperty(globalThis, 'localStorage', {
     writable: true,
     configurable: true,
 });
-
-// ── Mock external dependencies ──────────────────────────────────────────────
 
 vi.mock('../../styles/admin.css', () => ({}));
 
@@ -59,27 +55,26 @@ vi.mock('../../lib/agents/gemini.js', () => ({ formatGeminiLabel: vi.fn() }));
 vi.mock('../../lib/agents/qwen.js', () => ({ formatQwenLabel: vi.fn() }));
 vi.mock('../../lib/agents/haimaker.js', () => ({ formatHaimakerLabel: vi.fn() }));
 
-// ── Landing component — structural accessibility ────────────────────────────
-
 describe('Landing — input accessibility', () => {
-    it('renders a text input for nickname entry', () => {
+    it('renders a labeled text input for nickname entry', () => {
         render(<Landing onJoin={vi.fn()} />);
-        const input = screen.getByPlaceholderText('Enter your nickname...');
+        const input = screen.getByLabelText('Nickname');
         expect(input).toBeInTheDocument();
         expect(input.tagName).toBe('INPUT');
         expect(input).toHaveAttribute('type', 'text');
     });
 
-    it('nickname input has a maxLength attribute preventing overflow', () => {
+    it('nickname input keeps helper text explaining sanitization and fallback behavior', () => {
         render(<Landing onJoin={vi.fn()} />);
-        const input = screen.getByPlaceholderText('Enter your nickname...');
+        const input = screen.getByLabelText('Nickname');
         expect(input).toHaveAttribute('maxlength', '24');
+        expect(screen.getByText(/sanitized to 24 visible characters/i)).toBeInTheDocument();
+        expect(screen.getByText(/leave it blank to continue as anonymous/i)).toBeInTheDocument();
     });
 
-    it('join button is a native <button> element (keyboard-focusable by default)', () => {
+    it('join button is a native <button> element', () => {
         render(<Landing onJoin={vi.fn()} />);
-        // The form has a submit "Connect →" button — get by name
-        const submitBtn = screen.getByRole('button', { name: /connect/i });
+        const submitBtn = screen.getByRole('button', { name: /join openwire/i });
         expect(submitBtn.tagName).toBe('BUTTON');
         expect(submitBtn).toHaveAttribute('type', 'submit');
     });
@@ -90,32 +85,35 @@ describe('Landing — input accessibility', () => {
         expect(form).not.toBeNull();
     });
 
-    it('radio buttons for connection mode use the same name attribute (group)', () => {
+    it('connection mode radios share one named group', () => {
         render(<Landing onJoin={vi.fn()} />);
         const radios = screen.getAllByRole('radio');
         expect(radios.length).toBeGreaterThanOrEqual(2);
-        const names = radios.map(r => r.name);
-        // All radios in the same group share one name
-        const uniqueNames = new Set(names);
+        const uniqueNames = new Set(radios.map((radio) => radio.name));
         expect(uniqueNames.size).toBe(1);
+        expect(screen.getByText('Connect via')).toBeInTheDocument();
     });
 
     it('relay radio button is checked by default', () => {
         render(<Landing onJoin={vi.fn()} />);
-        const relayRadio = screen.getByRole('radio', { name: /openWire relay/i });
+        const relayRadio = screen.getByRole('radio', { name: /openwire relay/i });
         expect(relayRadio).toBeChecked();
     });
-});
 
-// ── Landing — functional form behavior (validates keyboard path works) ──────
+    it('cli mode reveals a labeled websocket url field with persistent helper copy', async () => {
+        render(<Landing onJoin={vi.fn()} />);
+        await userEvent.click(screen.getByRole('radio', { name: /local cli node/i }));
+        expect(screen.getByLabelText('Node WebSocket URL')).toBeInTheDocument();
+        expect(screen.getByText(/stored locally so repeat cli-node joins keep using the same endpoint/i)).toBeInTheDocument();
+    });
+});
 
 describe('Landing — form submit path', () => {
     it('calls onJoin when form is submitted with a valid nickname', async () => {
         const onJoin = vi.fn();
         render(<Landing onJoin={onJoin} />);
-        await userEvent.type(screen.getByPlaceholderText('Enter your nickname...'), 'Alice');
-        // Use the specific submit button to get its form
-        const submitBtn = screen.getByRole('button', { name: /connect/i });
+        await userEvent.type(screen.getByLabelText('Nickname'), 'Alice');
+        const submitBtn = screen.getByRole('button', { name: /join openwire/i });
         fireEvent.submit(submitBtn.closest('form'));
         expect(onJoin).toHaveBeenCalledTimes(1);
     });
@@ -123,8 +121,8 @@ describe('Landing — form submit path', () => {
     it('passes the mode "relay" by default in onJoin payload', async () => {
         const onJoin = vi.fn();
         render(<Landing onJoin={onJoin} />);
-        await userEvent.type(screen.getByPlaceholderText('Enter your nickname...'), 'Alice');
-        const submitBtn = screen.getByRole('button', { name: /connect/i });
+        await userEvent.type(screen.getByLabelText('Nickname'), 'Alice');
+        const submitBtn = screen.getByRole('button', { name: /join openwire/i });
         fireEvent.submit(submitBtn.closest('form'));
         expect(onJoin).toHaveBeenCalledWith(
             expect.any(String),
@@ -133,8 +131,6 @@ describe('Landing — form submit path', () => {
         );
     });
 });
-
-// ── AdminPasswordGate — accessible form structure ───────────────────────────
 
 describe('AdminPasswordGate — accessible form structure', () => {
     it('password input is type="password" (masked input)', () => {
@@ -165,37 +161,31 @@ describe('AdminPasswordGate — accessible form structure', () => {
         render(<AdminPasswordGate onSuccess={vi.fn()} onCancel={vi.fn()} />);
         await userEvent.type(screen.getByPlaceholderText('Admin password'), 'wrong');
         fireEvent.submit(screen.getByRole('button', { name: /unlock/i }).closest('form'));
-        // After async delay in component, error should appear
         await screen.findByText('Incorrect password.');
-        // Element exists in DOM (a screen reader could announce it if aria-live were set)
         expect(screen.getByText('Incorrect password.')).toBeInTheDocument();
     });
 });
 
-// ── Keyboard and focus tests (implementable in jsdom) ────────────────────────
-
 describe('Accessibility — keyboard and focus (jsdom)', () => {
-    it('Keyboard: Escape key closes AdminPortal overlay', () => {
+    it('clicking the admin overlay closes the gate', () => {
         const onCancel = vi.fn();
         render(<AdminPasswordGate onSuccess={vi.fn()} onCancel={onCancel} />);
         const overlay = document.querySelector('.admin-overlay');
-        // The overlay has onClick for e.target === e.currentTarget which closes it
         fireEvent.click(overlay);
         expect(onCancel).toHaveBeenCalledTimes(1);
     });
 
-    it('Keyboard: Enter key on landing form submits without clicking the button', async () => {
+    it('Enter key on landing form submits without clicking the button', async () => {
         const onJoin = vi.fn();
         render(<Landing onJoin={onJoin} />);
-        const input = screen.getByPlaceholderText('Enter your nickname...');
+        const input = screen.getByLabelText('Nickname');
         await userEvent.type(input, 'TestUser{Enter}');
         expect(onJoin).toHaveBeenCalledTimes(1);
     });
 
     it('autoFocus on nickname input is correctly applied on page load', () => {
         render(<Landing onJoin={vi.fn()} />);
-        const input = screen.getByPlaceholderText('Enter your nickname...');
-        // React renders autoFocus as a DOM property, so we check via the element reference
+        const input = screen.getByLabelText('Nickname');
         expect(document.activeElement).toBe(input);
     });
 
@@ -205,8 +195,6 @@ describe('Accessibility — keyboard and focus (jsdom)', () => {
         expect(document.activeElement).toBe(input);
     });
 });
-
-// ── Browser-only accessibility tests (require real browser / axe-core) ──────
 
 describe('Accessibility — browser-only (requires axe-core or real browser)', () => {
     it.todo('Color contrast: nickname input label/placeholder meets WCAG AA 4.5:1 ratio');
