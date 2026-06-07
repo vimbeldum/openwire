@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, useReducer, lazy, Suspense } from 'react';
 import '../styles/chat.css';
 import '../styles/games-shared.css';
 import ChatShellHeader from './ui/ChatShellHeader';
@@ -68,6 +68,12 @@ const PokeOverlay  = lazyRetry(() => import('./chat/PokeOverlay'));
 import LiveTicker from './chat/LiveTicker';
 import TypingBar from './chat/TypingBar';
 import * as ledger from '../lib/core/ledger.js';
+import {
+  createInitialSessionState,
+  sessionStateReducer,
+  SessionStatus,
+  isComposerEnabled,
+} from '../lib/chatSessionState.js';
 import { getRoomAlias } from '../lib/core/identity.js';
 import { loadStore, getCharactersDict } from '../lib/agents/agentStore.js';
 import { loadProfile, saveProfile, updateStreak } from '../lib/profile.js';
@@ -122,6 +128,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const [rooms, setRooms] = useState([]);
     const [currentRoom, setCurrentRoom] = useState(() => localStorage.getItem('openwire_current_room') || null);
     const [connected, setConnected] = useState(false);
+    const [sessionState, dispatchSessionEvent] = useReducer(sessionStateReducer, undefined, createInitialSessionState);
     const [myWallet, setMyWallet] = useState(null);
 
     // Games
@@ -1137,6 +1144,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     addMsg('★', `Your nickname was taken — assigned "${msg.nick}"`, 'system');
                 }
                 setConnected(true);
+                dispatchSessionEvent(msg);
                 setPeers(msg.peers || []);
                 setRooms(msg.rooms || []);
                 // Load existing peers' cosmetics
@@ -1548,10 +1556,12 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
             case 'kicked':
                 addMsg('★', `⚡ ${msg.message || 'You were kicked.'}`, 'system');
                 setConnected(false);
+                dispatchSessionEvent(msg);
                 break;
             case 'banned':
                 addMsg('★', `🚫 ${msg.message || 'You are banned.'}`, 'system');
                 setConnected(false);
+                dispatchSessionEvent(msg);
                 break;
             case 'banned_ips':
                 setBannedIps(msg.ips || []);
@@ -1562,14 +1572,17 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
 
             case 'disconnected':
                 setConnected(false);
+                dispatchSessionEvent(msg);
                 addMsg('★', '⚠ Disconnected — reconnecting...', 'system');
                 break;
 
             case 'cli_node_connecting':
+                dispatchSessionEvent(msg);
                 addMsg('★', `Connecting to CLI node at ${msg.url}...`, 'system');
                 break;
 
             case 'cli_node_fallback':
+                dispatchSessionEvent(msg);
                 addMsg('★', `CLI node unreachable — falling back to OpenWire Relay`, 'system');
                 break;
         }
