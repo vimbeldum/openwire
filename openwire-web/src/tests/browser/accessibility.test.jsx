@@ -58,7 +58,7 @@ vi.mock('../../lib/agents/haimaker.js', () => ({ formatHaimakerLabel: vi.fn() })
 describe('Landing — input accessibility', () => {
     it('renders a labeled text input for nickname entry', () => {
         render(<Landing onJoin={vi.fn()} />);
-        const input = screen.getByLabelText('Nickname');
+        const input = screen.getByLabelText(/Nickname/i);
         expect(input).toBeInTheDocument();
         expect(input.tagName).toBe('INPUT');
         expect(input).toHaveAttribute('type', 'text');
@@ -66,7 +66,7 @@ describe('Landing — input accessibility', () => {
 
     it('nickname input keeps helper text explaining sanitization and fallback behavior', () => {
         render(<Landing onJoin={vi.fn()} />);
-        const input = screen.getByLabelText('Nickname');
+        const input = screen.getByLabelText(/Nickname/i);
         expect(input).toHaveAttribute('maxlength', '24');
         expect(screen.getByText(/sanitized to 24 visible characters/i)).toBeInTheDocument();
         expect(screen.getByText(/leave it blank to continue as anonymous/i)).toBeInTheDocument();
@@ -103,7 +103,7 @@ describe('Landing — input accessibility', () => {
     it('cli mode reveals a labeled websocket url field with persistent helper copy', async () => {
         render(<Landing onJoin={vi.fn()} />);
         await userEvent.click(screen.getByRole('radio', { name: /local cli node/i }));
-        expect(screen.getByLabelText('Node WebSocket URL')).toBeInTheDocument();
+        expect(screen.getByLabelText(/Node WebSocket URL/i)).toBeInTheDocument();
         expect(screen.getByText(/stored locally so repeat cli-node joins keep using the same endpoint/i)).toBeInTheDocument();
     });
 });
@@ -112,7 +112,7 @@ describe('Landing — form submit path', () => {
     it('calls onJoin when form is submitted with a valid nickname', async () => {
         const onJoin = vi.fn();
         render(<Landing onJoin={onJoin} />);
-        await userEvent.type(screen.getByLabelText('Nickname'), 'Alice');
+        await userEvent.type(screen.getByLabelText(/Nickname/i), 'Alice');
         const submitBtn = screen.getByRole('button', { name: /join openwire/i });
         fireEvent.submit(submitBtn.closest('form'));
         expect(onJoin).toHaveBeenCalledTimes(1);
@@ -121,7 +121,7 @@ describe('Landing — form submit path', () => {
     it('passes the mode "relay" by default in onJoin payload', async () => {
         const onJoin = vi.fn();
         render(<Landing onJoin={onJoin} />);
-        await userEvent.type(screen.getByLabelText('Nickname'), 'Alice');
+        await userEvent.type(screen.getByLabelText(/Nickname/i), 'Alice');
         const submitBtn = screen.getByRole('button', { name: /join openwire/i });
         fireEvent.submit(submitBtn.closest('form'));
         expect(onJoin).toHaveBeenCalledWith(
@@ -178,14 +178,14 @@ describe('Accessibility — keyboard and focus (jsdom)', () => {
     it('Enter key on landing form submits without clicking the button', async () => {
         const onJoin = vi.fn();
         render(<Landing onJoin={onJoin} />);
-        const input = screen.getByLabelText('Nickname');
+        const input = screen.getByLabelText(/Nickname/i);
         await userEvent.type(input, 'TestUser{Enter}');
         expect(onJoin).toHaveBeenCalledTimes(1);
     });
 
     it('autoFocus on nickname input is correctly applied on page load', () => {
         render(<Landing onJoin={vi.fn()} />);
-        const input = screen.getByLabelText('Nickname');
+        const input = screen.getByLabelText(/Nickname/i);
         expect(document.activeElement).toBe(input);
     });
 
