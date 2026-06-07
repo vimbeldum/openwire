@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
 import Input from './ui/Input';
@@ -27,9 +27,18 @@ export function AdminPasswordGate({ onSuccess, onCancel }) {
         setLoading(false);
     };
 
+    // Close on Escape key
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') onCancel();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onCancel]);
+
     return (
         <div className="admin-overlay" role="dialog" aria-modal="true" aria-label="Admin password required" onClick={(e) => e.target === e.currentTarget && onCancel()}>
-            <Panel tone="subtle" padding="lg">
+            <Panel tone="subtle" padding="lg" className="admin-gate-card">
                 <div className="admin-gate-icon">🔐</div>
                 <div className="admin-gate-header">
                     <h2>Admin Access</h2>

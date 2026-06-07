@@ -2470,7 +2470,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                 roomConstraint={roomConstraint}
                 chaosEnabled={chaosEnabled}
                 chaosPersonality={chaosPersonality}
-                myNick={myNickRef.current}
+                myNick={myNick}
                 isCliMode={isCliMode}
                 connectionConfig={connectionConfig}
                 cliHost={cliHost}

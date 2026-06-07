@@ -5,7 +5,7 @@
    Long lists scroll internally (overflow-y: auto on .ah-list).
    ═══════════════════════════════════════════════════════════ */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as ledger from '../lib/core/ledger.js';
 
 const GAME_ICONS = {
@@ -123,6 +123,14 @@ export default function AccountHistory({ deviceId, myId, onClose }) {
         ledger.clearHistory(deviceId);
         setHistory([]);
     };
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
 
     return (
         <div className="ah-overlay" role="dialog" aria-modal="true" aria-label="Account history" onClick={e => e.target === e.currentTarget && onClose()}>

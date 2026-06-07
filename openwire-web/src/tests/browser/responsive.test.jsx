@@ -80,11 +80,53 @@ describe('Landing — responsive / viewport tests', () => {
         expect(document.body.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
     });
 
-    it('375px: landing heading and connect button are present in the DOM', async () => {
+    it('375px: landing heading and submit button are present in the DOM', async () => {
         setViewportWidth(375);
         await renderLanding();
-        expect(screen.getByText('Join the Network')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /connect/i })).toBeInTheDocument();
+        expect(screen.getByText('Join the network')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /join openwire/i })).toBeInTheDocument();
+    });
+
+    // ── 1b. Small Phone (360 px) — milestone contract minimum ────────────────
+
+    it('renders at 360px without throwing', async () => {
+        setViewportWidth(360);
+        await expect(renderLanding()).resolves.toBeDefined();
+    });
+
+    it('360px: document.body.scrollWidth does not exceed window.innerWidth', async () => {
+        setViewportWidth(360);
+        await renderLanding();
+        expect(document.body.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+    });
+
+    it('360px: connect button and heading are present', async () => {
+        setViewportWidth(360);
+        await renderLanding();
+        expect(screen.getByText('Join the network')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /join openwire/i })).toBeInTheDocument();
+    });
+
+    // ── 1c. Mid-range Phone (430 px) — common iPhone Max size ────────────────
+
+    it('renders at 430px without throwing', async () => {
+        setViewportWidth(430);
+        await expect(renderLanding()).resolves.toBeDefined();
+    });
+
+    it('430px: document.body.scrollWidth does not exceed window.innerWidth', async () => {
+        setViewportWidth(430);
+        await renderLanding();
+        expect(document.body.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+    });
+
+    it('430px: all form elements are present', async () => {
+        setViewportWidth(430);
+        await renderLanding();
+        expect(screen.getByPlaceholderText(/enter your nickname/i)).toBeInTheDocument();
+        expect(screen.getByRole('radio', { name: /openwire relay/i })).toBeInTheDocument();
+        expect(screen.getByRole('radio', { name: /local cli node/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /join openwire/i })).toBeInTheDocument();
     });
 
     // ── 2. Tablet (768 px) ──────────────────────────────────────────────────
@@ -128,9 +170,9 @@ describe('Landing — responsive / viewport tests', () => {
         // The logo contains "OpenWire" — use getAllByText since the radio label
         // "OpenWire Relay" also matches the /OpenWire/i pattern.
         expect(screen.getAllByText(/OpenWire/i).length).toBeGreaterThanOrEqual(1);
-        expect(screen.getByText('Join the Network')).toBeInTheDocument();
-        expect(screen.getByText(/OpenWire Relay/i)).toBeInTheDocument();
-        expect(screen.getByText(/Local CLI Node/i)).toBeInTheDocument();
+        expect(screen.getByText('Join the network')).toBeInTheDocument();
+        expect(screen.getAllByText(/OpenWire Relay/i).length).toBeGreaterThanOrEqual(1);
+        expect(screen.getAllByText(/Local CLI Node/i).length).toBeGreaterThanOrEqual(1);
     });
 
     // ── 4. No JS errors across all viewports ────────────────────────────────
@@ -139,7 +181,7 @@ describe('Landing — responsive / viewport tests', () => {
         for (const width of [375, 768, 1024, 1440]) {
             setViewportWidth(width);
             const { unmount } = await renderLanding();
-            expect(screen.getByRole('button', { name: /connect/i })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: /join openwire/i })).toBeInTheDocument();
             unmount();
         }
     });
@@ -166,17 +208,27 @@ describe('Landing — responsive / viewport tests', () => {
 
         const input = screen.getByPlaceholderText(/enter your nickname/i);
         fireEvent.change(input, { target: { value: 'Alice' } });
-        fireEvent.submit(screen.getByRole('button', { name: /connect/i }).closest('form'));
+        fireEvent.submit(screen.getByRole('button', { name: /join openwire/i }).closest('form'));
 
         expect(onJoin).toHaveBeenCalledTimes(1);
         expect(onJoin).toHaveBeenCalledWith('Alice', false, { mode: 'relay' });
     });
 
     it('Admin Access button is rendered at all viewports', async () => {
-        for (const width of [375, 768, 1440]) {
+        for (const width of [360, 375, 430, 768, 1024, 1440]) {
             setViewportWidth(width);
             const { unmount } = await renderLanding();
             expect(screen.getByRole('button', { name: /admin access/i })).toBeInTheDocument();
+            unmount();
+        }
+    });
+
+    it('connection-mode radio labels render at all viewports', async () => {
+        for (const width of [360, 430, 768, 1440]) {
+            setViewportWidth(width);
+            const { unmount } = await renderLanding();
+            expect(screen.getAllByText(/OpenWire Relay/i).length).toBeGreaterThanOrEqual(1);
+            expect(screen.getAllByText(/Local CLI Node/i).length).toBeGreaterThanOrEqual(1);
             unmount();
         }
     });

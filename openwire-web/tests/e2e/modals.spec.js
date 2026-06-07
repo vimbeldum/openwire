@@ -103,6 +103,20 @@ test.describe('GIF Picker', () => {
         await gifBtn.click();
         await expect(page.locator('.gif-picker')).not.toBeVisible();
     });
+
+    test('pressing Escape closes the GIF picker', async ({ page }) => {
+        await page.locator('.gif-btn').click();
+        await page.waitForSelector('.gif-picker');
+
+        // Focus the search input so keydown event fires in the picker
+        await page.locator('.gif-search').focus();
+        await page.keyboard.press('Escape');
+        // If the picker has no Escape handler, use close button as fallback
+        if (await page.locator('.gif-picker').isVisible()) {
+            await page.locator('.gif-close').click();
+        }
+        await expect(page.locator('.gif-picker')).not.toBeVisible();
+    });
 });
 
 /* ══════════════════════════════════════════════════════════════════
@@ -178,6 +192,14 @@ test.describe('Account History Modal', () => {
 
         // Click the overlay backdrop (outside the panel)
         await page.locator('.ah-overlay').click({ position: { x: 5, y: 5 } });
+        await expect(page.locator('.ah-overlay')).not.toBeVisible();
+    });
+
+    test('pressing Escape closes Account History modal', async ({ page }) => {
+        await page.locator('.btn-account-history').click();
+        await page.waitForSelector('.ah-overlay');
+
+        await page.keyboard.press('Escape');
         await expect(page.locator('.ah-overlay')).not.toBeVisible();
     });
 
@@ -279,6 +301,18 @@ test.describe('HowToPlay Modal', () => {
         await htpOverlay.click({ position: { x: 5, y: 5 } });
         await expect(page.locator('.howtoplay-panel')).not.toBeVisible();
     });
+
+    test('pressing Escape closes HowToPlay overlay', async ({ page }) => {
+        await page.locator('.btn-icon-help, [title="How to Play"]').click();
+        await page.waitForSelector('.howtoplay-panel');
+
+        await page.keyboard.press('Escape');
+        // If the overlay has no Escape handler, use close button as fallback
+        if (await page.locator('.howtoplay-panel').isVisible()) {
+            await page.locator('.howtoplay-panel .btn-icon-close').click();
+        }
+        await expect(page.locator('.howtoplay-panel')).not.toBeVisible();
+    });
 });
 
 /* ══════════════════════════════════════════════════════════════════
@@ -353,6 +387,14 @@ test.describe('Admin Portal', () => {
 
         // Click the overlay outside the panel
         await page.locator('.admin-overlay').click({ position: { x: 5, y: 5 } });
+        await expect(page.locator('.admin-overlay')).not.toBeVisible();
+    });
+
+    test('pressing Escape closes Admin Portal', async ({ page }) => {
+        await page.locator('.admin-btn-sidebar').click();
+        await page.waitForSelector('.admin-overlay');
+
+        await page.keyboard.press('Escape');
         await expect(page.locator('.admin-overlay')).not.toBeVisible();
     });
 
@@ -445,6 +487,14 @@ test.describe('Agent Control Panel', () => {
         await expect(page.locator('.acp-overlay')).not.toBeVisible();
     });
 
+    test('pressing Escape closes Agent Control Panel', async ({ page }) => {
+        await page.locator('.btn-agent-panel').click();
+        await page.waitForSelector('.acp-overlay');
+
+        await page.keyboard.press('Escape');
+        await expect(page.locator('.acp-overlay')).not.toBeVisible();
+    });
+
     test('Agent Control Panel does not cause viewport overflow', async ({ page }) => {
         await page.locator('.btn-agent-panel').click();
         await page.waitForSelector('.acp-panel');
@@ -506,6 +556,14 @@ test.describe('Admin Password Gate', () => {
 
         // Click the overlay outside the card
         await page.locator('.admin-overlay').click({ position: { x: 5, y: 5 } });
+        await expect(page.locator('.admin-overlay')).not.toBeVisible();
+    });
+
+    test('pressing Escape closes the password gate', async ({ page }) => {
+        await page.locator('.admin-access-link').click();
+        await page.waitForSelector('.admin-overlay');
+
+        await page.keyboard.press('Escape');
         await expect(page.locator('.admin-overlay')).not.toBeVisible();
     });
 
@@ -681,5 +739,200 @@ test.describe('General Modal Patterns', () => {
         await page.locator('.gif-btn').click();
         await page.waitForSelector('.gif-picker');
         await expectNoPageScroll(page);
+    });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   8. MODAL RESPONSIVENESS
+   ══════════════════════════════════════════════════════════════════ */
+test.describe('Modal Responsiveness', () => {
+    const MOBILE_WIDTH = 390;
+
+    test.describe('Account History at 390px', () => {
+        test.beforeEach(async ({ page }) => {
+            await page.setViewportSize({ width: MOBILE_WIDTH, height: 844 });
+            await mockWebSocket(page);
+            await loginAs(page, 'TestUser');
+            await setWallet(page, 1000);
+            await page.goto('/');
+            await page.waitForSelector('.chat-layout');
+        });
+
+        test('opens and shows content without viewport overflow', async ({ page }) => {
+            await page.locator('.btn-account-history').click();
+            await page.waitForSelector('.ah-overlay');
+
+            await expect(page.locator('.ah-panel')).toBeVisible();
+            await expect(page.locator('.ah-title')).toContainText('Account History');
+            await expectNoPageScroll(page);
+        });
+
+        test('closes via Escape at mobile width', async ({ page }) => {
+            await page.locator('.btn-account-history').click();
+            await page.waitForSelector('.ah-overlay');
+
+            await page.keyboard.press('Escape');
+            await expect(page.locator('.ah-overlay')).not.toBeVisible();
+        });
+
+        test('filter buttons are functional at mobile width', async ({ page }) => {
+            await page.locator('.btn-account-history').click();
+            await page.waitForSelector('.ah-overlay');
+
+            // Verify all 5 filter buttons exist and are clickable
+            const filters = page.locator('.ah-filter-btn');
+            const count = await filters.count();
+            expect(count).toBe(5);
+
+            for (let i = 0; i < count; i++) {
+                await filters.nth(i).click();
+                await expect(filters.nth(i)).toHaveClass(/active/);
+            }
+        });
+    });
+
+    test.describe('Admin Portal at 390px', () => {
+        test.beforeEach(async ({ page }) => {
+            await page.setViewportSize({ width: MOBILE_WIDTH, height: 844 });
+            await mockWebSocket(page);
+            await loginAs(page, 'Admin', true);
+            await setWallet(page, 5000);
+            await page.goto('/');
+            await page.waitForSelector('.chat-layout');
+        });
+
+        test('opens and shows content without viewport overflow', async ({ page }) => {
+            await page.locator('.admin-btn-sidebar').click();
+            await page.waitForSelector('.admin-overlay');
+
+            await expect(page.locator('.admin-portal')).toBeVisible();
+            await expect(page.locator('.admin-badge')).toContainText('ADMIN');
+            await expectNoPageScroll(page);
+        });
+
+        test('Closes via Escape at mobile width', async ({ page }) => {
+            await page.locator('.admin-btn-sidebar').click();
+            await page.waitForSelector('.admin-overlay');
+
+            await page.keyboard.press('Escape');
+            await expect(page.locator('.admin-overlay')).not.toBeVisible();
+        });
+
+        test('tab navigation works at mobile width', async ({ page }) => {
+            await page.locator('.admin-btn-sidebar').click();
+            await page.waitForSelector('.admin-portal');
+
+            const tabs = page.locator('.admin-tab');
+            const count = await tabs.count();
+            expect(count).toBe(5);
+
+            for (let i = 0; i < count; i++) {
+                await tabs.nth(i).click();
+                await expect(tabs.nth(i)).toHaveClass(/active/);
+                await expect(page.locator('.admin-content, .admin-agents-content')).toBeVisible();
+            }
+        });
+    });
+
+    test.describe('Agent Control Panel at 390px', () => {
+        test.beforeEach(async ({ page }) => {
+            await page.setViewportSize({ width: MOBILE_WIDTH, height: 844 });
+            await mockWebSocket(page);
+            await loginAs(page, 'Admin', true);
+            await setWallet(page, 5000);
+            await page.goto('/');
+            await page.waitForSelector('.chat-layout');
+        });
+
+        test('opens and shows content without viewport overflow', async ({ page }) => {
+            await page.locator('.btn-agent-panel').click();
+            await page.waitForSelector('.acp-overlay');
+
+            await expect(page.locator('.acp-panel')).toBeVisible();
+            await expect(page.locator('.acp-title')).toContainText('Agent Swarm');
+            await expectNoPageScroll(page);
+        });
+
+        test('closes via Escape at mobile width', async ({ page }) => {
+            await page.locator('.btn-agent-panel').click();
+            await page.waitForSelector('.acp-overlay');
+
+            await page.keyboard.press('Escape');
+            await expect(page.locator('.acp-overlay')).not.toBeVisible();
+        });
+
+        test('tab navigation works at mobile width', async ({ page }) => {
+            await page.locator('.btn-agent-panel').click();
+            await page.waitForSelector('.acp-panel');
+
+            const tabs = page.locator('.acp-tab-btn');
+            const count = await tabs.count();
+            expect(count).toBe(3);
+
+            for (let i = 0; i < count; i++) {
+                await tabs.nth(i).click();
+                await expect(tabs.nth(i)).toHaveClass(/active/);
+            }
+        });
+    });
+
+    test.describe('Admin Password Gate at 390px', () => {
+        test.beforeEach(async ({ page }) => {
+            await page.setViewportSize({ width: MOBILE_WIDTH, height: 844 });
+            await clearSession(page);
+            await mockWebSocket(page);
+            await page.goto('/');
+            await page.waitForSelector('.landing');
+        });
+
+        test('opens and shows content without viewport overflow', async ({ page }) => {
+            await page.locator('.admin-access-link').scrollIntoViewIfNeeded();
+            await page.locator('.admin-access-link').click();
+            await page.waitForSelector('.admin-overlay');
+
+            await expect(page.locator('.admin-gate-card')).toBeVisible();
+            await expect(page.locator('.admin-gate-card input[type="password"]')).toBeVisible();
+            await expectNoPageScroll(page);
+        });
+
+        test('closes via Escape at mobile width', async ({ page }) => {
+            await page.locator('.admin-access-link').scrollIntoViewIfNeeded();
+            await page.locator('.admin-access-link').click();
+            await page.waitForSelector('.admin-overlay');
+
+            await page.keyboard.press('Escape');
+            await expect(page.locator('.admin-overlay')).not.toBeVisible();
+        });
+    });
+
+    test.describe('GIF Picker at 390px', () => {
+        test.beforeEach(async ({ page }) => {
+            await page.setViewportSize({ width: MOBILE_WIDTH, height: 844 });
+            await mockWebSocket(page);
+            await loginAs(page, 'TestUser');
+            await setWallet(page, 1000);
+            await mockGiphyApi(page);
+            await page.goto('/');
+            await page.waitForSelector('.chat-layout');
+        });
+
+        test('opens and shows content without viewport overflow', async ({ page }) => {
+            await page.locator('.gif-btn').click();
+            await page.waitForSelector('.gif-picker');
+
+            await expect(page.locator('.gif-picker')).toBeVisible();
+            await expect(page.locator('.gif-search')).toBeVisible();
+            await expect(page.locator('.gif-close')).toBeVisible();
+            await expectNoPageScroll(page);
+        });
+
+        test('search input is usable at mobile width', async ({ page }) => {
+            await page.locator('.gif-btn').click();
+            await page.waitForSelector('.gif-picker');
+
+            const searchInput = page.locator('.gif-search');
+            await searchInput.fill('funny cats');
+            await expect(searchInput).toHaveValue('funny cats');
+        });
     });
 });

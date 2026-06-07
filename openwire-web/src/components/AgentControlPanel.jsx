@@ -225,6 +225,15 @@ function AgentControlPanel({ swarm, onClose }) {
     const wl = store.modelFilters?.whitelist || [];
     const bl = store.modelFilters?.blacklist || [];
 
+    // Close on Escape key
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
+
     return (
         <div className="acp-overlay" onClick={onClose}>
             <div className="acp-panel" onClick={e => e.stopPropagation()}>

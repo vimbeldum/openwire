@@ -112,6 +112,15 @@ function AdminPortal({ peers, onKick, onBanIp, onUnbanIp, onAdjustBalance, onAdj
         return () => clearInterval(id);
     }, [statsDebug, swarm]);
 
+    // Close on Escape key
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
+
     const totalChips = peers.reduce((s, p) => s + (p.balance || 0), 0);
     const richest = peers.reduce((best, p) => (!best || (p.balance || 0) > (best.balance || 0)) ? p : best, null);
 
