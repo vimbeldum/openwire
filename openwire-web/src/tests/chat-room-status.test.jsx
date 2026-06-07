@@ -142,6 +142,27 @@ describe('ChatShellHeader — status rendering', () => {
     renderHeader(state);
     expect(screen.getByText('CLI node unreachable \u2014 using relay')).toBeTruthy();
   });
+
+  it('shows status-dot--warning class when RECONNECT_FAILED', () => {
+    const state = { status: SessionStatus.RECONNECT_FAILED, connectionMode: 'relay', cliNodeHost: null, reconnectAttempt: 25 };
+    const { container } = renderHeader(state);
+    const dot = container.querySelector('.status-dot--warning');
+    expect(dot).toBeTruthy();
+  });
+
+  it('shows status-dot--info class when CLI_NODE_CONNECTING', () => {
+    const state = { status: SessionStatus.CLI_NODE_CONNECTING, connectionMode: 'cli-node', cliNodeHost: 'localhost:8080', reconnectAttempt: 0 };
+    const { container } = renderHeader(state);
+    const dot = container.querySelector('.status-dot--info');
+    expect(dot).toBeTruthy();
+  });
+
+  it('shows status-dot--warning class when CLI_NODE_FALLBACK', () => {
+    const state = { status: SessionStatus.CLI_NODE_FALLBACK, connectionMode: 'relay', cliNodeHost: null, reconnectAttempt: 0 };
+    const { container } = renderHeader(state);
+    const dot = container.querySelector('.status-dot--warning');
+    expect(dot).toBeTruthy();
+  });
 });
 
 /* ─────────────────────────────────────────────────────────────
@@ -208,6 +229,53 @@ describe('ConversationEmptyState — copy per session state', () => {
     const state = { status: SessionStatus.CLI_NODE_FALLBACK, connectionMode: 'relay', cliNodeHost: null, reconnectAttempt: 0 };
     renderEmptyState(state);
     expect(screen.getByText('CLI node unreachable \u2014 using relay')).toBeTruthy();
+  });
+
+  it('shows hint about secure connection when CONNECTING', () => {
+    const state = { status: SessionStatus.CONNECTING, connectionMode: 'relay', cliNodeHost: null, reconnectAttempt: 0 };
+    renderEmptyState(state);
+    expect(screen.getByText(/Establishing a secure connection/)).toBeTruthy();
+  });
+
+  it('shows hint about typing a message when CONNECTED', () => {
+    const state = { status: SessionStatus.CONNECTED, connectionMode: 'relay', cliNodeHost: null, reconnectAttempt: 0 };
+    renderEmptyState(state);
+    expect(screen.getByText(/Type a message below/)).toBeTruthy();
+  });
+
+  it('shows hint about network check when RECONNECT_FAILED', () => {
+    const state = { status: SessionStatus.RECONNECT_FAILED, connectionMode: 'relay', cliNodeHost: null, reconnectAttempt: 25 };
+    renderEmptyState(state);
+    expect(screen.getByText(/check your network or try refreshing/)).toBeTruthy();
+  });
+
+  it('shows hint about direct connection when CLI_NODE_CONNECTING', () => {
+    const state = { status: SessionStatus.CLI_NODE_CONNECTING, connectionMode: 'cli-node', cliNodeHost: 'example.com', reconnectAttempt: 0 };
+    renderEmptyState(state);
+    expect(screen.getByText(/Establishing a direct connection/)).toBeTruthy();
+  });
+
+  it('shows hint about relay routing when CLI_NODE_FALLBACK', () => {
+    const state = { status: SessionStatus.CLI_NODE_FALLBACK, connectionMode: 'relay', cliNodeHost: null, reconnectAttempt: 0 };
+    renderEmptyState(state);
+    expect(screen.getByText(/Messages are being routed through the OpenWire relay/)).toBeTruthy();
+  });
+
+  it('shows hint about page refresh when DISCONNECTED', () => {
+    const state = { status: SessionStatus.DISCONNECTED, connectionMode: 'relay', cliNodeHost: null, reconnectAttempt: 0 };
+    renderEmptyState(state);
+    expect(screen.getByText(/refresh to rejoin/)).toBeTruthy();
+  });
+
+  it('defaults to CONNECTING copy when sessionState is null', () => {
+    renderEmptyState(null);
+    expect(screen.getByText('Connecting to server...')).toBeTruthy();
+    expect(screen.getByText(/Establishing a secure connection/)).toBeTruthy();
+  });
+
+  it('defaults to CONNECTING copy when sessionState is undefined', () => {
+    renderEmptyState(undefined);
+    expect(screen.getByText('Connecting to server...')).toBeTruthy();
   });
 });
 
