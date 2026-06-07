@@ -1,0 +1,12 @@
+{
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "installCommand": "cd openwire-web && npm install",
+    "buildCommand": "cd openwire-web && npm run build",
+    "outputDirectory": "openwire-web/dist",
+    "rewrites": [
+        {
+            "source": "/((?!api/).*)",
+            "destination": "/"
+        }
+    ]
+}
