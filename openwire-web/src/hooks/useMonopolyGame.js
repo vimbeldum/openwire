@@ -25,6 +25,7 @@ export default function useMonopolyGame(deps) {
         switch (action.type) {
             case 'mono_start': {
                 if (action.host === myId) return;
+                monoHostRef.current = action.host;
                 addMsg('\u2605', `${action.host_nick} started Monopoly!`, 'game_invite', {
                     gameType: 'monopoly',
                     inviteData: { room_id: action.room_id, host: action.host, host_nick: action.host_nick },

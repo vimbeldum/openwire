@@ -702,7 +702,8 @@ function advanceTurn(game) {
 /* ── Message Protocol ─────────────────────────────────────── */
 
 export function isMonopolyMessage(data) {
-    return data?.type?.startsWith('mono_');
+    const action = parseMonopolyAction(data);
+    return !!action?.type?.startsWith('mono_');
 }
 
 export function serializeMonopolyAction(action) {
