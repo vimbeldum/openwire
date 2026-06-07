@@ -137,6 +137,35 @@ test.describe('Landing Page', () => {
         await expect(page.locator('.admin-gate-card input[type="password"]')).toBeVisible();
     });
 
+    test('admin entry from landing with correct password joins as admin', async ({ page }) => {
+        await page.goto('/');
+
+        // Fill in a nickname before opening admin gate
+        const nickInput = page.locator('input[placeholder="Enter your nickname..."]');
+        await nickInput.fill('LandingAdmin');
+
+        // Open admin gate
+        await page.locator('.admin-access-link').click();
+        await expect(page.locator('.admin-overlay')).toBeVisible();
+
+        // Verify dialog has the repaired accessible name
+        await expect(page.getByRole('dialog', { name: 'Unlock admin access' })).toBeVisible();
+
+        // Enter correct password and unlock
+        await page.locator('.admin-gate-card input[type="password"]').fill('openwire-admin');
+        await page.locator('.admin-gate-actions button[type="submit"]').click();
+
+        // Dialog should close
+        await expect(page.locator('.admin-overlay')).not.toBeVisible();
+
+        // Should join as admin -- ChatRoom visible with nickname
+        await expect(page.locator('.chat-header')).toBeVisible();
+        await expect(page.locator('.header-nick')).toContainText('LandingAdmin');
+
+        // Admin-specific UI should be visible
+        await expect(page.locator('.btn-agent-panel')).toBeVisible();
+    });
+
     test('session persists across reload', async ({ context }) => {
         // Use a fresh page without clearSession so init scripts don't
         // wipe localStorage on reload. loginAs re-sets the session on

@@ -19,6 +19,9 @@ export default defineConfig({
         port: 5173,
         reuseExistingServer: !process.env.CI,
         timeout: 60000,
+        env: {
+            VITE_ADMIN_PASSWORD: 'openwire-admin',
+        },
     },
     projects: [
         {

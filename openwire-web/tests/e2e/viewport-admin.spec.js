@@ -187,7 +187,7 @@ test.describe('Admin Portal Access', () => {
     test('admin logged in sees agent panel button in header', async ({ page }) => {
         await loginAs(page, 'AdminUser', true);
         await page.goto('/');
-        await page.waitForSelector('.global-header');
+        await page.waitForSelector('.chat-header');
 
         // The 🤖 agent panel button only renders when isAdmin is true
         const agentBtn = page.locator('.btn-agent-panel');
@@ -197,7 +197,7 @@ test.describe('Admin Portal Access', () => {
     test('non-admin does NOT see agent panel button', async ({ page }) => {
         await loginAs(page, 'RegularUser', false);
         await page.goto('/');
-        await page.waitForSelector('.global-header');
+        await page.waitForSelector('.chat-header');
 
         // The 🤖 agent panel button should not exist for regular users
         const agentBtn = page.locator('.btn-agent-panel');
@@ -207,12 +207,63 @@ test.describe('Admin Portal Access', () => {
     test('admin sidebar shows admin portal button', async ({ page }) => {
         await loginAs(page, 'SidebarAdmin', true);
         await page.goto('/');
-        await page.waitForSelector('.global-header');
+        await page.waitForSelector('.chat-header');
 
         // The sidebar admin button only renders when initialIsAdmin is true
         const adminSidebarBtn = page.locator('.admin-btn-sidebar');
         // It may be inside a sidebar that needs to be visible; check it exists in DOM
         await expect(adminSidebarBtn).toHaveCount(1);
+    });
+
+    test('admin gate shows error on incorrect password', async ({ page }) => {
+        await page.goto('/');
+        await page.waitForSelector('.landing');
+
+        // Open admin gate
+        await page.locator('.admin-access-link').click();
+        await expect(page.locator('.admin-overlay')).toBeVisible();
+
+        // Verify dialog has the repaired accessible name
+        await expect(page.getByRole('dialog', { name: 'Unlock admin access' })).toBeVisible();
+
+        // Enter wrong password and submit
+        await page.locator('.admin-gate-card input[type="password"]').fill('wrong-password');
+        await page.locator('.admin-gate-actions button[type="submit"]').click();
+
+        // Error message should appear
+        await expect(page.locator('.ui-field__error')).toHaveText('Incorrect password.');
+
+        // Dialog should remain visible (user can retry)
+        await expect(page.locator('.admin-overlay')).toBeVisible();
+    });
+
+    test('admin gate accepts correct password and joins as admin', async ({ page }) => {
+        await page.goto('/');
+        await page.waitForSelector('.landing');
+
+        // Fill in a nickname before opening admin gate
+        await page.locator('input[placeholder="Enter your nickname..."]').fill('GateAdmin');
+
+        // Open admin gate
+        await page.locator('.admin-access-link').click();
+        await expect(page.locator('.admin-overlay')).toBeVisible();
+
+        // Verify dialog has the repaired accessible name
+        await expect(page.getByRole('dialog', { name: 'Unlock admin access' })).toBeVisible();
+
+        // Enter correct password and unlock
+        await page.locator('.admin-gate-card input[type="password"]').fill('openwire-admin');
+        await page.locator('.admin-gate-actions button[type="submit"]').click();
+
+        // Dialog should close
+        await expect(page.locator('.admin-overlay')).not.toBeVisible();
+
+        // Should join as admin -- ChatRoom visible with nickname
+        await expect(page.locator('.chat-header')).toBeVisible();
+        await expect(page.locator('.header-nick')).toContainText('GateAdmin');
+
+        // Admin-specific UI should be visible
+        await expect(page.locator('.btn-agent-panel')).toBeVisible();
     });
 });
 
