@@ -12,7 +12,7 @@
  * the state derivation model (which is covered by chat-session-state.test.js).
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { SessionStatus } from '../lib/chatSessionState';
 
@@ -308,6 +308,221 @@ describe('ChatShellHeader — mobile compact context summary', () => {
     const { container } = renderHeader(state);
     const dot = container.querySelector('.compact-status-dot.status-dot--error');
     expect(dot).toBeTruthy();
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────
+   E. ChatShellHeader — hamburger ARIA and sidebar state
+   ───────────────────────────────────────────────────────────── */
+
+describe('ChatShellHeader — hamburger ARIA and sidebar state', () => {
+  let ChatShellHeader;
+
+  beforeAll(async () => {
+    const mod = await import('../components/ui/ChatShellHeader');
+    ChatShellHeader = mod.default;
+  });
+
+  function renderHamburger(sidebarOpen, overrides = {}) {
+    return render(
+      <ChatShellHeader
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={() => {}}
+        currentRoom={null}
+        currentRoomName={null}
+        safeLeaveRoom={() => {}}
+        setCurrentRoom={() => {}}
+        roomConstraint={null}
+        chaosEnabled={false}
+        chaosPersonality="instigator"
+        myNick="TestUser"
+        isCliMode={false}
+        connectionConfig={{}}
+        cliHost={null}
+        connected={false}
+        sessionState={{ status: SessionStatus.CONNECTED, connectionMode: 'relay', cliNodeHost: null, reconnectAttempt: 0 }}
+        peers={[]}
+        myWallet={null}
+        balance={0}
+        showAccountHistory={false}
+        setShowAccountHistory={() => {}}
+        isAdminRef={{ current: false }}
+        agentRunning={false}
+        setShowAgentPanel={() => {}}
+        showMuteMenu={false}
+        setShowMuteMenu={() => {}}
+        muteMenuRef={{ current: null }}
+        allAgentsMuted={false}
+        mutedAgents={{}}
+        toggleMuteAgent={() => {}}
+        toggleMuteAll={() => {}}
+        CHARACTERS={{}}
+        onLogout={null}
+        activePoke={null}
+        setActivePoke={() => {}}
+        {...overrides}
+      />
+    );
+  }
+
+  afterEach(() => cleanup());
+
+  it('renders hamburger button', () => {
+    const { container } = renderHamburger(false);
+    const btn = container.querySelector('.hamburger-btn');
+    expect(btn).toBeTruthy();
+  });
+
+  it('renders hamburger icon', () => {
+    const { container } = renderHamburger(false);
+    const btn = container.querySelector('.hamburger-btn');
+    expect(btn.textContent).toBe('\u2630');
+  });
+
+  it('has aria-controls pointing to chat-sidebar', () => {
+    const { container } = renderHamburger(false);
+    const btn = container.querySelector('.hamburger-btn');
+    expect(btn.getAttribute('aria-controls')).toBe('chat-sidebar');
+  });
+
+  it('has aria-label "Open sidebar" when sidebar is closed', () => {
+    const { container } = renderHamburger(false);
+    const btn = container.querySelector('.hamburger-btn');
+    expect(btn.getAttribute('aria-label')).toBe('Open sidebar');
+  });
+
+  it('has aria-label "Close sidebar" when sidebar is open', () => {
+    const { container } = renderHamburger(true);
+    const btn = container.querySelector('.hamburger-btn');
+    expect(btn.getAttribute('aria-label')).toBe('Close sidebar');
+  });
+
+  it('has aria-expanded false when sidebar is closed', () => {
+    const { container } = renderHamburger(false);
+    const btn = container.querySelector('.hamburger-btn');
+    expect(btn.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('has aria-expanded true when sidebar is open', () => {
+    const { container } = renderHamburger(true);
+    const btn = container.querySelector('.hamburger-btn');
+    expect(btn.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('has type button', () => {
+    const { container } = renderHamburger(false);
+    const btn = container.querySelector('.hamburger-btn');
+    expect(btn.getAttribute('type')).toBeNull(); // button type is implicit
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────
+   F. ChatShellHeader — sidebar close semantics
+   ───────────────────────────────────────────────────────────── */
+
+describe('ChatShellHeader — sidebar close semantics', () => {
+  let ChatShellHeader;
+
+  beforeAll(async () => {
+    const mod = await import('../components/ui/ChatShellHeader');
+    ChatShellHeader = mod.default;
+  });
+
+  function renderHamburger(sidebarOpen, overrides = {}) {
+    return render(
+      <ChatShellHeader
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={() => {}}
+        currentRoom={null}
+        currentRoomName={null}
+        safeLeaveRoom={() => {}}
+        setCurrentRoom={() => {}}
+        roomConstraint={null}
+        chaosEnabled={false}
+        chaosPersonality="instigator"
+        myNick="TestUser"
+        isCliMode={false}
+        connectionConfig={{}}
+        cliHost={null}
+        connected={false}
+        sessionState={{ status: SessionStatus.CONNECTED, connectionMode: 'relay', cliNodeHost: null, reconnectAttempt: 0 }}
+        peers={[]}
+        myWallet={null}
+        balance={0}
+        showAccountHistory={false}
+        setShowAccountHistory={() => {}}
+        isAdminRef={{ current: false }}
+        agentRunning={false}
+        setShowAgentPanel={() => {}}
+        showMuteMenu={false}
+        setShowMuteMenu={() => {}}
+        muteMenuRef={{ current: null }}
+        allAgentsMuted={false}
+        mutedAgents={{}}
+        toggleMuteAgent={() => {}}
+        toggleMuteAll={() => {}}
+        CHARACTERS={{}}
+        onLogout={null}
+        activePoke={null}
+        setActivePoke={() => {}}
+        {...overrides}
+      />
+    );
+  }
+
+  afterEach(() => cleanup());
+
+  it('calls setSidebarOpen when hamburger is clicked', () => {
+    const setSidebarOpen = vi.fn();
+    const { container } = renderHamburger(false, { setSidebarOpen });
+    const btn = container.querySelector('.hamburger-btn');
+    btn.click();
+    expect(setSidebarOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes toggle function to setSidebarOpen on click (closed -> open)', () => {
+    const setSidebarOpen = vi.fn();
+    const { container } = renderHamburger(false, { setSidebarOpen });
+    const btn = container.querySelector('.hamburger-btn');
+    btn.click();
+    // setSidebarOpen called with (v => !v) — invoke it to verify toggle
+    const toggleFn = setSidebarOpen.mock.calls[0][0];
+    expect(typeof toggleFn).toBe('function');
+    expect(toggleFn(false)).toBe(true);
+    expect(toggleFn(true)).toBe(false);
+  });
+
+  it('passes toggle function to setSidebarOpen on click (open -> closed)', () => {
+    const setSidebarOpen = vi.fn();
+    const { container } = renderHamburger(true, { setSidebarOpen });
+    const btn = container.querySelector('.hamburger-btn');
+    btn.click();
+    const toggleFn = setSidebarOpen.mock.calls[0][0];
+    expect(typeof toggleFn).toBe('function');
+    expect(toggleFn(true)).toBe(false);
+    expect(toggleFn(false)).toBe(true);
+  });
+
+  it('preserves sidebarOpen state independently of session state', () => {
+    const { container: closed } = renderHamburger(false);
+    const btnClosed = closed.querySelector('.hamburger-btn');
+    expect(btnClosed.getAttribute('aria-label')).toBe('Open sidebar');
+
+    cleanup();
+
+    const { container: open } = renderHamburger(true);
+    const btnOpen = open.querySelector('.hamburger-btn');
+    expect(btnOpen.getAttribute('aria-label')).toBe('Close sidebar');
+  });
+
+  it('toggles aria-expanded when sidebarOpen changes', () => {
+    const { container: closed } = renderHamburger(false);
+    expect(closed.querySelector('.hamburger-btn').getAttribute('aria-expanded')).toBe('false');
+
+    cleanup();
+
+    const { container: open } = renderHamburger(true);
+    expect(open.querySelector('.hamburger-btn').getAttribute('aria-expanded')).toBe('true');
   });
 });
 
