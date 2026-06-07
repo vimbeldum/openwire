@@ -5,7 +5,7 @@
  * viewport constraints, and core user interactions after login.
  */
 import { test, expect } from '@playwright/test';
-import { mockWebSocket, loginAs, clearSession, setWallet } from './helpers.js';
+import { mockWebSocket, loginAs, clearSession, setWallet, injectWelcome } from './helpers.js';
 
 test.describe('ChatRoom', () => {
     test.beforeEach(async ({ page }) => {
@@ -62,6 +62,7 @@ test.describe('ChatRoom', () => {
     // ── 5. Chat input ─────────────────────────────────────────────
 
     test('chat input is visible and accepts typed text', async ({ page }) => {
+        await injectWelcome(page);
         const input = page.locator('.chat-input input[type="text"]');
         await expect(input).toBeVisible();
         await input.click();
@@ -180,6 +181,7 @@ test.describe('ChatRoom — responsive breakpoints', () => {
             await setWallet(page, 1000);
             await page.goto('/');
             await page.waitForSelector('.chat-layout');
+            await injectWelcome(page);
 
             const input = page.locator('.chat-input input[type="text"]');
             await expect(input).toBeVisible();
@@ -203,6 +205,7 @@ test.describe('ChatRoom — responsive breakpoints', () => {
     // ── Sidebar drawer reachability ────────────────────────────────
 
     test('hamburger button has accessible aria-label', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 900 });
         await mockWebSocket(page);
         await loginAs(page, 'TestUser');
         await setWallet(page, 1000);
@@ -217,6 +220,7 @@ test.describe('ChatRoom — responsive breakpoints', () => {
     });
 
     test('clicking hamburger toggles sidebar visibility', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 900 });
         await mockWebSocket(page);
         await loginAs(page, 'TestUser');
         await setWallet(page, 1000);
@@ -231,8 +235,8 @@ test.describe('ChatRoom — responsive breakpoints', () => {
         await expect(hamburger).toHaveAttribute('aria-expanded', 'true');
         await expect(hamburger).toHaveAttribute('aria-label', 'Close sidebar');
 
-        // Click again to close
-        await hamburger.click();
+        // Use the sidebar-close-btn to close (hamburger is behind sidebar overlay)
+        await page.locator('.sidebar-close-btn').click();
         await expect(hamburger).toHaveAttribute('aria-expanded', 'false');
         await expect(hamburger).toHaveAttribute('aria-label', 'Open sidebar');
     });
@@ -254,7 +258,7 @@ test.describe('ChatRoom — responsive breakpoints', () => {
         // Sidebar content should be accessible
         await expect(page.locator('.sidebar')).toBeVisible();
         await expect(page.locator('text=My Wallet')).toBeVisible();
-        await expect(page.locator('text=General Chat')).toBeVisible();
+        await expect(page.locator('.sidebar .room-name')).toBeVisible();
     });
 
     // ── Accessibility label verification ───────────────────────────

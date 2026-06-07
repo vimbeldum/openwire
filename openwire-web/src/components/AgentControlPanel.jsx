@@ -7,6 +7,7 @@
    ═══════════════════════════════════════════════════════════ */
 
 import { useState, useEffect, useRef, memo } from 'react';
+import '../styles/admin.css';
 import {
     loadStore, saveStore, addGroup, removeGroup,
     addCharacter, removeCharacter, getGroupCharacters,

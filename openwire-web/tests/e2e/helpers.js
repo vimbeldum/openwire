@@ -137,3 +137,22 @@ export async function injectPeers(page, peers) {
         }
     }, peers);
 }
+
+/**
+ * Inject a welcome message into the WebSocket mock to transition
+ * the session state to CONNECTED (enables chat input, etc.).
+ */
+export async function injectWelcome(page, opts = {}) {
+    const { nick = 'TestUser' } = opts;
+    await page.evaluate(({ nick }) => {
+        const ws = window.__wsMock?.active;
+        if (!ws) return;
+        ws._injectMessage(JSON.stringify({
+            type: 'welcome',
+            peer_id: 'test-peer-001',
+            nick,
+            peers: [{ peer_id: 'test-peer-001', nick }],
+            rooms: [{ room_id: 'room-general', name: 'General Chat' }],
+        }));
+    }, { nick });
+}

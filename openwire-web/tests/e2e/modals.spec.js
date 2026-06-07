@@ -480,7 +480,7 @@ test.describe('Agent Control Panel', () => {
 
     test('clicking overlay backdrop closes the panel', async ({ page }) => {
         await page.locator('.btn-agent-panel').click();
-        await page.waitForSelector('.acp-overlay');
+        await page.locator('.acp-overlay').waitFor({ state: 'visible', timeout: 5000 });
 
         // Click on the overlay backdrop (outside the panel)
         await page.locator('.acp-overlay').click({ position: { x: 5, y: 5 } });
@@ -537,16 +537,16 @@ test.describe('Admin Password Gate', () => {
 
         await expect(page.locator('.admin-gate-card input[type="password"]')).toBeVisible();
         // Cancel button is present
-        await expect(page.locator('.admin-gate-actions .admin-btn')).toBeVisible();
+        await expect(page.locator('.admin-gate-actions button:has-text("Cancel")')).toBeVisible();
         // Unlock/submit button is present
-        await expect(page.locator('.admin-gate-actions .bj-btn-primary')).toBeVisible();
+        await expect(page.locator('.admin-gate-actions button:has-text("Unlock")')).toBeVisible();
     });
 
     test('cancel button closes the gate', async ({ page }) => {
         await page.locator('.admin-access-link').click();
         await page.waitForSelector('.admin-gate-card');
 
-        await page.locator('.admin-gate-actions .admin-btn').click();
+        await page.locator('.admin-gate-actions button:has-text("Cancel")').click();
         await expect(page.locator('.admin-overlay')).not.toBeVisible();
     });
 
@@ -573,11 +573,11 @@ test.describe('Admin Password Gate', () => {
 
         const pwInput = page.locator('.admin-gate-card input[type="password"]');
         await pwInput.fill('wrong-password-123');
-        await page.locator('.admin-gate-actions .bj-btn-primary').click();
+        await page.locator('.admin-gate-actions button:has-text("Unlock")').click();
 
         // Wait for the async check to complete and error to appear
-        await expect(page.locator('.admin-gate-error')).toBeVisible();
-        await expect(page.locator('.admin-gate-error')).toContainText('Incorrect password');
+        await expect(page.locator('.ui-field__error')).toBeVisible();
+        await expect(page.locator('.ui-field__error')).toContainText('Incorrect password');
     });
 
     test('password input accepts text', async ({ page }) => {
@@ -653,7 +653,8 @@ test.describe('General Modal Patterns', () => {
             const overlay = document.querySelector('.acp-overlay');
             if (!overlay) return null;
             const style = getComputedStyle(overlay);
-            return parseInt(style.zIndex, 10);
+            const parsed = parseInt(style.zIndex, 10);
+            return isNaN(parsed) ? parseInt(getComputedStyle(overlay).zIndex) || 0 : parsed;
         });
 
         expect(zIndex).toBeGreaterThanOrEqual(1);
@@ -802,6 +803,12 @@ test.describe('Modal Responsiveness', () => {
         });
 
         test('opens and shows content without viewport overflow', async ({ page }) => {
+            // At mobile width, open hamburger drawer first to reach admin-btn-sidebar
+            const hamburger = page.locator('.hamburger-btn');
+            await expect(hamburger).toBeVisible();
+            await hamburger.click();
+            await expect(page.locator('.sidebar')).toBeVisible();
+
             await page.locator('.admin-btn-sidebar').click();
             await page.waitForSelector('.admin-overlay');
 
@@ -811,6 +818,12 @@ test.describe('Modal Responsiveness', () => {
         });
 
         test('Closes via Escape at mobile width', async ({ page }) => {
+            // At mobile width, open hamburger drawer first to reach admin-btn-sidebar
+            const hamburger = page.locator('.hamburger-btn');
+            await expect(hamburger).toBeVisible();
+            await hamburger.click();
+            await expect(page.locator('.sidebar')).toBeVisible();
+
             await page.locator('.admin-btn-sidebar').click();
             await page.waitForSelector('.admin-overlay');
 
@@ -819,6 +832,12 @@ test.describe('Modal Responsiveness', () => {
         });
 
         test('tab navigation works at mobile width', async ({ page }) => {
+            // At mobile width, open hamburger drawer first to reach admin-btn-sidebar
+            const hamburger = page.locator('.hamburger-btn');
+            await expect(hamburger).toBeVisible();
+            await hamburger.click();
+            await expect(page.locator('.sidebar')).toBeVisible();
+
             await page.locator('.admin-btn-sidebar').click();
             await page.waitForSelector('.admin-portal');
 
