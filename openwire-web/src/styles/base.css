@@ -5,73 +5,68 @@
    ═══════════════════════════════════════════════════════════ */
 
 :root {
-  /* Dark Mode Palette from spec */
-  --bg-void: #0A0A0A;
-  --bg-dark: #1A1A1A;
-  --bg-base: #242424;
-  --bg-surface: #1E1E1E;
-  --bg-elevated: #2D2D2D;
-  --bg-hover: #3D3D3D;
+  /* Restrained dark shell with blue-led accents */
+  --bg-void: #071018;
+  --bg-dark: #0c1722;
+  --bg-base: #101c28;
+  --bg-surface: #142231;
+  --bg-elevated: #1a2b3d;
+  --bg-hover: #22374c;
+  --bg-page: radial-gradient(circle at top, rgba(96, 165, 250, 0.14), transparent 32%), linear-gradient(180deg, #0a121a 0%, #071018 100%);
 
-  /* Shorthand aliases used by panels */
-  --surface: #1E1E1E;
-  --brand: #66A1EE;
+  /* Surface aliases used throughout the app */
+  --surface: #142231;
+  --brand: #60a5fa;
+  --glass-bg: rgba(20, 34, 49, 0.78);
+  --glass-border: rgba(154, 175, 198, 0.18);
+  --glass-shine: rgba(255, 255, 255, 0.08);
 
-  /* Primary Accent - Trust/Tech */
-  --accent: #66A1EE;
-  --accent-bright: #3080E8;
-  --accent-dark: #1663C7;
-  --accent-glow: rgba(102, 161, 238, 0.15);
+  /* Accent system */
+  --accent: #60a5fa;
+  --accent-bright: #8ec5ff;
+  --accent-dark: #2563eb;
+  --accent-glow: rgba(96, 165, 250, 0.18);
+  --secondary: #93adc8;
+  --secondary-bright: #bfd1e6;
+  --secondary-glow: rgba(147, 173, 200, 0.16);
 
-  /* Secondary Accent - Playful/Gamification */
-  --secondary: #A866EE;
-  --secondary-bright: #8930E8;
-  --secondary-glow: rgba(168, 102, 238, 0.15);
+  /* Status colors */
+  --green: #34d399;
+  --green-glow: rgba(52, 211, 153, 0.16);
+  --yellow: #fbbf24;
+  --yellow-glow: rgba(251, 191, 36, 0.16);
+  --red: #fb7185;
+  --red-glow: rgba(251, 113, 133, 0.16);
+  --purple: #a78bfa;
+  --purple-glow: rgba(167, 139, 250, 0.16);
+  --gold: #f4c95d;
 
-  /* Semantic Colors */
-  --green: #16C72E;
-  --green-glow: rgba(22, 199, 46, 0.15);
-  --yellow: #E8B730;
-  --yellow-glow: rgba(232, 183, 48, 0.15);
-  --red: #E83A30;
-  --red-glow: rgba(232, 58, 48, 0.15);
-  --purple: #9B59B6;
-  --gold: #E8B730;
-  --gold-glow: rgba(232, 183, 48, 0.15);
-  --agent: #a78bfa;
-  --agent-glow: rgba(167, 139, 250, 0.15);
+  /* Text */
+  --text-primary: #f3f7fb;
+  --text: #f3f7fb;
+  --text-secondary: #d3deea;
+  --text-muted: #9aaec2;
+  --text-dim: #6e8398;
+  --text-inverse: #071018;
 
-  /* Typography */
-  --text-primary: #FFFFFF;
-  --text-secondary: #D0D0D0;
-  --text-muted: #A0A0A0;
-  --text-dim: #707070;
+  /* Borders, focus, depth */
+  --border-subtle: rgba(154, 175, 198, 0.16);
+  --border-strong: rgba(191, 209, 230, 0.28);
+  --focus-ring: rgba(96, 165, 250, 0.32);
+  --focus-ring-strong: rgba(96, 165, 250, 0.52);
+  --shadow-soft: 0 18px 48px rgba(3, 10, 18, 0.32);
+  --shadow-elevated: 0 24px 60px rgba(2, 8, 15, 0.44);
+  --shadow-glow: 0 0 0 1px rgba(96, 165, 250, 0.1), 0 20px 50px rgba(8, 15, 28, 0.4);
 
-  /* Typography Scale */
-  --text-xs: 0.7rem;
-  --text-sm: 0.78rem;
-  --text-base: 0.85rem;
-  --text-md: 0.95rem;
-  --text-lg: 1.1rem;
-  --text-xl: 1.3rem;
+  /* Geometry / motion */
+  --radius-sm: 0.875rem;
+  --radius: 1.125rem;
+  --radius-lg: 1.5rem;
+  --blur: 18px;
 
-  /* Liquid Glass */
-  --glass-bg: rgba(30, 30, 30, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-shine: rgba(255, 255, 255, 0.05);
-  --blur: 20px;
-
-  /* Spacing & Radius */
-  --radius: 16px;
-  --radius-sm: 10px;
-  --radius-lg: 24px;
-  --shadow-soft: 0 4px 24px rgba(0, 0, 0, 0.4);
-  --shadow-glow: 0 0 40px rgba(102, 161, 238, 0.1);
-  --shadow-elevated: 0 8px 40px rgba(0, 0, 0, 0.5);
-
-  /* Fonts */
-  --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+  /* Type */
+  --font: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', 'Consolas', monospace;
 }
 
 *,

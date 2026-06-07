@@ -7,7 +7,7 @@
  */
 
 import { render, screen, fireEvent } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 /* ── Storage stubs ─────────────────────────────────── */
 const _ls = new Map();
@@ -32,7 +32,14 @@ function renderLanding(props = {}) {
 /* ── Tests ──────────────────────────────────────── */
 
 describe('Landing', () => {
-    beforeEach(() => vi.clearAllMocks());
+    beforeEach(() => {
+        vi.clearAllMocks();
+        _ls.clear();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
 
     describe('rendering', () => {
         it('renders the OpenWire branding', () => {
@@ -78,21 +85,16 @@ describe('Landing', () => {
             const onJoin = vi.fn();
             renderLanding({ onJoin });
 
-            // Enter name
             fireEvent.change(screen.getByPlaceholderText(/nickname/i), { target: { value: 'Bob' } });
 
-            // Switch to CLI node mode
             const cliRadio = screen.getByText('Local CLI Node').closest('label').querySelector('input');
             fireEvent.click(cliRadio);
 
-            // Should now show CLI URL input
             const urlInput = screen.getByPlaceholderText(/192\.168/);
             expect(urlInput).toBeInTheDocument();
 
-            // Change the URL
             fireEvent.change(urlInput, { target: { value: 'ws://myhost:9999' } });
 
-            // Submit
             fireEvent.submit(screen.getByRole('button', { name: /Connect/ }).closest('form'));
             expect(onJoin).toHaveBeenCalledWith('Bob', false, { mode: 'cli-node', cliUrl: 'ws://myhost:9999' });
         });
@@ -100,6 +102,19 @@ describe('Landing', () => {
         it('does not show CLI URL input in relay mode', () => {
             renderLanding();
             expect(screen.queryByPlaceholderText(/192\.168/)).not.toBeInTheDocument();
+        });
+
+        it('falls back to the default cli url when the field is blank', () => {
+            const onJoin = vi.fn();
+            renderLanding({ onJoin });
+
+            fireEvent.change(screen.getByPlaceholderText(/nickname/i), { target: { value: 'Bob' } });
+            fireEvent.click(screen.getByText('Local CLI Node').closest('label').querySelector('input'));
+            fireEvent.change(screen.getByPlaceholderText(/192\.168/), { target: { value: '   ' } });
+            fireEvent.submit(screen.getByRole('button', { name: /Connect/ }).closest('form'));
+
+            expect(onJoin).toHaveBeenCalledWith('Bob', false, { mode: 'cli-node', cliUrl: 'ws://localhost:18080' });
+            expect(globalThis.localStorage.getItem('openwire_cli_node_url')).toBe('ws://localhost:18080');
         });
     });
 
@@ -113,12 +128,10 @@ describe('Landing', () => {
 
         it('switches back to relay mode', () => {
             renderLanding();
-            // Switch to CLI
             const cliRadio = screen.getByText('Local CLI Node').closest('label').querySelector('input');
             fireEvent.click(cliRadio);
             expect(screen.getByPlaceholderText(/192\.168/)).toBeInTheDocument();
 
-            // Switch back to relay
             const relayRadio = screen.getByText('OpenWire Relay').closest('label').querySelector('input');
             fireEvent.click(relayRadio);
             expect(screen.queryByPlaceholderText(/192\.168/)).not.toBeInTheDocument();
@@ -129,8 +142,18 @@ describe('Landing', () => {
         it('shows AdminPasswordGate when admin button clicked', () => {
             renderLanding();
             fireEvent.click(screen.getByText(/Admin Access/));
-            // AdminPasswordGate should appear (it has a password input)
             expect(screen.getByPlaceholderText(/password/i) || screen.getByText(/admin/i)).toBeTruthy();
+        });
+
+        it('shows an inline error for an incorrect admin password', async () => {
+            renderLanding();
+
+            fireEvent.click(screen.getByText(/Admin Access/));
+            fireEvent.change(screen.getByPlaceholderText(/password/i), { target: { value: 'wrong-pass' } });
+            fireEvent.click(screen.getByRole('button', { name: /Unlock/i }));
+
+            expect(await screen.findByText('Incorrect password.')).toBeInTheDocument();
+            expect(screen.getByPlaceholderText(/password/i)).toHaveAttribute('aria-invalid', 'true');
         });
     });
 

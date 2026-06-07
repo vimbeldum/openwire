@@ -1,4 +1,8 @@
 import { useState } from 'react';
+import Badge from './ui/Badge';
+import Button from './ui/Button';
+import Input from './ui/Input';
+import Panel from './ui/Panel';
 
 // --- Admin Password Gate ---
 export function AdminPasswordGate({ onSuccess, onCancel }) {
@@ -25,26 +29,37 @@ export function AdminPasswordGate({ onSuccess, onCancel }) {
 
     return (
         <div className="admin-overlay" onClick={(e) => e.target === e.currentTarget && onCancel()}>
-            <div className="admin-gate-card">
+            <Panel className="admin-gate-card" tone="subtle" padding="lg">
                 <div className="admin-gate-icon">🔐</div>
-                <h2>Admin Access</h2>
+                <div className="admin-gate-header">
+                    <h2>Admin Access</h2>
+                    <Badge tone="neutral">Restricted</Badge>
+                </div>
                 <form onSubmit={handleSubmit}>
-                    <input
+                    <Input
+                        id="admin-password"
                         type="password"
                         placeholder="Admin password"
                         value={password}
-                        onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                        onChange={(e) => {
+                            setPassword(e.target.value);
+                            setError('');
+                        }}
                         autoFocus
+                        label="Password"
+                        invalid={Boolean(error)}
+                        error={error}
                     />
-                    {error && <div className="admin-gate-error">{error}</div>}
                     <div className="admin-gate-actions">
-                        <button type="submit" className="bj-btn-primary" disabled={loading}>
-                            {loading ? 'Checking\u2026' : 'Unlock'}
-                        </button>
-                        <button type="button" className="admin-btn" onClick={onCancel}>Cancel</button>
+                        <Button type="submit" variant="primary" disabled={loading}>
+                            {loading ? 'Checking…' : 'Unlock'}
+                        </Button>
+                        <Button type="button" variant="secondary" onClick={onCancel}>
+                            Cancel
+                        </Button>
                     </div>
                 </form>
-            </div>
+            </Panel>
         </div>
     );
 }

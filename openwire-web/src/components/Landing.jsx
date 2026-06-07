@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { AdminPasswordGate } from './AdminPasswordGate';
+import Badge from './ui/Badge';
+import Button from './ui/Button';
+import Input from './ui/Input';
+import Panel from './ui/Panel';
 import { sanitizeNick } from '../lib/utils/sanitizeNick';
 
 const CLI_NODE_URL_KEY = 'openwire_cli_node_url';
@@ -39,18 +43,25 @@ export default function Landing({ onJoin }) {
                 <br />
                 No sign-up, no servers reading your messages.
             </p>
-            <form className="landing-card" onSubmit={handleSubmit}>
-                <h2>Join the Network</h2>
-                <input
+            <Panel as="form" className="landing-card" onSubmit={handleSubmit}>
+                <div className="landing-card-header">
+                    <h2>Join the Network</h2>
+                    <Badge tone={connectMode === 'cli-node' ? 'success' : 'info'}>
+                        {connectMode === 'cli-node' ? 'CLI node' : 'Relay default'}
+                    </Badge>
+                </div>
+
+                <Input
+                    id="landing-name"
                     type="text"
                     placeholder="Enter your nickname..."
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     autoFocus
                     maxLength={24}
+                    label="Nickname"
                 />
 
-                {/* Connection mode selector */}
                 <div className="landing-connect-via">
                     <span className="landing-connect-via-label">Connect via</span>
                     <div className="landing-connect-via-options">
@@ -76,25 +87,33 @@ export default function Landing({ onJoin }) {
                         </label>
                     </div>
                     {connectMode === 'cli-node' && (
-                        <input
+                        <Input
+                            id="landing-cli-url"
                             className="landing-cli-url-input"
                             type="text"
                             placeholder="ws://192.168.1.x:18080"
                             value={cliUrl}
                             onChange={(e) => setCliUrl(e.target.value)}
                             spellCheck={false}
+                            label="Node WebSocket URL"
+                            hint="Stored locally so repeat CLI-node joins keep using the same endpoint."
                         />
                     )}
                 </div>
 
-                <button type="submit">Connect →</button>
-            </form>
-            <button
+                <Button type="submit" fullWidth trailingIcon="→">
+                    Connect
+                </Button>
+            </Panel>
+            <Button
                 className="admin-access-link"
+                variant="ghost"
+                size="sm"
                 onClick={() => setShowAdminGate(true)}
+                leadingIcon="🔐"
             >
-                🔐 Admin Access
-            </button>
+                Admin Access
+            </Button>
             {showAdminGate && (
                 <AdminPasswordGate
                     onSuccess={handleAdminSuccess}
