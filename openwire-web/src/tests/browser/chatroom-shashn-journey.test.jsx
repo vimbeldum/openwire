@@ -12,6 +12,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import ShashnBoard from '../../components/ShashnBoard.jsx';
 import ShashnStateSummary from '../../components/chat/ShashnStateSummary.jsx';
 import * as shashn from '../../lib/shashn.js';
+import { SessionStatus, getStatusLabel, getStatusVariant, isComposerEnabled } from '../../lib/chatSessionState.js';
 
 /* ── Fixtures ──────────────────────────────────────────────── */
 
@@ -195,6 +196,25 @@ describe('ShashnBoard phase labels', () => {
             ],
         });
         expect(screen.getByText(/Alice Wins/i)).toBeInTheDocument();
+    });
+
+    it('renders scores alongside winner in game_end phase', () => {
+        renderBoard({
+            phase: 'game_end',
+            winner: 'me',
+            players: [
+                makePlayer('me', 'Alice', [], { score: 150, tricksWon: 6 }),
+                makePlayer('peer-2', 'Bob', [], { score: 20, tricksWon: 1 }),
+            ],
+        });
+        expect(screen.getByText(/Alice Wins/i)).toBeInTheDocument();
+        const scoreValues = document.querySelectorAll('.shashn-stat-value.score');
+        expect(scoreValues.length).toBe(2);
+        expect(scoreValues[0].textContent).toBe('150');
+        expect(scoreValues[1].textContent).toBe('20');
+        const trickValues = document.querySelectorAll('.shashn-stat-value.tricks');
+        expect(trickValues[0].textContent).toBe('6');
+        expect(trickValues[1].textContent).toBe('1');
     });
 });
 
@@ -691,4 +711,105 @@ describe('ShashnStateSummary', () => {
         expect(screen.getByText(/Starting/i)).toBeInTheDocument();
         expect(screen.queryByText(/vs Bob/i)).toBeNull();
     });
-}); 
+
+    it('shows opponent name and round info alongside game_end label when current player won', () => {
+        renderSummary({
+            phase: 'game_end',
+            winner: 'me',
+            round: 4,
+            players: [makePlayer('me', 'Alice', []), makePlayer('peer-2', 'Bob', [])],
+        });
+        expect(screen.getByText(/You won/i)).toBeInTheDocument();
+        expect(screen.getByText(/vs Bob/i)).toBeInTheDocument();
+        expect(screen.getByText(/Round 4/i)).toBeInTheDocument();
+    });
+
+    it('shows opponent name and round info alongside game_end label when opponent won', () => {
+        renderSummary({
+            phase: 'game_end',
+            winner: 'peer-2',
+            round: 4,
+            players: [makePlayer('me', 'Alice', []), makePlayer('peer-2', 'Bob', [])],
+        });
+        expect(screen.getByText(/Game Over/i)).toBeInTheDocument();
+        expect(screen.getByText(/vs Bob/i)).toBeInTheDocument();
+        expect(screen.getByText(/Round 4/i)).toBeInTheDocument();
+    });
+
+    it('renders Open Board button in game_end phase', () => {
+        renderSummary({
+            phase: 'game_end',
+            winner: 'me',
+            players: [makePlayer('me', 'Alice', []), makePlayer('peer-2', 'Bob', [])],
+        });
+        expect(screen.getByRole('button', { name: /Open Board/i })).toBeInTheDocument();
+    });
+});
+
+/* ── Session lifecycle tests ─────────────────────────────────
+ *
+ * Verify lifecycle state labels, variants, and composer gating
+ * are truthful at the chat-session browser seam.
+ */
+
+describe('Session lifecycle labels', () => {
+    afterEach(() => { vi.clearAllMocks(); });
+
+    it('getStatusLabel returns correct label for each SessionStatus', () => {
+        const cases = [
+            { status: SessionStatus.INITIAL,              expected: 'Connecting...' },
+            { status: SessionStatus.CONNECTING,            expected: 'Connecting...' },
+            { status: SessionStatus.CONNECTED,             expected: 'Connected' },
+            { status: SessionStatus.RECONNECTING,          expected: 'Reconnecting...' },
+            { status: SessionStatus.RECONNECT_FAILED,      expected: 'Connection Lost' },
+            { status: SessionStatus.DISCONNECTED,          expected: 'Disconnected' },
+            { status: SessionStatus.CLI_NODE_FALLBACK,     expected: 'CLI node unreachable \u2014 using relay' },
+            { status: SessionStatus.CLI_NODE_CONNECTING,   expected: 'Connecting to CLI node...' },
+        ];
+        for (const { status, expected } of cases) {
+            expect(getStatusLabel({ status })).toBe(expected);
+        }
+    });
+
+    it('getStatusLabel includes cliNodeHost when set', () => {
+        const label = getStatusLabel({ status: SessionStatus.CLI_NODE_CONNECTING, cliNodeHost: 'node.example.com' });
+        expect(label).toBe('Connecting to node.example.com...');
+    });
+
+    it('getStatusLabel returns Unknown for unrecognized status', () => {
+        expect(getStatusLabel({ status: 'BOOT' })).toBe('Unknown');
+    });
+
+    it('getStatusVariant returns correct variant for each SessionStatus', () => {
+        const cases = [
+            { status: SessionStatus.INITIAL,              expected: 'info' },
+            { status: SessionStatus.CONNECTING,            expected: 'info' },
+            { status: SessionStatus.CONNECTED,             expected: 'success' },
+            { status: SessionStatus.RECONNECTING,          expected: 'warning' },
+            { status: SessionStatus.RECONNECT_FAILED,      expected: 'warning' },
+            { status: SessionStatus.DISCONNECTED,          expected: 'error' },
+            { status: SessionStatus.CLI_NODE_CONNECTING,   expected: 'info' },
+            { status: SessionStatus.CLI_NODE_FALLBACK,     expected: 'warning' },
+        ];
+        for (const { status, expected } of cases) {
+            expect(getStatusVariant({ status })).toBe(expected);
+        }
+    });
+
+    it('getStatusVariant returns info for unrecognized status', () => {
+        expect(getStatusVariant({ status: 'BOOT' })).toBe('info');
+    });
+
+    it('isComposerEnabled returns true only for CONNECTED', () => {
+        const allStatuses = Object.values(SessionStatus);
+        for (const status of allStatuses) {
+            const enabled = isComposerEnabled({ status });
+            if (status === SessionStatus.CONNECTED) {
+                expect(enabled).toBe(true);
+            } else {
+                expect(enabled).toBe(false);
+            }
+        }
+    });
+});
+
