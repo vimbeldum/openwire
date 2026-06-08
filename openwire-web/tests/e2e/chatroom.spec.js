@@ -393,4 +393,71 @@ test.describe('ChatRoom — responsive breakpoints', () => {
         // Compact context has aria-label
         await expect(page.locator('.header-context-compact')).toHaveAttribute('aria-label', 'Room and session summary');
     });
+
+    // ── Mobile logout flow ─────────────────────────────────────────
+
+    test('logout works at mobile width (390px)', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 900 });
+        await mockWebSocket(page);
+        await loginAs(page, 'MobileLogoutUser');
+        await setWallet(page, 1000);
+        await page.goto('/');
+        await page.waitForSelector('.chat-header');
+
+        // Verify logged in
+        await expect(page.locator('.header-nick')).toHaveText('MobileLogoutUser');
+
+        // Logout button should be reachable at mobile width
+        const logoutBtn = page.locator('.btn-logout');
+        await expect(logoutBtn).toBeVisible();
+        await logoutBtn.click();
+
+        // Should return to landing
+        await expect(page.locator('.landing')).toBeVisible();
+        await expect(page.locator('.chat-layout')).not.toBeVisible();
+    });
+
+    // ── Mobile session transitions ─────────────────────────────────
+
+    test('composer disabled before welcome, enabled after at 390px', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 900 });
+        await mockWebSocket(page);
+        await loginAs(page, 'TestUser');
+        await setWallet(page, 1000);
+        await page.goto('/');
+        await page.waitForSelector('.chat-layout');
+
+        // Before welcome — composer disabled at mobile width
+        await expect(page.locator('.chat-input')).toHaveClass(/composer-disabled/);
+        const chatInput = page.locator('.chat-input input[type="text"]');
+        await expect(chatInput).toBeDisabled();
+
+        // After welcome — composer enabled at mobile width
+        await injectWelcome(page);
+        await expect(page.locator('.chat-input')).not.toHaveClass(/composer-disabled/);
+        await expect(chatInput).toBeEnabled();
+        await expect(chatInput).toBeVisible();
+    });
+
+    test('session status banner transitions at 390px', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 900 });
+        await mockWebSocket(page);
+        await loginAs(page, 'TestUser');
+        await setWallet(page, 1000);
+        await page.goto('/');
+        await page.waitForSelector('.chat-layout');
+
+        // Before welcome — banner visible with connecting text
+        const banner = page.locator('.session-status-banner');
+        await expect(banner).toBeVisible();
+        await expect(banner).toContainText('Connecting...');
+
+        // Online count shows connecting status
+        await expect(page.locator('.header-online-count')).toHaveText('Connecting...');
+
+        // After welcome — banner hidden, online count shows peer count
+        await injectWelcome(page);
+        await expect(banner).not.toBeVisible();
+        await expect(page.locator('.header-online-count')).toHaveText('1 online');
+    });
 });

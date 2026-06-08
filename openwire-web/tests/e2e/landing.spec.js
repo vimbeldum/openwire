@@ -315,5 +315,56 @@ test.describe('Landing Page — responsive breakpoints', () => {
             await expect(page.locator('.header-nick')).toContainText('MobileAdmin');
             await expect(page.locator('.btn-agent-panel')).toBeVisible();
         });
+
+        test(`CLI mode toggle is usable at ${width}px`, async ({ page }) => {
+            await page.setViewportSize({ width, height: 667 });
+            await page.goto('/');
+            await page.waitForSelector('.landing');
+
+            // CLI radio should be visible and clickable at mobile widths
+            const cliRadio = page.locator('input[name="connectMode"][value="cli-node"]');
+            await expect(cliRadio).toBeVisible();
+
+            // Select CLI mode — URL input should appear
+            await cliRadio.check();
+            await expect(page.locator('.landing-cli-url-input')).toBeVisible();
+
+            // Switch back to relay — URL input should hide
+            await page.locator('input[name="connectMode"][value="relay"]').check();
+            await expect(page.locator('.landing-cli-url-input')).not.toBeVisible();
+        });
+
+        test(`connect with CLI mode works at ${width}px`, async ({ page }) => {
+            await page.setViewportSize({ width, height: 667 });
+            await page.goto('/');
+            await page.waitForSelector('.landing');
+
+            await page.locator('input[placeholder="Enter your nickname..."]').fill('CliMobile');
+
+            // Select CLI mode, fill URL
+            await page.locator('input[name="connectMode"][value="cli-node"]').check();
+            const cliInput = page.locator('.landing-cli-url-input');
+            await cliInput.clear();
+            await cliInput.fill('ws://192.168.1.50:18080');
+
+            await page.locator('.landing-card button[type="submit"]').click();
+
+            // Verify ChatRoom renders with CLI badge at mobile width
+            await expect(page.locator('.chat-header')).toBeVisible();
+            await expect(page.locator('.header-nick')).toContainText('CliMobile');
+            await expect(page.locator('.connection-mode-badge')).toContainText('CLI Node');
+        });
+
+        test(`whitespace-only nickname falls back to Anonymous at ${width}px`, async ({ page }) => {
+            await page.setViewportSize({ width, height: 667 });
+            await page.goto('/');
+            await page.waitForSelector('.landing');
+
+            await page.locator('input[placeholder="Enter your nickname..."]').fill('   ');
+            await page.locator('.landing-card button[type="submit"]').click();
+
+            await expect(page.locator('.chat-header')).toBeVisible();
+            await expect(page.locator('.header-nick')).toContainText('Anonymous');
+        });
     }
 });

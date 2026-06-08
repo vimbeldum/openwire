@@ -277,3 +277,91 @@ test.describe('Error Handling', () => {
         await expect(page.locator('.landing-kicker')).toContainText('OpenWire');
     });
 });
+
+/* ============================================================
+   Responsive Breakpoints — Admin Flow at Mobile Widths
+   ============================================================ */
+test.describe('Admin Portal Access — responsive breakpoints', () => {
+    test.beforeEach(async ({ page }) => {
+        await clearSession(page);
+        await mockWebSocket(page);
+        await setupRuntimeGuard(page);
+    });
+
+    test.afterEach(async ({ page }) => {
+        await expectNoRuntimeErrors(page);
+    });
+
+    const MOBILE_WIDTHS = [375, 390];
+
+    for (const width of MOBILE_WIDTHS) {
+        test(`admin access link is visible at ${width}px`, async ({ page }) => {
+            await page.setViewportSize({ width, height: 667 });
+            await page.goto('/');
+            await page.waitForSelector('.landing');
+
+            const adminBtn = page.locator('.admin-access-link');
+            await expect(adminBtn).toBeVisible();
+            await expect(adminBtn).toContainText('Admin Access');
+        });
+
+        test(`admin gate opens and cancels at ${width}px`, async ({ page }) => {
+            await page.setViewportSize({ width, height: 667 });
+            await page.goto('/');
+            await page.waitForSelector('.landing');
+
+            // Open admin gate
+            await page.locator('.admin-access-link').click();
+            await expect(page.locator('.admin-overlay')).toBeVisible();
+            await expect(page.locator('.admin-gate-card h2')).toContainText('Admin Access');
+
+            // Cancel should close the overlay
+            const cancelBtn = page.locator('.admin-gate-actions button', { hasText: 'Cancel' });
+            await expect(cancelBtn).toBeVisible();
+            await cancelBtn.click();
+            await expect(page.locator('.admin-overlay')).not.toBeVisible();
+        });
+
+        test(`admin wrong password shows error at ${width}px`, async ({ page }) => {
+            await page.setViewportSize({ width, height: 667 });
+            await page.goto('/');
+            await page.waitForSelector('.landing');
+
+            // Open admin gate
+            await page.locator('.admin-access-link').click();
+            await expect(page.locator('.admin-overlay')).toBeVisible();
+            await expect(page.getByRole('dialog', { name: 'Unlock admin access' })).toBeVisible();
+
+            // Enter wrong password
+            await page.locator('.admin-gate-card input[type="password"]').fill('wrong-password');
+            await page.locator('.admin-gate-actions button[type="submit"]').click();
+
+            // Error message should appear
+            await expect(page.locator('.ui-field__error')).toHaveText('Incorrect password.');
+            await expect(page.locator('.admin-overlay')).toBeVisible();
+        });
+
+        test(`admin joins with correct password at ${width}px`, async ({ page }) => {
+            await page.setViewportSize({ width, height: 667 });
+            await page.goto('/');
+            await page.waitForSelector('.landing');
+
+            // Fill nickname before opening gate
+            await page.locator('input[placeholder="Enter your nickname..."]').fill('MobileAdmin');
+
+            // Open gate
+            await page.locator('.admin-access-link').click();
+            await expect(page.locator('.admin-overlay')).toBeVisible();
+
+            // Enter correct password
+            await page.locator('.admin-gate-card input[type="password"]').fill('openwire-admin');
+            await page.locator('.admin-gate-actions button[type="submit"]').click();
+
+            // Verify admin entry — dialog closes, ChatRoom visible with admin UI
+            await expect(page.locator('.admin-overlay')).not.toBeVisible();
+            await expect(page.locator('.chat-header')).toBeVisible();
+            await expect(page.locator('.header-nick')).toContainText('MobileAdmin');
+            await expect(page.locator('.btn-agent-panel')).toBeVisible();
+        });
+    }
+});
