@@ -17,6 +17,7 @@ import {
     injectShashnState,
     injectShashnJoin,
     makeShashnGame,
+    setupWithRoomMobile,
 } from './helpers.js';
 
 // ── Shared setup ─────────────────────────────────────────────
@@ -807,5 +808,121 @@ test.describe('Shashn State Summary Continuity', () => {
 
         await expect(page.locator('.shashn-state-summary')).toBeVisible();
         await expect(page.locator('.shashn-state-summary')).toContainText('HostUser won the round');
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  10. Mobile Width Continuity (390px)
+// ═══════════════════════════════════════════════════════════════
+
+test.describe('Shashn Mobile Width Continuity', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await setupWithRoomMobile(page);
+    });
+
+    test('sidebar Shashn button is reachable at 390px via hamburger', async ({ page }) => {
+        // At 390px the sidebar is already open as a drawer (opened by setupWithRoomMobile)
+        // Shashn button should be visible inside the sidebar
+        const shashnBtn = page.locator('.sidebar-btn', { hasText: 'Shashn' });
+        await expect(shashnBtn).toBeVisible();
+    });
+
+    test('can open Shashn board at 390px via hamburger + sidebar', async ({ page }) => {
+        // Sidebar is already open from setup
+        const shashnBtn = page.locator('.sidebar-btn', { hasText: 'Shashn' });
+        await shashnBtn.click();
+
+        // Sidebar should close
+        await expect(page.locator('#chat-sidebar')).not.toHaveClass(/mobile-open/);
+
+        // Board should be visible
+        await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('.shashn-title')).toContainText('Shashn');
+    });
+
+    test('Return to Chat button is reachable and works at 390px', async ({ page }) => {
+        // Open board via sidebar (already open from setup)
+        await page.locator('.sidebar-btn', { hasText: 'Shashn' }).click();
+        await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
+
+        // Return to Chat button should be visible
+        const returnBtn = page.locator('button[aria-label="Return to chat"]');
+        await expect(returnBtn).toBeVisible();
+        await expect(returnBtn).toContainText('Return to Chat');
+
+        // Close board
+        await returnBtn.click();
+        await expect(page.locator('.shashn-container')).not.toBeVisible();
+    });
+
+    test('closed-board summary is visible at 390px after closing', async ({ page }) => {
+        // Open board via sidebar (already open from setup)
+        await page.locator('.sidebar-btn', { hasText: 'Shashn' }).click();
+        await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
+
+        // Close board
+        await page.locator('button[aria-label="Return to chat"]').click();
+        await expect(page.locator('.shashn-container')).not.toBeVisible();
+
+        // State summary should be visible at mobile width
+        const summary = page.locator('.shashn-state-summary');
+        await expect(summary).toBeVisible();
+        await expect(summary).toContainText('Waiting for opponent to join');
+
+        // Open Board button should be visible
+        const openBoardBtn = page.getByRole('button', { name: /Open Board/i });
+        await expect(openBoardBtn).toBeVisible();
+    });
+
+    test('Open Board button reopens board at 390px', async ({ page }) => {
+        // Open and close board
+        await page.locator('.sidebar-btn', { hasText: 'Shashn' }).click();
+        await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
+        await page.locator('button[aria-label="Return to chat"]').click();
+        await expect(page.locator('.shashn-container')).not.toBeVisible();
+
+        // Click Open Board in state summary
+        await page.getByRole('button', { name: /Open Board/i }).click();
+
+        // Board should reopen
+        await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 3000 });
+        await expect(page.locator('.shashn-waiting-text')).toContainText('Waiting for opponent to join');
+    });
+
+    test('no scroll overflow at 390px when board is open', async ({ page }) => {
+        // Open board via sidebar (already open from setup)
+        await page.locator('.sidebar-btn', { hasText: 'Shashn' }).click();
+        await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
+
+        // Check for scroll overflow at mobile width
+        const noOverflow = await page.evaluate(() => {
+            return (
+                document.documentElement.scrollHeight <= window.innerHeight &&
+                document.documentElement.scrollWidth <= window.innerWidth
+            );
+        });
+        expect(noOverflow).toBe(true);
+    });
+
+    test('no scroll overflow at 390px after closing and reopening board', async ({ page }) => {
+        // Open and close board
+        await page.locator('.sidebar-btn', { hasText: 'Shashn' }).click();
+        await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
+        await page.locator('button[aria-label="Return to chat"]').click();
+        await expect(page.locator('.shashn-container')).not.toBeVisible();
+
+        // Reopen board via Open Board button
+        await page.getByRole('button', { name: /Open Board/i }).click();
+        await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 3000 });
+
+        // Check for overflow
+        const noOverflow = await page.evaluate(() => {
+            return (
+                document.documentElement.scrollHeight <= window.innerHeight &&
+                document.documentElement.scrollWidth <= window.innerWidth
+            );
+        });
+        expect(noOverflow).toBe(true);
     });
 });

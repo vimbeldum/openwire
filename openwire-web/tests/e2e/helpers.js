@@ -379,3 +379,40 @@ export async function injectShashnJoin(page, opts = {}) {
         }
     }, { roomId, peerId, nick });
 }
+
+/**
+ * Shared setup for mobile-width (390px) tests where the sidebar is a
+ * drawer off-screen. Opens the hamburger first so sidebar elements
+ * (like .room-item.active) are scrolled into the visible drawer area.
+ *
+ * Call AFTER page.setViewportSize().
+ */
+export async function setupWithRoomMobile(page) {
+    await mockWebSocket(page);
+    await loginAs(page, 'TestUser');
+    await setWallet(page, 5000);
+    await page.goto('/');
+    await page.waitForSelector('.chat-layout');
+
+    // At mobile widths, open the sidebar via hamburger first so
+    // sidebar elements are visible in the drawer
+    await page.locator('.hamburger-btn').click();
+    await page.waitForSelector('#chat-sidebar.mobile-open', { timeout: 3000 });
+
+    // Inject welcome so myIdRef and nickRef are populated
+    await injectWelcome(page);
+
+    // Inject a room so the Shashn button has a room_id to use
+    await page.evaluate(() => {
+        const ws = window.__wsMock?.active;
+        if (ws) {
+            ws._injectMessage(JSON.stringify({
+                type: 'room_created',
+                room_id: 'test-room-001',
+                name: 'TestRoom',
+            }));
+        }
+    });
+    // At mobile width the room-item is inside the open sidebar drawer
+    await page.waitForSelector('.room-item.active', { timeout: 3000 });
+}
