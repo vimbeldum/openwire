@@ -629,13 +629,22 @@ describe('ShashnStateSummary', () => {
         expect(screen.getByText(/Trick complete/i)).toBeInTheDocument();
     });
 
-    it('shows "Game over!" in game_end phase', () => {
+    it('shows "You won!" in game_end phase when current player won', () => {
         renderSummary({
             phase: 'game_end',
             winner: 'me',
             players: [makePlayer('me', 'Alice', []), makePlayer('peer-2', 'Bob', [])],
         });
-        expect(screen.getByText(/Game over/i)).toBeInTheDocument();
+        expect(screen.getByText(/You won/i)).toBeInTheDocument();
+    });
+
+    it('shows "Game Over!" in game_end phase when opponent won', () => {
+        renderSummary({
+            phase: 'game_end',
+            winner: 'peer-2',
+            players: [makePlayer('me', 'Alice', []), makePlayer('peer-2', 'Bob', [])],
+        });
+        expect(screen.getByText(/Game Over/i)).toBeInTheDocument();
     });
 
     it('shows opponent name and round info in play phase', () => {

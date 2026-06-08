@@ -57,9 +57,16 @@ function ShashnStateSummary({ game, myId, onOpenBoard }) {
             statusLabel = 'Trick complete';
             summaryIcon = '\uD83C\uDFC6';
         }
+    } else if (phase === 'round_end') {
+        badgeTone = 'info';
+        statusLabel = game.winner
+            ? (game.winner === myId ? 'You won the round!' :
+                opponentName ? opponentName + ' won the round' : 'Round over')
+            : 'Round complete';
+        summaryIcon = '\uD83C\uDFC6';
     } else if (phase === 'game_end') {
         badgeTone = 'success';
-        statusLabel = 'Game over!';
+        statusLabel = game.winner === myId ? 'You won!' : 'Game Over!';
         summaryIcon = '\uD83C\uDFC1';
     }
 

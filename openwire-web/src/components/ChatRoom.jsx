@@ -1359,6 +1359,9 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     const action = shashn.parseShashnAction(msg.data);
                     if (action && (action.type === 'shashn_start' || !shashnRef.current || shashnRef.current.roomId === msg.room_id)) {
                         handleShashnAction(msg, action);
+                        if (action.type === 'shashn_state') {
+                            setShashnBoardVisible(true);
+                        }
                     }
                 } else if (isCurrentRoom) {
                     const gifMatch = msg.data.match(/^\[GIF\](.+)$/);
@@ -2832,9 +2835,17 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                                 <button className="sidebar-btn" onClick={() => {
                                     const roomId = currentRoomRef.current || roomsRef.current[0]?.room_id;
                                     if (!roomId) { addMsg('\u2605', '\u26A0 Select or create a room first', 'system'); return; }
-                                    if (shashnRef.current) { setSidebarOpen(false); return; }
-                                    startShashn(roomId);
-                                    setSidebarOpen(false);
+                                    if (shashnRef.current && shashnBoardVisible) { setSidebarOpen(false); return; }
+                                    if (shashnRef.current && !shashnBoardVisible) {
+                                        // Board was closed — reopen fresh
+                                        startShashn(roomId);
+                                        setShashnBoardVisible(true);
+                                        setSidebarOpen(false);
+                                    } else {
+                                        startShashn(roomId);
+                                        setShashnBoardVisible(true);
+                                        setSidebarOpen(false);
+                                    }
                                 }}>{'\u{1F0A1}'} Shashn</button>
                             </div>
 
@@ -3153,7 +3164,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                     isHost={clueHostRef.current === myIdRef.current}
                 />
             )}
-            {shashnGame && (
+            {shashnGame && shashnBoardVisible && (
                 <ShashnBoard
                     game={shashnGame}
                     myId={myIdRef.current}

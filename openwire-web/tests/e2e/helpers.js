@@ -329,12 +329,7 @@ export async function injectShashnStart(page, opts = {}) {
                 type: 'room_message',
                 room_id: roomId,
                 peer_id: host,
-                data: JSON.stringify({
-                    type: 'shashn_start',
-                    room_id: roomId,
-                    host,
-                    host_nick: hostNick,
-                }),
+                data: { type: 'shashn_start', room_id: roomId, host, host_nick: hostNick },
             }));
         }
     }, { roomId, host, hostNick });
@@ -357,10 +352,7 @@ export async function injectShashnState(page, opts = {}) {
                 type: 'room_message',
                 room_id: roomId,
                 peer_id: peerId,
-                data: JSON.stringify({
-                    type: 'shashn_state',
-                    state: JSON.stringify(state),
-                }),
+                data: { type: 'shashn_state', state: JSON.stringify(state) },
             }));
         }
     }, { roomId, peerId, state });
@@ -382,11 +374,7 @@ export async function injectShashnJoin(page, opts = {}) {
                 type: 'room_message',
                 room_id: roomId,
                 peer_id: peerId,
-                data: JSON.stringify({
-                    type: 'shashn_join',
-                    peer_id: peerId,
-                    nick,
-                }),
+                data: { type: 'shashn_join', peer_id: peerId, nick },
             }));
         }
     }, { roomId, peerId, nick });
