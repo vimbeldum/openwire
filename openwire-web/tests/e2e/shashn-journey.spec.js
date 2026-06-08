@@ -72,18 +72,18 @@ test.describe('Shashn Board Opening', () => {
         // Should show the title
         await expect(page.locator('.shashn-title')).toContainText('Shashn');
 
-        // Phase should show "Waiting for players..."
-        await expect(page.locator('.shashn-phase')).toContainText('Waiting for players');
+        // Phase should show "Waiting for opponent to join..."
+        await expect(page.locator('.shashn-phase')).toContainText('Waiting for opponent to join');
     });
 
-    test('board shows "Waiting for second player..." when only host joined', async ({ page }) => {
+    test('board shows "Waiting for opponent to join..." when only host joined', async ({ page }) => {
         const shashnBtn = page.locator('.sidebar-btn', { hasText: 'Shashn' });
         await shashnBtn.click();
 
         await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
 
-        // Only the host (TestUser) has joined, so show second-player waiting text
-        await expect(page.locator('.shashn-waiting-text')).toContainText('Waiting for second player');
+        // Only the host (TestUser) has joined, so show opponent-joining waiting text
+        await expect(page.locator('.shashn-waiting-text')).toContainText('Waiting for opponent to join');
     });
 
     test('board renders player slots with join status', async ({ page }) => {
@@ -117,12 +117,12 @@ test.describe('Shashn Board Opening', () => {
         await expect(footer).toBeVisible();
 
         // Help button
-        await expect(footer.locator('.shashn-btn-help')).toBeVisible();
-        await expect(footer.locator('.shashn-btn-help')).toContainText('Help');
+        await expect(footer.locator('button[aria-label="Help"]')).toBeVisible();
+        await expect(footer.locator('button[aria-label="Help"]')).toContainText('Help');
 
-        // Close button
-        await expect(footer.locator('.shashn-btn-close')).toBeVisible();
-        await expect(footer.locator('.shashn-btn-close')).toContainText('✕');
+        // Return to Chat button
+        await expect(footer.locator('button[aria-label="Return to chat"]')).toBeVisible();
+        await expect(footer.locator('button[aria-label="Return to chat"]')).toContainText('Return to Chat');
     });
 });
 
@@ -218,15 +218,15 @@ test.describe('Shashn Board Closing', () => {
         await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
     });
 
-    test('clicking close button dismisses board', async ({ page }) => {
+    test('clicking Return to Chat button dismisses board', async ({ page }) => {
         // Close the board
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
     });
 
     test('floating chat button disappears when board is closed', async ({ page }) => {
         // Close the board
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         // Floating chat button should also be gone since no game is active
@@ -235,7 +235,7 @@ test.describe('Shashn Board Closing', () => {
     });
 
     test('chat layout is intact after closing the board', async ({ page }) => {
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         // Core chat surface should still be present
@@ -246,7 +246,7 @@ test.describe('Shashn Board Closing', () => {
     });
 
     test('opening and closing board does not cause scroll overflow', async ({ page }) => {
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         const noOverflow = await page.evaluate(() => {
@@ -387,7 +387,7 @@ test.describe('Shashn State Reception', () => {
         });
 
         await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
-        await expect(page.locator('.shashn-phase')).toContainText(/Opponent.*turn/i);
+        await expect(page.locator('.shashn-phase')).toContainText(/Waiting for HostUser/i);
     });
 
     test('shashn_state in trick_end phase shows Trick complete! label and Collect button', async ({ page }) => {
@@ -440,15 +440,15 @@ test.describe('Open / Close Continuity', () => {
         await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
 
         // Close it
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         // Click again — fresh session
         await shashnBtn.click();
         await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
 
-        // Should be a fresh game in deal phase waiting for second player
-        await expect(page.locator('.shashn-waiting-text')).toContainText('Waiting for second player');
+        // Should be a fresh game in deal phase waiting for opponent to join
+        await expect(page.locator('.shashn-waiting-text')).toContainText('Waiting for opponent to join');
     });
 
     test('opening shashn via sidebar while already open just keeps board open', async ({ page }) => {
@@ -491,7 +491,7 @@ test.describe('Game State Continuity', () => {
         await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
 
         // Close it
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         // Chat layout should still be intact
@@ -521,7 +521,7 @@ test.describe('Shashn Round End / Game End Phase State', () => {
         await acceptShashnInvite(page);
     });
 
-    test('shashn_state in round_end phase shows "Round over!" label', async ({ page }) => {
+    test('shashn_state in round_end phase shows round winner label', async ({ page }) => {
         await injectShashnState(page, {
             roomId: 'test-room-001',
             peerId: 'host-peer-999',
@@ -539,11 +539,11 @@ test.describe('Shashn Round End / Game End Phase State', () => {
         });
 
         await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
-        // Phase label should indicate round over
-        await expect(page.locator('.shashn-phase')).toContainText('Round over');
+        // Phase label should indicate opponent won the round (TestUser has higher tricks, but winner absent so opponentName is used)
+        await expect(page.locator('.shashn-phase')).toContainText('HostUser won the round');
     });
 
-    test('shashn_state in game_end phase shows "Game Over!" label and winner banner', async ({ page }) => {
+    test('shashn_state in game_end phase shows "You won!" label and winner banner', async ({ page }) => {
         await injectShashnState(page, {
             roomId: 'test-room-001',
             peerId: 'host-peer-999',
@@ -562,8 +562,8 @@ test.describe('Shashn Round End / Game End Phase State', () => {
         });
 
         await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
-        // Phase label should show Game Over!
-        await expect(page.locator('.shashn-phase')).toContainText('Game Over');
+        // Phase label should show "You won!" since winner matches myId
+        await expect(page.locator('.shashn-phase')).toContainText('You won');
 
         // Winner banner should show the winner's nick
         await expect(page.locator('.shashn-winner')).toBeVisible();
@@ -611,7 +611,7 @@ test.describe('Shashn State Summary Continuity', () => {
 
     test('state summary bar appears when board is closed with active game', async ({ page }) => {
         // Close the board
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         // State summary should be visible
@@ -620,7 +620,7 @@ test.describe('Shashn State Summary Continuity', () => {
     });
 
     test('state summary shows Open Board button', async ({ page }) => {
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         const openBoardBtn = page.getByRole('button', { name: /Open Board/i });
@@ -629,7 +629,7 @@ test.describe('Shashn State Summary Continuity', () => {
     });
 
     test('clicking Open Board in state summary reopens the board', async ({ page }) => {
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         // Click Open Board
@@ -637,14 +637,14 @@ test.describe('Shashn State Summary Continuity', () => {
 
         // Board should reopen
         await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 3000 });
-        // Game state should be preserved (still in deal phase waiting for second player)
-        await expect(page.locator('.shashn-waiting-text')).toContainText('Waiting for second player');
+        // Game state should be preserved (still in deal phase waiting for opponent to join)
+        await expect(page.locator('.shashn-waiting-text')).toContainText('Waiting for opponent to join');
     });
 
     test('state summary shows opponent name and round info in play phase', async ({ page }) => {
         // First need to set up via invite (as non-host) to get a play phase with opponent
         // Close initial board
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         // Receive invite from remote host
@@ -674,7 +674,7 @@ test.describe('Shashn State Summary Continuity', () => {
         await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
 
         // Close the board
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         // State summary should show "Your turn!" badge
@@ -690,7 +690,7 @@ test.describe('Shashn State Summary Continuity', () => {
 
     test('state summary shows trick_end status after close', async ({ page }) => {
         // Close initial host board
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         // Receive invite + state with trick_end phase
@@ -724,7 +724,7 @@ test.describe('Shashn State Summary Continuity', () => {
         await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
 
         // Close and check summary
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         await expect(page.locator('.shashn-state-summary')).toBeVisible();
@@ -733,7 +733,7 @@ test.describe('Shashn State Summary Continuity', () => {
 
     test('state summary shows game_end status after close', async ({ page }) => {
         // Close initial host board
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         // Receive invite + game_end state
@@ -763,7 +763,7 @@ test.describe('Shashn State Summary Continuity', () => {
         await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
 
         // Close and check summary shows "Game Over!"
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         await expect(page.locator('.shashn-state-summary')).toBeVisible();
@@ -772,7 +772,7 @@ test.describe('Shashn State Summary Continuity', () => {
 
     test('state summary shows round_end status after close', async ({ page }) => {
         // Close initial host board
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         // Receive invite + round_end state
@@ -802,7 +802,7 @@ test.describe('Shashn State Summary Continuity', () => {
         await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 5000 });
 
         // Close and check summary shows round_end status
-        await page.locator('.shashn-btn-close').click();
+        await page.locator('button[aria-label="Return to chat"]').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         await expect(page.locator('.shashn-state-summary')).toBeVisible();
