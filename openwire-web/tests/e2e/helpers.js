@@ -277,3 +277,117 @@ export function clearRuntimeGuard(page) {
         delete page.__runtimeGuard;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   SHASN-specific helpers
+   ═══════════════════════════════════════════════════════════ */
+
+/**
+ * Create a minimal deterministic Shashn game state for test injection.
+ * Players are provided as [{ peer_id, nick, hand, tricksWon, score }, ...]
+ */
+export function makeShashnGame(overrides = {}) {
+    const defaultGame = {
+        type: 'shashn',
+        roomId: 'test-room-001',
+        phase: 'deal',
+        players: [
+            { peer_id: null, nick: null, hand: [], tricksWon: 0, score: 0 },
+            { peer_id: null, nick: null, hand: [], tricksWon: 0, score: 0 },
+        ],
+        currentPlayer: 0,
+        currentTrick: { cards: [], leadSuit: null, winner: null },
+        deck: null,
+        trumpSuit: null,
+        round: 1,
+        trickNumber: 1,
+        log: [],
+        winner: null,
+        ...overrides,
+    };
+    // If overrides provides players, they replace the default ones entirely
+    if (overrides.players) {
+        defaultGame.players = overrides.players;
+    }
+    return defaultGame;
+}
+
+/**
+ * Inject a shashn_start message via the WebSocket mock.
+ * Triggers the game_invite card in chat.
+ */
+export async function injectShashnStart(page, opts = {}) {
+    const {
+        roomId = 'test-room-001',
+        host = 'host-peer-999',
+        hostNick = 'HostUser',
+    } = opts;
+    await page.evaluate(({ roomId, host, hostNick }) => {
+        const ws = window.__wsMock?.active;
+        if (ws) {
+            ws._injectMessage(JSON.stringify({
+                type: 'room_message',
+                room_id: roomId,
+                peer_id: host,
+                data: JSON.stringify({
+                    type: 'shashn_start',
+                    room_id: roomId,
+                    host,
+                    host_nick: hostNick,
+                }),
+            }));
+        }
+    }, { roomId, host, hostNick });
+}
+
+/**
+ * Inject a shashn_state message via the WebSocket mock.
+ * The state parameter should be a game object created with makeShashnGame().
+ */
+export async function injectShashnState(page, opts = {}) {
+    const {
+        roomId = 'test-room-001',
+        peerId = 'host-peer-999',
+        state = makeShashnGame(),
+    } = opts;
+    await page.evaluate(({ roomId, peerId, state }) => {
+        const ws = window.__wsMock?.active;
+        if (ws) {
+            ws._injectMessage(JSON.stringify({
+                type: 'room_message',
+                room_id: roomId,
+                peer_id: peerId,
+                data: JSON.stringify({
+                    type: 'shashn_state',
+                    state: JSON.stringify(state),
+                }),
+            }));
+        }
+    }, { roomId, peerId, state });
+}
+
+/**
+ * Inject a shashn_join message (simulates a peer joining the game).
+ */
+export async function injectShashnJoin(page, opts = {}) {
+    const {
+        roomId = 'test-room-001',
+        peerId = 'opponent-peer-002',
+        nick = 'OpponentUser',
+    } = opts;
+    await page.evaluate(({ roomId, peerId, nick }) => {
+        const ws = window.__wsMock?.active;
+        if (ws) {
+            ws._injectMessage(JSON.stringify({
+                type: 'room_message',
+                room_id: roomId,
+                peer_id: peerId,
+                data: JSON.stringify({
+                    type: 'shashn_join',
+                    peer_id: peerId,
+                    nick,
+                }),
+            }));
+        }
+    }, { roomId, peerId, nick });
+}
