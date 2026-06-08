@@ -23,6 +23,7 @@ import useMonopolyGame from '../hooks/useMonopolyGame';
 import useCluedoGame from '../hooks/useCluedoGame';
 import useShashnGame from '../hooks/useShashnGame';
 import MessageRow from './chat/MessageRow';
+import ShashnStateSummary from './chat/ShashnStateSummary';
 
 // Retry wrapper: on chunk-not-found after deploy, reload once to get fresh HTML
 function lazyRetry(fn) {
@@ -740,10 +741,14 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         handleCluedoAction, startCluedo, handleClueAction,
     } = useCluedoGame(gameDeps);
 
+    // ── SHASN board visibility separate from game existence ─
+    const [shashnBoardVisible, setShashnBoardVisible] = useState(false);
+
     const {
         shashnGame, setShashnGame,
         shashnRef, shashnHostRef, hasJoinedShashn,
         handleShashnAction, startShashn, handleShashnLocalAction,
+        shashnStateSummary,
     } = useShashnGame(gameDeps);
 
     // ── Game invite from chat message ────────────────────────
@@ -2372,7 +2377,7 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
     const currentRoomName = currentRoom ? rooms.find(r => r.room_id === currentRoom)?.name || 'Unknown Room' : null;
     const balance = myWallet ? wallet.getTotalBalance(myWallet) : 0;
     const myCosmetics = useMemo(() => profile ? getEquippedClasses(profile) : null, [profile]);
-    const anyGameActive = !!(activeGame || blackjackGame || rouletteGame || andarBaharGame || polymarketGame || mysteryGame || monopolyGame || cluedoGame || shashnGame);
+    const anyGameActive = !!(activeGame || blackjackGame || rouletteGame || andarBaharGame || polymarketGame || mysteryGame || monopolyGame || cluedoGame || (shashnGame && shashnBoardVisible));
 
     // Safe room leave — don't leave if an active game is using the room
     const safeLeaveRoom = useCallback((roomId) => {
@@ -2436,9 +2441,13 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
         hasJoinedClue.current = false;
     }, []);
     const closeShashn = useCallback(() => {
-        setShashnGame(null);
-        shashnHostRef.current = null;
-        hasJoinedShashn.current = false;
+        setShashnBoardVisible(false);
+        // Don't clear shashnGame — keep state alive so the chat summary bar
+        // can show waiting/active/your-turn cues and offer a board re-entry button.
+        // Full cleanup only happens on room switch via cleanupGameState.
+    }, []);
+    const openShashnBoard = useCallback(() => {
+        setShashnBoardVisible(true);
     }, []);
     const closeTtt = useCallback(() => setActiveGame(null), []);
     const helpBj = useCallback(() => openHelp('blackjack'), []);
@@ -2524,6 +2533,15 @@ export default function ChatRoom({ nick: initialNick, isAdmin: initialIsAdmin, c
                         </div>
                     ))}
                 </div>
+            )}
+
+            {/* ── SHASN state summary (visible when board is closed) ── */}
+            {!shashnBoardVisible && shashnGame && (
+                <ShashnStateSummary
+                    game={shashnGame}
+                    myId={myIdRef.current}
+                    onOpenBoard={openShashnBoard}
+                />
             )}
 
             {/* Casino Live Ticker — game events only, separate from chat */}

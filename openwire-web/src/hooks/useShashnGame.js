@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import * as shashn from '../lib/shashn';
 import * as socket from '../lib/socket';
 
@@ -158,9 +158,70 @@ export default function useShashnGame(deps) {
         return () => {};
     }, []);
 
+    // ── Derived state summary for chat consumption ──────
+    const shashnStateSummary = useMemo(() => {
+        const game = shashnGame;
+        if (!game) {
+            return { isWaiting: false, isActive: false, isMyTurn: false, statusText: '', opponentName: null, statusVariant: 'neutral' };
+        }
+
+        const myId = myIdRef.current;
+        const myPlayerIdx = game.players?.findIndex(p => p.peer_id === myId) ?? -1;
+        const otherPlayer = game.players?.find(p => p.peer_id !== null && p.peer_id !== myId) || null;
+        const opponentName = otherPlayer?.nick || null;
+
+        const phase = game.phase;
+        const totalPlayers = game.players?.filter(p => p.peer_id !== null).length || 0;
+        const currentPlayerPeerId = game.players?.[game.currentPlayer]?.peer_id || null;
+        const isMyTurn = currentPlayerPeerId === myId;
+
+        let isWaiting = false;
+        let isActive = false;
+        let statusText = '';
+        let statusVariant = 'neutral';
+
+        if (phase === 'deal') {
+            isWaiting = true;
+            if (totalPlayers < 2) {
+                statusText = opponentName ? 'Waiting for opponent to join...' : 'Waiting for players...';
+                statusVariant = 'info';
+            } else {
+                statusText = 'Game starting...';
+                statusVariant = 'info';
+            }
+        } else if (phase === 'play' || phase === 'trick_end') {
+            isActive = true;
+            if (isMyTurn && phase === 'play') {
+                statusText = 'Your turn!';
+                statusVariant = 'success';
+            } else if (phase === 'play') {
+                statusText = opponentName ? `Waiting for ${opponentName}...` : 'Waiting...';
+                statusVariant = 'warning';
+            } else if (phase === 'trick_end') {
+                statusText = 'Trick complete - collect to continue';
+                statusVariant = 'info';
+            }
+        } else if (phase === 'round_end' || phase === 'game_end') {
+            isActive = true;
+            if (game.winner === myId) {
+                statusText = `You won Round ${game.round}!`;
+                statusVariant = 'success';
+            } else if (game.winner) {
+                statusText = opponentName ? `${opponentName} won the round` : 'Round over';
+                statusVariant = 'warning';
+            } else {
+                statusText = 'Round complete';
+                statusVariant = 'neutral';
+            }
+        }
+
+        return { isWaiting, isActive, isMyTurn, statusText, opponentName, statusVariant };
+    }, [shashnGame, myIdRef]);
+
     return {
         shashnGame, setShashnGame,
         shashnRef, shashnHostRef, hasJoinedShashn,
         handleShashnAction, startShashn, handleShashnLocalAction,
+        shashnStateSummary,
     };
 }

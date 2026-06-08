@@ -2309,3 +2309,73 @@
   border-color: rgba(255, 60, 60, 0.5) !important;
   box-shadow: 0 0 0 1px rgba(255, 60, 60, 0.15) inset;
 }
+
+/* ── SHASN State Summary ─────────────────────────── */
+.shashn-state-summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.75rem;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent), color-mix(in srgb, #9b59b6 8%, transparent));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, transparent);
+  flex-shrink: 0;
+}
+
+.shashn-state-summary-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  max-width: 600px;
+  justify-content: center;
+}
+
+.shashn-state-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.shashn-state-text {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.shashn-state-badge {
+  white-space: nowrap;
+}
+
+.shashn-state-opponent {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.shashn-state-actions {
+  flex-shrink: 0;
+}
+
+.shashn-open-board-btn {
+  background: linear-gradient(135deg, var(--accent), #8e44ad);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+  white-space: nowrap;
+}
+
+.shashn-open-board-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.shashn-open-board-btn:active {
+  transform: translateY(0);
+}
