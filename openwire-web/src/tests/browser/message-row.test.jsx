@@ -80,7 +80,7 @@ describe('MessageRow', () => {
     });
 
     describe('game invites', () => {
-        it('renders active invite with Join button', () => {
+        it('renders active invite with Join button using shared primitives', () => {
             renderRow({
                 type: 'game_invite',
                 inviteUsed: false,
@@ -89,6 +89,12 @@ describe('MessageRow', () => {
                 ts: Date.now(),
             });
             expect(screen.getByText('Join Table')).toBeInTheDocument();
+            // Uses Button primitive
+            expect(screen.getByText('Join Table').closest('button')).toHaveClass('ui-button');
+            // Uses Panel primitive
+            const inviteCard = screen.getByText('Join Table').closest('.ui-panel');
+            expect(inviteCard).toBeInTheDocument();
+            expect(inviteCard).toHaveClass('invite-card');
         });
 
         it('clicking Join calls onJoinInvite', () => {
@@ -120,7 +126,7 @@ describe('MessageRow', () => {
             expect(onDismissInvite).toHaveBeenCalledWith('msg-1');
         });
 
-        it('shows expired text when invite has expired', () => {
+        it('shows expired Badge when invite has expired, no action buttons', () => {
             renderRow({
                 type: 'game_invite',
                 inviteUsed: false,
@@ -128,15 +134,46 @@ describe('MessageRow', () => {
                 ts: Date.now() - 120000, // 2 min ago, past 60s expiry
             });
             expect(screen.getByText(/expired/)).toBeInTheDocument();
+            // Expired invites use Badge primitive
+            expect(screen.getByText('expired')).toHaveClass('ui-badge');
+            // No action buttons in expired state
+            expect(screen.queryByText('Join Table')).not.toBeInTheDocument();
         });
 
-        it('shows joined text when invite is used', () => {
+        it('shows joined Badge when invite is used, no action buttons', () => {
             renderRow({
                 type: 'game_invite',
                 inviteUsed: true,
                 content: 'Join roulette!',
             });
             expect(screen.getByText(/joined/)).toBeInTheDocument();
+            // Joined invites use Badge primitive
+            expect(screen.getByText('joined')).toHaveClass('ui-badge--success');
+            // No action buttons in joined state
+            expect(screen.queryByText('Join Table')).not.toBeInTheDocument();
+        });
+
+        it('renders invite card with used opacity for past invites', () => {
+            const { container } = renderRow({
+                type: 'game_invite',
+                inviteUsed: true,
+                content: 'Done',
+            });
+            const card = container.querySelector('.invite-card.used');
+            expect(card).toBeInTheDocument();
+            expect(card).toHaveClass('ui-panel');
+        });
+
+        it('dismiss button has accessible label', () => {
+            renderRow({
+                type: 'game_invite',
+                inviteUsed: false,
+                content: 'Test',
+                ts: Date.now(),
+            });
+            const dismissBtn = screen.getByLabelText('Dismiss invite');
+            expect(dismissBtn).toBeInTheDocument();
+            expect(dismissBtn).toHaveClass('ui-button--ghost');
         });
     });
 

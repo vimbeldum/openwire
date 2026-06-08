@@ -1,4 +1,7 @@
 import { memo, useState, useEffect } from 'react';
+import Button from '../ui/Button.jsx';
+import Badge from '../ui/Badge.jsx';
+import Panel from '../ui/Panel.jsx';
 
 const REACTION_EMOJIS = ['\u{1F525}', '\u{1F44F}', '\u{1F4B0}'];
 const INVITE_EXPIRE_MS = 60 * 1000; // 60s
@@ -12,37 +15,38 @@ function MessageRow({ msg, renderContent, onReact, onJoinInvite, onDismissInvite
         return () => clearInterval(t);
     }, [msg.type, msg.inviteUsed]);
 
-    if (msg.type === 'game_invite' && !msg.inviteUsed) {
-        const expired = msg.ts && (now - msg.ts > INVITE_EXPIRE_MS);
+    if (msg.type === 'game_invite') {
+        const expired = !msg.inviteUsed && msg.ts && (now - msg.ts > INVITE_EXPIRE_MS);
+        if (msg.inviteUsed) {
+            return (
+                <div className={`msg ${msg.type}`}>
+                    <Panel tone="subtle" padding="md" className="invite-card used">
+                        <span className="invite-card-icon">{msg.sender}</span>
+                        <span className="invite-card-text">{msg.content}</span>
+                        <Badge tone="success">joined</Badge>
+                    </Panel>
+                </div>
+            );
+        }
         if (expired) {
             return (
                 <div className={`msg ${msg.type}`}>
-                    <div className="game-invite-inline used">
-                        <span className="game-invite-icon">{msg.sender}</span>
-                        <span className="game-invite-text">{msg.content} <em>(expired)</em></span>
-                    </div>
+                    <Panel tone="subtle" padding="md" className="invite-card used">
+                        <span className="invite-card-icon">{msg.sender}</span>
+                        <span className="invite-card-text">{msg.content}</span>
+                        <Badge tone="neutral">expired</Badge>
+                    </Panel>
                 </div>
             );
         }
         return (
             <div className={`msg ${msg.type}`}>
-                <div className="game-invite-inline">
-                    <span className="game-invite-icon">{msg.sender}</span>
-                    <span className="game-invite-text">{msg.content}</span>
-                    <button className="game-invite-join" onClick={() => onJoinInvite(msg)}>Join Table</button>
-                    <button className="game-invite-dismiss" onClick={() => onDismissInvite(msg.id)}>&#x2715;</button>
-                </div>
-            </div>
-        );
-    }
-
-    if (msg.type === 'game_invite' && msg.inviteUsed) {
-        return (
-            <div className={`msg ${msg.type}`}>
-                <div className="game-invite-inline used">
-                    <span className="game-invite-icon">{msg.sender}</span>
-                    <span className="game-invite-text">{msg.content} <em>(joined)</em></span>
-                </div>
+                <Panel tone="subtle" padding="md" className="invite-card">
+                    <span className="invite-card-icon">{msg.sender}</span>
+                    <span className="invite-card-text">{msg.content}</span>
+                    <Button variant="primary" size="sm" onClick={() => onJoinInvite(msg)}>Join Table</Button>
+                    <Button variant="ghost" size="sm" onClick={() => onDismissInvite(msg.id)} aria-label="Dismiss invite">&#x2715;</Button>
+                </Panel>
             </div>
         );
     }

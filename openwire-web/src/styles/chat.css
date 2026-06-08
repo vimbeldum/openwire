@@ -1520,43 +1520,33 @@
 .typing-text { font-style: italic; }
 
 /* ── Game Invite Inline Cards ───────────────────────────────── */
-.game-invite-inline {
+/* ── In-thread SHASN Invite Card ──────────────── */
+/* Normalized invite card using shared primitives (Panel, Button, Badge)     */
+/* Override Panel md padding for a compact inline card that matches chat     */
+/* typography, spacing, hierarchy, and accessible labels.                    */
+.invite-card.ui-panel {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  background: var(--accent-glow);
-  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
-  border-radius: var(--radius-sm);
   flex-wrap: wrap;
 }
-.game-invite-inline.used {
+.invite-card.ui-panel.used {
   opacity: 0.5;
 }
-.game-invite-icon { font-size: 1.1rem; }
-.game-invite-text { flex: 1; color: var(--text-dim); font-size: 0.88rem; }
-.game-invite-join {
-  padding: 0.25rem 0.65rem;
-  background: var(--accent);
-  color: var(--text-inverse);
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 0.78rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: opacity 0.15s;
+.invite-card-icon {
+  font-size: 1.1rem;
+  line-height: 1;
 }
-.game-invite-join:hover { opacity: 0.85; }
-.game-invite-dismiss {
-  padding: 0.2rem 0.5rem;
-  background: transparent;
-  color: var(--text-muted);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  font-size: 0.78rem;
-  cursor: pointer;
+.invite-card-text {
+  flex: 1;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.5;
 }
-.game-invite-dismiss:hover { color: var(--text-dim); }
+.invite-card-text .ui-badge {
+  margin-left: 0.4rem;
+}
 
 /* ── Emoji Reactions ────────────────────────────────────────── */
 .msg-reaction-bar {
