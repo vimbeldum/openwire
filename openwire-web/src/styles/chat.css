@@ -2301,14 +2301,17 @@
 }
 
 /* ── SHASN State Summary ─────────────────────────── */
-.shashn-state-summary {
+.shashn-state-summary.ui-panel {
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0.35rem 0.75rem;
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent), color-mix(in srgb, #9b59b6 8%, transparent));
+  border: none;
   border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, transparent);
+  border-radius: 0;
   flex-shrink: 0;
+  backdrop-filter: none;
 }
 
 .shashn-state-summary-inner {
@@ -2348,24 +2351,4 @@
   flex-shrink: 0;
 }
 
-.shashn-open-board-btn {
-  background: linear-gradient(135deg, var(--accent), #8e44ad);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 0.3rem 0.75rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s, transform 0.15s;
-  white-space: nowrap;
-}
 
-.shashn-open-board-btn:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-.shashn-open-board-btn:active {
-  transform: translateY(0);
-}

@@ -8,6 +8,8 @@
 
 import { memo } from 'react';
 import Badge from '../ui/Badge';
+import Button from '../ui/Button';
+import Panel from '../ui/Panel';
 
 /**
  * @param {object} props
@@ -71,7 +73,7 @@ function ShashnStateSummary({ game, myId, onOpenBoard }) {
     }
 
     return (
-        <div className="shashn-state-summary">
+        <Panel tone="subtle" padding="md" className="shashn-state-summary">
             <div className="shashn-state-summary-inner">
                 <span className="shashn-state-icon">{summaryIcon}</span>
                 <span className="shashn-state-text">
@@ -81,12 +83,12 @@ function ShashnStateSummary({ game, myId, onOpenBoard }) {
                     )}
                 </span>
                 <span className="shashn-state-actions">
-                    <button className="shashn-open-board-btn" onClick={onOpenBoard}>
-                        {'\uD83C\uDCCF'} Open Board
-                    </button>
+                    <Button variant="primary" size="sm" leadingIcon={'\uD83C\uDCCF'} onClick={onOpenBoard}>
+                        Open Board
+                    </Button>
                 </span>
             </div>
-        </div>
+        </Panel>
     );
 }
 
