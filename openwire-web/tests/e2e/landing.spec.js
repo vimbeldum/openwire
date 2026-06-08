@@ -254,3 +254,66 @@ test.describe('Landing Page', () => {
         await expect(page.locator('.landing')).not.toBeVisible();
     });
 });
+
+/* ══════════════════════════════════════════════════════════════════
+   14. RESPONSIVE BREAKPOINTS
+   ══════════════════════════════════════════════════════════════════ */
+test.describe('Landing Page — responsive breakpoints', () => {
+    test.beforeEach(async ({ page }) => {
+        await clearSession(page);
+        await mockWebSocket(page);
+        await setupRuntimeGuard(page);
+    });
+
+    test.afterEach(async ({ page }) => {
+        await expectNoRuntimeErrors(page);
+    });
+
+    const MOBILE_WIDTHS = [375, 390, 768];
+
+    for (const width of MOBILE_WIDTHS) {
+        test(`landing page renders correctly at ${width}px`, async ({ page }) => {
+            await page.setViewportSize({ width, height: 667 });
+            await page.goto('/');
+            await page.waitForSelector('.landing');
+
+            await expect(page.locator('.landing-kicker')).toContainText('OpenWire');
+            await expect(page.locator('.landing-card h2')).toContainText('Join the network');
+            await expect(page.locator('input[placeholder="Enter your nickname..."]')).toBeVisible();
+        });
+
+        test(`join form is usable at ${width}px`, async ({ page }) => {
+            await page.setViewportSize({ width, height: 667 });
+            await page.goto('/');
+            await page.waitForSelector('.landing');
+
+            const nickInput = page.locator('input[placeholder="Enter your nickname..."]');
+            await nickInput.fill('MobileUser');
+            await page.locator('.landing-card button[type="submit"]').click();
+
+            await expect(page.locator('.chat-header')).toBeVisible();
+            await expect(page.locator('.header-nick')).toContainText('MobileUser');
+        });
+
+        test(`admin access link is usable at ${width}px`, async ({ page }) => {
+            await page.setViewportSize({ width, height: 667 });
+            await page.goto('/');
+            await page.waitForSelector('.landing');
+
+            // Admin access link should be reachable
+            await expect(page.locator('.admin-access-link')).toBeVisible();
+            await page.locator('.admin-access-link').click();
+            await expect(page.locator('.admin-overlay')).toBeVisible();
+
+            // Enter nickname, password, and join as admin
+            await page.locator('input[placeholder="Enter your nickname..."]').fill('MobileAdmin');
+            await page.locator('.admin-gate-card input[type="password"]').fill('openwire-admin');
+            await page.locator('.admin-gate-actions button[type="submit"]').click();
+
+            await expect(page.locator('.admin-overlay')).not.toBeVisible();
+            await expect(page.locator('.chat-header')).toBeVisible();
+            await expect(page.locator('.header-nick')).toContainText('MobileAdmin');
+            await expect(page.locator('.btn-agent-panel')).toBeVisible();
+        });
+    }
+});
