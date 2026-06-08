@@ -88,8 +88,15 @@ describe('ShashnBoard phase labels', () => {
     });
 
     it('shows "Waiting for players..." in deal phase', () => {
-        renderBoard({ phase: 'deal' });
-        // The phase label in .shashn-phase
+        // Both slots empty — default makeGame has Alice joined, so override players
+        renderBoard({
+            phase: 'deal',
+            players: [
+                makePlayer(null, null, []),
+                makePlayer(null, null, []),
+            ],
+        });
+        // The phase label and waiting text both show "Waiting for players..."
         const phaseEls = screen.getAllByText(/Waiting for players/i);
         expect(phaseEls.length).toBeGreaterThanOrEqual(1);
     });
@@ -102,8 +109,9 @@ describe('ShashnBoard phase labels', () => {
                 makePlayer(null, null, []),
             ],
         });
-        // Second player slot shows "Waiting..."
-        expect(screen.getByText('Waiting for second player...')).toBeInTheDocument();
+        // Second player slot shows "Waiting..." (text appears in both phase label and waiting text)
+        const waitingEls = screen.getAllByText('Waiting for opponent to join...');
+        expect(waitingEls.length).toBeGreaterThanOrEqual(1);
         // First player slot shows ✓ indicator
         expect(screen.getByText('Waiting...')).toBeInTheDocument(); // player name for empty slot
     });
@@ -116,10 +124,12 @@ describe('ShashnBoard phase labels', () => {
                 makePlayer(null, null, []),
             ],
         });
-        expect(screen.getByText('Waiting for both players to join...')).toBeInTheDocument();
+        // Text appears in both phase label and waiting text
+        const waitingEls = screen.getAllByText(/Waiting for players/);
+        expect(waitingEls.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('shows "Your turn — play a card!" when it is my turn in play phase', () => {
+    it('shows "Your turn!" when it is my turn in play phase', () => {
         renderBoard({
             phase: 'play',
             currentPlayer: 0,
@@ -128,10 +138,11 @@ describe('ShashnBoard phase labels', () => {
                 makePlayer('peer-2', 'Bob', [makeCard('Q')]),
             ],
         });
-        expect(screen.getByText(/Your turn.*play a card/i)).toBeInTheDocument();
+        const turnEls = screen.getAllByText(/Your turn/i);
+        expect(turnEls.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('shows "Opponent\'s turn..." when it is not my turn in play phase', () => {
+    it('shows "Waiting for Bob..." when it is not my turn in play phase', () => {
         renderBoard({
             phase: 'play',
             currentPlayer: 1,
@@ -140,7 +151,7 @@ describe('ShashnBoard phase labels', () => {
                 makePlayer('peer-2', 'Bob', [makeCard('Q')]),
             ],
         });
-        expect(screen.getByText(/Opponent.*turn/i)).toBeInTheDocument();
+        expect(screen.getByText(/Waiting for Bob/i)).toBeInTheDocument();
     });
 
     it('shows "Trick complete!" in trick_end phase', () => {
@@ -162,10 +173,10 @@ describe('ShashnBoard phase labels', () => {
         expect(screen.getByText('Trick complete!')).toBeInTheDocument();
     });
 
-    it('shows "Game Over!" in game_end phase', () => {
+    it('shows "Game Over!" in game_end phase when opponent won', () => {
         renderBoard({
             phase: 'game_end',
-            winner: 'me',
+            winner: 'peer-2',
             players: [
                 makePlayer('me', 'Alice', [], { score: 150 }),
                 makePlayer('peer-2', 'Bob', [], { score: 20 }),
@@ -377,9 +388,9 @@ describe('ShashnBoard interactions', () => {
 
     it('close button calls onClose', () => {
         const onClose = vi.fn();
-        const { container } = renderBoard({ phase: 'deal' }, { onClose });
-        // Button text is "✕ Close" — match by class instead
-        const closeBtn = container.querySelector('.shashn-btn-close');
+        renderBoard({ phase: 'deal' }, { onClose });
+        // Button text is "Return to Chat" — find by accessible name
+        const closeBtn = screen.getByRole('button', { name: /Return to Chat/i });
         expect(closeBtn).toBeInTheDocument();
         fireEvent.click(closeBtn);
         expect(onClose).toHaveBeenCalledTimes(1);

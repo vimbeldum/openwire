@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, memo, useRef } from 'react';
+import Button from './ui/Button';
+import Badge from './ui/Badge';
 import '../styles/shashn.css';
 
 /* ── Constants ────────────────────────────────────────────── */
@@ -107,6 +109,7 @@ export default memo(function ShashnBoard({
     const myHand = game?.players?.[myPlayerIdx]?.hand || [];
     const otherPlayerIdx = myPlayerIdx === 0 ? 1 : 0;
     const otherPlayer = game?.players?.[otherPlayerIdx];
+    const opponentName = otherPlayer?.nick || null;
 
     const canPlay = isMyTurn && game?.phase === 'play';
     const leadSuit = game?.currentTrick?.leadSuit;
@@ -143,13 +146,27 @@ export default memo(function ShashnBoard({
         onAction({ type: 'newround' });
     };
 
-    /* ── Phase Labels ─────────────────────────────────────── */
-    const phaseLabels = {
-        deal: 'Waiting for players...',
-        play: isMyTurn ? 'Your turn — play a card!' : 'Opponent\'s turn...',
-        trick_end: 'Trick complete!',
-        round_end: 'Round over!',
-        game_end: 'Game Over!',
+    /* ── Phase Labels (aligned with ShashnStateSummary) ──── */
+    const getPhaseLabel = (phase) => {
+        if (phase === 'deal') {
+            const totalPlayers = game?.players?.filter(p => p.peer_id !== null).length || 0;
+            return totalPlayers < 2 ? 'Waiting for players...' : 'Starting...';
+        }
+        if (phase === 'play') {
+            if (isMyTurn) return 'Your turn!';
+            return opponentName ? `Waiting for ${opponentName}...` : 'Waiting...';
+        }
+        if (phase === 'trick_end') return 'Trick complete!';
+        if (phase === 'round_end') {
+            const winner = game?.winner;
+            if (winner === myId) return 'You won the round!';
+            if (opponentName) return `${opponentName} won the round`;
+            return 'Round complete';
+        }
+        if (phase === 'game_end') {
+            return game?.winner === myId ? 'You won!' : 'Game Over!';
+        }
+        return phase;
     };
 
     /* ── Empty / Loading State ───────────────────────────── */
@@ -168,6 +185,18 @@ export default memo(function ShashnBoard({
     if (phase === 'deal') {
         const hasPlayer1 = game.players[0]?.peer_id;
         const hasPlayer2 = game.players[1]?.peer_id;
+        const totalPlayers = [hasPlayer1, hasPlayer2].filter(Boolean).length;
+        const iHaveJoined = game.players?.some(p => p.peer_id === myId) || false;
+
+        let waitingMessage;
+        if (totalPlayers >= 2) {
+            waitingMessage = 'Starting...';
+        } else if (iHaveJoined) {
+            waitingMessage = 'Waiting for opponent to join...';
+        } else {
+            waitingMessage = 'Waiting for players...';
+        }
+
         return (
             <div className="shashn-container">
                 <div className="shashn-header">
@@ -175,7 +204,7 @@ export default memo(function ShashnBoard({
                         <span className="shashn-title-icon">🎴</span>
                         Shashn
                     </div>
-                    <div className="shashn-phase">Waiting for players...</div>
+                    <div className="shashn-phase">{waitingMessage}</div>
                 </div>
 
                 <div className="shashn-players">
@@ -199,20 +228,16 @@ export default memo(function ShashnBoard({
 
                 <div className="shashn-waiting">
                     <div className="shashn-waiting-icon">⏳</div>
-                    <div className="shashn-waiting-text">
-                        {!hasPlayer1 && !hasPlayer2 && 'Waiting for both players to join...'}
-                        {hasPlayer1 && !hasPlayer2 && 'Waiting for second player...'}
-                        {hasPlayer2 && !hasPlayer1 && 'Waiting for first player...'}
-                    </div>
+                    <div className="shashn-waiting-text">{waitingMessage}</div>
                 </div>
 
                 <div className="shashn-footer">
-                    <button className="shashn-footer-btn shashn-btn-help" onClick={() => onHelp?.('shashn')}>
-                        ❓ Help
-                    </button>
-                    <button className="shashn-footer-btn shashn-btn-close" onClick={onClose}>
-                        ✕ Close
-                    </button>
+                    <Button variant="ghost" size="sm" leadingIcon="❓" onClick={() => onHelp?.('shashn')} aria-label="Help">
+                        Help
+                    </Button>
+                    <Button variant="secondary" size="sm" leadingIcon="💬" onClick={onClose} aria-label="Return to chat">
+                        Return to Chat
+                    </Button>
                 </div>
             </div>
         );
@@ -227,7 +252,7 @@ export default memo(function ShashnBoard({
                     <span className="shashn-title-icon">🎴</span>
                     Shashn
                 </div>
-                <div className="shashn-phase">{phaseLabels[phase] || phase}</div>
+                <div className="shashn-phase">{getPhaseLabel(phase)}</div>
                 
                 <div className="shashn-round-info">
                     <span>Round {game.round}</span>
@@ -368,9 +393,9 @@ export default memo(function ShashnBoard({
 
                 {phase === 'trick_end' && (
                     <div className="shashn-trick-actions">
-                        <button className="shashn-btn shashn-btn-success" onClick={handleCollectTrick}>
+                        <Button variant="primary" onClick={handleCollectTrick} aria-label="Collect Trick">
                             Collect Trick
-                        </button>
+                        </Button>
                     </div>
                 )}
             </div>
@@ -443,16 +468,12 @@ export default memo(function ShashnBoard({
 
                 {canPlay && selectedCard && (
                     <div className="shashn-play-area">
-                        <button className="shashn-btn shashn-btn-primary" onClick={handlePlayCard}>
+                        <Button variant="primary" onClick={handlePlayCard} aria-label={`Play ${selectedCard}`}>
                             Play {selectedCard}
-                        </button>
-                        <button
-                            className="shashn-btn"
-                            style={{ background: 'rgba(255,255,255,0.2)', color: '#fff' }}
-                            onClick={() => setSelectedCard(null)}
-                        >
+                        </Button>
+                        <Button variant="ghost" onClick={() => setSelectedCard(null)} aria-label="Cancel">
                             Cancel
-                        </button>
+                        </Button>
                     </div>
                 )}
             </div>
@@ -476,20 +497,20 @@ export default memo(function ShashnBoard({
             {/* New Round Button */}
             {(phase === 'round_end' || (phase === 'game_end' && game.round < 10)) && (
                 <div className="shashn-play-area">
-                    <button className="shashn-btn shashn-btn-primary" onClick={handleNewRound}>
+                    <Button variant="primary" onClick={handleNewRound} aria-label="New Round">
                         New Round
-                    </button>
+                    </Button>
                 </div>
             )}
 
             {/* Footer */}
             <div className="shashn-footer">
-                <button className="shashn-footer-btn shashn-btn-help" onClick={() => onHelp?.('shashn')}>
-                    ❓ Help
-                </button>
-                <button className="shashn-footer-btn shashn-btn-close" onClick={onClose}>
-                    ✕ Close
-                </button>
+                <Button variant="ghost" size="sm" leadingIcon="❓" onClick={() => onHelp?.('shashn')} aria-label="Help">
+                    Help
+                </Button>
+                <Button variant="secondary" size="sm" leadingIcon="💬" onClick={onClose} aria-label="Return to chat">
+                    Return to Chat
+                </Button>
             </div>
         </div>
     );
