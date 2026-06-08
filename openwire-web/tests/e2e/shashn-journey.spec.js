@@ -280,9 +280,9 @@ test.describe('Shashn Invite Reception', () => {
         await page.waitForTimeout(500);
 
         // Should appear as a game_invite message
-        await expect(page.locator('.game-invite-inline')).toBeVisible({ timeout: 5000 });
-        await expect(page.locator('.game-invite-join')).toBeVisible();
-        await expect(page.locator('.game-invite-join')).toContainText('Join');
+        await expect(page.locator('.invite-card')).toBeVisible({ timeout: 5000 });
+        await expect(page.getByRole('button', { name: /Join Table/i })).toBeVisible();
+        await expect(page.getByRole('button', { name: /Join Table/i })).toContainText('Join');
     });
 
     test('invite message shows host nickname and shashn game type', async ({ page }) => {
@@ -294,8 +294,8 @@ test.describe('Shashn Invite Reception', () => {
 
         await page.waitForTimeout(500);
 
-        await expect(page.locator('.game-invite-text')).toContainText('HostUser');
-        await expect(page.locator('.game-invite-text')).toContainText('Shashn');
+        await expect(page.locator('.invite-card-text')).toContainText('HostUser');
+        await expect(page.locator('.invite-card-text')).toContainText('Shashn');
     });
 
     test('Join Table button appears on invite message', async ({ page }) => {
@@ -308,7 +308,7 @@ test.describe('Shashn Invite Reception', () => {
         await page.waitForTimeout(500);
 
         // The game_invite button with Join Table text
-        const joinBtn = page.locator('.game-invite-join');
+        const joinBtn = page.getByRole('button', { name: /Join Table/i });
         await expect(joinBtn).toBeVisible();
         await expect(joinBtn).toContainText('Join');
     });
@@ -324,7 +324,7 @@ test.describe('Shashn Invite Reception', () => {
  * does not block subsequent shashn_state injections.
  */
 async function acceptShashnInvite(page) {
-    const joinBtn = page.locator('.game-invite-join');
+    const joinBtn = page.getByRole('button', { name: /Join Table/i });
     await expect(joinBtn).toBeVisible({ timeout: 3000 });
     await joinBtn.click();
     await page.waitForTimeout(200);
@@ -483,7 +483,7 @@ test.describe('Game State Continuity', () => {
         });
 
         // The invite message should appear
-        await expect(page.locator('.game-invite-inline')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('.invite-card')).toBeVisible({ timeout: 5000 });
 
         // Re-click shashn in sidebar — startShashn triggers as host since we have no ref
         const shashnBtn = page.locator('.sidebar-btn', { hasText: 'Shashn' });
@@ -498,7 +498,7 @@ test.describe('Game State Continuity', () => {
         await expect(page.locator('.chat-layout')).toBeVisible();
 
         // The invite message should still be in the chat area
-        await expect(page.locator('.game-invite-inline')).toBeVisible();
+        await expect(page.locator('.invite-card')).toBeVisible();
     });
 });
 
@@ -623,7 +623,7 @@ test.describe('Shashn State Summary Continuity', () => {
         await page.locator('.shashn-btn-close').click();
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
-        const openBoardBtn = page.locator('.shashn-open-board-btn');
+        const openBoardBtn = page.getByRole('button', { name: /Open Board/i });
         await expect(openBoardBtn).toBeVisible();
         await expect(openBoardBtn).toContainText('Open Board');
     });
@@ -633,7 +633,7 @@ test.describe('Shashn State Summary Continuity', () => {
         await expect(page.locator('.shashn-container')).not.toBeVisible();
 
         // Click Open Board
-        await page.locator('.shashn-open-board-btn').click();
+        await page.getByRole('button', { name: /Open Board/i }).click();
 
         // Board should reopen
         await expect(page.locator('.shashn-container')).toBeVisible({ timeout: 3000 });
@@ -685,7 +685,7 @@ test.describe('Shashn State Summary Continuity', () => {
         await expect(page.locator('.shashn-state-summary')).toContainText('HostUser');
 
         // Open Board button should be present
-        await expect(page.locator('.shashn-open-board-btn')).toBeVisible();
+        await expect(page.getByRole('button', { name: /Open Board/i })).toBeVisible();
     });
 
     test('state summary shows trick_end status after close', async ({ page }) => {
