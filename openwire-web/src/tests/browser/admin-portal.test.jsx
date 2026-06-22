@@ -126,7 +126,8 @@ describe('AdminPasswordGate', () => {
 
     it('calls onSuccess when correct password is entered', async () => {
         const onSuccess = vi.fn();
-        // VITE_ADMIN_PASSWORD is undefined in test env, so fallback is 'openwire-admin'
+        // Force the fallback password ('openwire-admin') regardless of .env.local
+        vi.stubEnv('VITE_ADMIN_PASSWORD', undefined);
         render(<AdminPasswordGate onSuccess={onSuccess} onCancel={vi.fn()} />);
         await userEvent.type(screen.getByPlaceholderText('Admin password'), 'openwire-admin');
         fireEvent.submit(screen.getByRole('button', { name: /unlock/i }).closest('form'));

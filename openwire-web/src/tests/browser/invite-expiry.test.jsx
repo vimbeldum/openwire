@@ -57,7 +57,7 @@ describe('MessageRow — game invite expiry', () => {
         expect(screen.getByText('Join Table')).toBeInTheDocument();
     });
 
-    it('renders "(expired)" after 60s', () => {
+    it('renders "expired" badge after 60s', () => {
         renderRow({ ts: NOW });
 
         // Advance time by 61 seconds (past the 60s expiry)
@@ -65,14 +65,14 @@ describe('MessageRow — game invite expiry', () => {
             vi.advanceTimersByTime(61_000);
         });
 
-        expect(screen.getByText(/\(expired\)/)).toBeInTheDocument();
+        expect(screen.getByText(/expired/i)).toBeInTheDocument();
         expect(screen.queryByText('Join Table')).not.toBeInTheDocument();
     });
 
-    it('renders "(joined)" when inviteUsed is true', () => {
+    it('renders "joined" badge when inviteUsed is true', () => {
         renderRow({ inviteUsed: true });
 
-        expect(screen.getByText(/\(joined\)/)).toBeInTheDocument();
+        expect(screen.getByText(/joined/i)).toBeInTheDocument();
         expect(screen.queryByText('Join Table')).not.toBeInTheDocument();
     });
 
@@ -96,7 +96,7 @@ describe('MessageRow — game invite expiry', () => {
             vi.advanceTimersByTime(59_000);
         });
 
-        expect(screen.queryByText(/\(expired\)/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/expired/i)).not.toBeInTheDocument();
         expect(screen.getByText('Join Table')).toBeInTheDocument();
     });
 

@@ -69,7 +69,7 @@ describe('Landing — input accessibility', () => {
         const input = screen.getByLabelText(/Nickname/i);
         expect(input).toHaveAttribute('maxlength', '24');
         expect(screen.getByText(/sanitized to 24 visible characters/i)).toBeInTheDocument();
-        expect(screen.getByText(/leave it blank to continue as anonymous/i)).toBeInTheDocument();
+        expect(screen.getByText(/leave it blank to stay anonymous/i)).toBeInTheDocument();
     });
 
     it('join button is a native <button> element', () => {
@@ -167,6 +167,8 @@ describe('AdminPasswordGate — accessible form structure', () => {
 
     it('calls onSuccess when correct password is entered and submitted', async () => {
         const onSuccess = vi.fn();
+        // Force the fallback password ('openwire-admin') regardless of .env.local
+        vi.stubEnv('VITE_ADMIN_PASSWORD', undefined);
         render(<AdminPasswordGate onSuccess={onSuccess} onCancel={vi.fn()} />);
         await userEvent.type(screen.getByPlaceholderText('Admin password'), 'openwire-admin');
         fireEvent.submit(screen.getByRole('button', { name: /unlock/i }).closest('form'));

@@ -40,8 +40,8 @@ describe('Landing', () => {
     describe('rendering', () => {
         it('renders the landing headline and shared copy', () => {
             renderLanding();
-            expect(screen.getByRole('heading', { name: /join a room fast, keep the conversation primary/i })).toBeInTheDocument();
-            expect(screen.getByText(/browser-first encrypted chat/i)).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: /where conversations become games/i })).toBeInTheDocument();
+            expect(screen.getByText(/jump into encrypted rooms/i)).toBeInTheDocument();
         });
 
         it('renders the name input field', () => {
@@ -59,7 +59,7 @@ describe('Landing', () => {
             renderLanding();
             expect(screen.getByRole('radio', { name: /openwire relay/i })).toBeInTheDocument();
             expect(screen.getByRole('radio', { name: /local cli node/i })).toBeInTheDocument();
-            expect(screen.getByText(/choose the relay for the default hosted path/i)).toBeInTheDocument();
+            expect(screen.getByText(/relay is fastest/i)).toBeInTheDocument();
         });
 
         it('renders admin access link', () => {
@@ -173,6 +173,8 @@ describe('Landing', () => {
 
         it('joins as Admin after a successful admin unlock when nickname is blank', async () => {
             const onJoin = vi.fn();
+            // Force the fallback password ('openwire-admin') regardless of .env.local
+            vi.stubEnv('VITE_ADMIN_PASSWORD', undefined);
             renderLanding({ onJoin });
             fireEvent.click(screen.getByRole('button', { name: /admin access/i }));
             fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'openwire-admin' } });
@@ -186,6 +188,8 @@ describe('Landing', () => {
 
         it('passes the correct nickname and isAdmin flag on successful admin unlock with a filled nickname', async () => {
             const onJoin = vi.fn();
+            // Force the fallback password ('openwire-admin') regardless of .env.local
+            vi.stubEnv('VITE_ADMIN_PASSWORD', undefined);
             renderLanding({ onJoin });
             fireEvent.click(screen.getByRole('button', { name: /admin access/i }));
             fireEvent.change(screen.getByLabelText(/Nickname/i), { target: { value: 'Alice' } });
