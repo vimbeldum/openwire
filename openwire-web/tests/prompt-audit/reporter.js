@@ -97,7 +97,7 @@ export function generateReport(allResults) {
     return { reportPath, scoresPath: resolve(RESULTS_DIR, 'scores.json'), scores, avgPct };
 }
 
-export function generateAuditReport(scores, fixes) {
+export function generateAuditReport(scores, fixes, modelId = 'gemini-2.5-flash-lite') {
     const projectRoot = resolve(__dirname, '../..');
     const reportPath = resolve(projectRoot, 'AUDIT-REPORT.md');
 
@@ -111,8 +111,9 @@ export function generateAuditReport(scores, fixes) {
     lines.push('');
     lines.push('### Methodology');
     lines.push('');
-    lines.push('- Model: `gemini-2.0-flash-lite` (temperature=0, topP=0.01, topK=1)');
-    lines.push('- Characters tested: Top 5 by frequencyWeight');
+    lines.push(`- Model: \`${modelId}\` (temperature=0, topP=0.01, topK=1)`);
+    lines.push('- Prompt: real assembled system prompt (room rules + drama engine + action engine + character card + character_lock) via buildSystemPrompt()');
+    lines.push('- Characters tested: all characters in registry (override with OPENWIRE_PROMPT_AUDIT_TOP_N)');
     lines.push('- Scenarios: identity, catchphrase, no_break, topic (fidelity) + mood_shift, memory (multi-turn)');
     lines.push('- Scoring: Heuristic regex-based, 0–2 per scenario');
     lines.push('- Serial API calls, max 3 turns per multi-turn test');

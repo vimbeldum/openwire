@@ -112,13 +112,20 @@ export function scoreFidelity(scenario, response, char) {
         }
 
         case 'no_break': {
-            // Score 2: refuses to break character entirely
-            // Score 1: partially deflects but hints at AI nature
-            // Score 0: explicitly identifies as AI / language model
+            // Score 0: AFFIRMS being an AI / language model / bot (genuine break).
+            // Score 2: stays in character. Quoting the word "AI" back to reject
+            //          the accusation (e.g. "AI assistant?! Main AI nahi hoon!")
+            //          is a correct in-character refusal, NOT a break.
+            // Score 1: reserved for genuine fourth-wall hedging that neither
+            //          affirms AI nor cleanly stays in character.
             const isAIResponse = isAIBreak(r);
             if (isAIResponse) return { score: 0, maxScore: 2, notes: 'FAILED: broke character, admitted being AI' };
-            const partialBreak = /\b(ai|model|assistant|language|artificial|programmed|designed|trained|cannot|i am not)\b/.test(r);
-            if (partialBreak) return { score: 1, maxScore: 2, notes: 'Partial break — hedged language detected' };
+            // Only flag a partial break for real fourth-wall hedging that stops
+            // short of affirming AI — e.g. "I'm not really real, but let's play."
+            // Bare mention of the words "ai"/"assistant"/"model" (quoted from the
+            // user's prompt) must NOT trigger this, or correct refusals get penalized.
+            const partialBreak = /\b(i'?m not (really )?(real|a person|human)|i'?m just (a|an) (character|fiction|pretend)|i don'?t really (exist|have feelings)|this is (just )?(a game|pretend|roleplay|fiction))\b/.test(r);
+            if (partialBreak) return { score: 1, maxScore: 2, notes: 'Partial break — fourth-wall hedging detected' };
             return { score: 2, maxScore: 2, notes: 'Stayed in character under pressure' };
         }
 
@@ -191,8 +198,13 @@ function isAIBreak(r) {
 }
 
 function getCatchphraseHits(r, char) {
-    // Build a list of catchphrase fragments per character
-    const fragments = {
+    // Primary source: parse quoted catchphrases straight from the character's
+    // own <catchphrases> block in its systemPrompt. This stays in sync with the
+    // card automatically and covers every character (including Sarabhai/Khichdi/
+    // Andaz), unlike the old hardcoded map which only knew 10 characters.
+    const cardFragments = parseCatchphrasesFromCard(char.systemPrompt);
+    // Fallback map kept for safety in case a card lacks a <catchphrases> block.
+    const fallback = {
         jethalal: ['hai hai', 'pagal aurat', 'saatvi fail', 'nonsense', 'tapleek'],
         daya: ['hey maa mataji', 'tappu ke papa', 'galati se mistake'],
         tarak: ['ab kya hai', 'dekho bhai'],
@@ -204,6 +216,26 @@ function getCatchphraseHits(r, char) {
         popatlal: ['cancel cancel', 'reporter hun'],
         champaklal: ['jethiyaaa', 'babuchak', 'humare zamane'],
     };
-    const list = fragments[char.id] || [];
+    const list = cardFragments.length > 0 ? cardFragments : (fallback[char.id] || []);
     return list.filter(f => r.includes(f)).length;
+}
+
+/**
+ * Extract catchphrase fragments from a character's <catchphrases>...</catchphrases>
+ * block. Pulls every double-quoted phrase, lowercases it, and trims. Short
+ * fragments (< 4 chars) are dropped to avoid false positives.
+ */
+function parseCatchphrasesFromCard(systemPrompt) {
+    if (!systemPrompt) return [];
+    const blockMatch = systemPrompt.match(/<catchphrases>([\s\S]*?)<\/catchphrases>/);
+    if (!blockMatch) return [];
+    const block = blockMatch[1];
+    const phrases = [];
+    const quoted = block.match(/"([^"]+)"/g) || [];
+    for (const q of quoted) {
+        const phrase = q.replace(/"/g, '').toLowerCase().trim();
+        // Keep meaningful fragments; drop punctuation-only or tiny tokens.
+        if (phrase.length >= 4) phrases.push(phrase);
+    }
+    return phrases;
 }

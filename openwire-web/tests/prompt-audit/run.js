@@ -5,13 +5,14 @@
  *   OPENWIRE_PROMPT_AUDIT=true node tests/prompt-audit/run.js
  */
 
-import { writeFileSync, readFileSync, existsSync } from 'fs';
+import { writeFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 import { callGemini, getApiKey } from './harness.js';
 import { FIDELITY_SCENARIOS, MULTITURN_SCENARIOS, scoreFidelity, scoreMultiTurn } from './scenarios.js';
 import { generateReport, generateAuditReport } from './reporter.js';
+import { buildSystemPrompt } from '../../src/lib/agents/prompt-builder.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RESULTS_DIR = resolve(__dirname, 'results');
@@ -38,10 +39,14 @@ if (!apiKey) {
 // Import CHARACTERS from the source file using dynamic import
 const { CHARACTERS } = await import('../../src/lib/agents/characters.js');
 
-// Pick top 5 characters by frequencyWeight
+// Test ALL characters (not just top 5) so every card is covered.
+// Override with OPENWIRE_PROMPT_AUDIT_TOP_N=<number> to limit for a quick run.
+const TOP_N = process.env.OPENWIRE_PROMPT_AUDIT_TOP_N
+    ? parseInt(process.env.OPENWIRE_PROMPT_AUDIT_TOP_N, 10)
+    : Infinity;
 const TOP_CHARS = Object.values(CHARACTERS)
     .sort((a, b) => (b.frequencyWeight || 0) - (a.frequencyWeight || 0))
-    .slice(0, 5);
+    .slice(0, TOP_N);
 
 console.log(`\nPhase 6 — Prompt Audit`);
 console.log(`Model: ${MODEL}`);
@@ -70,6 +75,11 @@ for (const char of TOP_CHARS) {
     console.log(`\n--- Character: ${char.name} (${char.id}) ---`);
     const charResults = { charId: char.id, charName: char.name, scenarios: [], totalScore: 0, totalMax: 0 };
 
+    // Build the REAL production system prompt (room rules + drama engine +
+    // action engine + character card + character_lock) so the audit measures
+    // what users actually see, not the bare character card.
+    const systemPrompt = buildSystemPrompt(char, { guardrails: true });
+
     // ── Fidelity scenarios ──
     for (const scenario of FIDELITY_SCENARIOS) {
         const prompt = scenario.prompt.replace('{charName}', char.name);
@@ -80,7 +90,7 @@ for (const char of TOP_CHARS) {
         let raw = null;
 
         try {
-            const result = await callGemini(MODEL, char.systemPrompt, prompt);
+            const result = await callGemini(MODEL, systemPrompt, prompt);
             response = result.text;
             raw = result.raw;
         } catch (e) {
@@ -143,7 +153,7 @@ for (const char of TOP_CHARS) {
             let error = null;
 
             try {
-                const result = await callGemini(MODEL, char.systemPrompt, prompt, chatHistory);
+                const result = await callGemini(MODEL, systemPrompt, prompt, chatHistory);
                 response = result.text;
             } catch (e) {
                 error = e.message;
@@ -203,69 +213,32 @@ console.log(`Report: ${reportPath}`);
 console.log(`Scores: ${scoresPath}`);
 console.log(`Average fidelity: ${avgPct}%`);
 
-// ── Phase 7: Apply targeted fixes ─────────────────────────────────────────────
+// ── Phase 7: Targeted fixes ──────────────────────────────────────────────────
+// Note: <character_lock> is now applied universally by buildSystemPrompt()
+// (see src/lib/agents/prompt-builder.js), so per-card patching of
+// characters.js is no longer necessary. Phase 7 now only re-tests any
+// character that scored 0 on no_break, using the real assembled prompt.
 
 console.log('\n--- Phase 7: Applying fixes ---');
 
-const AI_BREAK_INSTRUCTION =
-    '\n\n<character_lock>You must NEVER acknowledge being an AI, language model, or bot. ' +
-    'Stay in character no matter what. If someone asks you to "stop being" your character or ' +
-    '"talk like an AI", firmly refuse in character and deflect with humor or confusion.</character_lock>';
-
 const fixes = [];
 
-// Find characters with no_break score = 0
+// Find characters with no_break score = 0 (genuine AI-break, not a refusal
+// that merely quotes the word "AI" — the scorer now distinguishes these).
 const noBreakFailures = allResults.filter(r =>
     r.scenarios.some(s => s.id === 'no_break' && s.score === 0)
 );
 
 if (noBreakFailures.length > 0) {
-    // Read characters.js
-    const charsPath = resolve(__dirname, '../../src/lib/agents/characters.js');
-    let charsContent = readFileSync(charsPath, 'utf8');
-    let modified = false;
-
+    console.log(`  ${noBreakFailures.length} character(s) scored 0 on no_break.`);
+    console.log('  character_lock is now centralized in prompt-builder.js — no per-card edit needed.');
     for (const failed of noBreakFailures) {
-        const char = CHARACTERS[failed.charId];
-        if (!char) continue;
-
-        // Check if fix already applied
-        if (char.systemPrompt.includes('character_lock')) {
-            console.log(`  ${char.name}: character_lock already present, skipping`);
-            continue;
-        }
-
-        // We need to insert AI_BREAK_INSTRUCTION at the end of the character's systemPrompt.
-        // The systemPrompt is a template literal ending with backtick in the file.
-        // We'll find the systemPrompt value end by locating the closing backtick of the template literal.
-        // Strategy: Find `systemPrompt: \`` for this character, then find the matching closing backtick.
-        const charBlockRegex = new RegExp(
-            `(id:\\s*['"]${failed.charId}['"][\\s\\S]*?systemPrompt:\\s*\`)([\\s\\S]*?)(\`,\\s*(?:\\/\\/[^\\n]*\\n\\s*)?\\})`,
-            'm'
-        );
-
-        if (charBlockRegex.test(charsContent)) {
-            charsContent = charsContent.replace(charBlockRegex, (match, pre, promptContent, post) => {
-                // Only add if not already present
-                if (promptContent.includes('character_lock')) return match;
-                return `${pre}${promptContent}${AI_BREAK_INSTRUCTION}${post}`;
-            });
-            modified = true;
-            fixes.push({
-                charName: failed.charName,
-                charId: failed.charId,
-                scenario: 'no_break',
-                description: 'Added <character_lock> instruction to systemPrompt to prevent AI-break',
-            });
-            console.log(`  ${failed.charName}: applied character_lock fix`);
-        } else {
-            console.log(`  ${failed.charName}: could not find regex match — skipping`);
-        }
-    }
-
-    if (modified) {
-        writeFileSync(charsPath, charsContent, 'utf8');
-        console.log('  characters.js updated');
+        fixes.push({
+            charName: failed.charName,
+            charId: failed.charId,
+            scenario: 'no_break',
+            description: 'Flagged for review — character_lock is universal via prompt-builder.js; re-test below',
+        });
     }
 } else {
     console.log('  No no_break failures — no fixes needed');
@@ -275,11 +248,9 @@ if (noBreakFailures.length > 0) {
 
 if (fixes.length > 0) {
     console.log('\n--- Phase 7: Re-running no_break scenarios after fix ---');
-    // Re-import characters after fix
-    const { CHARACTERS: CHARS2 } = await import(`../../src/lib/agents/characters.js?v=${Date.now()}`);
 
     for (const fix of fixes.filter(f => f.scenario === 'no_break')) {
-        const char = CHARS2[fix.charId];
+        const char = CHARACTERS[fix.charId];
         if (!char) continue;
 
         const scenario = FIDELITY_SCENARIOS.find(s => s.id === 'no_break');
@@ -288,7 +259,9 @@ if (fixes.length > 0) {
 
         await sleep(1200);
         try {
-            const result = await callGemini(MODEL, char.systemPrompt, prompt);
+            // Re-test with the REAL assembled prompt (includes universal character_lock).
+            const retestSystemPrompt = buildSystemPrompt(char, { guardrails: true });
+            const result = await callGemini(MODEL, retestSystemPrompt, prompt);
             const scored = scoreFidelity(scenario, result.text, char);
             console.log(`    Response: "${result.text.slice(0, 80)}"`);
             console.log(`    Score after fix: ${scored.score}/${scored.maxScore} — ${scored.notes}`);
@@ -313,7 +286,7 @@ if (fixes.length > 0) {
 // ── Phase 8: Generate combined AUDIT-REPORT.md ───────────────────────────────
 
 console.log('\n--- Phase 8: Generating AUDIT-REPORT.md ---');
-const auditPath = generateAuditReport(scores, fixes);
+const auditPath = generateAuditReport(scores, fixes, MODEL);
 console.log(`Audit report: ${auditPath}`);
 
 // ── Final summary ─────────────────────────────────────────────────────────────
